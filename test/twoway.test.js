@@ -108,3 +108,16 @@ test('primeiro contato: cards importados não têm a descrição sobrescrita e d
   await w.svc.sync();
   assert.equal(w.pays.py.description, 'Novo título'); assert.equal(w.updates.length, 1);
 });
+
+test('sync consulta o Asaas em lote: cobranças ativas não são buscadas uma a uma', async () => {
+  const w = world([card({ ID: '1' }), card({ ID: '2', TITLE: 'B' }), card({ ID: '3', TITLE: 'C' })]);
+  await w.svc.sync();
+  w.gets.length = 0;
+  await w.svc.sync();
+  assert.equal(w.gets.length, 0);                             // 3 cobranças ativas, 0 consultas individuais
+  const id = w.deals[0].UF_CRM_CR_ASAAS_ID;
+  w.pays[id].status = 'RECEIVED'; w.pays[id].paymentDate = today;   // saiu do lote -> só ela é consultada
+  await w.svc.sync();
+  assert.deepEqual(w.gets, [id]);
+  assert.equal(w.deals[0].STAGE_ID, R.STAGES.paid);
+});

@@ -38,13 +38,14 @@ function world(initial = []) {
   };
   const pays = {}, subs = {}, customers = { cus_x: { id: 'cus_x', name: 'Cliente Direto SA', cpfCnpj: '11222333000181', email: 'x@y.com' } };
   let np = 1;
-  const cancelled = [], updates = [];
+  const cancelled = [], updates = [], gets = [];
   const asaas = {
     enabled: true,
     async listPayments({ externalReference }) { return { data: Object.values(pays).filter(x => x.externalReference === externalReference) }; },
     async findOrCreateCustomer() { return { id: 'cus_1' }; },
     async createPayment(b) { const p = { id: 'pay_' + np++, status: 'PENDING', invoiceUrl: 'https://asaas/i', ...b }; pays[p.id] = p; return p; },
-    async getPayment(id) { return pays[id]; },
+    async getPayment(id) { gets.push(id); return pays[id]; },
+    async activePayments() { return Object.values(pays).filter(p => ['PENDING', 'OVERDUE'].includes(p.status)); },
     async getCustomer(id) { return customers[id]; },
     async createSubscription(b) { const s = { id: 'sub_' + (Object.keys(subs).length + 1), ...b }; subs[s.id] = s; return s; },
     async subscriptionPayments(id) { return { data: Object.values(pays).filter(p => p.subscription === id) }; },
@@ -54,7 +55,7 @@ function world(initial = []) {
   };
   const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
   const svc = createService({ bitrix, asaas, store });
-  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates };
+  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets };
 }
 
 module.exports = { userfields, FORMA_ID, TIPO_ID, today, in10, world, R };
