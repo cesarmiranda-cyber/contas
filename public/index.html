@@ -80,6 +80,15 @@ details.menu .pop{position:absolute;right:0;top:38px;z-index:10;background:var(-
 .cut small{color:var(--mut);display:block;font-size:11.5px}.cut b{font-variant-numeric:tabular-nums;text-align:right;display:block}
 .sel{display:flex;gap:8px;flex-wrap:wrap}.sel select{width:auto;min-width:150px;padding:8px 12px}
 .cat{font-size:11.5px;color:var(--brand);background:var(--brandbg);padding:1px 8px;border-radius:7px;font-weight:600;display:inline-block;margin-top:5px}
+.cfg{max-width:860px;margin:0 auto;display:grid;gap:16px}.cfg h2{margin:0 0 2px;font-size:16px}.cfg .hint{color:var(--mut);font-size:12.5px;margin:0 0 4px}
+.crumb{display:flex;align-items:center;gap:10px;margin-bottom:14px;max-width:860px;margin-inline:auto}.crumb h1{font-size:20px;margin:0}
+.st{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);margin:12px 0}
+.st b{display:block}.st small{color:var(--mut)}.st .ico{width:36px;height:36px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.keyin{position:relative}.keyin button{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:var(--mut);cursor:pointer;padding:6px 8px;font:inherit}
+.res{margin-top:12px;padding:11px 13px;border-radius:11px;font-weight:550;font-size:13px;display:none}.res.ok{display:block;background:var(--greenbg);color:var(--green)}.res.bad{display:block;background:var(--redbg);color:var(--red)}
+.steps{margin:6px 0 0;padding-left:18px;color:var(--ink2);font-size:13px}.steps li{margin:3px 0}
+.banner{max-width:860px;margin:0 auto 16px;padding:14px 16px;border-radius:14px;background:var(--amberbg);color:var(--amber);font-weight:600;display:none;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .empty{padding:56px 20px;text-align:center;color:var(--mut)}.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--graybg),var(--surface2),var(--graybg));background-size:200% 100%;animation:sk 1.2s infinite}@keyframes sk{to{background-position:-200% 0}}
 .logc{margin-top:16px}.logc summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between}.logc summary::-webkit-details-marker{display:none}
@@ -111,12 +120,13 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
     <span class="env bad" id="env"></span>
     <button class="btn" id="bGerar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Gerar parcelas</span></button>
     <button class="btn" id="bImp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span class="lbl">Importar do Asaas</span></button>
-    <button class="btn" id="bCfg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="lbl">Régua</span></button>
+    <button class="btn" id="bCfg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Configurações</span></button>
     <button class="btn pri" id="bSync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg><span class="lbl">Sincronizar</span></button>
   </div>
 </div></div>
 
-<main>
+<div class="banner" id="banner"><span id="bannerTxt"></span><button class="btn" id="bannerBtn">Abrir Configurações</button></div>
+<main id="viewMain">
   <section class="hero">
     <div class="card pad" id="hero"><div class="skel" style="width:40%"></div><div class="skel" style="width:60%;height:34px;margin-top:14px"></div></div>
     <div class="card pad"><div class="eyebrow">Atraso por faixa</div><div class="agebars" id="aging"></div></div>
@@ -143,6 +153,49 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <details class="card logc"><summary><span>Atividade recente</span><span class="mut" id="logn"></span></summary><div class="log" id="log"></div></details>
 </main>
 
+<main id="viewCfg" hidden>
+  <div class="crumb"><button class="btn" id="cBack">← Voltar</button><h1>Configurações</h1></div>
+  <div class="cfg">
+
+    <section class="card pad" id="secAsaas">
+      <h2>Integração com o Asaas</h2><p class="hint">Emissão de cobranças, conciliação de pagamentos e importação. A chave fica guardada só no servidor do app.</p>
+      <div class="st" id="aStatus"></div>
+      <label>Ambiente</label>
+      <div class="seg" id="aEnv" style="display:inline-flex"><button type="button" data-e="sandbox" class="on">Sandbox (testes)</button><button type="button" data-e="production">Produção (cobranças reais)</button></div>
+      <label>Chave de API</label>
+      <div class="keyin"><input id="aKey" type="password" autocomplete="off" spellcheck="false" placeholder="$aact_..."><button type="button" id="aShow">mostrar</button></div>
+      <p class="hint" id="aHelp" style="margin-top:6px"></p>
+      <label class="chk" id="aConfWrap" style="display:none"><input type="checkbox" id="aConf"><span><b>Entendo que em produção as cobranças são reais</b><br><span class="mut">Clientes receberão boletos, Pix e avisos de verdade.</span></span></label>
+      <div class="row"><button class="btn" id="aTest">Testar conexão</button><button class="btn pri" id="aSave">Salvar e ativar</button><button class="btn ghost" id="aDel" style="display:none">Remover chave do painel</button></div>
+      <div class="res" id="aRes"></div>
+      <details style="margin-top:14px"><summary class="mut" style="cursor:pointer">Como obter a chave</summary>
+        <ol class="steps"><li>Sandbox: entre em <b>sandbox.asaas.com</b> · Produção: <b>asaas.com</b>.</li><li>Vá em <b>Integrações → Chave de API</b> e gere uma chave nova.</li><li>Cole aqui, clique em <b>Testar conexão</b> e depois em <b>Salvar e ativar</b>.</li><li>Comece pelo Sandbox, valide um contrato de teste e só então mude para Produção.</li></ol></details>
+    </section>
+
+    <section class="card pad" id="secBitrix">
+      <h2>Conexão com o Bitrix24</h2><p class="hint">Webhook de entrada usado para ler e gravar o funil Contas.</p>
+      <div class="st" id="bStatus"></div>
+      <label>Trocar webhook (opcional)</label><input id="bHook" type="password" autocomplete="off" spellcheck="false" placeholder="https://seu-portal.bitrix24.com.br/rest/1/codigo/">
+      <div class="row"><button class="btn" id="bTest">Testar</button><button class="btn pri" id="bSave">Salvar webhook</button><button class="btn" id="bVerify">Verificar campos e etapas do funil</button></div>
+      <div class="res" id="bRes"></div>
+    </section>
+
+    <section class="card pad">
+      <h2>Automação e régua de cobrança</h2><p class="hint">Quando o app emite, importa e aciona os lembretes.</p>
+      <label class="chk"><input type="checkbox" id="cAuto"><span><b>Emitir cobrança no Asaas automaticamente</b><br><span class="mut">Deals completas viram cobrança sem ação manual.</span></span></label>
+      <label class="chk"><input type="checkbox" id="cImp"><span><b>Importar automaticamente do Asaas</b><br><span class="mut">Cobranças criadas direto no Asaas (e os meses novos das assinaturas) viram cards sozinhas.</span></span></label>
+      <label class="chk"><input type="checkbox" id="cRegua"><span><b>Régua ativa</b><br><span class="mut">Aciona os lembretes ao cliente. Desligada, nada é enviado.</span></span></label>
+      <label>Dias em relação ao vencimento (negativo = antes)</label><input id="cOff" placeholder="-3, 0, 1, 5, 15">
+      <div class="r2"><div><label>“Vence em breve” (dias antes)</label><input id="cProx" type="number"></div><div><label>Alerta crítico de atraso (dias)</label><input id="cAlerta" type="number"></div></div>
+      <div class="r2"><div><label>Multa por atraso (%)</label><input id="cMulta" type="number" step="0.1"></div><div><label>Juros ao mês (%)</label><input id="cJuros" type="number" step="0.1"></div></div>
+      <div class="r2"><div><label>Janela de importação (dias)</label><input id="cImpDias" type="number" min="1" max="730"></div><div></div></div>
+      <p class="hint" style="margin-top:12px">O app grava o gatilho (D-3, D0, D+1…) na deal e na linha do tempo. No Bitrix, um robô que reage à mudança do campo <b>“CR · Gatilho de cobrança”</b> envia o e-mail e o WhatsApp. Pagas e canceladas nunca recebem lembrete.</p>
+      <div class="row"><button class="btn pri" id="cOk">Salvar automação</button></div>
+    </section>
+
+  </div>
+</main>
+
 <dialog id="dGerar"><form method="dialog" id="fGerar">
   <h2>Gerar parcelas</h2><p class="hint">Cria uma deal por cobrança no funil Contas.</p>
   <label>Cliente</label>
@@ -167,17 +220,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="prev" id="iPrev" style="display:none"></div>
   <div class="foot"><button type="button" class="btn" id="iCancel">Fechar</button><button type="button" class="btn" id="iVer">Ver prévia</button><button class="btn pri" id="iOk" disabled>Importar</button></div>
 </form></dialog>
-<dialog id="dCfg"><form method="dialog">
-  <h2>Régua de cobrança</h2><p class="hint">Quando e como o app aciona a cobrança dos clientes.</p>
-  <label class="chk"><input type="checkbox" id="cAuto"><span><b>Emitir cobrança no Asaas automaticamente</b><br><span class="mut">Deals completas viram cobrança sem ação manual.</span></span></label>
-  <label class="chk"><input type="checkbox" id="cRegua"><span><b>Régua ativa</b><br><span class="mut">Aciona os lembretes ao cliente. Desligada, nada é enviado.</span></span></label>
-  <label class="chk"><input type="checkbox" id="cImp"><span><b>Importar automaticamente do Asaas</b><br><span class="mut">Cobranças criadas direto no Asaas (e as meses novos das assinaturas) viram cards sozinhas.</span></span></label>
-  <label>Dias em relação ao vencimento (negativo = antes)</label><input id="cOff" placeholder="-3, 0, 1, 5, 15">
-  <div class="r2"><div><label>“Próximo do vencimento” (dias antes)</label><input id="cProx" type="number"></div><div><label>Alerta crítico de atraso (dias)</label><input id="cAlerta" type="number"></div></div>
-  <div class="r2"><div><label>Multa por atraso (%)</label><input id="cMulta" type="number" step="0.1"></div><div><label>Juros ao mês (%)</label><input id="cJuros" type="number" step="0.1"></div></div>
-  <p class="hint" style="margin-top:14px">O app grava o gatilho (D-3, D0, D+1…) na deal e na linha do tempo. No Bitrix, um robô que reage à mudança do campo <b>“CR · Gatilho de cobrança”</b> envia o e-mail e o WhatsApp. Pagas e canceladas nunca recebem lembrete.</p>
-  <div class="foot"><button type="button" class="btn" id="cCancel">Fechar</button><button class="btn pri" id="cOk">Salvar</button></div>
-</form></dialog>
+
 <dialog id="dClass"><form method="dialog">
   <h2>Classificar título</h2><p class="hint" id="clHint"></p>
   <div class="r2"><div><label>Categoria</label><select id="clCat"></select></div><div id="clPlWrap"><label>Plano da licença</label><select id="clPl"></select></div></div>
@@ -200,7 +243,7 @@ let S=null,filter='todos',cliSel=null,fCat='',fPlano='';
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),4200)}
 async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
-async function load(){try{S=await api('GET','/api/state');render()}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message)}}
+async function load(){try{S=await api('GET','/api/state');$('#banner').style.display='none';render()}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message);if(/não configurado/i.test(e.message)){$('#bannerTxt').textContent='Falta conectar o Bitrix24. Abra as Configurações e informe o webhook.';$('#banner').style.display='flex'}}}
 const initials=n=>(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase();
 function dueText(d){
   if(!d.venc)return['<span class="mut">Sem data</span>',''];
@@ -318,12 +361,42 @@ $('#iVer').onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{const r
   p.innerHTML=`${r.analisadas} cobrança(s) analisadas desde ${dbr(r.desde)} · <b>${r.novos} nova(s) para importar</b>`+(r.itens.length?`<div style="margin-top:8px;font-weight:500;color:var(--ink2);max-height:160px;overflow:auto">${r.itens.slice(0,40).map(i=>`${dbr(i.venc)} · ${brl(i.valor)} · ${esc(i.descricao||i.asaasId)} <span class="mut">(${esc(i.status)})</span>`).join('<br>')}${r.itens.length>40?`<br>… e mais ${r.itens.length-40}`:''}</div>`:'');
   $('#iOk').disabled=!r.novos}catch(x){toast(x.message)}b.disabled=false};
 $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disabled=true;try{const r=await api('POST','/api/importar',{dias:+$('#iDias').value});di.close();toast(`${r.novos} card(s) criados a partir do Asaas`);load()}catch(x){toast(x.message);b.disabled=false}};
-// ---- config ----
-const c=$('#dCfg');
-$('#bCfg').onclick=()=>{const k=S.config;$('#cAuto').checked=k.autoCreate;$('#cImp').checked=k.importAuto;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;c.showModal()};
-$('#cCancel').onclick=()=>c.close();
-$('#cOk').onclick=async e=>{e.preventDefault();try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,importAuto:$('#cImp').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value});c.close();toast('Configuração salva');load()}catch(x){toast(x.message)}};
-[g,c,dc,di].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+// ---- configurações ----
+let CFG=null,aEnv='sandbox';
+const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
+const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
+function showView(v){const cfg=v==='cfg';$('#viewMain').hidden=cfg;$('#viewCfg').hidden=!cfg;if(cfg){loadSettings();location.hash='config'}else{history.replaceState(null,'',location.pathname);load()};window.scrollTo(0,0)}
+$('#bCfg').onclick=()=>showView('cfg');$('#cBack').onclick=()=>showView('main');$('#bannerBtn').onclick=()=>showView('cfg');
+function setEnv(e){aEnv=e;document.querySelectorAll('#aEnv button').forEach(b=>b.classList.toggle('on',b.dataset.e===e));
+  $('#aConfWrap').style.display=e==='production'?'flex':'none';
+  $('#aHelp').innerHTML=e==='production'?'Chave de <b>produção</b>: gerada em asaas.com (começa com <code>$aact_prod_</code>).':'Chave do <b>sandbox</b>: gerada em sandbox.asaas.com (começa com <code>$aact_hmlg_</code>).'}
+$('#aEnv').onclick=e=>{const b=e.target.closest('button[data-e]');if(b)setEnv(b.dataset.e)};
+$('#aShow').onclick=()=>{const i=$('#aKey');i.type=i.type==='password'?'text':'password';$('#aShow').textContent=i.type==='password'?'mostrar':'ocultar'};
+async function loadSettings(){
+  try{CFG=await api('GET','/api/settings')}catch(x){toast(x.message);return}
+  const a=CFG.asaas,b=CFG.bitrix,k=CFG.config;
+  $('#aStatus').innerHTML=a.configured?stat(true,`Conectado · ${a.env==='production'?'Produção':'Sandbox'}`,`Chave ${esc(a.hint)} · salva ${a.source==='painel'?'pelo painel':'nas variáveis do servidor'}`):stat(false,'Não configurado','Cole a chave de API abaixo para ativar a emissão e a conciliação.');
+  setEnv(a.configured?a.env:'sandbox');$('#aKey').value='';$('#aConf').checked=false;
+  $('#aDel').style.display=a.source==='painel'?'':'none';$('#aRes').className='res';
+  $('#bStatus').innerHTML=b.configured?stat(true,esc(b.host||'Bitrix24'),`Webhook ${esc(b.hint)} · ${b.source==='painel'?'salvo pelo painel':'nas variáveis do servidor'}`):stat(false,'Não configurado','Informe o webhook de entrada do Bitrix24.');
+  $('#bHook').value='';$('#bRes').className='res';
+  $('#cAuto').checked=k.autoCreate;$('#cImp').checked=k.importAuto;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;$('#cImpDias').value=k.importDias;
+}
+const busy=async(btn,fn)=>{btn.disabled=true;try{await fn()}finally{btn.disabled=false}};
+$('#aTest').onclick=e=>busy(e.currentTarget,async()=>{try{const r=await api('POST','/api/settings/asaas/test',{apiKey:$('#aKey').value,env:aEnv});res($('#aRes'),true,`Conexão OK${r.nome?` · ${r.nome}`:''} · saldo ${brl(r.saldo)} (${r.env==='production'?'produção':'sandbox'})`)}catch(x){res($('#aRes'),false,x.message)}});
+$('#aSave').onclick=e=>busy(e.currentTarget,async()=>{try{
+  if(!$('#aKey').value.trim()&&!CFG.asaas.configured){res($('#aRes'),false,'Informe a chave de API.');return}
+  const r=await api('PUT','/api/settings/asaas',{apiKey:$('#aKey').value,env:aEnv,confirmarProducao:$('#aConf').checked});
+  toast('Asaas ativado'+(r.nome?` · ${r.nome}`:''));await loadSettings();res($('#aRes'),true,`Salvo e ativo (${aEnv==='production'?'produção':'sandbox'}). Volte ao painel e clique em Sincronizar.`)}catch(x){res($('#aRes'),false,x.message)}});
+$('#aDel').onclick=e=>busy(e.currentTarget,async()=>{if(!confirm('Remover a chave do Asaas? Emissão e conciliação ficam desligadas.'))return;try{await api('DELETE','/api/settings/asaas');toast('Chave removida');loadSettings()}catch(x){toast(x.message)}});
+$('#bTest').onclick=e=>busy(e.currentTarget,async()=>{try{const r=await api('POST','/api/settings/bitrix/test',{webhook:$('#bHook').value});res($('#bRes'),true,`Conexão OK · ${r.host} · ${r.usuario||'usuário'}${r.admin?' (administrador)':''}`)}catch(x){res($('#bRes'),false,x.message)}});
+$('#bSave').onclick=e=>busy(e.currentTarget,async()=>{try{if(!$('#bHook').value.trim()){res($('#bRes'),false,'Cole a URL do novo webhook.');return}
+  await api('PUT','/api/settings/bitrix',{webhook:$('#bHook').value});toast('Webhook atualizado');await loadSettings()}catch(x){res($('#bRes'),false,x.message)}});
+$('#bVerify').onclick=e=>busy(e.currentTarget,async()=>{try{const r=await api('POST','/api/settings/verificar');
+  res($('#bRes'),true,`Funil pronto${r.camposCriados.length?` · ${r.camposCriados.length} campo(s) criado(s)`:''} · listas: ${r.listas.categorias} categorias, ${r.listas.planos} planos, ${r.listas.tipos} tipos, ${r.listas.formas} formas · Asaas ${r.asaas}`)}catch(x){res($('#bRes'),false,x.message)}});
+$('#cOk').onclick=e=>busy(e.currentTarget,async()=>{try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,importAuto:$('#cImp').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value,importDias:$('#cImpDias').value});toast('Automação salva');loadSettings()}catch(x){toast(x.message)}});
+[g,dc,di].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+if(location.hash==='#config')showView('cfg');
 load();setInterval(load,60000);
 </script>
 </body>

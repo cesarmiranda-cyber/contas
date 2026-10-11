@@ -6,6 +6,8 @@ const { createBitrix } = require('./lib/bitrix');
 const { createAsaas } = require('./lib/asaas');
 const { createStore } = require('./lib/store');
 const { createService } = require('./lib/service');
+const { createSecrets } = require('./lib/secrets');
+const { createSettingsApi } = require('./lib/settingsApi');
 const R = require('./lib/rules');
 
 // .env opcional (a plataforma de deploy já injeta as variáveis no processo).
@@ -18,10 +20,14 @@ try {
 
 const PORT = +process.env.PORT || 3000;
 const SYNC_MIN = +process.env.SYNC_MINUTES || 10;
-const store = createStore(process.env.DATA_DIR || path.join(__dirname, 'data'));
-const bitrix = createBitrix(process.env.BITRIX_WEBHOOK);
-const asaas = createAsaas({ apiKey: process.env.ASAAS_API_KEY, env: process.env.ASAAS_ENV || 'sandbox' });
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const store = createStore(DATA_DIR);
+const secrets = createSecrets(DATA_DIR);
+const bitrix = createBitrix('');
+const asaas = createAsaas({});
 const svc = createService({ bitrix, asaas, store });
+const settings = createSettingsApi({ secrets, asaas, bitrix, store, svc });
+settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
 const send = (res, code, obj) => {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -34,8 +40,10 @@ const readBody = req => new Promise((ok, no) => {
 });
 
 const routes = {
+  ...settings.routes,
   'GET /health': async () => ({ ok: true }),
   'GET /api/state': async () => {
+    if (!bitrix.enabled) { const e = new Error('Bitrix24 não configurado'); e.status = 503; throw e; }
     const deals = await svc.dealsCached();
     return {
       config: store.config, asaas: { enabled: asaas.enabled, env: asaas.env },
@@ -79,6 +87,7 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
     const key = `${req.method} ${u.pathname}`;
+    if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
     const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar)$/);
     if (m && req.method === 'POST') {
@@ -96,12 +105,12 @@ const server = http.createServer(async (req, res) => {
     send(res, 404, { error: 'não encontrado' });
   } catch (e) {
     store.log('erro', `${req.method} ${u.pathname}: ${e.message}`);
-    send(res, 500, { error: e.message });
+    send(res, e.status && e.status < 500 ? e.status : 500, { error: e.message });
   }
 });
 
 server.listen(PORT, () => {
-  console.log(`Contas a Receber em :${PORT} · Asaas ${asaas.enabled ? asaas.env : 'DESLIGADO (sem ASAAS_API_KEY)'} · sync a cada ${SYNC_MIN} min`);
+  console.log(`Contas a Receber em :${PORT} · Asaas ${asaas.enabled ? asaas.env : 'DESLIGADO (configure em Configurações)'} · sync a cada ${SYNC_MIN} min`);
   setTimeout(() => svc.sync().then(r => console.log('sync inicial', JSON.stringify(r))).catch(e => console.error(e)), 5000);
   setInterval(() => svc.sync().catch(e => console.error('sync', e.message)), SYNC_MIN * 60 * 1000);
 });
