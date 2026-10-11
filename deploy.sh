@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Deploy no servidor Vibe. Variáveis: VIBE_APP_KEY, SERVER_ID, BITRIX_WEBHOOK (obrigatórias);
+# BASE_VERSION (ex.: v1, a versão em que o código se baseia; exigido em servidores com time),
 # ASAAS_API_KEY e ASAAS_ENV (sandbox|production) opcionais. Nada de segredo fica no repositório.
 set -euo pipefail
 : "${VIBE_APP_KEY:?}" "${SERVER_ID:?}" "${BITRIX_WEBHOOK:?}"
@@ -14,7 +15,8 @@ print(json.dumps({
   "runtime": "node20", "start": "cd /opt/app && node server.js", "port": 3000,
   "env": env, "dataDirs": ["/opt/data/state"], "healthPath": "/health",
   "displayName": "Contas a Receber", "description": "Contas a receber do funil Contas (Bitrix24) integrado ao Asaas, com régua de cobrança automática.",
-  "changelog": os.environ.get("CHANGELOG", "Atualização do app")}))
+  "changelog": os.environ.get("CHANGELOG", "Atualização do app"),
+  **({"baseVersionId": os.environ["BASE_VERSION"]} if os.environ.get("BASE_VERSION") else {})}))
 PY
 curl -sS -m 900 -X POST "https://vibecode.bitrix24.com/v1/infra/servers/$SERVER_ID/deploy" \
   -H "X-Api-Key: $VIBE_APP_KEY" -H "Content-Type: application/json" --data @/tmp/contas-deploy.json
