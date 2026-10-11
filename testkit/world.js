@@ -18,13 +18,16 @@ function world(initial = []) {
   const deals = [...initial];
   const companies = {};
   const comments = [];
+  const calls = [];
   let nextId = 500, nextCo = 50;
   const bitrix = {
     async call(m, p) {
+      calls.push(m);
       switch (m) {
         case 'crm.deal.userfield.list': return { result: userfields() };
         case 'crm.status.list': return { result: [{ STATUS_ID: 'GERAR' }, { STATUS_ID: 'CONTRATADO' }] };
         case 'crm.company.get': return { result: companies[p.id] || { TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'fin@acme.com' }] } };
+        case 'crm.company.list': return { result: (p.filter?.ID || []).map(id => ({ ID: String(id), TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'fin@acme.com' }] })) };
         case 'crm.company.add': { const id = String(nextCo++); companies[id] = { ID: id, TITLE: p.fields.TITLE, EMAIL: p.fields.EMAIL || [] }; return { result: id }; }
         case 'crm.requisite.list': return { result: [] };
         case 'crm.duplicate.findbycomm': return { result: {} };
@@ -55,7 +58,7 @@ function world(initial = []) {
   };
   const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
   const svc = createService({ bitrix, asaas, store });
-  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets };
+  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets, calls };
 }
 
 module.exports = { userfields, FORMA_ID, TIPO_ID, today, in10, world, R };

@@ -290,7 +290,8 @@ function dueText(d){
 function render(){
   const k=S.kpis,ls=S.lastSync;
   const hasErr=ls?.errors?.length;
-  $('#sub').innerHTML=`<span class="dot ${hasErr?'err':ls?'':'off'}"></span>${ls?`Sincronizado ${new Date(ls.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${hasErr?` · ${ls.errors.length} erro(s)`:''}`:'Aguardando primeira sincronização'}`;
+  const lq=S.lastQuick,hm=a=>new Date(a).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  $('#sub').innerHTML=`<span class="dot ${hasErr?'err':ls?'':'off'}"></span>${ls?`Sincronizado ${new Date(ls.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${hasErr?` · ${ls.errors.length} erro(s)`:''}`:'Aguardando primeira sincronização'}${lq?` · pagamentos e vencimentos verificados às ${hm(lq.at)}`:''}`;
   const e=$('#env');e.className='env '+(S.asaas.enabled?(S.asaas.env==='production'?'ok':'warn'):'bad');e.textContent=S.asaas.enabled?`Asaas · ${S.asaas.env==='production'?'produção':'sandbox'}`:'Asaas desligado';
   // hero
   const parts=[['Pago',k.pago.valor,'var(--green)'],['Em aberto',k.aberto.valor,'var(--blue)'],['Atrasado',k.atrasado.valor,'var(--red)']];

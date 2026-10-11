@@ -47,7 +47,7 @@ const routes = {
     const deals = await svc.dealsCached();
     return {
       config: store.config, asaas: { enabled: asaas.enabled, env: asaas.env },
-      kpis: svc.kpis(deals), deals, lastSync: store.lastSync, logs: store.logs.slice(0, 50),
+      kpis: svc.kpis(deals), deals, lastSync: store.lastSync, lastQuick: store.lastQuick, logs: store.logs.slice(0, 50),
       hoje: R.todayBR(),
       listas: { categorias: Object.values((await svc.loadEnums()).categoria), planos: Object.values((await svc.loadEnums()).plano), licenca: R.CATEGORIA_LICENCA },
     };
@@ -114,4 +114,6 @@ server.listen(PORT, () => {
   console.log(`Contas a Receber em :${PORT} · Asaas ${asaas.enabled ? asaas.env : 'DESLIGADO (configure em Configurações)'} · sync a cada ${SYNC_MIN} min`);
   setTimeout(() => svc.sync().then(r => console.log('sync inicial', JSON.stringify(r))).catch(e => console.error(e)), 5000);
   setInterval(() => svc.sync().catch(e => console.error('sync', e.message)), SYNC_MIN * 60 * 1000);
+  const QUICK_MIN = +process.env.QUICK_MINUTES || 2;
+  setInterval(() => svc.quick().catch(e => console.error('quick', e.message)), QUICK_MIN * 60 * 1000);
 });
