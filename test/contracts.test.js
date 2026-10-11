@@ -1,0 +1,126 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs'), os = require('os'), path = require('path');
+const { createService } = require('../lib/service');
+const { createStore } = require('../lib/store');
+const R = require('../lib/rules');
+
+function userfields() {
+  const L = { CR_CATEGORIA: R.CATEGORIAS, CR_PLANO: R.PLANOS, CR_TIPO: R.TIPOS.map(t => t.label), CR_FORMA: R.FORMAS.map(f => f.label) };
+  const base = { CR_CATEGORIA: 100, CR_PLANO: 200, CR_TIPO: 300, CR_FORMA: 400 };
+  return Object.entries(L).map(([n, l]) => ({ ID: String(base[n]), FIELD_NAME: 'UF_CRM_' + n, USER_TYPE_ID: 'enumeration', LIST: l.map((v, i) => ({ ID: String(base[n] + i), VALUE: v })) }));
+}
+const FORMA_ID = c => String(400 + R.FORMAS.findIndex(f => f.code === c));
+const TIPO_ID = c => String(300 + R.TIPOS.findIndex(t => t.code === c));
+const today = R.todayBR();
+const in10 = R.addMonths(today, 1);
+
+function world(initial = []) {
+  const deals = [...initial];
+  const companies = {};
+  const comments = [];
+  let nextId = 500, nextCo = 50;
+  const bitrix = {
+    async call(m, p) {
+      switch (m) {
+        case 'crm.deal.userfield.list': return { result: userfields() };
+        case 'crm.status.list': return { result: [{ STATUS_ID: 'GERAR' }, { STATUS_ID: 'CONTRATADO' }] };
+        case 'crm.company.get': return { result: companies[p.id] || { TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'fin@acme.com' }] } };
+        case 'crm.company.add': { const id = String(nextCo++); companies[id] = { ID: id, TITLE: p.fields.TITLE, EMAIL: p.fields.EMAIL || [] }; return { result: id }; }
+        case 'crm.requisite.list': return { result: [] };
+        case 'crm.duplicate.findbycomm': return { result: {} };
+        case 'crm.deal.add': { const d = { ID: String(nextId++), ...p.fields }; deals.push(d); return { result: d.ID }; }
+        case 'crm.deal.update': Object.assign(deals.find(d => d.ID == p.id), p.fields); return { result: true };
+        case 'crm.timeline.comment.add': comments.push(p.fields); return { result: 1 };
+        default: return { result: true };
+      }
+    },
+    async listAll() { return deals; },
+  };
+  const pays = {}, subs = {}, customers = { cus_x: { id: 'cus_x', name: 'Cliente Direto SA', cpfCnpj: '11222333000181', email: 'x@y.com' } };
+  let np = 1;
+  const asaas = {
+    enabled: true,
+    async listPayments({ externalReference }) { return { data: Object.values(pays).filter(x => x.externalReference === externalReference) }; },
+    async findOrCreateCustomer() { return { id: 'cus_1' }; },
+    async createPayment(b) { const p = { id: 'pay_' + np++, status: 'PENDING', invoiceUrl: 'https://asaas/i', ...b }; pays[p.id] = p; return p; },
+    async getPayment(id) { return pays[id]; },
+    async getCustomer(id) { return customers[id]; },
+    async createSubscription(b) { const s = { id: 'sub_' + (Object.keys(subs).length + 1), ...b }; subs[s.id] = s; return s; },
+    async subscriptionPayments(id) { return { data: Object.values(pays).filter(p => p.subscription === id) }; },
+    async allPayments() { return Object.values(pays); },
+    async cancelPayment() {},
+  };
+  const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
+  const svc = createService({ bitrix, asaas, store });
+  return { deals, comments, pays, subs, asaas, svc, store, customers };
+}
+const master = (extra = {}) => ({ ID: '1', TITLE: 'Contrato Implantação', STAGE_ID: R.STAGES.gerar, OPPORTUNITY: '300', COMPANY_ID: '5', CONTACT_ID: '0', ASSIGNED_BY_ID: '1',
+  UF_CRM_CR_TIPO: TIPO_ID('PARCELADO'), UF_CRM_CR_FORMA: FORMA_ID('PIX'), UF_CRM_CR_QTD: '3', UF_CRM_CR_VENC: R.addMonths(today, 1) + 'T00:00:00+03:00', ...extra });
+
+test('contrato parcelado vira N cards + N cobranças, sem duplicar', async () => {
+  const w = world([master()]);
+  const r1 = await w.svc.sync();
+  assert.equal(r1.errors.length, 0, r1.errors.join(';'));
+  assert.equal(r1.contratos, 1);
+  const kids = w.deals.filter(d => d.UF_CRM_CR_ORIGEM == 1);
+  assert.equal(kids.length, 3);
+  assert.deepEqual(kids.map(k => k.UF_CRM_CR_PARCELA), ['1/3', '2/3', '3/3']);
+  assert.equal(kids.reduce((a, k) => a + k.OPPORTUNITY, 0), 300);
+  assert.equal(w.deals[0].STAGE_ID, R.STAGES.contrato);
+  assert.equal(w.deals[0].UF_CRM_CR_FILHOS.split(',').length, 3);
+  assert.equal(Object.keys(w.pays).length, 3);                          // cobranças emitidas para os filhos
+  assert.ok(Object.values(w.pays).every(p => p.billingType === 'PIX' && p.value === 100));
+  await w.svc.sync();
+  assert.equal(w.deals.filter(d => d.UF_CRM_CR_ORIGEM == 1).length, 3); // nada novo
+  assert.equal(Object.keys(w.pays).length, 3);
+  const k = w.svc.kpis(await w.svc.dealsCached(0));
+  assert.equal(k.aberto.valor, 300);                                    // contrato fora dos totais (sem contar em dobro)
+});
+
+test('contrato incompleto fica na etapa e avisa uma única vez', async () => {
+  const w = world([master({ COMPANY_ID: '0', UF_CRM_CR_QTD: '1' })]);
+  await w.svc.sync(); await w.svc.sync();
+  assert.equal(w.deals[0].STAGE_ID, R.STAGES.gerar);
+  assert.equal(w.deals.length, 1);
+  assert.equal(w.comments.length, 1);
+  assert.match(w.comments[0].COMMENT, /cliente/);
+  assert.match(w.comments[0].COMMENT, /parcelas/);
+});
+
+test('recorrente sem fim cria assinatura; meses novos viram cards ligados ao contrato', async () => {
+  const w = world([master({ UF_CRM_CR_TIPO: TIPO_ID('RECORRENTE'), UF_CRM_CR_QTD: '', OPPORTUNITY: '99.9' })]);
+  w.store.setConfig({ importAuto: true });
+  const r1 = await w.svc.sync();
+  assert.equal(r1.errors.length, 0, r1.errors.join(';'));
+  assert.equal(Object.keys(w.subs).length, 1);
+  assert.equal(w.subs.sub_1.cycle, 'MONTHLY'); assert.equal(w.subs.sub_1.value, 99.9);
+  assert.equal(w.deals[0].UF_CRM_CR_ASSINATURA, 'sub_1');
+  assert.equal(w.deals[0].STAGE_ID, R.STAGES.contrato);
+  // o Asaas gera a cobrança do mês seguinte
+  w.pays.pay_9 = { id: 'pay_9', status: 'PENDING', value: 99.9, dueDate: in10, billingType: 'PIX', customer: 'cus_x', subscription: 'sub_1', invoiceUrl: 'u' };
+  const r2 = await w.svc.sync();
+  assert.equal(r2.importados, 1);
+  const card = w.deals.find(d => d.UF_CRM_CR_ASAAS_ID === 'pay_9');
+  assert.ok(card); assert.equal(card.UF_CRM_CR_ORIGEM, 1); assert.equal(card.COMPANY_ID, '5');
+  assert.equal((await w.svc.sync()).importados, 0);                      // idempotente
+  assert.equal(Object.keys(w.subs).length, 1);                           // não recria a assinatura
+});
+
+test('importa do Asaas o que não tem card, cria o cliente e respeita status', async () => {
+  const w = world([]);
+  w.pays.p1 = { id: 'p1', status: 'OVERDUE', value: 200, dueDate: R.addMonths(today, -1), billingType: 'BOLETO', customer: 'cus_x', description: 'Licença Standard Vibe+', invoiceUrl: 'u1' };
+  w.pays.p2 = { id: 'p2', status: 'RECEIVED', value: 50, dueDate: R.addMonths(today, -1), billingType: 'PIX', customer: 'cus_x', description: 'Consultoria', paymentDate: today };
+  w.pays.p3 = { id: 'p3', status: 'DELETED', value: 70, dueDate: today, billingType: 'PIX', customer: 'cus_x' };
+  const previa = await w.svc.importar({ dias: 90, dryRun: true });
+  assert.equal(previa.novos, 2); assert.equal(w.deals.length, 0);        // prévia não grava nada
+  const r = await w.svc.importar({ dias: 90 });
+  assert.equal(r.novos, 2); assert.equal(w.deals.length, 2);
+  const late = w.deals.find(d => d.UF_CRM_CR_ASAAS_ID === 'p1'), paid = w.deals.find(d => d.UF_CRM_CR_ASAAS_ID === 'p2');
+  assert.equal(late.STAGE_ID, R.STAGES.late); assert.equal(paid.STAGE_ID, R.STAGES.paid);
+  assert.equal(late.UF_CRM_CR_CATEGORIA, '100'); assert.equal(late.UF_CRM_CR_PLANO, String(200 + R.PLANOS.indexOf('Standard Vibe+')));
+  assert.equal(late.UF_CRM_CR_FORMA, FORMA_ID('BOLETO'));
+  assert.equal(late.COMPANY_ID, paid.COMPANY_ID);                        // mesmo cliente reaproveitado (1 empresa criada)
+  assert.equal((await w.svc.importar({ dias: 90 })).novos, 0);           // segunda vez: nada
+});

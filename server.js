@@ -50,11 +50,14 @@ const routes = {
     if (typeof body.autoCreate === 'boolean') p.autoCreate = body.autoCreate;
     if (typeof body.reguaAtiva === 'boolean') p.reguaAtiva = body.reguaAtiva;
     if (Array.isArray(body.reguaOffsets)) p.reguaOffsets = body.reguaOffsets.map(Number).filter(Number.isInteger).slice(0, 12);
+    if (typeof body.importAuto === 'boolean') p.importAuto = body.importAuto;
+    if (body.importDias !== undefined && !isNaN(+body.importDias)) p.importDias = Math.max(1, Math.min(730, +body.importDias));
     for (const k of ['diasProximo', 'multaPct', 'jurosMensalPct', 'alertaAtrasoDias']) if (body[k] !== undefined && !isNaN(+body[k])) p[k] = +body[k];
     svc.invalidate();
     return store.setConfig(p);
   },
   'POST /api/gerar': async (_, body) => svc.gerar(body),
+  'POST /api/importar': async (_, body) => svc.importar({ dias: body.dias, dryRun: !!body.dryRun }),
   'GET /api/clientes': async (u) => svc.findCustomers(u.searchParams.get('q') || ''),
 };
 const dealRoutes = {
@@ -66,6 +69,7 @@ const dealRoutes = {
     svc.invalidate(); return { ok: true };
   },
   cancel: async c => { await svc.cancel(c); return { ok: true }; },
+  gerar: async c => svc.expandNow(c),
   categoria: async (c, body) => { await svc.classify(c, String(body.categoria || ''), String(body.plano || '')); return { ok: true }; },
   doc: async (c, body) => { await svc.setDoc(c.id, body.doc); return { ok: true }; },
 };
@@ -76,7 +80,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const key = `${req.method} ${u.pathname}`;
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
-    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria)$/);
+    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar)$/);
     if (m && req.method === 'POST') {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });

@@ -6,12 +6,22 @@ const { createService } = require('../lib/service');
 const { createStore } = require('../lib/store');
 const R = require('../lib/rules');
 
+// Campos de lista como o Bitrix devolve (ids numéricos distintos por campo).
+function userfields() {
+  const L = { CR_CATEGORIA: R.CATEGORIAS, CR_PLANO: R.PLANOS, CR_TIPO: R.TIPOS.map(t => t.label), CR_FORMA: R.FORMAS.map(f => f.label) };
+  const base = { CR_CATEGORIA: 100, CR_PLANO: 200, CR_TIPO: 300, CR_FORMA: 400 };
+  return Object.entries(L).map(([n, l]) => ({ ID: String(base[n]), FIELD_NAME: 'UF_CRM_' + n, USER_TYPE_ID: 'enumeration', LIST: l.map((v, i) => ({ ID: String(base[n] + i), VALUE: v })) }));
+}
+const FORMA_ID = code => String(400 + R.FORMAS.findIndex(f => f.code === code));
+const TIPO_ID = code => String(300 + R.TIPOS.findIndex(t => t.code === code));
+
 function fakes(deals) {
   const calls = [];
   const bitrix = {
     async call(m, p) {
       calls.push([m, p]);
-      if (m === 'crm.deal.userfield.list') return { result: [] };
+      if (m === 'crm.deal.userfield.list') return { result: userfields() };
+      if (m === 'crm.status.list') return { result: [{ STATUS_ID: 'GERAR' }, { STATUS_ID: 'CONTRATADO' }] };
       if (m === 'crm.company.get') return { result: { TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'fin@acme.com' }], PHONE: [{ VALUE: '11999990000' }] } };
       if (m === 'crm.requisite.list') return { result: [] };
       if (m === 'crm.deal.update') { Object.assign(deals.find(d => d.ID == p.id), p.fields); return { result: true }; }
@@ -34,7 +44,7 @@ function fakes(deals) {
 test('emite cobrança, concilia pagamento e aciona a régua sem duplicar', async () => {
   const today = R.todayBR();
   const due = R.addMonths(today, 0); // vence hoje -> D0
-  const deals = [{ ID: '10', TITLE: 'Implantação — 1/2', STAGE_ID: R.STAGES.open, OPPORTUNITY: '500', COMPANY_ID: '5', CONTACT_ID: '0', ASSIGNED_BY_ID: '1', UF_CRM_CR_VENC: due + 'T03:00:00+03:00', UF_CRM_CR_FORMA: 'PIX' }];
+  const deals = [{ ID: '10', TITLE: 'Implantação — 1/2', STAGE_ID: R.STAGES.open, OPPORTUNITY: '500', COMPANY_ID: '5', CONTACT_ID: '0', ASSIGNED_BY_ID: '1', UF_CRM_CR_VENC: due + 'T03:00:00+03:00', UF_CRM_CR_FORMA: FORMA_ID('PIX') }];
   const { bitrix, asaas, pays } = fakes(deals);
   const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
   store.setConfig({ reguaAtiva: true });
@@ -73,11 +83,11 @@ test('não emite cobrança sem CPF/CNPJ e marca pendência', async () => {
 
 test('gerar cria uma deal por parcela no funil 90', async () => {
   const added = [];
-  const bitrix = { async call(m, p) { if (m === 'crm.deal.add') { added.push(p.fields); return { result: 100 + added.length }; } return { result: [] }; }, async listAll() { return []; } };
+  const bitrix = { async call(m, p) { if (m === 'crm.deal.add') { added.push(p.fields); return { result: 100 + added.length }; } if (m === 'crm.deal.userfield.list') return { result: userfields() }; return { result: [] }; }, async listAll() { return []; } };
   const svc = createService({ bitrix, asaas: { enabled: false }, store: createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-'))) });
   const r = await svc.gerar({ titulo: 'Plano', tipo: 'PARCELADO', total: 100, parcelas: 3, primeiroVenc: '2026-11-10', companyId: '5', forma: 'boleto' });
   assert.equal(r.ids.length, 3);
-  assert.ok(added.every(f => f.CATEGORY_ID === 90 && f.STAGE_ID === R.STAGES.open && f.UF_CRM_CR_FORMA === 'BOLETO'));
+  assert.ok(added.every(f => f.CATEGORY_ID === 90 && f.STAGE_ID === R.STAGES.open && f.UF_CRM_CR_FORMA === FORMA_ID('BOLETO')));
   assert.equal(added.reduce((a, f) => a + f.OPPORTUNITY, 0).toFixed(2), '100.00');
 });
 
@@ -86,12 +96,13 @@ test('classifica por categoria/plano e agrupa os valores', async () => {
   const deals = [
     { ID: '1', TITLE: 'Licença Professional Vibe+', STAGE_ID: R.STAGES.open, OPPORTUNITY: '1000', COMPANY_ID: '5', UF_CRM_CR_VENC: today },
     { ID: '2', TITLE: 'Licença Basic', STAGE_ID: R.STAGES.late, OPPORTUNITY: '300', COMPANY_ID: '5', UF_CRM_CR_VENC: '2020-01-01' },
-    { ID: '3', TITLE: 'Projeto ERP', STAGE_ID: R.STAGES.open, OPPORTUNITY: '5000', COMPANY_ID: '5', UF_CRM_CR_VENC: '2099-01-01', UF_CRM_CR_CATEGORIA: '11' },
+    { ID: '3', TITLE: 'Projeto ERP', STAGE_ID: R.STAGES.open, OPPORTUNITY: '5000', COMPANY_ID: '5', UF_CRM_CR_VENC: '2099-01-01', UF_CRM_CR_CATEGORIA: '101' },
   ];
   const lists = { UF_CRM_CR_CATEGORIA: R.CATEGORIAS, UF_CRM_CR_PLANO: R.PLANOS };
   const bitrix = {
     async call(m, p) {
-      if (m === 'crm.deal.userfield.list') return { result: Object.entries(lists).map(([n, l]) => ({ FIELD_NAME: n, LIST: l.map((v, i) => ({ ID: String(n.endsWith('CATEGORIA') ? 10 + i : 20 + i), VALUE: v })) })) };
+      if (m === 'crm.deal.userfield.list') return { result: userfields() };
+      if (m === 'crm.status.list') return { result: [{ STATUS_ID: 'GERAR' }, { STATUS_ID: 'CONTRATADO' }] };
       if (m === 'crm.company.get') return { result: { TITLE: 'ACME', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'a@b.c' }] } };
       if (m === 'crm.requisite.list') return { result: [] };
       if (m === 'crm.deal.update') { Object.assign(deals.find(d => d.ID == p.id), p.fields); return { result: true }; }

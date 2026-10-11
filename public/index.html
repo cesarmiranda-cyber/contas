@@ -50,7 +50,7 @@ main{max-width:1320px;margin:0 auto;padding:20px}
 .kpi{padding:16px;display:flex;gap:13px;align-items:flex-start}
 .ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none}.ico svg{width:20px;height:20px}
 .kpi .v{font-size:21px;font-weight:720;letter-spacing:-.02em;line-height:1.2;margin-top:2px}.kpi .s{font-size:12px;color:var(--mut);margin-top:2px}
-.c-blue{background:var(--bluebg);color:var(--blue)}.c-red{background:var(--redbg);color:var(--red)}.c-green{background:var(--greenbg);color:var(--green)}.c-amber{background:var(--amberbg);color:var(--amber)}.c-gray{background:var(--graybg);color:var(--gray)}
+.c-blue{background:var(--bluebg);color:var(--blue)}.c-red{background:var(--redbg);color:var(--red)}.c-green{background:var(--greenbg);color:var(--green)}.c-amber{background:var(--amberbg);color:var(--amber)}.c-gray{background:var(--graybg);color:var(--gray)}.c-brand{background:var(--brandbg);color:var(--brand)}
 .toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
 .seg{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:12px;border:1px solid var(--line);overflow-x:auto;max-width:100%}
 .seg button{border:0;background:transparent;color:var(--ink2);padding:6px 12px;border-radius:9px;font:inherit;font-weight:550;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center}
@@ -110,6 +110,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="tools">
     <span class="env bad" id="env"></span>
     <button class="btn" id="bGerar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Gerar parcelas</span></button>
+    <button class="btn" id="bImp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span class="lbl">Importar do Asaas</span></button>
     <button class="btn" id="bCfg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="lbl">Régua</span></button>
     <button class="btn pri" id="bSync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg><span class="lbl">Sincronizar</span></button>
   </div>
@@ -160,10 +161,17 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="foot"><button type="button" class="btn" id="gCancel">Cancelar</button><button class="btn pri" id="gOk">Gerar no funil</button></div>
 </form></dialog>
 
+<dialog id="dImp"><form method="dialog">
+  <h2>Importar do Asaas</h2><p class="hint">Traz para o funil Contas as cobranças que existem no Asaas e ainda não têm card. Clientes novos são criados no Bitrix pelo CPF/CNPJ.</p>
+  <label>Período (dias para trás, pelo vencimento)</label><input id="iDias" type="number" min="1" max="730" value="90">
+  <div class="prev" id="iPrev" style="display:none"></div>
+  <div class="foot"><button type="button" class="btn" id="iCancel">Fechar</button><button type="button" class="btn" id="iVer">Ver prévia</button><button class="btn pri" id="iOk" disabled>Importar</button></div>
+</form></dialog>
 <dialog id="dCfg"><form method="dialog">
   <h2>Régua de cobrança</h2><p class="hint">Quando e como o app aciona a cobrança dos clientes.</p>
   <label class="chk"><input type="checkbox" id="cAuto"><span><b>Emitir cobrança no Asaas automaticamente</b><br><span class="mut">Deals completas viram cobrança sem ação manual.</span></span></label>
   <label class="chk"><input type="checkbox" id="cRegua"><span><b>Régua ativa</b><br><span class="mut">Aciona os lembretes ao cliente. Desligada, nada é enviado.</span></span></label>
+  <label class="chk"><input type="checkbox" id="cImp"><span><b>Importar automaticamente do Asaas</b><br><span class="mut">Cobranças criadas direto no Asaas (e as meses novos das assinaturas) viram cards sozinhas.</span></span></label>
   <label>Dias em relação ao vencimento (negativo = antes)</label><input id="cOff" placeholder="-3, 0, 1, 5, 15">
   <div class="r2"><div><label>“Próximo do vencimento” (dias antes)</label><input id="cProx" type="number"></div><div><label>Alerta crítico de atraso (dias)</label><input id="cAlerta" type="number"></div></div>
   <div class="r2"><div><label>Multa por atraso (%)</label><input id="cMulta" type="number" step="0.1"></div><div><label>Juros ao mês (%)</label><input id="cJuros" type="number" step="0.1"></div></div>
@@ -184,9 +192,10 @@ const brl=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL
 const dbr=d=>d?d.split('-').reverse().join('/'):'—';
 const ic=(p,w=18)=>`<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const I={clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',alert:'<path d="M12 8v5M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',check:'<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',list:'<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',more:'<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21a2 2 0 0 0 4 0"/>',doc:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/>',x:'<circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/>',ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',send:'<path d="M3 11l18-8-8 18-2-8z"/>'};
-const STAGE={'C90:NEW':['Em aberto','c-blue'],'C90:PREPAYMENT_INVOIC':['Vence em breve','c-amber'],'C90:PREPARATION':['Atrasado','c-red'],'C90:WON':['Pago','c-green'],'C90:LOSE':['Cancelado','c-gray']};
+const STAGE={'C90:GERAR':['Gerar cobranças','c-brand'],'C90:CONTRATADO':['Contratado','c-gray'],'C90:NEW':['Em aberto','c-blue'],'C90:PREPAYMENT_INVOIC':['Vence em breve','c-amber'],'C90:PREPARATION':['Atrasado','c-red'],'C90:WON':['Pago','c-green'],'C90:LOSE':['Cancelado','c-gray']};
 const FORMA={BOLETO:'Boleto',PIX:'Pix',CREDIT_CARD:'Cartão',UNDEFINED:'Livre'};
 const AVC=['c-blue','c-green','c-amber','c-red','c-gray'];
+const isC=d=>d.stageId==='C90:GERAR'||d.stageId==='C90:CONTRATADO';
 let S=null,filter='todos',cliSel=null,fCat='',fPlano='';
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),4200)}
@@ -227,7 +236,8 @@ function render(){
   $('#fPlano').innerHTML=opt(S.listas.planos,'Todos os planos',fPlano);
   // tabs
   const cnt=f=>S.deals.filter(f).length;
-  const T=[['todos','Todos',()=>true],['abertos','Em aberto',d=>d.stageId==='C90:NEW'],['proximo','Vencem em breve',d=>d.stageId==='C90:PREPAYMENT_INVOIC'],['atrasados','Atrasados',d=>d.stageId==='C90:PREPARATION'],['pagos','Pagos',d=>d.stageId==='C90:WON'],['cancelados','Cancelados',d=>d.stageId==='C90:LOSE'],['pend','Pendências',d=>d.pendencias.length]];
+  const T=[['todos','Todos',d=>!isC(d)],['contratos','Contratos',isC],['abertos','Em aberto',d=>d.stageId==='C90:NEW'],['proximo','Vencem em breve',d=>d.stageId==='C90:PREPAYMENT_INVOIC'],['atrasados','Atrasados',d=>d.stageId==='C90:PREPARATION'],['pagos','Pagos',d=>d.stageId==='C90:WON'],['cancelados','Cancelados',d=>d.stageId==='C90:LOSE'],['pend','Pendências',d=>d.pendencias.length]];
+  if(!S.deals.some(isC)&&filter==='contratos')filter='todos';
   $('#tabs').innerHTML=T.map(([id,l,f])=>`<button data-t="${id}" class="${filter===id?'on':''}">${l}<em>${cnt(f)}</em></button>`).join('');
   const f=T.find(t=>t[0]===filter)[2],q=$('#q').value.trim().toLowerCase();
   const list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id}`.toLowerCase().includes(q)).filter(d=>!fCat||(fCat==='Sem categoria'?!d.categoria:d.categoria===fCat)).filter(d=>!fPlano||d.plano===fPlano);
@@ -239,21 +249,23 @@ function render(){
     const warns=d.pendencias.map(p=>`<span class="warn ${p.sev==='alta'?'alta':''}">${esc(p.msg)}</span>`).join('');
     const nome=d.cliente||'Sem cliente';
     const menu=[
-      !fin&&!d.asaasId&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
+      d.stageId==='C90:GERAR'?`<button data-a="gerar" data-id="${d.id}">${ic(I.send,16)}Gerar cobranças agora</button>`:'',
+      !fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'&&!d.asaasId&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
       `<button data-a="classify" data-id="${d.id}">${ic(I.list,16)}Classificar</button>`,
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
     return `<tr>
       <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
-      <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:'<span class="mut">—</span>'}</td>
+      <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(d.valor)}</td>
       <td class="due"><b>${dv}</b>${ds}</td>
       <td><span class="pill ${sc}">${sl}</span>${d.avisos.length?`<div class="mut" style="font-size:11.5px;margin-top:4px">avisos: ${d.avisos.map(o=>o===0?'D0':o<0?'D'+o:'D+'+o).join(' · ')}</div>`:''}</td>
       <td><div class="acts">
         ${d.link?`<a class="btn sm" href="${esc(d.link)}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a>`:''}
-        ${!fin?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
+        ${d.stageId==='C90:GERAR'?`<button class="btn sm" data-a="gerar" data-id="${d.id}">${ic(I.send,14)}Gerar</button>`:''}
+        ${!fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
         <details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details>
       </div></td></tr>`}).join('');
   $('#logn').textContent=S.logs.length?`${S.logs.length} registros`:'';
@@ -298,12 +310,20 @@ $('#gSel').onchange=e=>{cliSel=JSON.parse(e.target.value);$('#gCli').value=cliSe
 $('#fGerar').onsubmit=async e=>{e.preventDefault();if(!cliSel){toast('Busque e selecione o cliente');return}
   const tp=$('#gTipo').value,body={titulo:$('#gTit').value,tipo:tp,forma:$('#gForma').value,total:+$('#gTot').value,parcelas:+$('#gN').value,mensal:+$('#gN').value,primeiroVenc:$('#gVenc').value,origem:$('#gOri').value||undefined,categoria:$('#gCat').value,plano:$('#gCat').value===S.listas.licenca?$('#gPl').value:'',doc:$('#gDoc').value||undefined,[cliSel.tipo==='company'?'companyId':'contactId']:cliSel.id};
   $('#gOk').disabled=true;try{const r=await api('POST','/api/gerar',body);g.close();toast(`${r.ids.length} título(s) criados no funil Contas`);load()}catch(x){toast(x.message)}$('#gOk').disabled=false};
+// ---- importar do Asaas ----
+const di=$('#dImp');
+$('#bImp').onclick=()=>{$('#iPrev').style.display='none';$('#iOk').disabled=true;di.showModal()};
+$('#iCancel').onclick=()=>di.close();
+$('#iVer').onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{const r=await api('POST','/api/importar',{dias:+$('#iDias').value,dryRun:true});const p=$('#iPrev');p.style.display='block';
+  p.innerHTML=`${r.analisadas} cobrança(s) analisadas desde ${dbr(r.desde)} · <b>${r.novos} nova(s) para importar</b>`+(r.itens.length?`<div style="margin-top:8px;font-weight:500;color:var(--ink2);max-height:160px;overflow:auto">${r.itens.slice(0,40).map(i=>`${dbr(i.venc)} · ${brl(i.valor)} · ${esc(i.descricao||i.asaasId)} <span class="mut">(${esc(i.status)})</span>`).join('<br>')}${r.itens.length>40?`<br>… e mais ${r.itens.length-40}`:''}</div>`:'');
+  $('#iOk').disabled=!r.novos}catch(x){toast(x.message)}b.disabled=false};
+$('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disabled=true;try{const r=await api('POST','/api/importar',{dias:+$('#iDias').value});di.close();toast(`${r.novos} card(s) criados a partir do Asaas`);load()}catch(x){toast(x.message);b.disabled=false}};
 // ---- config ----
 const c=$('#dCfg');
-$('#bCfg').onclick=()=>{const k=S.config;$('#cAuto').checked=k.autoCreate;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;c.showModal()};
+$('#bCfg').onclick=()=>{const k=S.config;$('#cAuto').checked=k.autoCreate;$('#cImp').checked=k.importAuto;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;c.showModal()};
 $('#cCancel').onclick=()=>c.close();
-$('#cOk').onclick=async e=>{e.preventDefault();try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value});c.close();toast('Configuração salva');load()}catch(x){toast(x.message)}};
-[g,c,dc].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+$('#cOk').onclick=async e=>{e.preventDefault();try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,importAuto:$('#cImp').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value});c.close();toast('Configuração salva');load()}catch(x){toast(x.message)}};
+[g,c,dc,di].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 load();setInterval(load,60000);
 </script>
 </body>
