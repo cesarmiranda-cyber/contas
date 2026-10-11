@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contas a Receber</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2430;--mut:#667085;--line:#e4e7ec;--brand:#1f6feb;--ok:#117a45;--okbg:#e3f6ec;--warn:#9a6700;--warnbg:#fff4d6;--bad:#b42318;--badbg:#fde8e6;--gray:#475467;--graybg:#eef0f3;--blue:#1849a9;--bluebg:#e5eefc}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1318;--card:#171c23;--ink:#e8ecf2;--mut:#98a2b3;--line:#2a313b;--brand:#5b9bff;--ok:#5fd39a;--okbg:#10301f;--warn:#f0b840;--warnbg:#33290d;--bad:#ff8a80;--badbg:#3a1613;--gray:#c0c8d4;--graybg:#222a34;--blue:#8ab4ff;--bluebg:#16264a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{font-size:20px;margin:0}h2{font-size:15px;margin:0 0 10px}
+.sub{color:var(--mut);font-size:12px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer;font:inherit}
+.btn:hover{border-color:var(--brand)}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn:disabled{opacity:.5;cursor:wait}
+.btn.sm{padding:3px 8px;font-size:12px}
+.chip{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.c-ok{background:var(--okbg);color:var(--ok)}.c-warn{background:var(--warnbg);color:var(--warn)}.c-bad{background:var(--badbg);color:var(--bad)}.c-gray{background:var(--graybg);color:var(--gray)}.c-blue{background:var(--bluebg);color:var(--blue)}
+.grid{display:grid;gap:12px}.kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .v{font-size:22px;font-weight:700;margin:2px 0}.kpi .l{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 10px}.tab{padding:5px 11px;border-radius:99px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-size:13px}.tab.on{background:var(--brand);border-color:var(--brand);color:#fff}
+input,select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 9px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:900px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+td.n{text-align:right;white-space:nowrap}.iss{font-size:12px;color:var(--bad);margin-top:3px}.iss.m{color:var(--warn)}
+.aging{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--graybg);margin:8px 0}.aging i{display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mut)}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);padding:18px;max-width:520px;width:calc(100% - 32px)}dialog::backdrop{background:#0008}
+label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}dialog input,dialog select{width:100%}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.act{display:flex;gap:4px;flex-wrap:wrap}
+.log{max-height:220px;overflow:auto;font-size:12px;color:var(--mut)}.log div{padding:2px 0;border-bottom:1px dashed var(--line)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;display:none;z-index:9;max-width:90%}
+@media(max-width:600px){.wrap{padding:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Contas a Receber</h1><div class="sub" id="sub">carregando…</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span id="asaasChip" class="chip c-gray"></span>
+      <button class="btn" id="bGerar">+ Gerar parcelas</button>
+      <button class="btn" id="bCfg">Configurar régua</button>
+      <button class="btn pri" id="bSync">Sincronizar agora</button>
+    </div>
+  </header>
+
+  <div class="grid kpis" id="kpis"></div>
+
+  <div class="card" style="margin-bottom:12px">
+    <h2>Atraso por faixa (aging)</h2>
+    <div class="aging" id="aging"></div><div class="legend" id="agingLegend"></div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <input id="q" placeholder="Buscar cliente, título ou ID…" style="flex:1;min-width:200px">
+  </div>
+  <div class="card tw"><table>
+    <thead><tr><th>#</th><th>Cliente / título</th><th>Parcela</th><th>Forma</th><th class="n">Valor</th><th>Vencimento</th><th>Situação</th><th>Ações</th></tr></thead>
+    <tbody id="rows"></tbody></table>
+    <div id="empty" class="sub" style="padding:14px;display:none">Nenhum título neste filtro. Crie deals no funil <b>Contas</b> do Bitrix ou use “Gerar parcelas”.</div>
+  </div>
+
+  <div class="card" style="margin-top:12px"><h2>Atividade recente</h2><div class="log" id="log"></div></div>
+</div>
+
+<dialog id="dGerar"><form method="dialog" id="fGerar">
+  <h2>Gerar parcelas / recorrência</h2>
+  <label>Cliente (busque a empresa ou contato do Bitrix)</label>
+  <div style="display:flex;gap:6px"><input id="gCli" placeholder="Nome…"><button type="button" class="btn" id="gBusca">Buscar</button></div>
+  <select id="gSel" size="3" style="display:none;margin-top:6px"></select>
+  <label>Título do serviço/produto</label><input id="gTit" required placeholder="Ex.: Implantação Bitrix24">
+  <div class="row2">
+    <div><label>Tipo</label><select id="gTipo"><option value="PARCELADO">Parcelado</option><option value="UNICA">À vista (única)</option><option value="RECORRENTE">Recorrente mensal</option></select></div>
+    <div><label>Forma de pagamento</label><select id="gForma"><option value="UNDEFINED">Cliente escolhe</option><option value="BOLETO">Boleto</option><option value="PIX">Pix</option><option value="CREDIT_CARD">Cartão</option></select></div>
+  </div>
+  <div class="row2">
+    <div><label id="gTotLbl">Valor total (R$)</label><input id="gTot" type="number" step="0.01" min="0.01" required></div>
+    <div><label id="gNLbl">Nº de parcelas</label><input id="gN" type="number" min="1" max="60" value="1"></div>
+  </div>
+  <div class="row2">
+    <div><label>1º vencimento</label><input id="gVenc" type="date" required></div>
+    <div><label>Deal de origem (ID, opcional)</label><input id="gOri" type="number"></div>
+  </div>
+  <label>CPF/CNPJ do pagador (se não estiver no cadastro)</label><input id="gDoc" placeholder="Somente números">
+  <div id="gPrev" class="sub" style="margin-top:8px"></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn" id="gCancel">Cancelar</button><button class="btn pri" id="gOk">Gerar no funil</button></div>
+</form></dialog>
+
+<dialog id="dCfg"><form method="dialog">
+  <h2>Régua de cobrança e regras</h2>
+  <label><input type="checkbox" id="cAuto" style="width:auto"> Emitir cobrança no Asaas automaticamente</label>
+  <label><input type="checkbox" id="cRegua" style="width:auto"> <b>Régua ativa</b> — acionar lembretes ao cliente (gatilho para automação do Bitrix)</label>
+  <label>Dias em relação ao vencimento (separados por vírgula; negativo = antes)</label><input id="cOff">
+  <div class="row2"><div><label>“Próximo do vencimento” (dias antes)</label><input id="cProx" type="number"></div><div><label>Alerta crítico de atraso (dias)</label><input id="cAlerta" type="number"></div></div>
+  <div class="row2"><div><label>Multa por atraso (%)</label><input id="cMulta" type="number" step="0.1"></div><div><label>Juros ao mês (%)</label><input id="cJuros" type="number" step="0.1"></div></div>
+  <p class="sub">Os lembretes gravam o gatilho (D-3, D0, D+1…) na deal e na linha do tempo. Configure no Bitrix um robô que, ao mudar o campo “CR · Gatilho de cobrança”, envie o e-mail e o WhatsApp. Cobranças pagas ou canceladas nunca recebem lembrete.</p>
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn" id="cCancel">Fechar</button><button class="btn pri" id="cOk">Salvar</button></div>
+</form></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const dbr=d=>d?d.split('-').reverse().join('/'):'—';
+let S=null,filter='todos',cliSel=null;
+const STAGE={'C90:NEW':['Em aberto','c-blue'],'C90:PREPAYMENT_INVOIC':['Próx. do venc.','c-warn'],'C90:PREPARATION':['Atrasado','c-bad'],'C90:WON':['Pago','c-ok'],'C90:LOSE':['Cancelado','c-gray']};
+const FORMA={BOLETO:'Boleto',PIX:'Pix',CREDIT_CARD:'Cartão',UNDEFINED:'Livre'};
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',4500)}
+async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
+async function load(){try{S=await api('GET','/api/state');render()}catch(e){$('#sub').textContent='Erro: '+e.message}}
+function render(){
+  const k=S.kpis,ls=S.lastSync;
+  $('#sub').textContent=ls?`Última sincronização: ${new Date(ls.at).toLocaleString('pt-BR')} · ${ls.created||0} emitidas · ${ls.moved||0} movidas · ${ls.reminders||0} lembretes${ls.errors?.length?` · ${ls.errors.length} erro(s)`:''}`:'Ainda não sincronizado';
+  const ch=$('#asaasChip');ch.textContent=S.asaas.enabled?`Asaas ${S.asaas.env==='production'?'produção':'sandbox'}`:'Asaas desligado (sem chave)';ch.className='chip '+(S.asaas.enabled?(S.asaas.env==='production'?'c-ok':'c-warn'):'c-bad');
+  const kp=(l,v,s,c)=>`<div class="card kpi"><div class="l">${l}</div><div class="v" style="color:${c||'inherit'}">${v}</div><div class="sub">${s}</div></div>`;
+  $('#kpis').innerHTML=kp('Em aberto',brl(k.aberto.valor),k.aberto.qtd+' título(s)','var(--blue)')+kp('Atrasado',brl(k.atrasado.valor),`${k.atrasado.qtd} título(s) · inadimplência ${k.inadimplenciaPct}%`,'var(--bad)')+kp('Pago',brl(k.pago.valor),`${k.pago.qtd} título(s) · ${brl(k.pago.mes)} no mês`,'var(--ok)')+kp('Cancelado',brl(k.cancelado.valor),k.cancelado.qtd+' título(s)','var(--gray)')+kp('Pendências',k.pendencias,'títulos com algo a corrigir',k.pendencias?'var(--warn)':'var(--ok)');
+  const tot=Object.values(k.aging).reduce((a,b)=>a+b,0),cols=['#f0b840','#f08a40','#e5533d','#9d1c1c'];
+  $('#aging').innerHTML=Object.entries(k.aging).map(([n,v],i)=>`<i style="width:${tot?v/tot*100:0}%;background:${cols[i]}"></i>`).join('');
+  $('#agingLegend').innerHTML=Object.entries(k.aging).map(([n,v],i)=>`<span><b style="color:${cols[i]}">●</b> ${n} dias: ${brl(v)}</span>`).join('');
+  const cnt=f=>S.deals.filter(f).length;
+  const T=[['todos','Todos',()=>true],['abertos','Em aberto',d=>d.stageId==='C90:NEW'],['proximo','Próx. do venc.',d=>d.stageId==='C90:PREPAYMENT_INVOIC'],['atrasados','Atrasados',d=>d.stageId==='C90:PREPARATION'],['pagos','Pagos',d=>d.stageId==='C90:WON'],['cancelados','Cancelados',d=>d.stageId==='C90:LOSE'],['pend','⚠ Pendências',d=>d.pendencias.length]];
+  $('#tabs').innerHTML=T.map(([id,l,f])=>`<span class="tab ${filter===id?'on':''}" data-t="${id}">${l} (${cnt(f)})</span>`).join('');
+  const f=T.find(t=>t[0]===filter)[2],q=$('#q').value.trim().toLowerCase();
+  const list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id}`.toLowerCase().includes(q));
+  $('#empty').style.display=list.length?'none':'block';
+  $('#rows').innerHTML=list.map(d=>{const [sl,sc]=STAGE[d.stageId]||[d.etapa,'c-gray'];
+    const iss=d.pendencias.map(p=>`<div class="iss ${p.sev==='media'?'m':''}">⚠ ${esc(p.msg)}</div>`).join('');
+    const fin=d.stageId==='C90:WON'||d.stageId==='C90:LOSE';
+    return `<tr><td>${d.id}</td><td><b>${esc(d.cliente||'—')}</b><div class="sub">${esc(d.titulo)}</div>${iss}</td><td>${esc(d.parcela||'—')}<div class="sub">${esc(d.tipo||'')}</div></td><td>${FORMA[d.forma]||'—'}</td><td class="n">${brl(d.valor)}</td><td>${dbr(d.venc)}${d.atraso?`<div class="iss">${d.atraso} dia(s) em atraso</div>`:''}</td><td><span class="chip ${sc}">${sl}</span>${d.statusAsaas?`<div class="sub">${esc(d.statusAsaas)}</div>`:''}${d.avisos.length?`<div class="sub">avisos: ${d.avisos.map(o=>o===0?'D0':o<0?'D'+o:'D+'+o).join(', ')}</div>`:''}</td><td><div class="act">${d.link?`<a class="btn sm" href="${esc(d.link)}" target="_blank" rel="noopener">Fatura</a>`:''}${!fin&&!d.asaasId&&S.asaas.enabled?`<button class="btn sm" data-a="charge" data-id="${d.id}">Emitir</button>`:''}${!fin&&!d.doc?`<button class="btn sm" data-a="doc" data-id="${d.id}">CPF/CNPJ</button>`:''}${!fin?`<button class="btn sm" data-a="remind" data-id="${d.id}">Cobrar agora</button><button class="btn sm" data-a="cancel" data-id="${d.id}">Cancelar</button>`:''}<a class="btn sm" href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">Bitrix</a></div></td></tr>`}).join('');
+  $('#log').innerHTML=S.logs.map(l=>`<div>${new Date(l.at).toLocaleString('pt-BR')} · <b>${esc(l.type)}</b> · ${esc(l.msg)}</div>`).join('')||'<div>Sem atividade ainda.</div>';
+}
+$('#tabs').onclick=e=>{const t=e.target.closest('.tab');if(t){filter=t.dataset.t;render()}};
+$('#q').oninput=()=>S&&render();
+$('#bSync').onclick=async e=>{e.target.disabled=true;try{const r=await api('POST','/api/sync');toast(r.skipped?'Já há uma sincronização em andamento':`Sincronizado: ${r.created} emitidas, ${r.moved} movidas, ${r.reminders} lembretes${r.errors.length?`, ${r.errors.length} erro(s)`:''}`)}catch(x){toast(x.message)}e.target.disabled=false;load()};
+$('#rows').onclick=async e=>{const b=e.target.closest('button[data-a]');if(!b)return;const {a,id}=b.dataset;
+  try{
+    if(a==='cancel'&&!confirm('Cancelar esta cobrança? Se já estiver emitida, será cancelada no Asaas.'))return;
+    if(a==='remind'&&!confirm('Acionar o gatilho de cobrança desta deal agora?'))return;
+    let body;if(a==='doc'){const doc=prompt('CPF ou CNPJ do pagador:');if(!doc)return;body={doc}}
+    b.disabled=true;await api('POST',`/api/deals/${id}/${a}`,body);toast('Feito.');load()
+  }catch(x){toast(x.message);b.disabled=false}};
+// ---- gerar parcelas ----
+const g=$('#dGerar');
+function prev(){const t=+$('#gTot').value,n=+$('#gN').value||1,tp=$('#gTipo').value;$('#gTotLbl').textContent=tp==='RECORRENTE'?'Valor mensal (R$)':'Valor total (R$)';$('#gNLbl').textContent=tp==='RECORRENTE'?'Nº de meses':'Nº de parcelas';$('#gN').disabled=tp==='UNICA';
+  $('#gPrev').textContent=t>0?(tp==='RECORRENTE'?`${n} cobranças mensais de ${brl(t)} = ${brl(t*n)}`:tp==='UNICA'?`1 cobrança de ${brl(t)}`:`${n}× de ≈ ${brl(t/n)}`):''}
+['gTot','gN','gTipo'].forEach(i=>$('#'+i).addEventListener('input',prev));
+$('#bGerar').onclick=()=>{cliSel=null;$('#fGerar').reset();$('#gSel').style.display='none';prev();g.showModal()};
+$('#gCancel').onclick=()=>g.close();
+$('#gBusca').onclick=async()=>{const q=$('#gCli').value.trim();if(q.length<2)return;try{const r=await api('GET','/api/clientes?q='+encodeURIComponent(q));const s=$('#gSel');s.innerHTML=r.map(c=>`<option value='${esc(JSON.stringify(c))}'>${c.tipo==='company'?'🏢':'👤'} ${esc(c.nome)} (#${c.id})</option>`).join('')||'<option disabled>Nada encontrado</option>';s.style.display='block'}catch(x){toast(x.message)}};
+$('#gSel').onchange=e=>{cliSel=JSON.parse(e.target.value);$('#gCli').value=cliSel.nome};
+$('#fGerar').onsubmit=async e=>{e.preventDefault();if(!cliSel){toast('Busque e selecione o cliente');return}
+  const tp=$('#gTipo').value,body={titulo:$('#gTit').value,tipo:tp,forma:$('#gForma').value,total:+$('#gTot').value,parcelas:+$('#gN').value,mensal:+$('#gN').value,primeiroVenc:$('#gVenc').value,origem:$('#gOri').value||undefined,doc:$('#gDoc').value||undefined,[cliSel.tipo==='company'?'companyId':'contactId']:cliSel.id};
+  $('#gOk').disabled=true;try{const r=await api('POST','/api/gerar',body);g.close();toast(`${r.ids.length} título(s) criados no funil Contas`);load()}catch(x){toast(x.message)}$('#gOk').disabled=false};
+// ---- config ----
+const c=$('#dCfg');
+$('#bCfg').onclick=()=>{const k=S.config;$('#cAuto').checked=k.autoCreate;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;c.showModal()};
+$('#cCancel').onclick=()=>c.close();
+$('#cOk').onclick=async e=>{e.preventDefault();try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value});c.close();toast('Configuração salva');load()}catch(x){toast(x.message)}};
+load();setInterval(load,60000);
+</script>
+</body>
+</html>
