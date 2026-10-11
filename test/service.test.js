@@ -80,3 +80,36 @@ test('gerar cria uma deal por parcela no funil 90', async () => {
   assert.ok(added.every(f => f.CATEGORY_ID === 90 && f.STAGE_ID === R.STAGES.open && f.UF_CRM_CR_FORMA === 'BOLETO'));
   assert.equal(added.reduce((a, f) => a + f.OPPORTUNITY, 0).toFixed(2), '100.00');
 });
+
+test('classifica por categoria/plano e agrupa os valores', async () => {
+  const today = R.todayBR();
+  const deals = [
+    { ID: '1', TITLE: 'Licença Professional Vibe+', STAGE_ID: R.STAGES.open, OPPORTUNITY: '1000', COMPANY_ID: '5', UF_CRM_CR_VENC: today },
+    { ID: '2', TITLE: 'Licença Basic', STAGE_ID: R.STAGES.late, OPPORTUNITY: '300', COMPANY_ID: '5', UF_CRM_CR_VENC: '2020-01-01' },
+    { ID: '3', TITLE: 'Projeto ERP', STAGE_ID: R.STAGES.open, OPPORTUNITY: '5000', COMPANY_ID: '5', UF_CRM_CR_VENC: '2099-01-01', UF_CRM_CR_CATEGORIA: '11' },
+  ];
+  const lists = { UF_CRM_CR_CATEGORIA: R.CATEGORIAS, UF_CRM_CR_PLANO: R.PLANOS };
+  const bitrix = {
+    async call(m, p) {
+      if (m === 'crm.deal.userfield.list') return { result: Object.entries(lists).map(([n, l]) => ({ FIELD_NAME: n, LIST: l.map((v, i) => ({ ID: String(n.endsWith('CATEGORIA') ? 10 + i : 20 + i), VALUE: v })) })) };
+      if (m === 'crm.company.get') return { result: { TITLE: 'ACME', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'a@b.c' }] } };
+      if (m === 'crm.requisite.list') return { result: [] };
+      if (m === 'crm.deal.update') { Object.assign(deals.find(d => d.ID == p.id), p.fields); return { result: true }; }
+      return { result: [] };
+    },
+    async listAll() { return deals; },
+  };
+  const svc = createService({ bitrix, asaas: { enabled: false }, store: createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-'))) });
+  const r = await svc.sync();
+  assert.equal(r.errors.length, 0, r.errors.join(';'));
+  assert.equal(r.classified, 2);                       // 1 e 2 citam o plano; 3 já tinha categoria
+  const all = await svc.dealsCached(0);
+  const by = id => all.find(d => d.id === id);
+  assert.equal(by(1).categoria, 'Licença Bitrix24'); assert.equal(by(1).plano, 'Professional Vibe+');
+  assert.equal(by(3).categoria, 'Serviço / Projeto'); assert.equal(by(3).plano, '');
+  const k = svc.kpis(all);
+  const lic = k.porCategoria.find(g => g.nome === 'Licença Bitrix24');
+  assert.equal(lic.aReceber, 1300); assert.equal(lic.atrasado, 300);
+  assert.equal(k.porPlano.find(g => g.nome === 'Basic').atrasado, 300);
+  await assert.rejects(() => svc.classify(by(1), 'Inexistente', ''), /Categoria inexistente/);
+});

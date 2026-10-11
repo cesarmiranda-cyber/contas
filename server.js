@@ -41,6 +41,7 @@ const routes = {
       config: store.config, asaas: { enabled: asaas.enabled, env: asaas.env },
       kpis: svc.kpis(deals), deals, lastSync: store.lastSync, logs: store.logs.slice(0, 50),
       hoje: R.todayBR(),
+      listas: { categorias: Object.values((await svc.loadEnums()).categoria), planos: Object.values((await svc.loadEnums()).plano), licenca: R.CATEGORIA_LICENCA },
     };
   },
   'POST /api/sync': async () => svc.sync({ trigger: 'manual' }),
@@ -65,6 +66,7 @@ const dealRoutes = {
     svc.invalidate(); return { ok: true };
   },
   cancel: async c => { await svc.cancel(c); return { ok: true }; },
+  categoria: async (c, body) => { await svc.classify(c, String(body.categoria || ''), String(body.plano || '')); return { ok: true }; },
   doc: async (c, body) => { await svc.setDoc(c.id, body.doc); return { ok: true }; },
 };
 
@@ -74,7 +76,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const key = `${req.method} ${u.pathname}`;
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
-    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc)$/);
+    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria)$/);
     if (m && req.method === 'POST') {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });

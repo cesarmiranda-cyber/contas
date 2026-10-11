@@ -73,6 +73,13 @@ td{padding:14px 16px;border-top:1px solid var(--line);vertical-align:middle}tbod
 details.menu{position:relative}details.menu summary{list-style:none;cursor:pointer;width:32px;height:32px;display:grid;place-items:center;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink2)}details.menu summary::-webkit-details-marker{display:none}details.menu summary:hover{border-color:var(--brand);color:var(--brand)}
 details.menu .pop{position:absolute;right:0;top:38px;z-index:10;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px -12px rgba(18,24,43,.3);min-width:190px;padding:5px}
 .pop button,.pop a{display:flex;gap:8px;align-items:center;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:8px 10px;border-radius:8px;font:inherit;cursor:pointer;text-decoration:none}.pop button:hover,.pop a:hover{background:var(--surface2)}.pop .dng{color:var(--red)}
+.cuts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+.cut{display:grid;grid-template-columns:minmax(110px,1fr) 1.6fr 130px;gap:12px;align-items:center;padding:7px 8px;border-radius:10px;cursor:pointer;font-size:13px;border:1px solid transparent}
+.cut:hover{background:var(--surface2)}.cut.on{background:var(--brandbg);border-color:var(--brand)}
+.cut .t{height:9px;background:var(--graybg);border-radius:99px;overflow:hidden;display:flex}.cut .t i{display:block;height:100%}
+.cut small{color:var(--mut);display:block;font-size:11.5px}.cut b{font-variant-numeric:tabular-nums;text-align:right;display:block}
+.sel{display:flex;gap:8px;flex-wrap:wrap}.sel select{width:auto;min-width:150px;padding:8px 12px}
+.cat{font-size:11.5px;color:var(--brand);background:var(--brandbg);padding:1px 8px;border-radius:7px;font-weight:600;display:inline-block;margin-top:5px}
 .empty{padding:56px 20px;text-align:center;color:var(--mut)}.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--graybg),var(--surface2),var(--graybg));background-size:200% 100%;animation:sk 1.2s infinite}@keyframes sk{to{background-position:-200% 0}}
 .logc{margin-top:16px}.logc summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between}.logc summary::-webkit-details-marker{display:none}
@@ -85,7 +92,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 .r2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 .prev{margin-top:12px;padding:10px 12px;background:var(--brandbg);color:var(--brand);border-radius:11px;font-weight:600;font-size:13px}.prev:empty{display:none}
 .toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;z-index:99;max-width:92%;transition:.25s;font-weight:550;box-shadow:0 14px 30px -10px rgba(0,0,0,.5)}.toast.show{opacity:1;transform:translate(-50%,0)}
-@media(max-width:980px){.hero{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:980px){.cuts{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){
   main{padding:14px}.bar{padding:10px 14px}.kpis{gap:10px}.kpi{padding:13px;flex-direction:column;gap:8px}.hero .big{font-size:28px}
   .btn .lbl{display:none}.btn.pri .lbl{display:inline}
@@ -114,10 +121,15 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
     <div class="card pad"><div class="eyebrow">Atraso por faixa</div><div class="agebars" id="aging"></div></div>
   </section>
   <section class="kpis" id="kpis"></section>
+  <section class="cuts">
+    <div class="card pad"><div class="eyebrow" style="display:flex;justify-content:space-between">Por categoria <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">clique para filtrar</span></div><div id="cutCat" style="margin-top:8px"></div></div>
+    <div class="card pad"><div class="eyebrow" style="display:flex;justify-content:space-between">Licenças por plano <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">clique para filtrar</span></div><div id="cutPlano" style="margin-top:8px"></div></div>
+  </section>
 
   <section class="card">
     <div class="toolbar">
       <div class="seg" id="tabs"></div>
+      <div class="sel"><select id="fCat" aria-label="Categoria"></select><select id="fPlano" aria-label="Plano"></select></div>
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" placeholder="Buscar cliente, título ou ID…"></div>
     </div>
     <div class="tw"><table>
@@ -135,7 +147,8 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <label>Cliente</label>
   <div style="display:flex;gap:8px"><input id="gCli" placeholder="Buscar empresa ou contato do Bitrix…"><button type="button" class="btn" id="gBusca">Buscar</button></div>
   <select id="gSel" size="4" style="display:none;margin-top:8px"></select>
-  <label>Serviço / produto</label><input id="gTit" required placeholder="Ex.: Implantação Bitrix24">
+  <label>Serviço / produto</label><input id="gTit" required placeholder="Ex.: Licença Bitrix24 Professional Vibe+">
+  <div class="r2"><div><label>Categoria</label><select id="gCat"></select></div><div id="gPlWrap"><label>Plano da licença</label><select id="gPl"></select></div></div>
   <div class="r2"><div><label>Tipo</label><select id="gTipo"><option value="PARCELADO">Parcelado</option><option value="UNICA">À vista (única)</option><option value="RECORRENTE">Recorrente mensal</option></select></div>
   <div><label>Forma de pagamento</label><select id="gForma"><option value="UNDEFINED">Cliente escolhe</option><option value="BOLETO">Boleto</option><option value="PIX">Pix</option><option value="CREDIT_CARD">Cartão</option></select></div></div>
   <div class="r2"><div><label id="gTotLbl">Valor total (R$)</label><input id="gTot" type="number" step="0.01" min="0.01" required></div>
@@ -157,6 +170,11 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <p class="hint" style="margin-top:14px">O app grava o gatilho (D-3, D0, D+1…) na deal e na linha do tempo. No Bitrix, um robô que reage à mudança do campo <b>“CR · Gatilho de cobrança”</b> envia o e-mail e o WhatsApp. Pagas e canceladas nunca recebem lembrete.</p>
   <div class="foot"><button type="button" class="btn" id="cCancel">Fechar</button><button class="btn pri" id="cOk">Salvar</button></div>
 </form></dialog>
+<dialog id="dClass"><form method="dialog">
+  <h2>Classificar título</h2><p class="hint" id="clHint"></p>
+  <div class="r2"><div><label>Categoria</label><select id="clCat"></select></div><div id="clPlWrap"><label>Plano da licença</label><select id="clPl"></select></div></div>
+  <div class="foot"><button type="button" class="btn" id="clCancel">Cancelar</button><button class="btn pri" id="clOk">Salvar</button></div>
+</form></dialog>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -169,7 +187,7 @@ const I={clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',alert:'<
 const STAGE={'C90:NEW':['Em aberto','c-blue'],'C90:PREPAYMENT_INVOIC':['Vence em breve','c-amber'],'C90:PREPARATION':['Atrasado','c-red'],'C90:WON':['Pago','c-green'],'C90:LOSE':['Cancelado','c-gray']};
 const FORMA={BOLETO:'Boleto',PIX:'Pix',CREDIT_CARD:'Cartão',UNDEFINED:'Livre'};
 const AVC=['c-blue','c-green','c-amber','c-red','c-gray'];
-let S=null,filter='todos',cliSel=null;
+let S=null,filter='todos',cliSel=null,fCat='',fPlano='';
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),4200)}
 async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
@@ -200,12 +218,19 @@ function render(){
   $('#aging').innerHTML=at.map(([n,v],i)=>`<div class="ag"><span class="mut">${n} dias</span><div class="t"><i style="width:${v/mx*100}%;background:${cols[i]}"></i></div><b>${brl(v)}</b></div>`).join('');
   const kp=(cls,icon,l,v,s)=>`<div class="card kpi"><div class="ico ${cls}">${ic(icon,20)}</div><div><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div></div>`;
   $('#kpis').innerHTML=kp('c-blue',I.clock,'Em aberto',brl(k.aberto.valor),`${k.aberto.qtd} título(s)`)+kp('c-red',I.alert,'Atrasado',brl(k.atrasado.valor),`${k.atrasado.qtd} título(s)`)+kp('c-green',I.check,'Recebido no mês',brl(k.pago.mes),`${k.pago.qtd} pago(s) no total`)+kp(k.pendencias?'c-amber':'c-green',I.list,'Pendências',k.pendencias,k.pendencias?'títulos a corrigir':'tudo em dia');
+  // cortes por categoria e plano
+  const cutRow=(g,kind,sel)=>{const tot=g.aReceber+g.pago||1;return `<div class="cut ${sel?'on':''}" data-${kind}="${esc(g.nome)}"><div><b style="text-align:left">${esc(g.nome)}</b><small>${g.qtd} em aberto</small></div><div class="t" title="Atrasado ${brl(g.atrasado)}"><i style="width:${(g.aReceber-g.atrasado)/tot*100}%;background:var(--blue)"></i><i style="width:${g.atrasado/tot*100}%;background:var(--red)"></i><i style="width:${g.pago/tot*100}%;background:var(--green)"></i></div><div><b>${brl(g.aReceber)}</b><small>${g.atrasado?`<span class="late">${brl(g.atrasado)} atrasado</span>`:'a receber'}</small></div></div>`};
+  $('#cutCat').innerHTML=k.porCategoria.map(g=>cutRow(g,'cat',fCat===g.nome)).join('')||'<div class="mut">Sem dados</div>';
+  $('#cutPlano').innerHTML=k.porPlano.length?k.porPlano.map(g=>cutRow(g,'plano',fPlano===g.nome)).join(''):'<div class="mut" style="padding:8px">Nenhum título com plano definido ainda. Classifique pelo menu <b>⋮ → Classificar</b> ou pela deal no Bitrix.</div>';
+  const opt=(arr,first,cur)=>`<option value="">${first}</option>`+arr.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('');
+  $('#fCat').innerHTML=opt([...S.listas.categorias,'Sem categoria'],'Todas as categorias',fCat);
+  $('#fPlano').innerHTML=opt(S.listas.planos,'Todos os planos',fPlano);
   // tabs
   const cnt=f=>S.deals.filter(f).length;
   const T=[['todos','Todos',()=>true],['abertos','Em aberto',d=>d.stageId==='C90:NEW'],['proximo','Vencem em breve',d=>d.stageId==='C90:PREPAYMENT_INVOIC'],['atrasados','Atrasados',d=>d.stageId==='C90:PREPARATION'],['pagos','Pagos',d=>d.stageId==='C90:WON'],['cancelados','Cancelados',d=>d.stageId==='C90:LOSE'],['pend','Pendências',d=>d.pendencias.length]];
   $('#tabs').innerHTML=T.map(([id,l,f])=>`<button data-t="${id}" class="${filter===id?'on':''}">${l}<em>${cnt(f)}</em></button>`).join('');
   const f=T.find(t=>t[0]===filter)[2],q=$('#q').value.trim().toLowerCase();
-  const list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id}`.toLowerCase().includes(q));
+  const list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id}`.toLowerCase().includes(q)).filter(d=>!fCat||(fCat==='Sem categoria'?!d.categoria:d.categoria===fCat)).filter(d=>!fPlano||d.plano===fPlano);
   $('#empty').style.display=list.length?'none':'block';
   $('#rows').innerHTML=list.map(d=>{
     const [sl,sc]=STAGE[d.stageId]||[d.etapa,'c-gray'];
@@ -215,11 +240,12 @@ function render(){
     const nome=d.cliente||'Sem cliente';
     const menu=[
       !fin&&!d.asaasId&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
+      `<button data-a="classify" data-id="${d.id}">${ic(I.list,16)}Classificar</button>`,
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
     return `<tr>
-      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
+      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
       <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(d.valor)}</td>
@@ -235,11 +261,24 @@ function render(){
 }
 $('#tabs').onclick=e=>{const t=e.target.closest('button[data-t]');if(t){filter=t.dataset.t;render()}};
 $('#q').oninput=()=>S&&render();
+$('#fCat').onchange=e=>{fCat=e.target.value;render()};
+$('#fPlano').onchange=e=>{fPlano=e.target.value;render()};
+const toggle=(cur,v)=>cur===v?'':v;
+$('#cutCat').onclick=e=>{const r=e.target.closest('[data-cat]');if(r){fCat=toggle(fCat,r.dataset.cat);render()}};
+$('#cutPlano').onclick=e=>{const r=e.target.closest('[data-plano]');if(r){fPlano=toggle(fPlano,r.dataset.plano);render()}};
 document.addEventListener('click',e=>{document.querySelectorAll('details.menu[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
 $('#bSync').onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.classList.add('spin');
   try{const r=await api('POST','/api/sync');toast(r.skipped?'Já há uma sincronização em andamento':`${r.created} emitida(s) · ${r.moved} movida(s) · ${r.reminders} lembrete(s)${r.errors.length?` · ${r.errors.length} erro(s)`:''}`)}catch(x){toast(x.message)}
   b.disabled=false;b.classList.remove('spin');load()};
+const dc=$('#dClass');let clId=null;
+function fillSel(sel,arr,cur,first){sel.innerHTML=`<option value="">${first}</option>`+arr.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('')}
+function plWrap(catSel,wrap){wrap.style.display=catSel.value===S.listas.licenca?'':'none'}
+$('#clCat').onchange=()=>plWrap($('#clCat'),$('#clPlWrap'));
+$('#gCat').onchange=()=>plWrap($('#gCat'),$('#gPlWrap'));
+$('#clCancel').onclick=()=>dc.close();
+$('#clOk').onclick=async e=>{e.preventDefault();try{const cat=$('#clCat').value;await api('POST',`/api/deals/${clId}/categoria`,{categoria:cat,plano:cat===S.listas.licenca?$('#clPl').value:''});dc.close();toast('Classificação salva');load()}catch(x){toast(x.message)}};
 $('#rows').onclick=async e=>{const b=e.target.closest('[data-a]');if(!b)return;const {a,id}=b.dataset;
+  if(a==='classify'){const d=S.deals.find(x=>x.id==id);clId=id;$('#clHint').textContent=`#${d.id} · ${d.titulo}`;fillSel($('#clCat'),S.listas.categorias,d.categoria,'Sem categoria');fillSel($('#clPl'),S.listas.planos,d.plano,'Sem plano');plWrap($('#clCat'),$('#clPlWrap'));b.closest('details')&&(b.closest('details').open=false);dc.showModal();return}
   try{
     if(a==='cancel'&&!confirm('Cancelar esta cobrança? Se já estiver emitida, será cancelada no Asaas.'))return;
     if(a==='remind'&&!confirm('Acionar o gatilho de cobrança desta deal agora?'))return;
@@ -252,19 +291,19 @@ function prev(){const t=+$('#gTot').value,n=+$('#gN').value||1,tp=$('#gTipo').va
   $('#gTotLbl').textContent=tp==='RECORRENTE'?'Valor mensal (R$)':'Valor total (R$)';$('#gNLbl').textContent=tp==='RECORRENTE'?'Nº de meses':'Nº de parcelas';$('#gN').disabled=tp==='UNICA';
   $('#gPrev').textContent=t>0?(tp==='RECORRENTE'?`${n} cobranças mensais de ${brl(t)} = ${brl(t*n)}`:tp==='UNICA'?`1 cobrança de ${brl(t)}`:`${n}× de ≈ ${brl(t/n)}`):''}
 ['gTot','gN','gTipo'].forEach(i=>$('#'+i).addEventListener('input',prev));
-$('#bGerar').onclick=()=>{cliSel=null;$('#fGerar').reset();$('#gSel').style.display='none';prev();g.showModal()};
+$('#bGerar').onclick=()=>{cliSel=null;$('#fGerar').reset();$('#gSel').style.display='none';fillSel($('#gCat'),S.listas.categorias,'','Sem categoria');fillSel($('#gPl'),S.listas.planos,'','Sem plano');plWrap($('#gCat'),$('#gPlWrap'));prev();g.showModal()};
 $('#gCancel').onclick=()=>g.close();
 $('#gBusca').onclick=async()=>{const q=$('#gCli').value.trim();if(q.length<2)return;try{const r=await api('GET','/api/clientes?q='+encodeURIComponent(q));const s=$('#gSel');s.innerHTML=r.map(c=>`<option value='${esc(JSON.stringify(c))}'>${c.tipo==='company'?'🏢':'👤'} ${esc(c.nome)} (#${c.id})</option>`).join('')||'<option disabled>Nada encontrado</option>';s.style.display='block'}catch(x){toast(x.message)}};
 $('#gSel').onchange=e=>{cliSel=JSON.parse(e.target.value);$('#gCli').value=cliSel.nome};
 $('#fGerar').onsubmit=async e=>{e.preventDefault();if(!cliSel){toast('Busque e selecione o cliente');return}
-  const tp=$('#gTipo').value,body={titulo:$('#gTit').value,tipo:tp,forma:$('#gForma').value,total:+$('#gTot').value,parcelas:+$('#gN').value,mensal:+$('#gN').value,primeiroVenc:$('#gVenc').value,origem:$('#gOri').value||undefined,doc:$('#gDoc').value||undefined,[cliSel.tipo==='company'?'companyId':'contactId']:cliSel.id};
+  const tp=$('#gTipo').value,body={titulo:$('#gTit').value,tipo:tp,forma:$('#gForma').value,total:+$('#gTot').value,parcelas:+$('#gN').value,mensal:+$('#gN').value,primeiroVenc:$('#gVenc').value,origem:$('#gOri').value||undefined,categoria:$('#gCat').value,plano:$('#gCat').value===S.listas.licenca?$('#gPl').value:'',doc:$('#gDoc').value||undefined,[cliSel.tipo==='company'?'companyId':'contactId']:cliSel.id};
   $('#gOk').disabled=true;try{const r=await api('POST','/api/gerar',body);g.close();toast(`${r.ids.length} título(s) criados no funil Contas`);load()}catch(x){toast(x.message)}$('#gOk').disabled=false};
 // ---- config ----
 const c=$('#dCfg');
 $('#bCfg').onclick=()=>{const k=S.config;$('#cAuto').checked=k.autoCreate;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;c.showModal()};
 $('#cCancel').onclick=()=>c.close();
 $('#cOk').onclick=async e=>{e.preventDefault();try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value});c.close();toast('Configuração salva');load()}catch(x){toast(x.message)}};
-[g,c].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+[g,c,dc].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 load();setInterval(load,60000);
 </script>
 </body>

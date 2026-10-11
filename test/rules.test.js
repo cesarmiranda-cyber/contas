@@ -43,3 +43,12 @@ test('pendências apontam o que escapa da cobrança', () => {
   for (const w of ['Sem cliente', 'Valor zerado', 'vencimento', 'CPF/CNPJ', 'e-mail', 'Asaas']) assert.ok(msgs.includes(w), w);
   assert.deepEqual(R.issuesFor({ ...c, stageId: R.STAGES.paid }, R.DEFAULT_CONFIG, '2026-10-11', true), []);
 });
+
+test('classificação sugere plano só quando o título cita o plano', () => {
+  assert.deepEqual(R.guessClass('Licença Bitrix24 Professional Vibe+ anual'), { categoria: 'Licença Bitrix24', plano: 'Professional Vibe+' });
+  assert.deepEqual(R.guessClass('Renovação Enterprise'), { categoria: 'Licença Bitrix24', plano: 'Enterprise' });
+  assert.deepEqual(R.guessClass('Plano STANDARD vibe+'), { categoria: 'Licença Bitrix24', plano: 'Standard Vibe+' });
+  assert.deepEqual(R.guessClass('Basic Vibecode'), { categoria: 'Licença Bitrix24', plano: 'Basic Vibe+' });
+  assert.deepEqual(R.guessClass('Implantação do CRM'), { categoria: '', plano: '' });
+  assert.equal(R.PLANOS.length, 8);
+});
