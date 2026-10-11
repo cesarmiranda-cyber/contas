@@ -89,6 +89,14 @@ details.menu .pop{position:absolute;right:0;top:38px;z-index:10;background:var(-
 .res{margin-top:12px;padding:11px 13px;border-radius:11px;font-weight:550;font-size:13px;display:none}.res.ok{display:block;background:var(--greenbg);color:var(--green)}.res.bad{display:block;background:var(--redbg);color:var(--red)}
 .steps{margin:6px 0 0;padding-left:18px;color:var(--ink2);font-size:13px}.steps li{margin:3px 0}
 .banner{max-width:860px;margin:0 auto 16px;padding:14px 16px;border-radius:14px;background:var(--amberbg);color:var(--amber);font-weight:600;display:none;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.fbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface2)}
+.fbar select,.fbar input[type=date]{width:auto;padding:7px 10px;font-size:13px}.fbar .sp{flex:1}
+.chip2{border:1px solid var(--line);background:var(--surface);color:var(--ink2);padding:5px 11px;border-radius:99px;font:inherit;font-size:12.5px;font-weight:550;cursor:pointer}.chip2:hover{border-color:var(--brand);color:var(--brand)}.chip2.on{background:var(--brandbg);color:var(--brand);border-color:var(--brand)}
+.sum{display:flex;gap:6px 18px;flex-wrap:wrap;align-items:baseline;padding:11px 16px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink2)}.sum b{color:var(--ink);font-size:15px}.sum .i{display:inline-flex;gap:6px;align-items:center}
+th.s{cursor:pointer;user-select:none}th.s:hover{color:var(--brand)}th.s .ar{opacity:.35;margin-left:3px}th.s.on{color:var(--brand)}th.s.on .ar{opacity:1}
+tr.grp td{background:var(--surface2);font-weight:650;padding:9px 16px;border-top:1px solid var(--line);color:var(--ink2)}tr.grp td span{font-weight:500;color:var(--mut);margin-left:10px}tr.grp:hover{background:transparent}
+.dlg-sub{color:var(--mut);font-size:12.5px;margin:0 0 4px}.note{font-size:12px;color:var(--amber);background:var(--amberbg);padding:8px 10px;border-radius:9px;margin-top:10px;display:none}
+textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 12px;outline:none;width:100%;resize:vertical;min-height:70px}textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brandbg)}
 .empty{padding:56px 20px;text-align:center;color:var(--mut)}.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--graybg),var(--surface2),var(--graybg));background-size:200% 100%;animation:sk 1.2s infinite}@keyframes sk{to{background-position:-200% 0}}
 .logc{margin-top:16px}.logc summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between}.logc summary::-webkit-details-marker{display:none}
@@ -109,6 +117,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   tbody tr{padding:14px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:8px 10px}
   td{border:0;padding:0}td.c-cli{grid-column:1/-1}td.num{text-align:left}.acts{justify-content:flex-start;grid-column:1/-1}
   .hide-m{display:none}
+  tr.grp{display:block}tr.grp td{display:block}
 }
 </style>
 </head>
@@ -134,7 +143,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <section class="kpis" id="kpis"></section>
   <section class="cuts">
     <div class="card pad"><div class="eyebrow" style="display:flex;justify-content:space-between">Por categoria <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">clique para filtrar</span></div><div id="cutCat" style="margin-top:8px"></div></div>
-    <div class="card pad"><div class="eyebrow" style="display:flex;justify-content:space-between">Licenças por plano <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">clique para filtrar</span></div><div id="cutPlano" style="margin-top:8px"></div></div>
+    <div class="card pad"><div class="eyebrow" style="display:flex;justify-content:space-between">Licenças por tipo <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">clique para filtrar</span></div><div id="cutPlano" style="margin-top:8px"></div></div>
   </section>
 
   <section class="card">
@@ -143,8 +152,17 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
       <div class="sel"><select id="fCat" aria-label="Categoria"></select><select id="fPlano" aria-label="Plano"></select></div>
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" placeholder="Buscar cliente, título ou ID…"></div>
     </div>
+    <div class="fbar">
+      <select id="dField" aria-label="Campo de data"><option value="venc">Vencimento</option><option value="pagoEm">Pago em</option><option value="criado">Criado em</option></select>
+      <input type="date" id="dFrom" aria-label="De"><span class="mut">até</span><input type="date" id="dTo" aria-label="Até">
+      <button class="chip2" data-p="hoje">Hoje</button><button class="chip2" data-p="semana">Esta semana</button><button class="chip2" data-p="mes">Este mês</button><button class="chip2" data-p="passado">Mês passado</button><button class="chip2" data-p="prox30">Próx. 30 dias</button><button class="chip2" data-p="limpar">Limpar</button>
+      <span class="sp"></span>
+      <label class="chk" style="margin:0;padding:5px 10px;border-radius:99px;font-size:12.5px"><input type="checkbox" id="gMes" style="width:15px;height:15px;margin:0">Agrupar por mês</label>
+      <button class="chip2" id="bCsv">⬇ Exportar CSV</button>
+    </div>
+    <div class="sum" id="sum"></div>
     <div class="tw"><table>
-      <thead><tr><th>Cliente</th><th class="hide-m">Parcela</th><th class="hide-m">Forma</th><th class="num">Valor</th><th>Vencimento</th><th>Situação</th><th></th></tr></thead>
+      <thead><tr><th class="s" data-k="cliente">Cliente<span class="ar">↕</span></th><th class="hide-m">Parcela</th><th class="hide-m">Forma</th><th class="num s" data-k="valor">Valor<span class="ar">↕</span></th><th class="s" data-k="venc">Vencimento<span class="ar">↕</span></th><th class="s" data-k="etapa">Situação<span class="ar">↕</span></th><th></th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
     <div class="empty" id="empty" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8"/></svg><b>Nada por aqui</b>Nenhum título neste filtro. Crie deals no funil <b style="display:inline">Contas</b> ou use “Gerar parcelas”.</div>
@@ -202,7 +220,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div style="display:flex;gap:8px"><input id="gCli" placeholder="Buscar empresa ou contato do Bitrix…"><button type="button" class="btn" id="gBusca">Buscar</button></div>
   <select id="gSel" size="4" style="display:none;margin-top:8px"></select>
   <label>Serviço / produto</label><input id="gTit" required placeholder="Ex.: Licença Bitrix24 Professional Vibe+">
-  <div class="r2"><div><label>Categoria</label><select id="gCat"></select></div><div id="gPlWrap"><label>Plano da licença</label><select id="gPl"></select></div></div>
+  <div class="r2"><div><label>Categoria</label><select id="gCat"></select></div><div id="gPlWrap"><label>Tipo de licença</label><select id="gPl"></select></div></div>
   <div class="r2"><div><label>Tipo</label><select id="gTipo"><option value="PARCELADO">Parcelado</option><option value="UNICA">À vista (única)</option><option value="RECORRENTE">Recorrente mensal</option></select></div>
   <div><label>Forma de pagamento</label><select id="gForma"><option value="UNDEFINED">Cliente escolhe</option><option value="BOLETO">Boleto</option><option value="PIX">Pix</option><option value="CREDIT_CARD">Cartão</option></select></div></div>
   <div class="r2"><div><label id="gTotLbl">Valor total (R$)</label><input id="gTot" type="number" step="0.01" min="0.01" required></div>
@@ -221,10 +239,17 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="foot"><button type="button" class="btn" id="iCancel">Fechar</button><button type="button" class="btn" id="iVer">Ver prévia</button><button class="btn pri" id="iOk" disabled>Importar</button></div>
 </form></dialog>
 
-<dialog id="dClass"><form method="dialog">
-  <h2>Classificar título</h2><p class="hint" id="clHint"></p>
-  <div class="r2"><div><label>Categoria</label><select id="clCat"></select></div><div id="clPlWrap"><label>Plano da licença</label><select id="clPl"></select></div></div>
-  <div class="foot"><button type="button" class="btn" id="clCancel">Cancelar</button><button class="btn pri" id="clOk">Salvar</button></div>
+<dialog id="dEdit"><form method="dialog" id="fEdit">
+  <h2>Editar lançamento</h2><p class="dlg-sub" id="eHint"></p>
+  <label>Título / descrição da cobrança</label><input id="eTit" required maxlength="255">
+  <div class="r2"><div><label>Categoria</label><select id="eCat"></select></div><div id="ePlWrap"><label>Tipo de licença</label><select id="ePl"></select></div></div>
+  <div class="r2"><div><label>Valor (R$)</label><input id="eVal" type="number" step="0.01" min="0.01" required></div><div><label>Vencimento</label><input id="eVenc" type="date" required></div></div>
+  <div class="r2"><div><label>Forma de pagamento</label><select id="eForma"><option value="UNDEFINED">Cliente escolhe</option><option value="BOLETO">Boleto</option><option value="PIX">Pix</option><option value="CREDIT_CARD">Cartão</option></select></div><div><label>Tipo</label><select id="eTipo"><option value="">—</option><option value="UNICA">À vista</option><option value="PARCELADO">Parcelado</option><option value="RECORRENTE">Recorrente mensal</option></select></div></div>
+  <label>CPF/CNPJ do pagador</label><input id="eDoc" placeholder="Somente números">
+  <label>Observações</label><textarea id="eObs" placeholder="Anotações internas sobre este lançamento"></textarea>
+  <div class="note" id="eNote"></div>
+  <p class="dlg-sub" style="margin-top:12px">Salvo na deal do Bitrix. Se já existe cobrança no Asaas, valor, vencimento, forma e descrição são atualizados lá também.</p>
+  <div class="foot"><button type="button" class="btn" id="eCancel">Cancelar</button><button class="btn pri" id="eOk">Salvar</button></div>
 </form></dialog>
 <div class="toast" id="toast"></div>
 
@@ -239,7 +264,14 @@ const STAGE={'C90:GERAR':['Gerar cobranças','c-brand'],'C90:CONTRATADO':['Contr
 const FORMA={BOLETO:'Boleto',PIX:'Pix',CREDIT_CARD:'Cartão',UNDEFINED:'Livre'};
 const AVC=['c-blue','c-green','c-amber','c-red','c-gray'];
 const isC=d=>d.stageId==='C90:GERAR'||d.stageId==='C90:CONTRATADO';
+let CURLIST=[];
 let S=null,filter='todos',cliSel=null,fCat='',fPlano='';
+let dF='venc',dFrom='',dTo='',sortK='venc',sortD=1,groupMes=false;
+const ymd=d=>d.toISOString().slice(0,10);const addD=(day,n)=>{const d=new Date(day+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return ymd(d)};
+const monthRange=(day,off)=>{const [y,m]=day.split('-').map(Number);return [ymd(new Date(Date.UTC(y,m-1+off,1))),ymd(new Date(Date.UTC(y,m+off,0)))]};
+const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const mesLabel=k=>k?`${MESES[+k.slice(5,7)-1]}/${k.slice(0,4)}`:'Sem data';
+const STAGE_ORD={'C90:GERAR':0,'C90:PREPARATION':1,'C90:PREPAYMENT_INVOIC':2,'C90:NEW':3,'C90:CONTRATADO':4,'C90:WON':5,'C90:LOSE':6};
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),4200)}
 async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
@@ -273,19 +305,28 @@ function render(){
   // cortes por categoria e plano
   const cutRow=(g,kind,sel)=>{const tot=g.aReceber+g.pago||1;return `<div class="cut ${sel?'on':''}" data-${kind}="${esc(g.nome)}"><div><b style="text-align:left">${esc(g.nome)}</b><small>${g.qtd} em aberto</small></div><div class="t" title="Atrasado ${brl(g.atrasado)}"><i style="width:${(g.aReceber-g.atrasado)/tot*100}%;background:var(--blue)"></i><i style="width:${g.atrasado/tot*100}%;background:var(--red)"></i><i style="width:${g.pago/tot*100}%;background:var(--green)"></i></div><div><b>${brl(g.aReceber)}</b><small>${g.atrasado?`<span class="late">${brl(g.atrasado)} atrasado</span>`:'a receber'}</small></div></div>`};
   $('#cutCat').innerHTML=k.porCategoria.map(g=>cutRow(g,'cat',fCat===g.nome)).join('')||'<div class="mut">Sem dados</div>';
-  $('#cutPlano').innerHTML=k.porPlano.length?k.porPlano.map(g=>cutRow(g,'plano',fPlano===g.nome)).join(''):'<div class="mut" style="padding:8px">Nenhum título com plano definido ainda. Classifique pelo menu <b>⋮ → Classificar</b> ou pela deal no Bitrix.</div>';
+  $('#cutPlano').innerHTML=k.porPlano.length?k.porPlano.map(g=>cutRow(g,'plano',fPlano===g.nome)).join(''):'<div class="mut" style="padding:8px">Nenhum título com tipo de licença definido ainda. Use <b>Editar</b> no lançamento ou preencha na deal do Bitrix.</div>';
   const opt=(arr,first,cur)=>`<option value="">${first}</option>`+arr.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('');
   $('#fCat').innerHTML=opt([...S.listas.categorias,'Sem categoria'],'Todas as categorias',fCat);
-  $('#fPlano').innerHTML=opt(S.listas.planos,'Todos os planos',fPlano);
+  $('#fPlano').innerHTML=opt(S.listas.planos,'Todos os tipos de licença',fPlano);
   // tabs
   const cnt=f=>S.deals.filter(f).length;
   const T=[['todos','Todos',d=>!isC(d)],['contratos','Contratos',isC],['abertos','Em aberto',d=>d.stageId==='C90:NEW'],['proximo','Vencem em breve',d=>d.stageId==='C90:PREPAYMENT_INVOIC'],['atrasados','Atrasados',d=>d.stageId==='C90:PREPARATION'],['pagos','Pagos',d=>d.stageId==='C90:WON'],['cancelados','Cancelados',d=>d.stageId==='C90:LOSE'],['pend','Pendências',d=>d.pendencias.length]];
   if(!S.deals.some(isC)&&filter==='contratos')filter='todos';
   $('#tabs').innerHTML=T.map(([id,l,f])=>`<button data-t="${id}" class="${filter===id?'on':''}">${l}<em>${cnt(f)}</em></button>`).join('');
   const f=T.find(t=>t[0]===filter)[2],q=$('#q').value.trim().toLowerCase();
-  const list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id}`.toLowerCase().includes(q)).filter(d=>!fCat||(fCat==='Sem categoria'?!d.categoria:d.categoria===fCat)).filter(d=>!fPlano||d.plano===fPlano);
+  let list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id} ${d.obs||''}`.toLowerCase().includes(q)).filter(d=>!fCat||(fCat==='Sem categoria'?!d.categoria:d.categoria===fCat)).filter(d=>!fPlano||d.plano===fPlano);
+  if(dFrom||dTo)list=list.filter(d=>{const v=d[dF];return v&&(!dFrom||v>=dFrom)&&(!dTo||v<=dTo)});
+  const cmp={cliente:(a,b)=>(a.cliente||'￿').localeCompare(b.cliente||'￿','pt-BR'),valor:(a,b)=>a.valor-b.valor,venc:(a,b)=>(a.venc||'9999').localeCompare(b.venc||'9999'),etapa:(a,b)=>(STAGE_ORD[a.stageId]??9)-(STAGE_ORD[b.stageId]??9)}[sortK];
+  list=[...list].sort((a,b)=>cmp(a,b)*sortD||a.id-b.id);
+  CURLIST=list;
+  document.querySelectorAll('th.s').forEach(th=>{th.classList.toggle('on',th.dataset.k===sortK);th.querySelector('.ar').textContent=th.dataset.k===sortK?(sortD>0?'↑':'↓'):'↕'});
+  document.querySelectorAll('.chip2[data-p]').forEach(b=>b.classList.remove('on'));
+  const money=(fn)=>list.filter(fn).reduce((a,d)=>a+d.valor,0),qtd=fn=>list.filter(fn).length;
+  const sg=[['Em aberto','var(--blue)',d=>d.stageId==='C90:NEW'||d.stageId==='C90:PREPAYMENT_INVOIC'],['Atrasado','var(--red)',d=>d.stageId==='C90:PREPARATION'],['Pago','var(--green)',d=>d.stageId==='C90:WON'],['Cancelado','var(--gray)',d=>d.stageId==='C90:LOSE']].filter(([,,fn])=>qtd(fn));
+  $('#sum').innerHTML=`<span><b>${list.length}</b> lançamento${list.length===1?'':'s'}</span><span>Total <b>${brl(list.filter(d=>!isC(d)&&d.stageId!=='C90:LOSE').reduce((a,d)=>a+d.valor,0))}</b></span>`+sg.map(([n,c,fn])=>`<span class="i"><i class="sw" style="background:${c}"></i>${n} <b style="font-size:13px">${brl(money(fn))}</b> <span class="mut">(${qtd(fn)})</span></span>`).join('')+((dFrom||dTo)?`<span class="mut">· ${{venc:'vencimento',pagoEm:'pagamento',criado:'criação'}[dF]} ${dFrom?'de '+dbr(dFrom):''} ${dTo?'até '+dbr(dTo):''}</span>`:'');
   $('#empty').style.display=list.length?'none':'block';
-  $('#rows').innerHTML=list.map(d=>{
+  const rowHtml=d=>{
     const [sl,sc]=STAGE[d.stageId]||[d.etapa,'c-gray'];
     const fin=d.stageId==='C90:WON'||d.stageId==='C90:LOSE';
     const [dv,ds]=dueText(d);
@@ -294,7 +335,7 @@ function render(){
     const menu=[
       d.stageId==='C90:GERAR'?`<button data-a="gerar" data-id="${d.id}">${ic(I.send,16)}Gerar cobranças agora</button>`:'',
       !fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'&&!d.asaasId&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
-      `<button data-a="classify" data-id="${d.id}">${ic(I.list,16)}Classificar</button>`,
+      `<button data-a="editar" data-id="${d.id}">${ic(I.doc,16)}Editar lançamento</button>`,
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
@@ -307,10 +348,14 @@ function render(){
       <td><span class="pill ${sc}">${sl}</span>${d.avisos.length?`<div class="mut" style="font-size:11.5px;margin-top:4px">avisos: ${d.avisos.map(o=>o===0?'D0':o<0?'D'+o:'D+'+o).join(' · ')}</div>`:''}</td>
       <td><div class="acts">
         ${d.link?`<a class="btn sm" href="${esc(d.link)}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a>`:''}
+        <button class="btn sm" data-a="editar" data-id="${d.id}">${ic(I.doc,14)}Editar</button>
         ${d.stageId==='C90:GERAR'?`<button class="btn sm" data-a="gerar" data-id="${d.id}">${ic(I.send,14)}Gerar</button>`:''}
         ${!fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
         <details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details>
-      </div></td></tr>`}).join('');
+      </div></td></tr>`};
+  if(groupMes){const gs=new Map();for(const d of list){const k=(d[dF]||'').slice(0,7);(gs.get(k)||gs.set(k,[]).get(k)).push(d)}
+    $('#rows').innerHTML=[...gs].map(([k,ds])=>`<tr class="grp"><td colspan="7">${mesLabel(k)}<span>${ds.length} lançamento(s) · ${brl(ds.filter(d=>!isC(d)).reduce((a,d)=>a+d.valor,0))}</span></td></tr>`+ds.map(rowHtml).join('')).join('')}
+  else $('#rows').innerHTML=list.map(rowHtml).join('');
   $('#logn').textContent=S.logs.length?`${S.logs.length} registros`:'';
   $('#log').innerHTML=S.logs.map(l=>`<div><time>${new Date(l.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</time><span class="lt">${esc(l.type)}</span><span>${esc(l.msg)}</span></div>`).join('')||'<div class="mut">Sem atividade ainda.</div>';
 }
@@ -325,15 +370,45 @@ document.addEventListener('click',e=>{document.querySelectorAll('details.menu[op
 $('#bSync').onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.classList.add('spin');
   try{const r=await api('POST','/api/sync');toast(r.skipped?'Já há uma sincronização em andamento':`${r.created} emitida(s) · ${r.moved} movida(s) · ${r.reminders} lembrete(s)${r.errors.length?` · ${r.errors.length} erro(s)`:''}`)}catch(x){toast(x.message)}
   b.disabled=false;b.classList.remove('spin');load()};
-const dc=$('#dClass');let clId=null;
 function fillSel(sel,arr,cur,first){sel.innerHTML=`<option value="">${first}</option>`+arr.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('')}
 function plWrap(catSel,wrap){wrap.style.display=catSel.value===S.listas.licenca?'':'none'}
-$('#clCat').onchange=()=>plWrap($('#clCat'),$('#clPlWrap'));
 $('#gCat').onchange=()=>plWrap($('#gCat'),$('#gPlWrap'));
-$('#clCancel').onclick=()=>dc.close();
-$('#clOk').onclick=async e=>{e.preventDefault();try{const cat=$('#clCat').value;await api('POST',`/api/deals/${clId}/categoria`,{categoria:cat,plano:cat===S.listas.licenca?$('#clPl').value:''});dc.close();toast('Classificação salva');load()}catch(x){toast(x.message)}};
+// ---- editar lançamento ----
+const de=$('#dEdit');let edId=null,edOrig=null;
+$('#eCat').onchange=()=>plWrap($('#eCat'),$('#ePlWrap'));
+$('#eCancel').onclick=()=>de.close();
+function openEdit(id){const d=S.deals.find(x=>x.id==id);if(!d)return;edId=id;edOrig=d;
+  $('#eHint').textContent=`#${d.id} · ${d.cliente||'Sem cliente'}${d.asaasId?' · cobrança '+d.asaasId:''}`;
+  $('#eTit').value=d.titulo;$('#eVal').value=d.valor;$('#eVenc').value=d.venc||'';$('#eForma').value=d.forma||'UNDEFINED';$('#eTipo').value=d.tipo||'';$('#eDoc').value=d.doc||'';$('#eObs').value=d.obs||'';
+  fillSel($('#eCat'),S.listas.categorias,d.categoria,'Sem categoria');fillSel($('#ePl'),S.listas.planos,d.plano,'Sem tipo de licença');plWrap($('#eCat'),$('#ePlWrap'));
+  const lock=d.asaasId&&d.statusAsaas&&!['PENDING','OVERDUE','AWAITING_RISK_ANALYSIS'].includes(d.statusAsaas);
+  ['eVal','eVenc','eForma'].forEach(i=>$('#'+i).disabled=!!lock);
+  const n=$('#eNote');n.style.display=lock?'block':'none';n.textContent=lock?`Cobrança ${d.statusAsaas} no Asaas: valor, vencimento e forma de pagamento não podem mais ser alterados.`:'';
+  de.showModal()}
+$('#fEdit').onsubmit=async e=>{e.preventDefault();const b=$('#eOk');b.disabled=true;
+  const cat=$('#eCat').value;
+  const body={titulo:$('#eTit').value,categoria:cat,plano:cat===S.listas.licenca?$('#ePl').value:'',tipo:$('#eTipo').value,obs:$('#eObs').value,doc:$('#eDoc').value};
+  if(!$('#eVal').disabled){body.valor=+$('#eVal').value;body.venc=$('#eVenc').value;body.forma=$('#eForma').value}
+  try{const r=await api('POST',`/api/deals/${edId}/editar`,body);de.close();
+    toast(!r.alterado?'Nada foi alterado':r.asaas?.enviado?.length?`Salvo no Bitrix e enviado ao Asaas (${r.asaas.enviado.join(', ')})`:r.asaas?.bloqueado?r.asaas.bloqueado:'Salvo no Bitrix');load()}
+  catch(x){toast(x.message)}b.disabled=false};
+// ---- consulta por data, ordenação, agrupamento, exportação ----
+const setRange=(a,b)=>{dFrom=a;dTo=b;$('#dFrom').value=a;$('#dTo').value=b;render()};
+$('#dField').onchange=e=>{dF=e.target.value;render()};
+$('#dFrom').onchange=e=>{dFrom=e.target.value;render()};$('#dTo').onchange=e=>{dTo=e.target.value;render()};
+document.querySelector('.fbar').onclick=e=>{const b=e.target.closest('.chip2[data-p]');if(!b)return;const h=S.hoje,p=b.dataset.p;
+  if(p==='hoje')setRange(h,h);else if(p==='semana'){const dow=new Date(h+'T00:00:00Z').getUTCDay();const ini=addD(h,-(dow===0?6:dow-1));setRange(ini,addD(ini,6))}
+  else if(p==='mes')setRange(...monthRange(h,0));else if(p==='passado')setRange(...monthRange(h,-1));else if(p==='prox30')setRange(h,addD(h,30));else setRange('','');
+  b.classList.add('on')};
+$('#gMes').onchange=e=>{groupMes=e.target.checked;render()};
+document.querySelector('thead').onclick=e=>{const th=e.target.closest('th.s');if(!th)return;if(sortK===th.dataset.k)sortD*=-1;else{sortK=th.dataset.k;sortD=1}render()};
+$('#bCsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const head=['ID','Cliente','Título','Categoria','Tipo de licença','Parcela','Forma','Valor','Vencimento','Pago em','Criado em','Situação','Status Asaas','CPF/CNPJ','Observações'];
+  const rows=CURLIST.map(d=>[d.id,d.cliente,d.titulo,d.categoria,d.plano,d.parcela,FORMA[d.forma]||'',String(d.valor).replace('.',','),dbr(d.venc),dbr(d.pagoEm),dbr(d.criado),(STAGE[d.stageId]||[d.etapa])[0],d.statusAsaas,d.doc,d.obs].map(q).join(';'));
+  const blob=new Blob(['\ufeff'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lancamentos-${S.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${CURLIST.length} lançamento(s) exportados`)};
 $('#rows').onclick=async e=>{const b=e.target.closest('[data-a]');if(!b)return;const {a,id}=b.dataset;
-  if(a==='classify'){const d=S.deals.find(x=>x.id==id);clId=id;$('#clHint').textContent=`#${d.id} · ${d.titulo}`;fillSel($('#clCat'),S.listas.categorias,d.categoria,'Sem categoria');fillSel($('#clPl'),S.listas.planos,d.plano,'Sem plano');plWrap($('#clCat'),$('#clPlWrap'));b.closest('details')&&(b.closest('details').open=false);dc.showModal();return}
+  if(a==='editar'){b.closest('details')&&(b.closest('details').open=false);openEdit(id);return}
   try{
     if(a==='cancel'&&!confirm('Cancelar esta cobrança? Se já estiver emitida, será cancelada no Asaas.'))return;
     if(a==='remind'&&!confirm('Acionar o gatilho de cobrança desta deal agora?'))return;
@@ -395,7 +470,7 @@ $('#bSave').onclick=e=>busy(e.currentTarget,async()=>{try{if(!$('#bHook').value.
 $('#bVerify').onclick=e=>busy(e.currentTarget,async()=>{try{const r=await api('POST','/api/settings/verificar');
   res($('#bRes'),true,`Funil pronto${r.camposCriados.length?` · ${r.camposCriados.length} campo(s) criado(s)`:''} · listas: ${r.listas.categorias} categorias, ${r.listas.planos} planos, ${r.listas.tipos} tipos, ${r.listas.formas} formas · Asaas ${r.asaas}`)}catch(x){res($('#bRes'),false,x.message)}});
 $('#cOk').onclick=e=>busy(e.currentTarget,async()=>{try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,importAuto:$('#cImp').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value,importDias:$('#cImpDias').value});toast('Automação salva');loadSettings()}catch(x){toast(x.message)}});
-[g,dc,di].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+[g,de,di].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 if(location.hash==='#config')showView('cfg');
 load();setInterval(load,60000);
 </script>

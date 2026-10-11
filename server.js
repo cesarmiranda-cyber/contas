@@ -78,6 +78,7 @@ const dealRoutes = {
   },
   cancel: async c => { await svc.cancel(c); return { ok: true }; },
   gerar: async c => svc.expandNow(c),
+  editar: async (c, body) => svc.editar(c, body),
   categoria: async (c, body) => { await svc.classify(c, String(body.categoria || ''), String(body.plano || '')); return { ok: true }; },
   doc: async (c, body) => { await svc.setDoc(c.id, body.doc); return { ok: true }; },
 };
@@ -89,7 +90,7 @@ const server = http.createServer(async (req, res) => {
     const key = `${req.method} ${u.pathname}`;
     if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
-    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar)$/);
+    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar|editar)$/);
     if (m && req.method === 'POST') {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });
