@@ -121,3 +121,19 @@ test('sync consulta o Asaas em lote: cobranças ativas não são buscadas uma a 
   assert.deepEqual(w.gets, [id]);
   assert.equal(w.deals[0].STAGE_ID, R.STAGES.paid);
 });
+
+test('valor guardado arredondado no campo antigo não gera alerta falso nem envia valor ao Asaas', async () => {
+  const w = world([]);
+  w.pays.pz = { id: 'pz', status: 'PENDING', value: 1927.7, dueDate: R.addMonths(today, 1), billingType: 'BOLETO', customer: 'cus_x', description: 'Parcela\n2 de 12', invoiceUrl: 'u' };
+  await w.svc.importar({ dias: 90 });
+  const d = w.deals.find(x => x.UF_CRM_CR_ASAAS_ID === 'pz');
+  assert.equal(d.TITLE, 'Parcela 2 de 12');                  // título em uma linha
+  d.UF_CRM_CR_VALOR_ASAAS = '1928';                           // como o campo sem casas decimais gravava
+  const r = await w.svc.sync();
+  assert.equal(r.errors.length, 0, r.errors.join(';'));
+  assert.equal(w.updates.length, 0);                          // nada enviado ao Asaas
+  assert.equal(w.pays.pz.value, 1927.7);
+  assert.equal(d.UF_CRM_CR_VALOR_ASAAS, 1927.7);              // campo corrigido com os centavos
+  const v = (await w.svc.dealsCached(0)).find(x => x.id === +d.ID);
+  assert.ok(!v.pendencias.some(p => /difere/.test(p.msg)));
+});
