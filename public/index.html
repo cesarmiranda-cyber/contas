@@ -97,6 +97,11 @@ th.s{cursor:pointer;user-select:none}th.s:hover{color:var(--brand)}th.s .ar{opac
 tr.grp td{background:var(--surface2);font-weight:650;padding:9px 16px;border-top:1px solid var(--line);color:var(--ink2)}tr.grp td span{font-weight:500;color:var(--mut);margin-left:10px}tr.grp:hover{background:transparent}
 .dlg-sub{color:var(--mut);font-size:12.5px;margin:0 0 4px}.note{font-size:12px;color:var(--amber);background:var(--amberbg);padding:8px 10px;border-radius:9px;margin-top:10px;display:none}
 textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 12px;outline:none;width:100%;resize:vertical;min-height:70px}textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brandbg)}
+.cli-card{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 18px;margin-bottom:16px}.cli-card .av{width:46px;height:46px;font-size:15px}
+.cli-card h2{margin:0;font-size:17px}.cli-card .meta{display:flex;gap:6px 16px;flex-wrap:wrap;color:var(--mut);font-size:12.5px;margin-top:2px}.cli-card .tag{margin-left:auto}
+body.scoped #bImp,body.scoped #bCfg,body.scoped .cuts,body.scoped details.logc,body.scoped #agingCard,body.scoped #fCat,body.scoped #fPlano{display:none!important}
+body.scoped .hero{grid-template-columns:1fr}
+tbody tr.cur{background:var(--brandbg)}tbody tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
 .empty{padding:56px 20px;text-align:center;color:var(--mut)}.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--graybg),var(--surface2),var(--graybg));background-size:200% 100%;animation:sk 1.2s infinite}@keyframes sk{to{background-position:-200% 0}}
 .logc{margin-top:16px}.logc summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between}.logc summary::-webkit-details-marker{display:none}
@@ -136,9 +141,10 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 
 <div class="banner" id="banner"><span id="bannerTxt"></span><button class="btn" id="bannerBtn">Abrir Configurações</button></div>
 <main id="viewMain">
+  <div id="cliCard" class="card cli-card" style="display:none"></div>
   <section class="hero">
     <div class="card pad" id="hero"><div class="skel" style="width:40%"></div><div class="skel" style="width:60%;height:34px;margin-top:14px"></div></div>
-    <div class="card pad"><div class="eyebrow">Atraso por faixa</div><div class="agebars" id="aging"></div></div>
+    <div class="card pad" id="agingCard"><div class="eyebrow">Atraso por faixa</div><div class="agebars" id="aging"></div></div>
   </section>
   <section class="kpis" id="kpis"></section>
   <section class="cuts">
@@ -264,6 +270,12 @@ const STAGE={'C90:GERAR':['Gerar cobranças','c-brand'],'C90:CONTRATADO':['Contr
 const FORMA={BOLETO:'Boleto',PIX:'Pix',CREDIT_CARD:'Cartão',UNDEFINED:'Livre'};
 const AVC=['c-blue','c-green','c-amber','c-red','c-gray'];
 const isC=d=>d.stageId==='C90:GERAR'||d.stageId==='C90:CONTRATADO';
+// Dentro de uma aba do Bitrix (deal/empresa/contato) a URL traz o card aberto; o servidor resolve o cliente e filtra.
+const QS=new URLSearchParams(location.search),PL=QS.get('placement')||'';
+let PO={};try{PO=JSON.parse(QS.get('placement_options')||'{}')}catch{}
+const SCOPE=/^\d+$/.test(String(PO.ID||''))?(/DEAL_DETAIL/.test(PL)?`deal=${PO.ID}`:/COMPANY_DETAIL/.test(PL)?`company=${PO.ID}`:/CONTACT_DETAIL/.test(PL)?`contact=${PO.ID}`:''):'';
+if(SCOPE)document.body.classList.add('scoped');
+const CUR_DEAL=/DEAL_DETAIL/.test(PL)?+PO.ID:0;
 let CURLIST=[];
 let S=null,filter='todos',cliSel=null,fCat='',fPlano='';
 let dF='venc',dFrom='',dTo='',sortK='venc',sortD=1,groupMes=false;
@@ -275,7 +287,8 @@ const STAGE_ORD={'C90:GERAR':0,'C90:PREPARATION':1,'C90:PREPAYMENT_INVOIC':2,'C9
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),4200)}
 async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
-async function load(){try{S=await api('GET','/api/state');$('#banner').style.display='none';render()}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message);if(/não configurado/i.test(e.message)){$('#bannerTxt').textContent='Falta conectar o Bitrix24. Abra as Configurações e informe o webhook.';$('#banner').style.display='flex'}}}
+async function load(){try{S=await api('GET','/api/state'+(SCOPE?'?'+SCOPE:''));$('#banner').style.display='none';render()}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message);if(/não configurado/i.test(e.message)){$('#bannerTxt').textContent='Falta conectar o Bitrix24. Abra as Configurações e informe o webhook.';$('#banner').style.display='flex'}}}
+const fmtDoc=d=>{d=String(d||'').replace(/\D/g,'');return d.length===11?d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4'):d.length===14?d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):d};
 const initials=n=>(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase();
 function dueText(d){
   if(!d.venc)return['<span class="mut">Sem data</span>',''];
@@ -289,6 +302,11 @@ function dueText(d){
 }
 function render(){
   const k=S.kpis,ls=S.lastSync;
+  const cc=$('#cliCard');
+  if(S.escopo){const e=S.escopo;document.querySelector('.ttl h1').textContent='Cobranças do cliente';
+    cc.style.display='flex';cc.innerHTML=`<div class="av c-blue">${esc(initials(e.nome||'?'))}</div><div><h2>${esc(e.nome||'Cliente sem nome')}</h2><div class="meta">${e.doc?`<span>${e.doc.length===11?'CPF':'CNPJ'} ${esc(fmtDoc(e.doc))}</span>`:''}${e.email?`<span>${esc(e.email)}</span>`:''}${e.telefone?`<span>${esc(e.telefone)}</span>`:''}</div></div><span class="tag">${e.qtd} lançamento${e.qtd===1?'':'s'} no funil Contas</span>`;
+    if(e.tipo==='nenhum'){cc.innerHTML=`<div class="av c-gray">?</div><div><h2>Esta deal não tem cliente</h2><div class="meta"><span>Vincule uma empresa ou contato à deal para ver as cobranças.</span></div></div>`}}
+  else cc.style.display='none';
   const hasErr=ls?.errors?.length;
   const lq=S.lastQuick,hm=a=>new Date(a).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
   $('#sub').innerHTML=`<span class="dot ${hasErr?'err':ls?'':'off'}"></span>${ls?`Sincronizado ${new Date(ls.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${hasErr?` · ${ls.errors.length} erro(s)`:''}`:'Aguardando primeira sincronização'}${lq?` · pagamentos e vencimentos verificados às ${hm(lq.at)}`:''}`;
@@ -340,7 +358,7 @@ function render(){
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
-    return `<tr>
+    return `<tr class="${d.id===CUR_DEAL?'cur':''}">
       <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
       <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
@@ -422,7 +440,7 @@ function prev(){const t=+$('#gTot').value,n=+$('#gN').value||1,tp=$('#gTipo').va
   $('#gTotLbl').textContent=tp==='RECORRENTE'?'Valor mensal (R$)':'Valor total (R$)';$('#gNLbl').textContent=tp==='RECORRENTE'?'Nº de meses':'Nº de parcelas';$('#gN').disabled=tp==='UNICA';
   $('#gPrev').textContent=t>0?(tp==='RECORRENTE'?`${n} cobranças mensais de ${brl(t)} = ${brl(t*n)}`:tp==='UNICA'?`1 cobrança de ${brl(t)}`:`${n}× de ≈ ${brl(t/n)}`):''}
 ['gTot','gN','gTipo'].forEach(i=>$('#'+i).addEventListener('input',prev));
-$('#bGerar').onclick=()=>{cliSel=null;$('#fGerar').reset();$('#gSel').style.display='none';fillSel($('#gCat'),S.listas.categorias,'','Sem categoria');fillSel($('#gPl'),S.listas.planos,'','Sem plano');plWrap($('#gCat'),$('#gPlWrap'));prev();g.showModal()};
+$('#bGerar').onclick=()=>{cliSel=null;$('#fGerar').reset();$('#gSel').style.display='none';fillSel($('#gCat'),S.listas.categorias,'','Sem categoria');fillSel($('#gPl'),S.listas.planos,'','Sem plano');plWrap($('#gCat'),$('#gPlWrap'));prev();if(S.escopo&&(S.escopo.companyId||S.escopo.contactId)){cliSel=S.escopo.companyId?{tipo:'company',id:S.escopo.companyId,nome:S.escopo.nome}:{tipo:'contact',id:S.escopo.contactId,nome:S.escopo.nome};$('#gCli').value=S.escopo.nome;$('#gCli').readOnly=true}else $('#gCli').readOnly=false;g.showModal()};
 $('#gCancel').onclick=()=>g.close();
 $('#gBusca').onclick=async()=>{const q=$('#gCli').value.trim();if(q.length<2)return;try{const r=await api('GET','/api/clientes?q='+encodeURIComponent(q));const s=$('#gSel');s.innerHTML=r.map(c=>`<option value='${esc(JSON.stringify(c))}'>${c.tipo==='company'?'🏢':'👤'} ${esc(c.nome)} (#${c.id})</option>`).join('')||'<option disabled>Nada encontrado</option>';s.style.display='block'}catch(x){toast(x.message)}};
 $('#gSel').onchange=e=>{cliSel=JSON.parse(e.target.value);$('#gCli').value=cliSel.nome};
@@ -472,7 +490,7 @@ $('#bVerify').onclick=e=>busy(e.currentTarget,async()=>{try{const r=await api('P
   res($('#bRes'),true,`Funil pronto${r.camposCriados.length?` · ${r.camposCriados.length} campo(s) criado(s)`:''} · listas: ${r.listas.categorias} categorias, ${r.listas.planos} planos, ${r.listas.tipos} tipos, ${r.listas.formas} formas · Asaas ${r.asaas}`)}catch(x){res($('#bRes'),false,x.message)}});
 $('#cOk').onclick=e=>busy(e.currentTarget,async()=>{try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,importAuto:$('#cImp').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value,importDias:$('#cImpDias').value});toast('Automação salva');loadSettings()}catch(x){toast(x.message)}});
 [g,de,di].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
-if(location.hash==='#config')showView('cfg');
+if(location.hash==='#config'&&!SCOPE)showView('cfg');
 load();setInterval(load,60000);
 </script>
 </body>

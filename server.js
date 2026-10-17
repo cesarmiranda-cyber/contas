@@ -42,12 +42,13 @@ const readBody = req => new Promise((ok, no) => {
 const routes = {
   ...settings.routes,
   'GET /health': async () => ({ ok: true }),
-  'GET /api/state': async () => {
+  'GET /api/state': async (u) => {
     if (!bitrix.enabled) { const e = new Error('Bitrix24 não configurado'); e.status = 503; throw e; }
-    const deals = await svc.dealsCached();
+    const q = u.searchParams;
+    const { deals, kpis, escopo } = await svc.estado({ deal: q.get('deal'), company: q.get('company'), contact: q.get('contact') });
     return {
-      config: store.config, asaas: { enabled: asaas.enabled, env: asaas.env },
-      kpis: svc.kpis(deals), deals, lastSync: store.lastSync, lastQuick: store.lastQuick, logs: store.logs.slice(0, 50),
+      config: store.config, asaas: { enabled: asaas.enabled, env: asaas.env }, escopo,
+      kpis, deals, lastSync: store.lastSync, lastQuick: store.lastQuick, logs: escopo ? store.logs.filter(l => l.deal && deals.some(d => d.id === l.deal)).slice(0, 50) : store.logs.slice(0, 50),
       hoje: R.todayBR(),
       listas: { categorias: Object.values((await svc.loadEnums()).categoria), planos: Object.values((await svc.loadEnums()).plano), licenca: R.CATEGORIA_LICENCA },
     };
