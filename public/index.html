@@ -116,6 +116,38 @@ body.scoped .vtabs{display:none}
 details.adv{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:0 12px}details.adv summary{cursor:pointer;padding:11px 0;font-weight:600;color:var(--ink2)}details.adv[open]{padding-bottom:12px}
 .opts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.opts .btn{flex:1;min-width:150px;justify-content:center}
 .wtbl{width:100%;min-width:0;border-collapse:collapse;margin-top:8px}.wtbl td{padding:8px 4px;border-top:1px solid var(--line);font-size:13px}
+:root{--v1:#2a78d6;--v2:#eb6834;--v3:#1baf7a;--vw:#fab219;--vc:#d03b3b;--o1:#86b6ef;--o2:#3987e5;--o3:#1c5cab;--o4:#104281}
+@media(prefers-color-scheme:dark){:root{--v1:#3987e5;--v2:#d95926;--v3:#199e70;--o1:#184f95;--o2:#2a78d6;--o3:#5598e7;--o4:#9ec5f4}}
+.dwrap{display:grid;gap:16px}.dfilter{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dfilter .mini{margin-left:auto}
+.dgrid{display:grid;gap:16px}.dg-top{grid-template-columns:minmax(250px,.9fr) 2fr}.dg-tiles{grid-template-columns:repeat(4,1fr)}.dg-two{grid-template-columns:1fr 1fr}
+.vcard{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px}
+.vhead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}.vhead h3{margin:0;font-size:14px}.vhead .sub{color:var(--mut);font-size:12px;margin-top:2px}
+.tbtn{border:1px solid var(--line);background:transparent;color:var(--ink2);border-radius:8px;padding:3px 9px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}.tbtn:hover{border-color:var(--brand);color:var(--brand)}
+.hero-n{font-size:56px;font-weight:700;letter-spacing:-.03em;line-height:1;margin:6px 0 4px}.hero-l{display:inline-flex;gap:6px;align-items:center;font-weight:650;font-size:14px}
+.nivel-ok{color:var(--ink)}.sev{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:650;color:var(--ink2)}
+.leg2{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2);margin-bottom:8px}.leg2 span{display:inline-flex;align-items:center;gap:6px}.leg2 i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.vsvg{width:100%;height:auto;display:block;overflow:visible}.vsvg text{fill:var(--mut);font:11px system-ui,sans-serif}.vsvg text.cur{fill:var(--ink);font-weight:700}.vsvg .grid{stroke:var(--line);stroke-width:1}.vsvg .axis{stroke:var(--line);stroke-width:1}.vsvg .lbl{fill:var(--ink2);font-weight:650}
+.vsvg .hit{fill:transparent;cursor:default}.vsvg .hit:hover,.vsvg .hit:focus{fill:color-mix(in srgb,var(--ink) 5%,transparent);outline:none}
+.hb{display:grid;grid-template-columns:78px 1fr auto;gap:10px;align-items:center;padding:6px 4px;border-radius:8px;font-size:13px}.hb:hover{background:var(--surface2)}
+.hb .tr{height:14px;background:var(--graybg);border-radius:0 4px 4px 0}.hb .tr i{display:block;height:100%;border-radius:0 4px 4px 0;min-width:2px}.hb b{font-variant-numeric:tabular-nums;font-size:12.5px;white-space:nowrap}.hb .nm{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb.wide{grid-template-columns:minmax(90px,1.1fr) 2fr auto}
+.mt{display:grid;grid-template-columns:130px 1fr;gap:4px 14px;padding:9px 0;border-top:1px solid var(--line);align-items:center}.mt:first-of-type{border-top:0}.mt .n{font-weight:600;font-size:13px}.mt .tr{height:10px;background:var(--graybg);border-radius:99px;overflow:hidden;position:relative}.mt .tr i{display:block;height:100%;border-radius:99px}
+.mt .d{grid-column:2;font-size:12px;color:var(--mut);display:flex;gap:8px;align-items:center;flex-wrap:wrap}.mt .v{font-weight:700;font-size:13px;margin-left:auto}
+.ins{display:grid;gap:8px}.ins div{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--ink);padding:9px 11px;border-radius:11px;background:var(--surface2);border:1px solid var(--line)}.ins svg{flex:none;margin-top:1px}.ins .a svg{color:var(--vc)}.ins .i svg{color:var(--v1)}.ins .o svg{color:var(--v3)}
+.tile{display:flex;gap:12px;align-items:flex-start}.tile .v{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.15}.tile .s{font-size:12px;color:var(--mut);margin-top:3px}.tile .dl{font-weight:650;font-size:12px}
+.dtbl{width:100%;min-width:0;border-collapse:collapse;font-size:13px}.dtbl th,.dtbl td{padding:7px 8px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}.dtbl th:first-child,.dtbl td:first-child{text-align:left}.dtbl thead th{border-top:0;background:transparent;color:var(--mut);font-size:11.5px}
+.vtip{position:fixed;z-index:200;pointer-events:none;display:none;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:0 14px 34px -10px rgba(0,0,0,.35);border-radius:10px;padding:9px 11px;font-size:12.5px;min-width:150px;max-width:260px}
+.vtip b{display:block;margin-bottom:5px;color:var(--ink2);font-size:12px}.vtip .tr{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:1px 0}.vtip .tr span{color:var(--ink2);flex:1}.vtip .tr strong{font-variant-numeric:tabular-nums}.vtip .tr i{width:12px;height:3px;border-radius:2px;display:inline-block}
+.busy{opacity:.55;transition:opacity .15s}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(620px,100vw);background:var(--bg);border-left:1px solid var(--line);box-shadow:-24px 0 60px -20px rgba(0,0,0,.35);z-index:60;display:flex;flex-direction:column;transform:translateX(102%);transition:transform .22s}
+.drawer.open{transform:none}.drawer header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;margin:0;background:var(--surface)}.drawer h2{margin:0;font-size:16px}.drawer .body{overflow:auto;padding:16px;flex:1}
+.dim{position:fixed;inset:0;background:rgba(10,14,28,.35);z-index:55;display:none}.dim.on{display:block}
+body.scoped #scopedDash{display:block}#scopedDash{display:none;margin-bottom:16px}
+body.scoped .hero,body.scoped .kpis{display:none}
+body.scoped #bDash{display:none}
+@media(max-width:980px){.dg-top,.dg-two{grid-template-columns:1fr}.dg-tiles{grid-template-columns:1fr 1fr}.hero-n{font-size:48px}}
+@media(max-width:640px){.mt{grid-template-columns:1fr}.mt .d{grid-column:1}.dg-tiles{grid-template-columns:1fr}}
+.dwrap.compact .dg-top,.dwrap.compact .dg-two{grid-template-columns:1fr}.dwrap.compact .dg-tiles{grid-template-columns:1fr 1fr}
 .empty{padding:56px 20px;text-align:center;color:var(--mut)}.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--graybg),var(--surface2),var(--graybg));background-size:200% 100%;animation:sk 1.2s infinite}@keyframes sk{to{background-position:-200% 0}}
 .logc{margin-top:16px}.logc summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between}.logc summary::-webkit-details-marker{display:none}
@@ -148,6 +180,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="tools">
     <span class="env bad" id="env"></span>
     <button class="btn pri" id="bNova"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nova cobrança</span></button>
+    <button class="btn" id="bDash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="lbl">Painel financeiro</span></button>
     <button class="btn" id="bGerar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Gerar parcelas</span></button>
     <button class="btn" id="bImp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span class="lbl">Importar do Asaas</span></button>
     <button class="btn" id="bCfg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Configurações</span></button>
@@ -157,8 +190,9 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 
 <div class="banner" id="banner"><span id="bannerTxt"></span><button class="btn" id="bannerBtn">Abrir Configurações</button></div>
 <main id="viewMain">
-  <div class="vtabs" id="vtabs"><button class="on" data-v="main">Lançamentos</button><button data-v="subs">Assinaturas</button><button data-v="links">Links de pagamento</button></div>
+  <div class="vtabs" data-active="main"></div>
   <div id="cliCard" class="card cli-card" style="display:none"></div>
+  <section id="scopedDash"></section>
   <section class="hero">
     <div class="card pad" id="hero"><div class="skel" style="width:40%"></div><div class="skel" style="width:60%;height:34px;margin-top:14px"></div></div>
     <div class="card pad" id="agingCard"><div class="eyebrow">Atraso por faixa</div><div class="agebars" id="aging"></div></div>
@@ -194,8 +228,12 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <details class="card logc"><summary><span>Atividade recente</span><span class="mut" id="logn"></span></summary><div class="log" id="log"></div></details>
 </main>
 
+<main id="viewDash" hidden>
+  <div class="vtabs" data-active="dash"></div>
+  <div id="dashHost"></div>
+</main>
 <main id="viewSubs" hidden>
-  <div class="vtabs"><button data-v="main">Lançamentos</button><button class="on" data-v="subs">Assinaturas</button><button data-v="links">Links de pagamento</button></div>
+  <div class="vtabs" data-active="subs"></div>
   <section class="card">
     <div class="toolbar"><div class="seg" id="subSeg"><button data-s="ACTIVE" class="on">Ativas</button><button data-s="INACTIVE">Inativas</button></div><div style="display:flex;gap:8px"><button class="btn" id="subRef">Atualizar</button><button class="btn pri" id="subNova">+ Nova assinatura</button></div></div>
     <div class="tw"><table><thead><tr><th>Cliente</th><th>Valor</th><th>Ciclo</th><th>Próx. vencimento</th><th>Forma</th><th>Situação</th><th></th></tr></thead><tbody id="subRows"></tbody></table></div>
@@ -203,7 +241,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   </section>
 </main>
 <main id="viewLinks" hidden>
-  <div class="vtabs"><button data-v="main">Lançamentos</button><button data-v="subs">Assinaturas</button><button class="on" data-v="links">Links de pagamento</button></div>
+  <div class="vtabs" data-active="links"></div>
   <section class="card">
     <div class="toolbar"><div class="mini">Links reutilizáveis: o cliente abre, escolhe a forma de pagamento e paga. Cada pagamento vira um card no funil (com a importação do Asaas ligada).</div><button class="btn pri" id="linkNovo">+ Novo link</button></div>
     <div class="tw"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Valor</th><th>Forma</th><th>Criado em</th><th></th></tr></thead><tbody id="linkRows"></tbody></table></div>
@@ -337,6 +375,8 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <p class="dlg-sub" style="margin-top:12px">Salvo na deal do Bitrix. Se já existe cobrança no Asaas, valor, vencimento, forma e descrição são atualizados lá também.</p>
   <div class="foot"><button type="button" class="btn" id="eCancel">Cancelar</button><button class="btn pri" id="eOk">Salvar</button></div>
 </form></dialog>
+<div class="dim" id="dim"></div>
+<aside class="drawer" id="drawer" aria-label="Painel financeiro" aria-hidden="true"><header><h2>Painel financeiro</h2><button class="btn sm" id="drClose">Fechar</button></header><div class="body" id="drBody"></div></aside>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -367,7 +407,7 @@ const STAGE_ORD={'C90:GERAR':0,'C90:PREPARATION':1,'C90:PREPAYMENT_INVOIC':2,'C9
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),4200)}
 async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
-async function load(){try{S=await api('GET','/api/state'+(SCOPE?'?'+SCOPE:''));$('#banner').style.display='none';render()}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message);if(/não configurado/i.test(e.message)){$('#bannerTxt').textContent='Falta conectar o Bitrix24. Abra as Configurações e informe o webhook.';$('#banner').style.display='flex'}}}
+async function load(){try{S=await api('GET','/api/state'+(SCOPE?'?'+SCOPE:''));$('#banner').style.display='none';render();if(SCOPE&&typeof loadDash==='function')loadDash($('#scopedDash'),{})}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message);if(/não configurado/i.test(e.message)){$('#bannerTxt').textContent='Falta conectar o Bitrix24. Abra as Configurações e informe o webhook.';$('#banner').style.display='flex'}}}
 const fmtDoc=d=>{d=String(d||'').replace(/\D/g,'');return d.length===11?d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4'):d.length===14?d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):d};
 const initials=n=>(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase();
 function dueText(d){
@@ -542,10 +582,12 @@ $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disable
 let CFG=null,aEnv='sandbox';
 const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
 const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
-function showView(v){['main','cfg','subs','links'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
+function showView(v){['main','cfg','subs','links','dash'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
   if(v==='cfg'){loadSettings();location.hash='config'}else history.replaceState(null,'',location.pathname+location.search);
-  if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();window.scrollTo(0,0)}
-document.querySelectorAll('.vtabs button[data-v]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.v)));
+  if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();if(v==='dash')loadDash($('#dashHost'),{});window.scrollTo(0,0)}
+const VTABS=[['main','Lançamentos'],['dash','Dashboard'],['subs','Assinaturas'],['links','Links de pagamento']];
+document.querySelectorAll('.vtabs').forEach(v=>{v.innerHTML=VTABS.map(([k,l])=>`<button data-v="${k}" class="${v.dataset.active===k?'on':''}">${l}</button>`).join('')});
+document.addEventListener('click',e=>{const b=e.target.closest('.vtabs button[data-v]');if(b)showView(b.dataset.v)});
 $('#bCfg').onclick=()=>showView('cfg');$('#cBack').onclick=()=>showView('main');$('#bannerBtn').onclick=()=>showView('cfg');
 function setEnv(e){aEnv=e;document.querySelectorAll('#aEnv button').forEach(b=>b.classList.toggle('on',b.dataset.e===e));
   $('#aConfWrap').style.display=e==='production'?'flex':'none';
@@ -699,6 +741,101 @@ async function loadWallets(){let w=[];try{w=await api('GET','/api/carteiras')}ca
 $('#wRows').onclick=async e=>{const b=e.target.closest('button[data-wd]');if(!b)return;if(!confirm('Remover este recebedor? Lançamentos que já usam o nome dele no campo de split deixarão de emitir até corrigir.'))return;try{await api('DELETE','/api/carteiras/'+encodeURIComponent(b.dataset.wd));loadWallets()}catch(x){toast(x.message)}};
 $('#wAdd').onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{await api('POST','/api/carteiras',{nome:$('#wNome').value,walletId:$('#wId').value});$('#wNome').value='';$('#wId').value='';res($('#wRes'),true,'Recebedor cadastrado.');loadWallets()}catch(x){res($('#wRes'),false,x.message)}b.disabled=false};
 [dn,dd,dsb].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+
+// ================= painel financeiro =================
+let DM=6;
+const axisFmt=v=>v>=1e6?(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mi':v>=1e3?(v/1e3).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil':String(Math.round(v));
+const brlC=v=>'R$ '+axisFmt(v);
+function niceScale(v){if(!(v>0))return{max:100,step:25};const raw=v/4,p=10**Math.floor(Math.log10(raw)),f=raw/p,step=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;return{step,max:Math.ceil(v/step-1e-9)*step}}
+const SER=[['recebido','Recebido','var(--v1)'],['atrasado','Em atraso','var(--v2)'],['aVencer','A vencer','var(--v3)']];
+const tipAttr=t=>`data-tip="${esc(JSON.stringify(t))}"`;
+const roundTop=(x,y,w,h,r,c)=>{r=Math.min(r,h,w/2);return `<path d="M${x},${y+h}L${x},${y+r}Q${x},${y} ${x+r},${y}L${x+w-r},${y}Q${x+w},${y} ${x+w},${y+r}L${x+w},${y+h}Z" fill="${c}"/>`};
+
+function chartTimeline(linha,W){
+  const H=262,ml=46,mr=8,mt=18,mb=40,pw=W-ml-mr,ph=H-mt-mb,n=linha.length,slot=pw/n,bw=Math.min(24,slot*.62);
+  const tot=x=>x.recebido+x.atrasado+x.aVencer,sc=niceScale(Math.max(...linha.map(tot),1)),max=sc.max,every=n>13?(W<520?3:2):(W<420?2:1),ticks=Math.round(max/sc.step);
+  let g='',bars='',hits='',lab='',xl='';
+  for(let i=0;i<=ticks;i++){const y=mt+ph-ph*i/ticks;g+=`<line class="grid" x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}"/><text x="${ml-8}" y="${y+4}" text-anchor="end">${axisFmt(sc.step*i)}</text>`}
+  linha.forEach((x,i)=>{
+    const cx=ml+slot*i+slot/2,x0=cx-bw/2,base=mt+ph;let acc=0;
+    const segs=SER.filter(([k])=>x[k]>0);
+    segs.forEach(([k,nome,c],si)=>{const h=x[k]/max*ph,top=base-acc-h,hh=Math.max(1,h-(si>0?2:0));bars+=si===segs.length-1?roundTop(x0,top,bw,hh,4,c):`<rect x="${x0}" y="${top}" width="${bw}" height="${hh}" fill="${c}"/>`;acc+=h});
+    if(x.atual&&tot(x)>0)lab+=`<text class="lbl" x="${cx}" y="${base-acc-6}" text-anchor="middle">${brlC(tot(x))}</text>`;
+    if(i%every===0||x.atual)xl+=`<text class="${x.atual?'cur':''}" x="${cx}" y="${H-mb+16}" text-anchor="middle">${esc(x.label)}</text>`;
+    if(x.atual)xl+=`<text x="${cx}" y="${H-mb+29}" text-anchor="middle" style="font-size:10px">hoje</text>`;
+    const rows=[...SER.filter(([k])=>x[k]>0).map(([k,nome,c])=>[nome,brl(x[k]),c]),['Total',brl(tot(x))]];
+    hits+=`<rect class="hit" tabindex="0" role="img" aria-label="${esc(x.label)}: total ${esc(brl(tot(x)))}" x="${ml+slot*i}" y="${mt}" width="${slot}" height="${ph}" ${tipAttr({t:x.label+(x.atual?' · mês atual':x.futuro?' · previsão':''),rows})}/>`;
+  });
+  return `<svg class="vsvg" viewBox="0 0 ${W} ${H}" role="group" aria-label="Recebido, em atraso e a vencer por mês">${g}<line class="axis" x1="${ml}" x2="${W-mr}" y1="${mt+ph}" y2="${mt+ph}"/>${bars}${lab}${xl}${hits}</svg>`;
+}
+const twinTable=(head,rows)=>`<table class="dtbl"><thead><tr>${head.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+const card=(title,sub,chart,table,extra='')=>`<div class="vcard" ${table?'data-twin':''}><div class="vhead"><div><h3>${title}</h3>${sub?`<div class="sub">${sub}</div>`:''}</div>${table?'<button type="button" class="tbtn" data-twin-btn>Ver tabela</button>':''}</div>${extra}<div class="cv">${chart}</div>${table?`<div class="tv" hidden>${table}</div>`:''}</div>`;
+
+function sevOf(v){return v>=70?['var(--v1)','Bom',I.check]:v>=50?['var(--vw)','Atenção',I.alert]:['var(--vc)','Crítico',I.x]}
+function meters(comps){return comps.map(c=>{const [col,lbl,icn]=sevOf(c.valor);return `<div class="mt"><div class="n">${esc(c.nome)}</div><div class="tr" style="background:color-mix(in srgb,${col} 18%,var(--surface))" ${tipAttr({t:c.nome,rows:[['Nota',String(Math.round(c.valor))+' / 100'],['Peso na nota',c.peso+'%']]})}><i style="width:${Math.max(2,c.valor)}%;background:${col}"></i></div><div class="d"><span class="sev">${ic(icn,14)}${lbl}</span><span>${esc(c.texto)}</span><span class="v">${Math.round(c.valor)}</span></div></div>`}).join('')}
+
+function hbRows(items,{label,value,color,tip,wide}){const max=Math.max(...items.map(value),1);return items.map(it=>`<div class="hb tipable ${wide?'wide':''}" tabindex="0" ${tipAttr(tip(it))}><span class="nm" title="${esc(label(it))}">${esc(label(it))}</span><div class="tr"><i style="width:${value(it)/max*100}%;background:${color(it)}"></i></div><b>${brl(value(it))}</b></div>`).join('')}
+
+function renderDash(host,pl,o={}){
+  const d=pl.dash,ind=d.individual,r=d.resumo,sd=d.saude,e=pl.escopo;
+  host.className='dwrap'+(o.compact?' compact':'');
+  const NV={excelente:'var(--v1)',boa:'var(--v1)',atencao:'var(--vw)',critica:'var(--vc)','sem-dados':'var(--mut)'}[sd.nivel],NI={excelente:I.check,boa:I.check,atencao:I.alert,critica:I.x,'sem-dados':I.clock}[sd.nivel];
+  const delta=r.recebidoDeltaPct===null?'':`<span class="dl" style="color:${r.recebidoDeltaPct>=0?'var(--ink)':'var(--vc)'}">${r.recebidoDeltaPct>=0?'▲':'▼'} ${Math.abs(r.recebidoDeltaPct).toLocaleString('pt-BR')}% vs mesmo período do mês anterior</span>`;
+  const tile=(cls,icn,l,v,sub)=>`<div class="vcard tile"><div class="ico ${cls}">${ic(icn,20)}</div><div><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${sub}</div></div></div>`;
+  const filt=`<div class="dfilter"><div class="seg">${[3,6,12].map(m=>`<button type="button" data-dm="${m}" class="${DM===m?'on':''}">${m} meses</button>`).join('')}</div><span class="mini">Histórico e indicadores de tendência usam a janela; saldos e atrasos mostram a situação de hoje (${dbr(d.hoje)}).</span></div>`;
+  const hero=`<div class="vcard"><div class="eyebrow">${ind?'Perfil de pagamento':'Saúde financeira'}</div><div class="hero-n">${sd.score===null?'—':sd.score}</div><div class="hero-l" style="color:${NV}">${ic(NI,18)}<span class="nivel-ok">${esc(sd.rotulo)}</span></div>
+    <div class="mini" style="margin-top:8px">${sd.score===null?'Ainda não há histórico suficiente para calcular.':`Nota de 0 a 100 · confiança ${esc(sd.confianca)} · ${d.pontualidade.n+d.eficiencia.n} registros na base`}</div>${sd.teto?`<div class="mini" style="margin-top:6px;color:var(--ink2)">${ic(I.alert,14)} Nota limitada a ${sd.teto.max} por ${esc(sd.teto.motivo)}.</div>`:''}</div>`;
+  const insights=`<div class="vcard"><div class="vhead"><div><h3>O que merece atenção</h3></div></div><div class="ins">${d.insights.map(i=>`<div class="${i.tipo==='alerta'?'a':i.tipo==='ok'?'o':'i'}">${ic(i.tipo==='alerta'?I.alert:i.tipo==='ok'?I.check:I.clock,18)}<span>${esc(i.msg)}</span></div>`).join('')}</div></div>`;
+  const tiles=`<div class="dgrid dg-tiles">${
+    tile('c-blue',I.clock,'Previsto · 30 dias',brl(r.proximos.d30),d.previsao30.esperado!==null?`Esperado pelo histórico: ${brl(d.previsao30.esperado)}`:`${r.aVencer.qtd} título${r.aVencer.qtd===1?'':'s'} a vencer no total`)
+   +tile('c-green',I.check,'Recebido no mês',brl(r.recebidoMes),delta||`${r.pago.qtd} pago${r.pago.qtd===1?'':'s'} no total`)
+   +tile('c-red',I.alert,'Em atraso',brl(r.atrasado.valor),`${r.atrasado.qtd} título${r.atrasado.qtd===1?'':'s'} · ${r.inadimplenciaPct.toLocaleString('pt-BR')}% do a receber`)
+   +(ind?tile('c-gray',I.list,'Total já pago',brl(r.pago.valor),`${r.pago.qtd} pagamento${r.pago.qtd===1?'':'s'} · ticket médio ${brl(d.ticketMedio)}`):tile('c-amber',I.list,'A receber (total)',brl(r.aReceber),`${r.aVencer.qtd+r.atrasado.qtd} título${r.aVencer.qtd+r.atrasado.qtd===1?'':'s'} em aberto`))}</div>`;
+  const tl=d.linha;
+  const timeline=card('Recebimentos e previsão',`Por mês · ${tl.length} meses (${DM-1} antes e ${DM-1} depois do atual)`,
+    chartTimeline(tl,Math.max(300,Math.min(780,(host.clientWidth||780)-40))),
+    twinTable(['Mês','Recebido','Em atraso','A vencer'],tl.map(x=>[x.label+(x.atual?' (atual)':''),brl(x.recebido),brl(x.atrasado),brl(x.aVencer)])),
+    `<div class="leg2">${SER.map(([k,n,c])=>`<span><i style="background:${c}"></i>${n}</span>`).join('')}</div>`);
+  const OC=['var(--o1)','var(--o2)','var(--o3)','var(--o4)'];
+  const aging=card('Atraso por faixa',r.atrasado.qtd?`${r.atrasado.qtd} título${r.atrasado.qtd===1?'':'s'} · mais antigo há ${d.maisAntigo} dias`:'Nada em atraso',
+    r.atrasado.qtd?hbRows(d.aging,{label:a=>a.faixa+' dias',value:a=>a.valor,color:a=>OC[d.aging.indexOf(a)],tip:a=>({t:a.faixa+' dias de atraso',rows:[['Valor',brl(a.valor)],['Títulos',String(a.qtd)]]})}):`<div class="mini" style="padding:14px 4px">${ic(I.check,16)} Sem títulos em atraso.</div>`,
+    twinTable(['Faixa','Valor','Títulos'],d.aging.map(a=>[a.faixa+' dias',brl(a.valor),String(a.qtd)])));
+  const dev=!ind?card('Maiores valores em atraso',d.devedores.length?'Por cliente':'Nenhum cliente em atraso',
+    d.devedores.length?hbRows(d.devedores,{wide:true,label:c=>c.cliente,value:c=>c.valor,color:()=>'var(--v2)',tip:c=>({t:c.cliente,rows:[['Em atraso',brl(c.valor)],['Títulos',String(c.qtd)],['Maior atraso',c.maxAtraso+' dias']]})}):`<div class="mini" style="padding:14px 4px">${ic(I.check,16)} Nenhum cliente em atraso.</div>`,
+    twinTable(['Cliente','Em atraso','Títulos','Maior atraso'],d.devedores.map(c=>[c.cliente,brl(c.valor),String(c.qtd),c.maxAtraso+' dias']))):'';
+  const prox=`<div class="vcard"><div class="vhead"><div><h3>Próximas cobranças</h3><div class="sub">Os ${d.proximas.length} próximos vencimentos</div></div></div>${d.proximas.length?`<table class="dtbl"><tbody>${d.proximas.map(p=>`<tr><td><b>${dbr(p.venc)}</b><div class="mini">${p.dias===0?'hoje':'em '+p.dias+' dia'+(p.dias===1?'':'s')}${!ind&&p.cliente?' · '+esc(p.cliente):''}</div></td><td><b>${brl(p.valor)}</b></td><td>${p.link?`<button type="button" class="tbtn" data-copy="${esc(p.link)}">Copiar link</button>`:''}</td></tr>`).join('')}</tbody></table>`:`<div class="mini" style="padding:14px 4px">Nenhuma cobrança a vencer.</div>`}</div>`;
+  const health=`<div class="vcard"><div class="vhead"><div><h3>${ind?'Como este cliente paga':'Do que é feita a nota'}</h3><div class="sub">${sd.componentes.length?'Cada parte vai de 0 a 100; o peso mostra quanto pesa na nota':'Sem dados suficientes'}</div></div></div>${meters(sd.componentes)}
+    <details style="margin-top:10px"><summary class="mini" style="cursor:pointer">Como os números são calculados</summary><div class="mini" style="margin-top:6px;line-height:1.55"><b>Eficiência de cobrança:</b> do que venceu na janela, quanto já foi recebido; todo atraso em aberto conta, de qualquer idade. <b>Pontualidade:</b> % dos pagamentos feitos até 2 dias após o vencimento (compensação de boleto e fim de semana). <b>Inadimplência:</b> valor em atraso ÷ total a receber (a parte da nota cai 2 pontos a cada 1%). ${ind?'':'<b>Concentração:</b> quanto o maior cliente pesa no a receber (acima de 25% começa a reduzir). '}A nota fica limitada (máx. 84 com atraso acima de 60 dias, 69 acima de 90) para não parecer boa com dívida antiga. Previsão “esperada” = previsto × eficiência histórica, só com 10+ títulos de base.</div></details></div>`;
+  const facts=[['Receita recorrente prevista (30 dias)',brl(d.recorrente30)],['Ticket médio dos pagos',brl(d.ticketMedio)],['Média recebida (3 meses)',brl(d.mediaRecebida3m)],['Cancelado (90 dias)',`${brl(d.cancelado90.valor)} · ${d.cancelado90.qtd}`],...(ind?[['Maior atraso atual',d.maisAntigo?d.maisAntigo+' dias':'—'],['Atraso médio ao pagar',d.pontualidade.atrasoMedio?d.pontualidade.atrasoMedio+' dias':'—'],['Cobranças no funil',String(d.total)]]:[['Clientes com saldo',String(d.concentracao.clientes)],['Maior cliente',d.concentracao.topCliente?`${d.concentracao.topCliente} · ${d.concentracao.top1Pct}%`:'—'],['5 maiores clientes',d.concentracao.top5Pct+'% do a receber']])];
+  const kv=`<div class="vcard"><div class="vhead"><div><h3>Indicadores</h3></div></div><table class="dtbl"><tbody>${facts.map(([k,v])=>`<tr><td>${esc(k)}</td><td><b>${esc(v)}</b></td></tr>`).join('')}</tbody></table></div>`;
+  host.innerHTML=filt+`<div class="dgrid dg-top">${hero}${insights}</div>`+tiles+timeline+`<div class="dgrid dg-two">${aging}${ind?prox:dev}</div>`+`<div class="dgrid dg-two">${ind?kv:prox}${health}</div>`+(ind?'':kv);
+}
+
+// dicas ao passar o mouse / focar (conteúdo sempre via textContent)
+const vtip=document.createElement('div');vtip.className='vtip';document.body.appendChild(vtip);
+function fillTip(el){let t;try{t=JSON.parse(el.dataset.tip)}catch{return false}
+  vtip.textContent='';const b=document.createElement('b');b.textContent=t.t;vtip.appendChild(b);
+  for(const [n,v,c] of t.rows){const row=document.createElement('div');row.className='tr';if(c){const k=document.createElement('i');k.style.background=c;row.appendChild(k)}const a=document.createElement('span');a.textContent=n;const z=document.createElement('strong');z.textContent=v;row.append(a,z);vtip.appendChild(row)}return true}
+function placeTip(x,y){vtip.style.display='block';const w=vtip.offsetWidth,h=vtip.offsetHeight;vtip.style.left=Math.max(8,Math.min(innerWidth-w-8,x+14))+'px';vtip.style.top=Math.max(8,Math.min(innerHeight-h-8,y-h-10))+'px'}
+const hideTip=()=>{vtip.style.display='none'};
+document.addEventListener('pointermove',e=>{const el=e.target.closest&&e.target.closest('[data-tip]');if(el&&fillTip(el))placeTip(e.clientX,e.clientY);else hideTip()});
+document.addEventListener('focusin',e=>{const el=e.target.closest&&e.target.closest('[data-tip]');if(el&&fillTip(el)){const r=el.getBoundingClientRect();placeTip(r.left+r.width/2,r.top+r.height/2)}});
+document.addEventListener('focusout',hideTip);
+document.addEventListener('scroll',hideTip,true);
+
+// carregar / interação
+const dashQS=()=>`meses=${DM}`+(SCOPE?'&'+SCOPE:'');
+async function loadDash(host,o={}){if(!host)return;host.classList.add('busy');
+  try{const pl=await api('GET','/api/dashboard?'+dashQS());if(pl.escopo&&pl.escopo.tipo==='nenhum'){host.innerHTML='';host.classList.remove('busy');return}renderDash(host,pl,o)}
+  catch(x){host.innerHTML=`<div class="res bad" style="display:block">${esc(x.message)}</div>`;host.classList.remove('busy')}}
+function refreshDash(){if($('#drawer').classList.contains('open'))loadDash($('#drBody'),{compact:true});if(!$('#viewDash').hidden)loadDash($('#dashHost'),{});if(SCOPE)loadDash($('#scopedDash'),{})}
+document.addEventListener('click',e=>{
+  const m=e.target.closest('[data-dm]');if(m){DM=+m.dataset.dm;refreshDash();return}
+  const t=e.target.closest('[data-twin-btn]');if(t){const c=t.closest('.vcard'),cv=c.querySelector('.cv'),tv=c.querySelector('.tv'),ver=tv.hidden;tv.hidden=!ver;cv.hidden=ver;t.textContent=ver?'Ver gráfico':'Ver tabela'}});
+function openDrawer(){$('#drawer').classList.add('open');$('#drawer').setAttribute('aria-hidden','false');$('#dim').classList.add('on');loadDash($('#drBody'),{compact:true})}
+function closeDrawer(){$('#drawer').classList.remove('open');$('#drawer').setAttribute('aria-hidden','true');$('#dim').classList.remove('on')}
+$('#bDash').onclick=openDrawer;$('#drClose').onclick=closeDrawer;$('#dim').onclick=closeDrawer;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
 load();setInterval(load,60000);
 </script>
 </body>

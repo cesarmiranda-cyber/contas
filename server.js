@@ -9,6 +9,7 @@ const { createService } = require('./lib/service');
 const { createSecrets } = require('./lib/secrets');
 const { createSettingsApi } = require('./lib/settingsApi');
 const R = require('./lib/rules');
+const { dashboard } = require('./lib/dashboard');
 
 // .env opcional (a plataforma de deploy já injeta as variáveis no processo).
 try {
@@ -54,6 +55,14 @@ const routes = {
     };
   },
   'POST /api/sync': async () => svc.sync({ trigger: 'manual' }),
+  // Painel financeiro: geral, ou só do cliente quando vem ?deal= / ?company= / ?contact= (resolvido no servidor).
+  'GET /api/dashboard': async (u) => {
+    if (!bitrix.enabled) { const e = new Error('Bitrix24 não configurado'); e.status = 503; throw e; }
+    const q = u.searchParams;
+    const { deals, escopo } = await svc.estado({ deal: q.get('deal'), company: q.get('company'), contact: q.get('contact') });
+    const meses = [3, 6, 12].includes(+q.get('meses')) ? +q.get('meses') : 6;
+    return { escopo, dash: dashboard(deals, R.todayBR(), { meses, individual: !!escopo }) };
+  },
   'PUT /api/config': async (_, body) => {
     const p = {};
     if (typeof body.autoCreate === 'boolean') p.autoCreate = body.autoCreate;
