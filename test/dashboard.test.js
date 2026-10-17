@@ -165,3 +165,25 @@ test('pontualidade tolera 2 dias (compensação) e o alerta de "costuma atrasar"
   const amostraPequena = dashboard([t(S.paid, 100, '2026-09-10', { pagoEm: '2026-09-20', cliente: 'Duda' }), t(S.paid, 100, '2026-09-10', { pagoEm: '2026-09-20', cliente: 'Duda' })], HOJE, { individual: true });
   assert.ok(!amostraPequena.insights.some(i => /Costuma pagar com atraso/.test(i.msg)));                     // só 2 pagamentos: não conclui
 });
+
+test('painel entrega as 3 janelas de uma vez (trocar o filtro não exige nova consulta) e o cache serve rápido', async () => {
+  const { world, today, FORMA_ID, TIPO_ID } = require('../testkit/world');
+  const w = world([{ ID: '1', TITLE: 'A', STAGE_ID: R.STAGES.open, OPPORTUNITY: '100', COMPANY_ID: '5', CONTACT_ID: '0', UF_CRM_CR_VENC: R.addMonths(today, 1) + 'T00:00:00+03:00', UF_CRM_CR_FORMA: FORMA_ID('PIX'), UF_CRM_CR_TIPO: TIPO_ID('UNICA') }]);
+  const p = await w.svc.painel({});
+  assert.deepEqual(Object.keys(p.dashes).sort(), ['12', '3', '6']);
+  assert.deepEqual([3, 6, 12].map(m => p.dashes[m].linha.length), [5, 11, 23]);
+  assert.equal(p.dashes[3].resumo.aReceber, p.dashes[12].resumo.aReceber);                 // saldos não dependem da janela
+  assert.equal(p.escopo, null);
+  const c = await w.svc.painel({ deal: '1' });
+  assert.equal(c.dashes[6].individual, true); assert.equal(c.escopo.companyId, '5');
+  // cache: dentro de 5 min devolve na hora (e atualiza em segundo plano); maxAge 0 e invalidação leem de novo
+  const antes = w.calls.length;
+  await w.svc.dealsCached(1); await new Promise(r => setTimeout(r, 5));
+  const base = w.calls.length;
+  w.deals.push({ ID: '2', TITLE: 'B', STAGE_ID: R.STAGES.open, OPPORTUNITY: '50', COMPANY_ID: '5', CONTACT_ID: '0', UF_CRM_CR_VENC: R.addMonths(today, 1) + 'T00:00:00+03:00' });
+  const stale = await w.svc.dealsCached(60000);
+  assert.equal(stale.length, 1);                                                          // dentro do prazo: não releu
+  const fresh = await w.svc.dealsCached(0);
+  assert.equal(fresh.length, 2);                                                          // maxAge 0: lê de novo
+  assert.ok(base >= antes);
+});

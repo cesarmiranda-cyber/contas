@@ -777,7 +777,7 @@ function meters(comps){return comps.map(c=>{const [col,lbl,icn]=sevOf(c.valor);r
 function hbRows(items,{label,value,color,tip,wide}){const max=Math.max(...items.map(value),1);return items.map(it=>`<div class="hb tipable ${wide?'wide':''}" tabindex="0" ${tipAttr(tip(it))}><span class="nm" title="${esc(label(it))}">${esc(label(it))}</span><div class="tr"><i style="width:${value(it)/max*100}%;background:${color(it)}"></i></div><b>${brl(value(it))}</b></div>`).join('')}
 
 function renderDash(host,pl,o={}){
-  const d=pl.dash,ind=d.individual,r=d.resumo,sd=d.saude,e=pl.escopo;
+  const d=pl.dashes?pl.dashes[DM]:pl.dash,ind=d.individual,r=d.resumo,sd=d.saude,e=pl.escopo;
   host.className='dwrap'+(o.compact?' compact':'');
   const NV={excelente:'var(--v1)',boa:'var(--v1)',atencao:'var(--vw)',critica:'var(--vc)','sem-dados':'var(--mut)'}[sd.nivel],NI={excelente:I.check,boa:I.check,atencao:I.alert,critica:I.x,'sem-dados':I.clock}[sd.nivel];
   const delta=r.recebidoDeltaPct===null?'':`<span class="dl" style="color:${r.recebidoDeltaPct>=0?'var(--ink)':'var(--vc)'}">${r.recebidoDeltaPct>=0?'▲':'▼'} ${Math.abs(r.recebidoDeltaPct).toLocaleString('pt-BR')}% vs mesmo período do mês anterior</span>`;
@@ -824,13 +824,18 @@ document.addEventListener('focusout',hideTip);
 document.addEventListener('scroll',hideTip,true);
 
 // carregar / interação
-const dashQS=()=>`meses=${DM}`+(SCOPE?'&'+SCOPE:'');
-async function loadDash(host,o={}){if(!host)return;host.classList.add('busy');
-  try{const pl=await api('GET','/api/dashboard?'+dashQS());if(pl.escopo&&pl.escopo.tipo==='nenhum'){host.innerHTML='';host.classList.remove('busy');return}renderDash(host,pl,o)}
-  catch(x){host.innerHTML=`<div class="res bad" style="display:block">${esc(x.message)}</div>`;host.classList.remove('busy')}}
+const dashQS=()=>SCOPE;
+const DP=new WeakMap();                         // último painel carregado de cada área (as 3 janelas já vêm juntas)
+async function loadDash(host,o={}){if(!host)return;const tok=host._t=(host._t||0)+1;host.classList.add('busy');
+  try{const pl=await api('GET','/api/dashboard'+(dashQS()?'?'+dashQS():''));if(tok!==host._t)return;       // resposta atrasada: não sobrescreve a mais nova
+    if(pl.escopo&&pl.escopo.tipo==='nenhum'){host.innerHTML='';host.classList.remove('busy');return}
+    DP.set(host,{pl,o});renderDash(host,pl,o)}
+  catch(x){if(tok!==host._t)return;host.innerHTML=`<div class="res bad" style="display:block">${esc(x.message)}</div>`;host.classList.remove('busy')}}
 function refreshDash(){if($('#drawer').classList.contains('open'))loadDash($('#drBody'),{compact:true});if(!$('#viewDash').hidden)loadDash($('#dashHost'),{});if(SCOPE)loadDash($('#scopedDash'),{})}
+// trocar a janela (3/6/12 meses) é instantâneo: redesenha com os dados que já estão na tela
+function applyWindow(){for(const h of [$('#drBody'),$('#dashHost'),$('#scopedDash')]){const c=DP.get(h);if(c&&h.offsetParent!==null)renderDash(h,c.pl,c.o)}}
 document.addEventListener('click',e=>{
-  const m=e.target.closest('[data-dm]');if(m){DM=+m.dataset.dm;refreshDash();return}
+  const m=e.target.closest('[data-dm]');if(m){DM=+m.dataset.dm;applyWindow();return}
   const t=e.target.closest('[data-twin-btn]');if(t){const c=t.closest('.vcard'),cv=c.querySelector('.cv'),tv=c.querySelector('.tv'),ver=tv.hidden;tv.hidden=!ver;cv.hidden=ver;t.textContent=ver?'Ver gráfico':'Ver tabela'}});
 function openDrawer(){$('#drawer').classList.add('open');$('#drawer').setAttribute('aria-hidden','false');$('#dim').classList.add('on');loadDash($('#drBody'),{compact:true})}
 function closeDrawer(){$('#drawer').classList.remove('open');$('#drawer').setAttribute('aria-hidden','true');$('#dim').classList.remove('on')}
