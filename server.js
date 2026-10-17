@@ -66,6 +66,20 @@ const routes = {
     return store.setConfig(p);
   },
   'POST /api/gerar': async (_, body) => svc.gerar(body),
+  'POST /api/cobrar': async (_, body) => svc.cobrar.nova(body),
+  'GET /api/links': async () => store.links,
+  'GET /api/assinaturas': async (u) => svc.cobrar.assinaturas({ status: ['ACTIVE', 'INACTIVE', 'EXPIRED'].includes(u.searchParams.get('status')) ? u.searchParams.get('status') : undefined }),
+  'GET /api/carteiras': async () => store.wallets,
+  'POST /api/carteiras': async (_, b) => {
+    const nome = String(b.nome || '').trim(), walletId = String(b.walletId || '').trim();
+    const bad = (m) => { const e = new Error(m); e.status = 400; return e; };
+    if (nome.length < 2 || nome.length > 60) throw bad('Informe um nome de 2 a 60 caracteres.');
+    if (/[=;%]/.test(nome)) throw bad('O nome não pode ter os caracteres = ; %');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(walletId)) throw bad('walletId inválido: use o ID da carteira do Asaas do recebedor (formato 00000000-0000-0000-0000-000000000000).');
+    if (store.wallets.some(w => w.nome.toLowerCase() === nome.toLowerCase() && w.walletId !== walletId)) throw bad('Já existe uma carteira com esse nome.');
+    store.log('config', `Carteira de split cadastrada: ${nome}`);
+    return store.addWallet({ nome, walletId });
+  },
   'POST /api/importar': async (_, body) => svc.importar({ dias: body.dias, dryRun: !!body.dryRun }),
   'GET /api/clientes': async (u) => svc.findCustomers(u.searchParams.get('q') || ''),
 };
@@ -79,6 +93,9 @@ const dealRoutes = {
   },
   cancel: async c => { await svc.cancel(c); return { ok: true }; },
   gerar: async c => svc.expandNow(c),
+  detalhe: async c => svc.detalhe(c),
+  receber: async (c, body) => svc.receberDinheiro(c, body),
+  estornar: async (c, body) => svc.estornar(c, body),
   editar: async (c, body) => svc.editar(c, body),
   categoria: async (c, body) => { await svc.classify(c, String(body.categoria || ''), String(body.plano || '')); return { ok: true }; },
   doc: async (c, body) => { await svc.setDoc(c.id, body.doc); return { ok: true }; },
@@ -91,11 +108,18 @@ const server = http.createServer(async (req, res) => {
     const key = `${req.method} ${u.pathname}`;
     if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
-    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar|editar)$/);
+    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar|editar|detalhe|receber|estornar)$/);
     if (m && req.method === 'POST') {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });
       return send(res, 200, await dealRoutes[m[2]](c, await readBody(req)));
+    }
+    const m2 = u.pathname.match(/^\/api\/(assinaturas|links|carteiras)\/([\w.-]+)$/);
+    if (m2 && (req.method === 'PUT' || req.method === 'DELETE')) {
+      const [, kind, id] = m2;
+      if (kind === 'assinaturas') return send(res, 200, req.method === 'PUT' ? await svc.cobrar.editarAssinatura(id, await readBody(req)) : await svc.cobrar.cancelarAssinatura(id));
+      if (kind === 'links' && req.method === 'DELETE') return send(res, 200, await svc.cobrar.removerLink(id));
+      if (kind === 'carteiras' && req.method === 'DELETE') { store.log('config', `Carteira de split removida: ${id}`); return send(res, 200, store.removeWallet(id)); }
     }
     if (req.method === 'GET') {
       const f = path.join(__dirname, 'public', u.pathname === '/' ? 'index.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));

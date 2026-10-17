@@ -102,6 +102,20 @@ textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px soli
 body.scoped #bImp,body.scoped #bCfg,body.scoped .cuts,body.scoped details.logc,body.scoped #agingCard,body.scoped #fCat,body.scoped #fPlano{display:none!important}
 body.scoped .hero{grid-template-columns:1fr}
 tbody tr.cur{background:var(--brandbg)}tbody tr.cur td:first-child{box-shadow:inset 3px 0 0 var(--brand)}
+.vtabs{display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--line);padding:4px;border-radius:12px;width:fit-content;max-width:100%;overflow-x:auto}
+.vtabs button{border:0;background:transparent;color:var(--ink2);padding:7px 14px;border-radius:9px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}.vtabs button.on{background:var(--brandbg);color:var(--brand)}
+body.scoped .vtabs{display:none}
+.pill.c-amber:before,.pill.c-blue:before{opacity:.9}
+.copybox{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:var(--surface2);margin-top:6px}
+.copybox code{flex:1;font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;color:var(--ink2);max-height:64px;overflow:auto}
+.dsec{margin-top:14px}.dsec h3{margin:0;font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}.kv div{background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:9px 11px}.kv small{display:block;color:var(--mut);font-size:11.5px}.kv b{font-size:14px}
+.qr{display:block;width:150px;height:150px;border-radius:10px;border:1px solid var(--line);background:#fff;padding:6px;margin-top:8px}
+.srow{display:grid;grid-template-columns:1.4fr .8fr .6fr auto;gap:8px;align-items:center;margin-top:8px}.srow select,.srow input{padding:8px 10px}
+.mini{font-size:12px;color:var(--mut)}
+details.adv{margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:0 12px}details.adv summary{cursor:pointer;padding:11px 0;font-weight:600;color:var(--ink2)}details.adv[open]{padding-bottom:12px}
+.opts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.opts .btn{flex:1;min-width:150px;justify-content:center}
+.wtbl{width:100%;min-width:0;border-collapse:collapse;margin-top:8px}.wtbl td{padding:8px 4px;border-top:1px solid var(--line);font-size:13px}
 .empty{padding:56px 20px;text-align:center;color:var(--mut)}.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--graybg),var(--surface2),var(--graybg));background-size:200% 100%;animation:sk 1.2s infinite}@keyframes sk{to{background-position:-200% 0}}
 .logc{margin-top:16px}.logc summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between}.logc summary::-webkit-details-marker{display:none}
@@ -123,6 +137,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   td{border:0;padding:0}td.c-cli{grid-column:1/-1}td.num{text-align:left}.acts{justify-content:flex-start;grid-column:1/-1}
   .hide-m{display:none}
   tr.grp{display:block}tr.grp td{display:block}
+  .kv{grid-template-columns:1fr 1fr}.srow{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -132,15 +147,17 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="ttl"><h1>Contas a Receber</h1><div class="sub" id="sub"><span class="dot off"></span>carregando…</div></div>
   <div class="tools">
     <span class="env bad" id="env"></span>
+    <button class="btn pri" id="bNova"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nova cobrança</span></button>
     <button class="btn" id="bGerar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Gerar parcelas</span></button>
     <button class="btn" id="bImp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span class="lbl">Importar do Asaas</span></button>
     <button class="btn" id="bCfg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Configurações</span></button>
-    <button class="btn pri" id="bSync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg><span class="lbl">Sincronizar</span></button>
+    <button class="btn" id="bSync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg><span class="lbl">Sincronizar</span></button>
   </div>
 </div></div>
 
 <div class="banner" id="banner"><span id="bannerTxt"></span><button class="btn" id="bannerBtn">Abrir Configurações</button></div>
 <main id="viewMain">
+  <div class="vtabs" id="vtabs"><button class="on" data-v="main">Lançamentos</button><button data-v="subs">Assinaturas</button><button data-v="links">Links de pagamento</button></div>
   <div id="cliCard" class="card cli-card" style="display:none"></div>
   <section class="hero">
     <div class="card pad" id="hero"><div class="skel" style="width:40%"></div><div class="skel" style="width:60%;height:34px;margin-top:14px"></div></div>
@@ -177,6 +194,22 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <details class="card logc"><summary><span>Atividade recente</span><span class="mut" id="logn"></span></summary><div class="log" id="log"></div></details>
 </main>
 
+<main id="viewSubs" hidden>
+  <div class="vtabs"><button data-v="main">Lançamentos</button><button class="on" data-v="subs">Assinaturas</button><button data-v="links">Links de pagamento</button></div>
+  <section class="card">
+    <div class="toolbar"><div class="seg" id="subSeg"><button data-s="ACTIVE" class="on">Ativas</button><button data-s="INACTIVE">Inativas</button></div><div style="display:flex;gap:8px"><button class="btn" id="subRef">Atualizar</button><button class="btn pri" id="subNova">+ Nova assinatura</button></div></div>
+    <div class="tw"><table><thead><tr><th>Cliente</th><th>Valor</th><th>Ciclo</th><th>Próx. vencimento</th><th>Forma</th><th>Situação</th><th></th></tr></thead><tbody id="subRows"></tbody></table></div>
+    <div class="empty" id="subEmpty" style="display:none"><b>Nenhuma assinatura</b>Crie uma em “Nova assinatura”.</div>
+  </section>
+</main>
+<main id="viewLinks" hidden>
+  <div class="vtabs"><button data-v="main">Lançamentos</button><button data-v="subs">Assinaturas</button><button class="on" data-v="links">Links de pagamento</button></div>
+  <section class="card">
+    <div class="toolbar"><div class="mini">Links reutilizáveis: o cliente abre, escolhe a forma de pagamento e paga. Cada pagamento vira um card no funil (com a importação do Asaas ligada).</div><button class="btn pri" id="linkNovo">+ Novo link</button></div>
+    <div class="tw"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Valor</th><th>Forma</th><th>Criado em</th><th></th></tr></thead><tbody id="linkRows"></tbody></table></div>
+    <div class="empty" id="linkEmpty" style="display:none"><b>Nenhum link criado</b>Gere o primeiro em “Novo link”.</div>
+  </section>
+</main>
 <main id="viewCfg" hidden>
   <div class="crumb"><button class="btn" id="cBack">← Voltar</button><h1>Configurações</h1></div>
   <div class="cfg">
@@ -202,6 +235,14 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
       <label>Trocar webhook (opcional)</label><input id="bHook" type="password" autocomplete="off" spellcheck="false" placeholder="https://seu-portal.bitrix24.com.br/rest/1/codigo/">
       <div class="row"><button class="btn" id="bTest">Testar</button><button class="btn pri" id="bSave">Salvar webhook</button><button class="btn" id="bVerify">Verificar campos e etapas do funil</button></div>
       <div class="res" id="bRes"></div>
+    </section>
+
+    <section class="card pad" id="secSplit">
+      <h2>Split de pagamento</h2><p class="hint">Recebedores que podem dividir uma cobrança. Use o <b>walletId</b> da conta Asaas de cada parceiro (Asaas → Integrações → ou peça ao parceiro). No lançamento você escolhe quanto vai para cada um.</p>
+      <table class="wtbl"><tbody id="wRows"></tbody></table>
+      <div class="r2" style="margin-top:12px"><div><label>Nome do recebedor</label><input id="wNome" maxlength="60" placeholder="Ex.: Parceiro A"></div><div><label>walletId do Asaas</label><input id="wId" placeholder="00000000-0000-0000-0000-000000000000"></div></div>
+      <div class="row"><button class="btn pri" id="wAdd">Cadastrar recebedor</button></div>
+      <div class="res" id="wRes"></div>
     </section>
 
     <section class="card pad">
@@ -243,6 +284,45 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <label>Período (dias para trás, pelo vencimento)</label><input id="iDias" type="number" min="1" max="730" value="90">
   <div class="prev" id="iPrev" style="display:none"></div>
   <div class="foot"><button type="button" class="btn" id="iCancel">Fechar</button><button type="button" class="btn" id="iVer">Ver prévia</button><button class="btn pri" id="iOk" disabled>Importar</button></div>
+</form></dialog>
+
+<dialog id="dNova"><form method="dialog" id="fNova">
+  <h2>Nova cobrança</h2><p class="dlg-sub" id="nSub"></p>
+  <div class="seg" id="nTipo" style="display:flex"><button type="button" data-t="avulsa" class="on">Avulsa</button><button type="button" data-t="parcelada">Parcelada</button><button type="button" data-t="assinatura">Assinatura</button><button type="button" data-t="link">Link de pagamento</button></div>
+  <div id="nCliWrap"><label>Cliente</label><div style="display:flex;gap:8px"><input id="nCli" placeholder="Buscar empresa ou contato do Bitrix…"><button type="button" class="btn" id="nBusca">Buscar</button></div><select id="nSel" size="4" style="display:none;margin-top:8px"></select></div>
+  <div id="nNomeWrap" style="display:none"><label>Nome do link</label><input id="nNome" maxlength="255" placeholder="Ex.: Renovação Bitrix24"></div>
+  <div id="nTitWrap"><label>Título / descrição da cobrança</label><input id="nTit" maxlength="255" placeholder="Ex.: Licença Bitrix24 Professional Vibe+"></div>
+  <label>Forma de pagamento</label>
+  <div class="seg" id="nForma" style="display:flex"><button type="button" data-f="UNDEFINED" class="on">Cliente escolhe</button><button type="button" data-f="BOLETO">Boleto</button><button type="button" data-f="PIX">Pix</button><button type="button" data-f="CREDIT_CARD">Cartão</button></div>
+  <p class="dlg-sub" id="nFormaHint" style="margin-top:6px"></p>
+  <div class="r2"><div><label id="nValLbl">Valor (R$)</label><input id="nVal" type="number" step="0.01" min="0.01"></div><div id="nVencWrap"><label id="nVencLbl">Vencimento</label><input id="nVenc" type="date"></div></div>
+  <div id="nParcWrap" style="display:none"><label>Nº de parcelas</label><input id="nParc" type="number" min="2" max="60" value="2"></div>
+  <div id="nAssWrap" style="display:none"><div class="r2"><div><label>Ciclo</label><select id="nCiclo"><option value="MENSAL">Mensal</option><option value="SEMANAL">Semanal</option><option value="QUINZENAL">Quinzenal</option><option value="BIMESTRAL">Bimestral</option><option value="TRIMESTRAL">Trimestral</option><option value="SEMESTRAL">Semestral</option><option value="ANUAL">Anual</option></select></div><div><label>Máx. de cobranças (opcional)</label><input id="nMax" type="number" min="1"></div></div><label>Data de término (opcional)</label><input id="nFim" type="date"></div>
+  <div id="nLinkWrap" style="display:none"><div class="r2"><div><label>Tipo do link</label><select id="nLTipo"><option value="DETACHED">Avulso (paga uma vez)</option><option value="INSTALLMENT">Parcelado (cliente escolhe até N)</option><option value="RECURRENT">Assinatura recorrente</option></select></div><div id="nLParcWrap" style="display:none"><label>Máx. de parcelas</label><input id="nLParc" type="number" min="2" max="21" value="12"></div><div id="nLCicloWrap" style="display:none"><label>Ciclo</label><select id="nLCiclo"><option value="MENSAL">Mensal</option><option value="SEMANAL">Semanal</option><option value="QUINZENAL">Quinzenal</option><option value="BIMESTRAL">Bimestral</option><option value="TRIMESTRAL">Trimestral</option><option value="SEMESTRAL">Semestral</option><option value="ANUAL">Anual</option></select></div></div>
+    <div class="r2"><div><label>Dias para vencer (boleto)</label><input id="nLDias" type="number" min="1" max="365"></div><div><label>Link válido até (opcional)</label><input id="nLFim" type="date"></div></div><label>Descrição (opcional)</label><input id="nLDesc" maxlength="500"></div>
+  <details class="adv" id="nAdv"><summary>Desconto, split e classificação</summary>
+    <div id="nDescWrap"><label>Desconto por pagamento antecipado</label><div class="srow" style="grid-template-columns:1fr 1fr 1fr"><input id="nDVal" type="number" step="0.01" min="0" placeholder="Valor"><select id="nDTipo"><option value="PERCENTAGE">%</option><option value="FIXED">R$</option></select><input id="nDDias" type="number" min="0" max="30" placeholder="Até X dias antes"></div></div>
+    <label>Split de pagamento</label><div id="nSplit"></div><button type="button" class="btn sm" id="nSplitAdd" style="margin-top:8px">+ Adicionar recebedor</button><p class="mini" id="nSplitHint"></p>
+    <div id="nClassWrap"><div class="r2"><div><label>Categoria</label><select id="nCat"></select></div><div id="nPlWrap"><label>Tipo de licença</label><select id="nPl"></select></div></div><label>CPF/CNPJ do pagador (se não estiver no cadastro)</label><input id="nDoc" placeholder="Somente números"></div>
+  </details>
+  <div class="prev" id="nPrev"></div>
+  <div class="res" id="nRes"></div><div id="nOut"></div>
+  <div class="foot"><button type="button" class="btn" id="nCancel">Fechar</button><button class="btn pri" id="nOk">Criar cobrança</button></div>
+</form></dialog>
+
+<dialog id="dDet"><form method="dialog" style="padding:22px">
+  <h2 id="dtTit">Cobrança</h2><p class="dlg-sub" id="dtSub"></p>
+  <div id="dtBody"></div>
+  <div class="foot"><button type="button" class="btn" id="dtClose">Fechar</button></div>
+</form></dialog>
+
+<dialog id="dSub"><form method="dialog" id="fSub">
+  <h2>Editar assinatura</h2><p class="dlg-sub" id="sbHint"></p>
+  <div class="r2"><div><label>Valor (R$)</label><input id="sbVal" type="number" step="0.01" min="0.01"></div><div><label>Próximo vencimento</label><input id="sbVenc" type="date"></div></div>
+  <div class="r2"><div><label>Ciclo</label><select id="sbCiclo"><option value="">— manter —</option><option value="MENSAL">Mensal</option><option value="SEMANAL">Semanal</option><option value="QUINZENAL">Quinzenal</option><option value="BIMESTRAL">Bimestral</option><option value="TRIMESTRAL">Trimestral</option><option value="SEMESTRAL">Semestral</option><option value="ANUAL">Anual</option></select></div><div><label>Forma de pagamento</label><select id="sbForma"><option value="">— manter —</option><option value="UNDEFINED">Cliente escolhe</option><option value="BOLETO">Boleto</option><option value="PIX">Pix</option><option value="CREDIT_CARD">Cartão</option></select></div></div>
+  <label>Situação</label><select id="sbStatus"><option value="ACTIVE">Ativa</option><option value="INACTIVE">Pausada (inativa)</option></select>
+  <label class="chk"><input type="checkbox" id="sbPend"><span><b>Aplicar também às cobranças pendentes</b><br><span class="mut">Valor e forma novos valem para as cobranças já geradas e ainda não pagas.</span></span></label>
+  <div class="foot"><button type="button" class="btn" id="sbCancel">Cancelar</button><button class="btn pri" id="sbOk">Salvar</button></div>
 </form></dialog>
 
 <dialog id="dEdit"><form method="dialog" id="fEdit">
@@ -354,6 +434,7 @@ function render(){
     const menu=[
       d.stageId==='C90:GERAR'?`<button data-a="gerar" data-id="${d.id}">${ic(I.send,16)}Gerar cobranças agora</button>`:'',
       !fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'&&!d.asaasId&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
+      d.asaasId?`<button data-a="detalhe" data-id="${d.id}">${ic(I.link,16)}Ver cobrança (boleto, Pix, split)</button>`:'',
       `<button data-a="editar" data-id="${d.id}">${ic(I.doc,16)}Editar lançamento</button>`,
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
@@ -366,7 +447,7 @@ function render(){
       <td class="due"><b>${dv}</b>${ds}</td>
       <td><span class="pill ${sc}">${sl}</span>${d.avisos.length?`<div class="mut" style="font-size:11.5px;margin-top:4px">avisos: ${d.avisos.map(o=>o===0?'D0':o<0?'D'+o:'D+'+o).join(' · ')}</div>`:''}</td>
       <td><div class="acts">
-        ${d.link?`<a class="btn sm" href="${esc(d.link)}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a>`:''}
+        ${d.link?`<a class="btn sm" href="${esc(d.link)}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a><button class="btn sm" data-a="copy" data-v="${esc(d.link)}" title="Copiar link de pagamento">${ic(I.doc,14)}Copiar</button>`:''}
         <button class="btn sm" data-a="editar" data-id="${d.id}">${ic(I.doc,14)}Editar</button>
         ${d.stageId==='C90:GERAR'?`<button class="btn sm" data-a="gerar" data-id="${d.id}">${ic(I.send,14)}Gerar</button>`:''}
         ${!fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
@@ -427,6 +508,8 @@ $('#bCsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const blob=new Blob(['\ufeff'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lancamentos-${S.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${CURLIST.length} lançamento(s) exportados`)};
 $('#rows').onclick=async e=>{const b=e.target.closest('[data-a]');if(!b)return;const {a,id}=b.dataset;
+  if(a==='copy'){copyText(b.dataset.v);return}
+  if(a==='detalhe'){b.closest('details')&&(b.closest('details').open=false);openDet(id);return}
   if(a==='editar'){b.closest('details')&&(b.closest('details').open=false);openEdit(id);return}
   try{
     if(a==='cancel'&&!confirm('Cancelar esta cobrança? Se já estiver emitida, será cancelada no Asaas.'))return;
@@ -459,7 +542,10 @@ $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disable
 let CFG=null,aEnv='sandbox';
 const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
 const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
-function showView(v){const cfg=v==='cfg';$('#viewMain').hidden=cfg;$('#viewCfg').hidden=!cfg;if(cfg){loadSettings();location.hash='config'}else{history.replaceState(null,'',location.pathname);load()};window.scrollTo(0,0)}
+function showView(v){['main','cfg','subs','links'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
+  if(v==='cfg'){loadSettings();location.hash='config'}else history.replaceState(null,'',location.pathname+location.search);
+  if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();window.scrollTo(0,0)}
+document.querySelectorAll('.vtabs button[data-v]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.v)));
 $('#bCfg').onclick=()=>showView('cfg');$('#cBack').onclick=()=>showView('main');$('#bannerBtn').onclick=()=>showView('cfg');
 function setEnv(e){aEnv=e;document.querySelectorAll('#aEnv button').forEach(b=>b.classList.toggle('on',b.dataset.e===e));
   $('#aConfWrap').style.display=e==='production'?'flex':'none';
@@ -474,6 +560,7 @@ async function loadSettings(){
   $('#aDel').style.display=a.source==='painel'?'':'none';$('#aRes').className='res';
   $('#bStatus').innerHTML=b.configured?stat(true,esc(b.host||'Bitrix24'),`Webhook ${esc(b.hint)} · ${b.source==='painel'?'salvo pelo painel':'nas variáveis do servidor'}`):stat(false,'Não configurado','Informe o webhook de entrada do Bitrix24.');
   $('#bHook').value='';$('#bRes').className='res';
+  loadWallets();
   $('#cAuto').checked=k.autoCreate;$('#cImp').checked=k.importAuto;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;$('#cImpDias').value=k.importDias;
 }
 const busy=async(btn,fn)=>{btn.disabled=true;try{await fn()}finally{btn.disabled=false}};
@@ -491,6 +578,127 @@ $('#bVerify').onclick=e=>busy(e.currentTarget,async()=>{try{const r=await api('P
 $('#cOk').onclick=e=>busy(e.currentTarget,async()=>{try{await api('PUT','/api/config',{autoCreate:$('#cAuto').checked,importAuto:$('#cImp').checked,reguaAtiva:$('#cRegua').checked,reguaOffsets:$('#cOff').value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n)),diasProximo:$('#cProx').value,alertaAtrasoDias:$('#cAlerta').value,multaPct:$('#cMulta').value,jurosMensalPct:$('#cJuros').value,importDias:$('#cImpDias').value});toast('Automação salva');loadSettings()}catch(x){toast(x.message)}});
 [g,de,di].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 if(location.hash==='#config'&&!SCOPE)showView('cfg');
+
+// ================= cobrança completa =================
+function copyText(t){const done=()=>toast('Copiado');
+  const fb=()=>{const a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();try{document.execCommand('copy');done()}catch{toast('Não consegui copiar')}a.remove()};
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(done,fb);else fb()}
+const CICLO_PT={WEEKLY:'Semanal',BIWEEKLY:'Quinzenal',MONTHLY:'Mensal',BIMONTHLY:'Bimestral',QUARTERLY:'Trimestral',SEMIANNUALLY:'Semestral',YEARLY:'Anual'};
+const FORMA_PT={BOLETO:'Boleto',PIX:'Pix',CREDIT_CARD:'Cartão',UNDEFINED:'Cliente escolhe'};
+const ASAAS_ST={PENDING:['Aguardando','c-blue'],OVERDUE:['Vencida','c-red'],RECEIVED:['Recebida','c-green'],CONFIRMED:['Confirmada','c-green'],RECEIVED_IN_CASH:['Recebida em dinheiro','c-green'],REFUNDED:['Estornada','c-gray'],REFUND_REQUESTED:['Estorno solicitado','c-amber'],DELETED:['Cancelada','c-gray'],ACTIVE:['Ativa','c-green'],INACTIVE:['Inativa','c-gray'],EXPIRED:['Encerrada','c-gray']};
+const stPill=st=>{const [l,c]=ASAAS_ST[st]||[st,'c-gray'];return `<span class="pill ${c}">${esc(l)}</span>`};
+const cbox=(label,val,openUrl)=>val?`<div class="dsec"><h3>${label}</h3><div class="copybox"><code>${esc(val)}</code><button type="button" class="btn sm" data-copy="${esc(val)}">Copiar</button>${openUrl?`<a class="btn sm" href="${esc(val)}" target="_blank" rel="noopener">Abrir</a>`:''}</div></div>`:'';
+document.addEventListener('click',e=>{const b=e.target.closest('[data-copy]');if(b)copyText(b.dataset.copy)});
+
+// ---- Nova cobrança ----
+const dn=$('#dNova');let N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};
+const FORMA_HINT={UNDEFINED:'O cliente escolhe boleto, Pix ou cartão na página do link.',BOLETO:'Gera boleto com PDF e linha digitável.',PIX:'Gera QR Code e Pix copia e cola.',CREDIT_CARD:'O cliente informa o cartão na página segura do Asaas — o app não guarda dados de cartão.'};
+function nSetTipo(t){N.tipo=t;document.querySelectorAll('#nTipo button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  const link=t==='link';$('#nCliWrap').style.display=link?'none':'';$('#nTitWrap').style.display=link?'none':'';$('#nNomeWrap').style.display=link?'':'none';$('#nVencWrap').style.display=link?'none':'';
+  $('#nParcWrap').style.display=t==='parcelada'?'':'none';$('#nAssWrap').style.display=t==='assinatura'?'':'none';$('#nLinkWrap').style.display=link?'':'none';
+  $('#nDescWrap').style.display=link?'none':'';$('#nClassWrap').style.display=link?'none':'';
+  $('#nValLbl').textContent={avulsa:'Valor (R$)',parcelada:'Valor total (R$)',assinatura:'Valor por cobrança (R$)',link:'Valor (R$, opcional)'}[t];
+  $('#nVencLbl').textContent={avulsa:'Vencimento',parcelada:'1º vencimento',assinatura:'1º vencimento'}[t]||'';
+  $('#nSub').textContent={avulsa:'Uma cobrança. Cria o card no funil Contas e emite no Asaas.',parcelada:'Parcelamento do Asaas (boleto, Pix ou cartão em N vezes): um card por parcela.',assinatura:'Cobrança recorrente automática. Cada mês vira um card no funil.',link:'Link reutilizável para enviar ao cliente (WhatsApp, e-mail). Não cria card até alguém pagar.'}[t];
+  nPrev()}
+function nSetForma(f){N.forma=f;document.querySelectorAll('#nForma button').forEach(b=>b.classList.toggle('on',b.dataset.f===f));$('#nFormaHint').textContent=FORMA_HINT[f];nPrev()}
+function nPrev(){const v=+$('#nVal').value,n=+$('#nParc').value||2;let t='';
+  if(v>0){if(N.tipo==='parcelada')t=`${n}x de ≈ ${brl(v/n)} (total ${brl(v)})`;else if(N.tipo==='assinatura')t=`${brl(v)} a cada ${$('#nCiclo').selectedOptions[0].text.toLowerCase()}`+($('#nMax').value?` · ${$('#nMax').value} cobranças`:'');else if(N.tipo==='avulsa')t=`1 cobrança de ${brl(v)}`;
+    const dv=+$('#nDVal').value;if(dv>0&&N.tipo!=='link')t+=` · desconto ${$('#nDTipo').value==='PERCENTAGE'?dv+'%':brl(dv)} se pagar até ${+$('#nDDias').value||0} dia(s) antes`}
+  $('#nPrev').textContent=t}
+const sOpts=()=>N.carteiras.map(w=>`<option>${esc(w.nome)}</option>`).join('');
+function nSplitAdd(){if(!N.carteiras.length){$('#nSplitHint').textContent='Nenhum recebedor cadastrado. Cadastre em Configurações → Split de pagamento.';return}
+  $('#nSplitHint').textContent='';const r=document.createElement('div');r.className='srow';r.innerHTML=`<select>${sOpts()}</select><input type="number" step="0.01" min="0.01" placeholder="Valor"><select><option value="%">%</option><option value="R$">R$</option></select><button type="button" class="btn sm" title="Remover">✕</button>`;
+  r.querySelector('button').onclick=()=>r.remove();$('#nSplit').appendChild(r)}
+const nSplitText=()=>[...document.querySelectorAll('#nSplit .srow')].map(r=>{const [a,b,c]=[r.children[0].value,r.children[1].value,r.children[2].value];return b?`${a}=${c==='%'?b+'%':'R$ '+String(b).replace('.',',')}`:''}).filter(Boolean).join('; ');
+async function openNova(tipo,prefill){N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};$('#fNova').reset();$('#nSplit').innerHTML='';$('#nSplitHint').textContent='';$('#nRes').className='res';$('#nOut').innerHTML='';$('#nSel').style.display='none';$('#nOk').style.display='';$('#nOk').disabled=false;
+  try{N.carteiras=await api('GET','/api/carteiras')}catch{}
+  fillSel($('#nCat'),S.listas.categorias,'','Sem categoria');fillSel($('#nPl'),S.listas.planos,'','Sem tipo de licença');plWrap($('#nCat'),$('#nPlWrap'));
+  if(S.escopo&&(S.escopo.companyId||S.escopo.contactId)){N.cli=S.escopo.companyId?{tipo:'company',id:S.escopo.companyId,nome:S.escopo.nome}:{tipo:'contact',id:S.escopo.contactId,nome:S.escopo.nome};$('#nCli').value=S.escopo.nome;$('#nCli').readOnly=true;$('#nBusca').style.display='none'}
+  else{$('#nCli').readOnly=false;$('#nBusca').style.display=''}
+  $('#nVenc').value=addD(S.hoje,7);nSetForma('UNDEFINED');nSetTipo(tipo||'avulsa');dn.showModal()}
+$('#nTipo').onclick=e=>{const b=e.target.closest('button[data-t]');if(b)nSetTipo(b.dataset.t)};
+$('#nForma').onclick=e=>{const b=e.target.closest('button[data-f]');if(b)nSetForma(b.dataset.f)};
+['nVal','nParc','nCiclo','nMax','nDVal','nDTipo','nDDias'].forEach(i=>$('#'+i).addEventListener('input',nPrev));
+$('#nCat').onchange=()=>plWrap($('#nCat'),$('#nPlWrap'));
+$('#nLTipo').onchange=()=>{const t=$('#nLTipo').value;$('#nLParcWrap').style.display=t==='INSTALLMENT'?'':'none';$('#nLCicloWrap').style.display=t==='RECURRENT'?'':'none'};
+$('#nSplitAdd').onclick=nSplitAdd;
+$('#nBusca').onclick=async()=>{const q=$('#nCli').value.trim();if(q.length<2)return;try{const r=await api('GET','/api/clientes?q='+encodeURIComponent(q));const sl=$('#nSel');sl.innerHTML=r.map(c=>`<option value='${esc(JSON.stringify(c))}'>${c.tipo==='company'?'🏢':'👤'} ${esc(c.nome)} (#${c.id})</option>`).join('')||'<option disabled>Nada encontrado</option>';sl.style.display='block'}catch(x){toast(x.message)}};
+$('#nSel').onchange=e=>{N.cli=JSON.parse(e.target.value);$('#nCli').value=N.cli.nome};
+$('#nCancel').onclick=()=>dn.close();
+$('#bNova').onclick=()=>openNova('avulsa');
+$('#subNova').onclick=()=>openNova('assinatura');
+$('#linkNovo').onclick=()=>openNova('link');
+$('#fNova').onsubmit=async e=>{e.preventDefault();const t=N.tipo,res=$('#nRes');res.className='res';
+  const body={tipo:t,forma:N.forma,valor:$('#nVal').value,split:nSplitText()};
+  if(t==='link'){Object.assign(body,{nome:$('#nNome').value,tipoCobranca:$('#nLTipo').value,maxParcelas:$('#nLParc').value,ciclo:$('#nLCiclo').value,diasVenc:$('#nLDias').value,fim:$('#nLFim').value,descricao:$('#nLDesc').value})}
+  else{if(!N.cli){res.className='res bad';res.textContent='Busque e selecione o cliente.';return}
+    Object.assign(body,{titulo:$('#nTit').value,venc:$('#nVenc').value,[N.cli.tipo==='company'?'companyId':'contactId']:N.cli.id,doc:$('#nDoc').value||undefined,categoria:$('#nCat').value,plano:$('#nCat').value===S.listas.licenca?$('#nPl').value:''});
+    if(+$('#nDVal').value>0)body.desconto={valor:+$('#nDVal').value,tipo:$('#nDTipo').value,dias:+$('#nDDias').value||0};
+    if(t==='parcelada')body.parcelas=$('#nParc').value;
+    if(t==='assinatura'){body.ciclo=$('#nCiclo').value;body.maxCobrancas=$('#nMax').value||undefined;body.fim=$('#nFim').value||undefined}}
+  if(S.asaas.env==='production'&&!confirm('Você está em PRODUÇÃO: isto cria uma cobrança REAL no Asaas e o cliente pode ser notificado. Continuar?'))return;
+  const b=$('#nOk');b.disabled=true;
+  try{const r=await api('POST','/api/cobrar',body);res.className='res ok';
+    res.textContent={avulsa:'Cobrança criada e card gravado no funil.',parcelada:`Parcelamento criado: ${r.parcelas} cards no funil.`,assinatura:'Assinatura criada. Novas cobranças viram cards automaticamente.',link:'Link de pagamento criado.'}[t];
+    $('#nOut').innerHTML=cbox(t==='link'?'Link de pagamento':'Link da cobrança',r.link,true)+cbox('Boleto (PDF)',r.boleto,true)+cbox('Linha digitável',r.linha)+cbox('Pix copia e cola',r.pix);
+    $('#nOk').style.display='none';load();if(t==='link')loadLinks()}
+  catch(x){res.className='res bad';res.textContent=x.message;b.disabled=false}};
+
+// ---- painel da cobrança ----
+const dd=$('#dDet');let DET=null,DETID=null;
+async function openDet(id){DETID=id;$('#dtTit').textContent='Cobrança';$('#dtSub').textContent='Carregando…';$('#dtBody').innerHTML='';dd.showModal();await loadDet()}
+async function loadDet(){try{DET=await api('POST',`/api/deals/${DETID}/detalhe`,{});renderDet()}catch(x){$('#dtSub').textContent='';$('#dtBody').innerHTML=`<div class="res bad">${esc(x.message)}</div>`}}
+function renderDet(){const d=DET,deal=S.deals.find(x=>x.id==DETID)||{};
+  $('#dtTit').innerHTML=`Cobrança ${stPill(d.status)}`;$('#dtSub').textContent=`${deal.cliente||''} · ${d.id}${d.parcelamento?' · parcelamento '+d.parcelamento:''}${d.assinatura?' · assinatura '+d.assinatura:''}`;
+  const desc=d.desconto?`${d.desconto.type==='PERCENTAGE'?d.desconto.value+'%':brl(d.desconto.value)} até ${d.desconto.dueDateLimitDays} dia(s) antes`:'—';
+  const split=d.split.length?`<table class="wtbl"><tbody>${d.split.map(s=>`<tr><td><b>${esc(s.nome)}</b></td><td>${s.percentual?s.percentual+'%':brl(s.fixo)}</td><td class="mini">${esc(s.status)}</td></tr>`).join('')}</tbody></table>`:'<div class="mini">Sem divisão.</div>';
+  $('#dtBody').innerHTML=`<div class="kv"><div><small>Valor</small><b>${brl(d.valor)}</b></div><div><small>Vencimento</small><b>${dbr(d.venc)}</b></div><div><small>Forma</small><b>${esc(FORMA_PT[d.forma]||d.forma)}</b></div><div><small>Multa / juros</small><b>${d.multa||0}% · ${d.juros||0}% a.m.</b></div><div><small>Desconto</small><b>${esc(desc)}</b></div><div><small>${d.paga?'Pago em':'Nosso número'}</small><b>${esc(d.paga?dbr(d.pagoEm):d.nossoNumero||'—')}</b></div></div>`
+   +cbox('Link de pagamento',d.link,true)+cbox('Boleto (PDF)',d.boleto,true)+cbox('Linha digitável',d.linha)+cbox('Pix copia e cola',d.pix)+(d.pixImagem?`<img class="qr" alt="QR Code Pix" src="data:image/png;base64,${esc(d.pixImagem)}">`:'')
+   +`<div class="dsec"><h3>Split de pagamento</h3>${split}</div>`
+   +(d.ativa?`<div class="dsec"><h3>Registrar recebimento em dinheiro</h3><div class="srow" style="grid-template-columns:1fr 1fr auto"><input type="date" id="rcData" max="${S.hoje}" value="${S.hoje}"><input type="number" id="rcVal" step="0.01" min="0.01" value="${d.valor}"><button type="button" class="btn sm" data-act="receber">Registrar</button></div><label class="chk" style="margin:8px 0 0;padding:6px 10px;font-size:12.5px"><input type="checkbox" id="rcNot" style="width:15px;height:15px">Avisar o cliente do recebimento</label></div>`:'')
+   +(d.paga?`<div class="dsec"><h3>Estornar</h3><div class="srow" style="grid-template-columns:1fr 1.4fr auto"><input type="number" id="esVal" step="0.01" min="0.01" max="${d.valor}" placeholder="Valor (vazio = total)"><input id="esMot" maxlength="200" placeholder="Motivo (opcional)"><button type="button" class="btn sm" data-act="estornar" style="color:var(--red)">Estornar</button></div></div>`:'')
+   +`<div id="dtRes" class="res"></div>`}
+$('#dtBody').onclick=async e=>{const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act,res=$('#dtRes');res.className='res';b.disabled=true;
+  try{
+    if(act==='receber'){if(!confirm(`Registrar recebimento em dinheiro de ${brl($('#rcVal').value)}? Isso baixa a cobrança no Asaas.`)){b.disabled=false;return}
+      await api('POST',`/api/deals/${DETID}/receber`,{data:$('#rcData').value,valor:$('#rcVal').value,notificar:$('#rcNot').checked});toast('Recebimento registrado')}
+    if(act==='estornar'){if(!confirm('Solicitar o estorno desta cobrança no Asaas? Esta ação não pode ser desfeita.')){b.disabled=false;return}
+      await api('POST',`/api/deals/${DETID}/estornar`,{valor:$('#esVal').value,motivo:$('#esMot').value});toast('Estorno solicitado')}
+    await load();await loadDet()}
+  catch(x){res.className='res bad';res.textContent=x.message;b.disabled=false}};
+$('#dtClose').onclick=()=>dd.close();
+
+// ---- assinaturas ----
+let subStatus='ACTIVE',SUBS=[],subId=null;
+async function loadSubs(){$('#subRows').innerHTML='<tr><td colspan="7"><div class="skel" style="width:60%"></div></td></tr>';try{SUBS=await api('GET','/api/assinaturas?status='+subStatus)}catch(x){toast(x.message);SUBS=[]}renderSubs()}
+function renderSubs(){$('#subEmpty').style.display=SUBS.length?'none':'block';
+  $('#subRows').innerHTML=SUBS.map(a=>`<tr><td><b>${esc(a.cliente||'—')}</b><div class="mini">${esc(a.descricao)}</div></td><td class="val">${brl(a.valor)}</td><td>${esc(CICLO_PT[a.ciclo]||a.ciclo)}</td><td>${dbr(a.proximoVenc)}</td><td>${esc(FORMA_PT[a.forma]||a.forma)}</td><td>${stPill(a.status)}</td><td><div class="acts"><button class="btn sm" data-sa="editar" data-id="${esc(a.id)}">Editar</button>${a.status==='ACTIVE'?`<button class="btn sm" data-sa="cancelar" data-id="${esc(a.id)}">Cancelar</button>`:''}${a.dealId?`<a class="btn sm" href="https://manda4.bitrix24.com.br/crm/deal/details/${a.dealId}/" target="_blank" rel="noopener">Bitrix</a>`:''}</div></td></tr>`).join('')}
+$('#subSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(!b)return;subStatus=b.dataset.s;document.querySelectorAll('#subSeg button').forEach(x=>x.classList.toggle('on',x===b));loadSubs()};
+$('#subRef').onclick=loadSubs;
+const dsb=$('#dSub');
+$('#subRows').onclick=async e=>{const b=e.target.closest('button[data-sa]');if(!b)return;const a=SUBS.find(x=>x.id===b.dataset.id);if(!a)return;
+  if(b.dataset.sa==='editar'){subId=a.id;$('#sbHint').textContent=`${a.cliente||''} · ${a.id}`;$('#sbVal').value=a.valor;$('#sbVenc').value=a.proximoVenc||'';$('#sbCiclo').value='';$('#sbForma').value='';$('#sbStatus').value=a.status==='INACTIVE'?'INACTIVE':'ACTIVE';$('#sbPend').checked=false;dsb.showModal()}
+  else{if(!confirm(`Cancelar a assinatura de ${a.cliente||a.id}? As cobranças pendentes dela serão canceladas no Asaas.`))return;b.disabled=true;try{await api('DELETE','/api/assinaturas/'+encodeURIComponent(a.id));toast('Assinatura cancelada');loadSubs()}catch(x){toast(x.message);b.disabled=false}}};
+$('#sbCancel').onclick=()=>dsb.close();
+$('#fSub').onsubmit=async e=>{e.preventDefault();const b=$('#sbOk');b.disabled=true;
+  try{await api('PUT','/api/assinaturas/'+encodeURIComponent(subId),{valor:$('#sbVal').value,vencimento:$('#sbVenc').value,ciclo:$('#sbCiclo').value,forma:$('#sbForma').value,status:$('#sbStatus').value,atualizarPendentes:$('#sbPend').checked});dsb.close();toast('Assinatura atualizada');loadSubs()}
+  catch(x){toast(x.message)}b.disabled=false};
+
+// ---- links de pagamento ----
+let LINKS=[];
+const LTIPO={DETACHED:'Avulso',INSTALLMENT:'Parcelado',RECURRENT:'Recorrente'};
+async function loadLinks(){try{LINKS=await api('GET','/api/links')}catch(x){toast(x.message);LINKS=[]}
+  $('#linkEmpty').style.display=LINKS.length?'none':'block';
+  $('#linkRows').innerHTML=LINKS.map(l=>`<tr><td><b>${esc(l.nome)}</b></td><td>${esc(LTIPO[l.tipo]||l.tipo)}</td><td class="val">${l.valor?brl(l.valor):'<span class="mut">Cliente informa</span>'}</td><td>${esc(FORMA_PT[l.forma]||l.forma)}</td><td>${l.criado?new Date(l.criado).toLocaleDateString('pt-BR'):''}</td><td><div class="acts"><button class="btn sm" data-copy="${esc(l.url)}">Copiar link</button><a class="btn sm" href="${esc(l.url)}" target="_blank" rel="noopener">Abrir</a><button class="btn sm" data-lk="${esc(l.id)}" style="color:var(--red)">Remover</button></div></td></tr>`).join('')}
+$('#linkRows').onclick=async e=>{const b=e.target.closest('button[data-lk]');if(!b)return;if(!confirm('Remover este link de pagamento? Quem tiver o link não conseguirá mais pagar por ele.'))return;b.disabled=true;try{await api('DELETE','/api/links/'+encodeURIComponent(b.dataset.lk));toast('Link removido');loadLinks()}catch(x){toast(x.message);b.disabled=false}};
+
+// ---- carteiras (split) em Configurações ----
+async function loadWallets(){let w=[];try{w=await api('GET','/api/carteiras')}catch{}
+  $('#wRows').innerHTML=w.length?w.map(x=>`<tr><td><b>${esc(x.nome)}</b></td><td class="mini">${esc(x.walletId)}</td><td style="text-align:right"><button class="btn sm" data-wd="${esc(x.walletId)}" style="color:var(--red)">Remover</button></td></tr>`).join(''):'<tr><td class="mini" colspan="3">Nenhum recebedor cadastrado.</td></tr>'}
+$('#wRows').onclick=async e=>{const b=e.target.closest('button[data-wd]');if(!b)return;if(!confirm('Remover este recebedor? Lançamentos que já usam o nome dele no campo de split deixarão de emitir até corrigir.'))return;try{await api('DELETE','/api/carteiras/'+encodeURIComponent(b.dataset.wd));loadWallets()}catch(x){toast(x.message)}};
+$('#wAdd').onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{await api('POST','/api/carteiras',{nome:$('#wNome').value,walletId:$('#wId').value});$('#wNome').value='';$('#wId').value='';res($('#wRes'),true,'Recebedor cadastrado.');loadWallets()}catch(x){res($('#wRes'),false,x.message)}b.disabled=false};
+[dn,dd,dsb].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 load();setInterval(load,60000);
 </script>
 </body>

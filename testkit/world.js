@@ -33,6 +33,7 @@ function world(initial = []) {
         case 'crm.requisite.list': return { result: [] };
         case 'crm.duplicate.findbycomm': return { result: {} };
         case 'crm.deal.add': { const d = { ID: String(nextId++), ...p.fields }; deals.push(d); return { result: d.ID }; }
+        case 'crm.deal.delete': { const i = deals.findIndex(d => d.ID == p.id); if (i >= 0) deals.splice(i, 1); return { result: true }; }
         case 'crm.deal.update': Object.assign(deals.find(d => d.ID == p.id), p.fields); return { result: true };
         case 'crm.timeline.comment.add': comments.push(p.fields); return { result: 1 };
         default: return { result: true };
@@ -43,15 +44,46 @@ function world(initial = []) {
   const pays = {}, subs = {}, customers = { cus_x: { id: 'cus_x', name: 'Cliente Direto SA', cpfCnpj: '11222333000181', email: 'x@y.com' } };
   let np = 1;
   const cancelled = [], updates = [], gets = [];
+  const installments = {}, receipts = [], refunds = [], links = [], deletedLinks = [], subUpdates = [], subCancelled = [], created = [];
+  const opts = { autoFirst: false, failCreate: null, noPix: false };
+  const addMonths = (d, n) => R.addMonths(d, n);
   const asaas = {
     enabled: true,
     async listPayments({ externalReference }) { return { data: Object.values(pays).filter(x => x.externalReference === externalReference) }; },
     async findOrCreateCustomer() { return { id: 'cus_1' }; },
-    async createPayment(b) { const p = { id: 'pay_' + np++, status: 'PENDING', invoiceUrl: 'https://asaas/i', ...b }; pays[p.id] = p; return p; },
+    async createPayment(b) {
+      if (opts.failCreate) { const e = new Error(opts.failCreate); e.status = 400; throw e; }
+      created.push(b);
+      if (b.installmentCount) {
+        const inst = 'inst_' + (Object.keys(installments).length + 1), n = b.installmentCount, each = Math.round((b.totalValue / n) * 100) / 100, arr = [];
+        for (let i = 0; i < n; i++) {
+          const { installmentCount, totalValue, ...rest } = b;
+          const p = { ...rest, id: 'pay_' + np++, status: 'PENDING', value: each, dueDate: addMonths(b.dueDate, i), installment: inst, installmentNumber: i + 1, invoiceUrl: `https://asaas/i/${np}`, bankSlipUrl: `https://asaas/b/${np}` };
+          pays[p.id] = p; arr.push(p);
+        }
+        installments[inst] = arr; return arr[0];
+      }
+      const p = { id: 'pay_' + np++, status: 'PENDING', invoiceUrl: 'https://asaas/i', bankSlipUrl: 'https://asaas/b', ...b }; pays[p.id] = p; return p;
+    },
     async getPayment(id) { gets.push(id); return pays[id]; },
     async activePayments() { return Object.values(pays).filter(p => ['PENDING', 'OVERDUE'].includes(p.status)); },
-    async getCustomer(id) { return customers[id]; },
-    async createSubscription(b) { const s = { id: 'sub_' + (Object.keys(subs).length + 1), ...b }; subs[s.id] = s; return s; },
+    async getCustomer(id) { return customers[id] || { id, name: 'Cliente ' + id }; },
+    async installmentPayments(id) { return { data: installments[id] || [] }; },
+    async identificationField(id) { return { identificationField: '00190.00009 01234.567890 12345.678901 1 99990000012345' }; },
+    async pixQrCode(id) { if (opts.noPix) throw new Error('Pix indisponível'); return { payload: `00020126PIX${id}`, encodedImage: 'iVBORw0KGgo' }; },
+    async receiveInCash(id, b) { receipts.push([id, b]); Object.assign(pays[id], { status: 'RECEIVED_IN_CASH', paymentDate: b.paymentDate }); },
+    async refund(id, b) { refunds.push([id, b]); pays[id].status = 'REFUND_REQUESTED'; },
+    async createPaymentLink(b) { links.push(b); return { id: 'lnk_' + links.length, url: `https://asaas/l/${links.length}`, ...b }; },
+    async deletePaymentLink(id) { deletedLinks.push(id); },
+    async createSubscription(b) {
+      if (opts.failCreate) { const e = new Error(opts.failCreate); e.status = 400; throw e; }
+      const s = { id: 'sub_' + (Object.keys(subs).length + 1), status: 'ACTIVE', ...b }; subs[s.id] = s;
+      if (opts.autoFirst) { const p = { id: 'pay_' + np++, status: 'PENDING', value: b.value, dueDate: b.nextDueDate, billingType: b.billingType, customer: b.customer, subscription: s.id, invoiceUrl: 'https://asaas/i/sub' }; pays[p.id] = p; }
+      return s;
+    },
+    async allSubscriptions() { return Object.values(subs); },
+    async updateSubscription(id, b) { subUpdates.push([id, b]); const m = { value: 'value', nextDueDate: 'nextDueDate', cycle: 'cycle', billingType: 'billingType', description: 'description', status: 'status' }; for (const [k, v] of Object.entries(b)) if (m[k]) subs[id][m[k]] = v; return subs[id]; },
+    async cancelSubscription(id) { subCancelled.push(id); subs[id].status = 'INACTIVE'; },
     async subscriptionPayments(id) { return { data: Object.values(pays).filter(p => p.subscription === id) }; },
     async allPayments() { return Object.values(pays); },
     async cancelPayment(id) { pays[id].status = 'DELETED'; cancelled.push(id); },
@@ -59,7 +91,7 @@ function world(initial = []) {
   };
   const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
   const svc = createService({ bitrix, asaas, store });
-  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets, calls };
+  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets, calls, installments, receipts, refunds, links, deletedLinks, subUpdates, subCancelled, created, opts };
 }
 
 module.exports = { userfields, FORMA_ID, TIPO_ID, today, in10, world, R };
