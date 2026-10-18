@@ -9,6 +9,10 @@ const { createService } = require('./lib/service');
 const { createSecrets } = require('./lib/secrets');
 const { createSettingsApi } = require('./lib/settingsApi');
 const R = require('./lib/rules');
+const { createFinStore } = require('./lib/finStore');
+const { createEmpresas } = require('./lib/empresas');
+const { createAsaasRouter } = require('./lib/asaasRouter');
+const { createFinApi } = require('./lib/finApi');
 
 // .env opcional (a plataforma de deploy já injeta as variáveis no processo).
 try {
@@ -24,9 +28,14 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const store = createStore(DATA_DIR);
 const secrets = createSecrets(DATA_DIR);
 const bitrix = createBitrix('');
-const asaas = createAsaas({});
-const svc = createService({ bitrix, asaas, store });
-const settings = createSettingsApi({ secrets, asaas, bitrix, store, svc });
+const asaasBase = createAsaas({});
+const fin = createFinStore(DATA_DIR);
+const empresas = createEmpresas({ fin, secrets, bitrix, createAsaas });
+// Multiempresa: cada empresa pode ter a própria chave do Asaas; quem não tem usa a conta padrão.
+const asaas = createAsaasRouter({ base: asaasBase, clientFor: id => empresas.clientFor(id), allClients: () => empresas.allClients() });
+const svc = createService({ bitrix, asaas, store, empresas });
+const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store });
+const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
 const send = (res, code, obj) => {
@@ -42,6 +51,7 @@ const readBody = req => new Promise((ok, no) => {
 const routes = {
   ...settings.routes,
   'GET /health': async () => ({ ok: true }),
+  'POST /api/sync-empresas': async () => empresas.sincronizarCampo(),
   'GET /api/state': async (u) => {
     if (!bitrix.enabled) { const e = new Error('Bitrix24 não configurado'); e.status = 503; throw e; }
     const q = u.searchParams;
@@ -111,6 +121,15 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
+    if (u.pathname.startsWith('/api/fin/')) {
+      const r = await finApi.handle(req.method, u.pathname, u, () => readBody(req));
+      if (!r) return send(res, 404, { error: 'não encontrado' });
+      if (r.json && r.json.__csv !== undefined) {
+        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${r.json.nome}"` });
+        return res.end('\ufeff' + r.json.__csv);
+      }
+      return send(res, 200, r.json);
+    }
     const key = `${req.method} ${u.pathname}`;
     if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
@@ -118,7 +137,8 @@ const server = http.createServer(async (req, res) => {
     if (m && req.method === 'POST') {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });
-      return send(res, 200, await dealRoutes[m[2]](c, await readBody(req)));
+      const body = await readBody(req);
+      return send(res, 200, await asaas.as(c.empresa, () => dealRoutes[m[2]](c, body)));   // conta Asaas da empresa do card
     }
     const m2 = u.pathname.match(/^\/api\/(assinaturas|links|carteiras)\/([\w.-]+)$/);
     if (m2 && (req.method === 'PUT' || req.method === 'DELETE')) {
@@ -145,6 +165,11 @@ server.listen(PORT, () => {
   console.log(`Contas a Receber em :${PORT} · Asaas ${asaas.enabled ? asaas.env : 'DESLIGADO (configure em Configurações)'} · sync a cada ${SYNC_MIN} min`);
   setTimeout(() => svc.sync().then(r => console.log('sync inicial', JSON.stringify(r))).catch(e => console.error(e)), 5000);
   setInterval(() => svc.sync().catch(e => console.error('sync', e.message)), SYNC_MIN * 60 * 1000);
+  // Contratos (funil 15): avisa o responsável nos marcos de vencimento, 1x por hora (cada marco só uma vez por contrato).
+  const avisar = () => bitrix.enabled && finApi.avisarContratos().then(r => r.enviados.length && console.log('avisos de contrato', r.enviados.length)).catch(e => console.error('avisos', e.message));
+  setTimeout(avisar, 30000); setInterval(avisar, 3600 * 1000);
+  const folha = () => { try { finApi.folhaAuto(); } catch (e) { console.error('folha', e.message); } };
+  setTimeout(folha, 10000); setInterval(folha, 3600 * 1000);
   const QUICK_MIN = +process.env.QUICK_MINUTES || 2;
   setInterval(() => svc.quick().catch(e => console.error('quick', e.message)), QUICK_MIN * 60 * 1000);
 });
