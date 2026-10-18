@@ -34,7 +34,7 @@ const empresas = createEmpresas({ fin, secrets, bitrix, createAsaas });
 // Multiempresa: cada empresa pode ter a própria chave do Asaas; quem não tem usa a conta padrão.
 const asaas = createAsaasRouter({ base: asaasBase, clientFor: id => empresas.clientFor(id), allClients: () => empresas.allClients() });
 const svc = createService({ bitrix, asaas, store, empresas });
-const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store });
+const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR });
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
@@ -42,9 +42,9 @@ const send = (res, code, obj) => {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(obj));
 };
-const readBody = req => new Promise((ok, no) => {
+const readBody = (req, limit = 1e6) => new Promise((ok, no) => {
   let b = '';
-  req.on('data', c => { b += c; if (b.length > 1e6) { no(new Error('payload grande')); req.destroy(); } });
+  req.on('data', c => { b += c; if (b.length > limit) { no(new Error('payload grande')); req.destroy(); } });
   req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch (e) { no(e); } });
 });
 
@@ -122,8 +122,12 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
     if (u.pathname.startsWith('/api/fin/')) {
-      const r = await finApi.handle(req.method, u.pathname, u, () => readBody(req));
+      const r = await finApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/fin/anexos' ? 12e6 : u.pathname === '/api/fin/conciliacao/importar' ? 3e6 : 1e6));
       if (!r) return send(res, 404, { error: 'não encontrado' });
+      if (r.json && r.json.__file) {   // anexo: sempre como download, tipo fixo pela extensão (nunca executa no navegador)
+        res.writeHead(200, { 'Content-Type': r.json.__file.mime, 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(r.json.__file.nome)}`, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'", 'Cache-Control': 'private, no-store' });
+        return res.end(r.json.__file.dados);
+      }
       if (r.json && r.json.__csv !== undefined) {
         res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${r.json.nome}"` });
         return res.end('\ufeff' + r.json.__csv);
@@ -168,6 +172,8 @@ server.listen(PORT, () => {
   // Contratos (funil 15): avisa o responsável nos marcos de vencimento, 1x por hora (cada marco só uma vez por contrato).
   const avisar = () => bitrix.enabled && finApi.avisarContratos().then(r => r.enviados.length && console.log('avisos de contrato', r.enviados.length)).catch(e => console.error('avisos', e.message));
   setTimeout(avisar, 30000); setInterval(avisar, 3600 * 1000);
+  const recorr = () => { try { const n = finApi.gerarRecorrenciasAgora(); if (n) console.log('recorrências geradas', n); } catch (e) { console.error('recorrências', e.message); } };
+  setTimeout(recorr, 12000); setInterval(recorr, 3600 * 1000);
   const folha = () => { try { finApi.folhaAuto(); } catch (e) { console.error('folha', e.message); } };
   setTimeout(folha, 10000); setInterval(folha, 3600 * 1000);
   const QUICK_MIN = +process.env.QUICK_MINUTES || 2;
