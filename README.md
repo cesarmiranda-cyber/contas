@@ -4,7 +4,7 @@ Tela única em `/` (`public/financeiro.html`). Os links antigos `/?deal=ID`, `?c
 
 | Grupo | Menu | Para que serve |
 |---|---|---|
-| **Visão geral** | Painel | Indicadores, caixa projetado, alertas e passos de implantação |
+| **Visão geral** | Painel | Painel estilo BI: período, filtros e visuais clicáveis com filtro cruzado (clique em um mês, categoria, cliente, fornecedor ou conta e todo o painel se ajusta), indicadores que abrem a lista correspondente e tabela dos lançamentos do filtro |
 | **Receitas** | A receber · Emitir cobranças · Contratos | Títulos (funil do Bitrix + manuais), ações no Asaas (emitir, lembrar, receber em dinheiro, estornar), nova cobrança/assinatura/link, **gerar cobranças do contrato**, aviso de vencimento |
 | **Despesas** | A pagar · Notas de entrada · Contas fixas | Lançamentos com parcelas e anotações, **importação de XML de NF-e** (títulos + estoque), recorrências sem fim |
 | **Tesouraria** | Fluxo de caixa · Bancos e contas · Conciliação | Projeção por empresa/conta, saldos, extrato, transferências, conciliação por OFX |
@@ -66,3 +66,17 @@ As credenciais salvas pelo painel ficam em `DATA_DIR/secrets.json` (modo 0600), 
 
 ## Rodar / testar
 `node server.js` · `npm test` (Node ≥ 20, sem dependências). Deploy: `./deploy.sh`.
+
+
+## Segurança (revisão)
+- Sem login próprio: o acesso é controlado pela plataforma (servidor com acesso restrito a usuários nomeados). Dentro do app não há perfis.
+- **CSRF**: pedidos que alteram dados exigem `application/json` e são recusados quando o navegador indica que vieram de outro site (`Sec-Fetch-Site`).
+- **Cabeçalhos**: `Content-Security-Policy` (só o próprio site; o app só pode ser embutido em domínios Bitrix24), `X-Content-Type-Options`, `Referrer-Policy`.
+- **XSS**: todo texto vindo do Bitrix/Asaas/XML/OFX é escapado; links externos só `http(s)`.
+- **XML (NF-e)**: leitor próprio que recusa `<!ENTITY>`/DOCTYPE e limita tamanho e profundidade. **OFX** com limite de tamanho e linhas.
+- **Anexos**: tipos permitidos por extensão, 8 MB, nome sanitizado, guardados por id aleatório e sempre baixados (nunca abertos no navegador).
+- **SSRF**: o webhook do Bitrix só aceita `https`, sem usuário/porta e sem endereços internos.
+- Chaves do Asaas e o webhook ficam em `secrets.json` (0600) e nunca voltam inteiros para a tela.
+
+## Dados de demonstração
+Configurações → Demonstração carrega 2 empresas fictícias com histórico (todos os processos) e remove tudo depois. Nada vai ao Bitrix/Asaas; as empresas demo não entram no campo “CR · Empresa”.

@@ -44,8 +44,8 @@ const send = (res, code, obj) => {
 };
 const readBody = (req, limit = 1e6) => new Promise((ok, no) => {
   let b = '';
-  req.on('data', c => { b += c; if (b.length > limit) { no(new Error('payload grande')); req.destroy(); } });
-  req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch (e) { no(e); } });
+  req.on('data', c => { b += c; if (b.length > limit) { const e = new Error('Corpo da requisição grande demais.'); e.status = 413; no(e); req.destroy(); } });
+  req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch { const e = new Error('Corpo da requisição não é um JSON válido.'); e.status = 400; no(e); } });
 });
 
 const routes = {
@@ -118,9 +118,21 @@ const dealRoutes = {
 };
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
+// Segurança: o app só aceita pedidos do próprio site (barra CSRF) e só pode ser embutido no Bitrix24.
+const FRAME = ["'self'", ...['com', 'com.br', 'eu', 'es', 'de', 'fr', 'it', 'pl', 'in', 'ru', 'ua', 'co.uk', 'com.tr', 'vn', 'id', 'kz', 'by', 'uk', 'jp', 'cn'].map(t => `https://*.bitrix24.${t}`)].join(' ');
+const SEC = {
+  'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cross-Origin-Resource-Policy': 'same-origin',
+  'Content-Security-Policy': `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors ${FRAME}`,
+};
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
+  for (const [k, v] of Object.entries(SEC)) res.setHeader(k, v);
   try {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      const site = req.headers['sec-fetch-site'];
+      if (site && !['same-origin', 'same-site', 'none'].includes(site)) return send(res, 403, { error: 'Pedido de outro site bloqueado.' });
+      if (['POST', 'PUT', 'PATCH'].includes(req.method) && !/^application\/json\b/i.test(req.headers['content-type'] || '') && Number(req.headers['content-length'] || 0) > 0) return send(res, 415, { error: 'Envie o corpo como application/json.' });
+    }
     if (u.pathname.startsWith('/api/fin/')) {
       const r = await finApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/fin/anexos' ? 12e6 : u.pathname === '/api/fin/conciliacao/importar' ? 3e6 : 1e6));
       if (!r) return send(res, 404, { error: 'não encontrado' });
@@ -156,7 +168,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET') {
       const f = path.join(__dirname, 'public', u.pathname === '/' || u.pathname === '/index.html' ? 'financeiro.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
-      if (f.startsWith(path.join(__dirname, 'public')) && fs.existsSync(f) && fs.statSync(f).isFile()) {
+      if (f.startsWith(path.join(__dirname, 'public') + path.sep) && fs.existsSync(f) && fs.statSync(f).isFile()) {
         res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
         return fs.createReadStream(f).pipe(res);
       }
