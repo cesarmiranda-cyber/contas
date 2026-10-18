@@ -1,3 +1,19 @@
+# Financeiro Nutrimix (Bitrix24 + Asaas) — mapa do app
+
+Tela única em `/` (`public/financeiro.html`). Os links antigos `/?deal=ID`, `?company=` e `?contact=` (aba dentro da deal) redirecionam para o modo embutido: contrato + cobranças (funil 15) ou cobranças do cliente (funil 90).
+
+| Grupo | Menu | Para que serve |
+|---|---|---|
+| **Visão geral** | Painel | Indicadores, caixa projetado, alertas e passos de implantação |
+| **Receitas** | A receber · Emitir cobranças · Contratos | Títulos (funil do Bitrix + manuais), ações no Asaas (emitir, lembrar, receber em dinheiro, estornar), nova cobrança/assinatura/link, **gerar cobranças do contrato**, aviso de vencimento |
+| **Despesas** | A pagar · Notas de entrada · Contas fixas | Lançamentos com parcelas e anotações, **importação de XML de NF-e** (títulos + estoque), recorrências sem fim |
+| **Tesouraria** | Fluxo de caixa · Bancos e contas · Conciliação | Projeção por empresa/conta, saldos, extrato, transferências, conciliação por OFX |
+| **Estoque e pessoas** | Estoque · Folha de pagamento | Saldo e custo médio, movimentos; lançamento mensal da folha |
+| **Análise** | Orçamento · Relatórios | Metas por categoria; central de relatórios (a receber, a pagar, DRE, fluxo, inadimplência, extrato, folha, estoque, notas) com CSV |
+| **Administração** | Cadastros · Configurações | **Cadastros** (dados mestres): empresas, contas bancárias, fornecedores, funcionários, produtos, plano de contas, centros de custo. **Configurações** (regras): integrações (Bitrix, Asaas, split), formas e condições de pagamento, cobrança e automações, contratos, rotinas, atividades (auditoria) |
+
+**Gerar cobranças do contrato (funil 15)**: na tela do contrato, informe valor, parcelas, 1º vencimento e forma. O app cria os títulos no funil de cobranças (herdando cliente, responsável, empresa e “minha empresa” do contrato) — eles aparecem em A receber — e, se marcado, emite no Asaas em seguida. Uma vez por contrato.
+
 # Contas a Receber (Bitrix24 funil 90 + Asaas)
 
 Cada deal do funil **Contas** (categoria 90) é um título a receber (uma parcela/cobrança).

@@ -151,8 +151,11 @@ const server = http.createServer(async (req, res) => {
       if (kind === 'links' && req.method === 'DELETE') return send(res, 200, await svc.cobrar.removerLink(id));
       if (kind === 'carteiras' && req.method === 'DELETE') { store.log('config', `Carteira de split removida: ${id}`); return send(res, 200, store.removeWallet(id)); }
     }
+    if (req.method === 'GET' && (u.pathname === '/' || u.pathname === '/index.html') && /[?&](deal|company|contact)=/.test(req.url)) {   // links antigos da aba dentro da deal
+      res.writeHead(302, { Location: '/financeiro.html' + u.search }); return res.end();
+    }
     if (req.method === 'GET') {
-      const f = path.join(__dirname, 'public', u.pathname === '/' ? 'index.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
+      const f = path.join(__dirname, 'public', u.pathname === '/' || u.pathname === '/index.html' ? 'financeiro.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
       if (f.startsWith(path.join(__dirname, 'public')) && fs.existsSync(f) && fs.statSync(f).isFile()) {
         res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
         return fs.createReadStream(f).pipe(res);
