@@ -515,8 +515,8 @@ async function cfgIntegracoes(){const [st,wl]=await Promise.all([api0('GET','/ap
     onAll('[data-rmw]','click',b=>confirm('Remover este recebedor?')&&act(()=>api0('DELETE','/api/carteiras/'+b.dataset.rmw),'Removido'))});
   return `<div class="g2" style="margin-bottom:16px">
    ${card('Bitrix24',`<div class="cb"><p style="margin-top:0">${pillOk(bx.configured,'Conectado','Não configurado')} ${bx.host?`<span class="mut">${esc(bx.host)} · ${esc(bx.hint)} · origem: ${esc(bx.source)}</span>`:''}</p>
-     <label>Webhook de entrada (URL com o código)<input id="bxHook" type="password" autocomplete="off" placeholder="https://seu-portal.bitrix24.com.br/rest/1/CODIGO/"></label>
-     <p class="hint">Permissões necessárias: CRM, Mensagens (im) e Usuários. Crie com um usuário administrador. O código nunca volta inteiro para a tela.</p>
+     <label>Webhook de entrada (URL com o código)<input id="bxHook" type="text" name="bitrix-webhook-url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://seu-portal.bitrix24.com.br/rest/1/CODIGO/"></label>
+     <p class="hint">Permissões necessárias: CRM, Mensagens (im) e Usuários. Crie com um usuário administrador. Depois de salvo, o código nunca volta inteiro para a tela. Você pode colar a URL com ou sem https:// e até com o nome do método no fim: o app ajusta.</p>
      <div class="row"><button class="btn" id="bxTest">Testar conexão</button><button class="btn pri" id="bxSave">Testar e salvar</button></div></div>`,'','Conexão com o portal')}
    ${card('Asaas — conta padrão',`<div class="cb"><p style="margin-top:0">${pillOk(a.configured,`${a.env==='production'?'Produção':'Sandbox'} ativo`,'Sem chave')} ${a.hint?`<span class="mut">${esc(a.hint)} · origem: ${esc(a.source)}</span>`:''}</p>
      <div class="form">${sel('asEnvX','Ambiente',[['sandbox','Sandbox (testes)'],['production','Produção (cobranças reais)']],a.env).replace('name="asEnvX"','id="asEnv"')}<label>Chave de API<input id="asKey" type="password" autocomplete="off" placeholder="$aact_..."></label></div>
