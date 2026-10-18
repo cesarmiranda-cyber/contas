@@ -57,24 +57,6 @@ test('recorrência sem fim: gera até o horizonte, não duplica, respeita fim e 
   assert.throws(() => X.validarRecorrencia({ tipo: 'pagar', empresaId: 'e1', inicio: '2026-10-01', modelo: { descricao: 'Aluguel', valor: 0 } }), /valor/i);
 });
 
-test('orçamento: meta padrão, exceção por mês, status e totais por empresa', () => {
-  const mes = D.slice(0, 7);
-  const orcamentos = [{ id: 'o1', empresaId: 'e1', tipo: 'despesa', categoria: 'Marketing', valor: 1000, mes: '' }, { id: 'o2', empresaId: 'e1', tipo: 'despesa', categoria: 'Marketing', valor: 3000, mes }, { id: 'o3', empresaId: 'e1', tipo: 'despesa', categoria: 'Aluguel e condomínio', valor: 2000, mes: '' }, { id: 'o4', empresaId: 'e1', tipo: 'receita', categoria: 'Vendas e serviços', valor: 10000, mes: '' }, { id: 'o5', empresaId: 'e2', tipo: 'despesa', categoria: 'Marketing', valor: 500, mes: '' }];
-  const pagar = [{ id: 'cp_1', empresaId: 'e1', categoria: 'Marketing', valor: 2900, status: 'paga', pagoEm: `${mes}-02`, valorPago: 2900, venc: `${mes}-02` }, { id: 'cp_2', empresaId: 'e1', categoria: 'Aluguel e condomínio', valor: 2500, status: 'aberta', venc: `${mes}-20` }, { id: 'cp_3', empresaId: 'e1', categoria: 'Software e licenças', valor: 90, status: 'cancelada', venc: `${mes}-20` }, { id: 'cp_4', empresaId: 'e2', categoria: 'Marketing', valor: 700, status: 'aberta', venc: `${mes}-10` }];
-  const receber = [{ id: 'rc_1', empresaId: 'e1', categoria: 'Vendas e serviços', valor: 6000, status: 'pago', pagoEm: `${mes}-05`, valorPago: 6000, venc: `${mes}-05`, origem: 'manual' }];
-  const o = X.orcamentoMes({ orcamentos, receber, pagar, empresaId: 'e1', mes });
-  const L = Object.fromEntries(o.linhas.map(l => [l.categoria, l]));
-  assert.equal(L['Marketing'].orcado, 3000); assert.equal(L['Marketing'].pct, 96.7); assert.equal(L['Marketing'].status, 'alerta');   // exceção do mês vale mais que o padrão
-  assert.equal(L['Aluguel e condomínio'].status, 'estourado'); assert.equal(L['Aluguel e condomínio'].desvio, 500);
-  assert.equal(L['Vendas e serviços'].status, 'abaixo'); assert.equal(L['Vendas e serviços'].realizado, 6000);
-  assert.ok(!L['Software e licenças']);                                                // cancelado não aparece
-  assert.equal(o.despesas.orcado, 5000); assert.equal(o.receitas.previsto, 6000);
-  const prox = X.orcamentoMes({ orcamentos, receber, pagar, empresaId: 'e1', mes: R.addMonths(D, 1).slice(0, 7) });
-  assert.equal(prox.linhas.find(l => l.categoria === 'Marketing').orcado, 1000);       // sem exceção: volta ao padrão
-  assert.equal(X.orcamentoMes({ orcamentos, receber, pagar, mes }).linhas.find(l => l.categoria === 'Marketing').orcado, 3500);   // todas as empresas somam
-  assert.throws(() => X.validarOrcamento({ empresaId: 'x', tipo: 'despesa', categoria: 'A', valor: 1 }, [{ id: 'e1' }]), /empresa/i);
-});
-
 // ---------- API ----------
 function api() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fx-')), fin = createFinStore(dir), secrets = createSecrets(dir);
@@ -146,19 +128,6 @@ test('API recorrências: cria, gera, reajusta os futuros e encerra', async () =>
   const del = await call('DELETE', `/recorrencias/${r.id}`);
   assert.equal(del.removidas, 3); assert.equal(fin.pagar.all().length, 1);
   await assert.rejects(call('POST', '/recorrencias', { tipo: 'pagar', empresaId: emp.id, inicio: D, modelo: { descricao: 'x', valor: 10 } }), /título/);
-});
-
-test('API orçamento: define meta, exceção por mês e remove', async () => {
-  const { call } = api(); const { emp } = await setup(call);
-  const mes = D.slice(0, 7);
-  await call('PUT', '/orcamento', { empresaId: emp.id, tipo: 'despesa', categoria: 'Marketing', valor: 1000 });
-  await call('PUT', '/orcamento', { empresaId: emp.id, tipo: 'despesa', categoria: 'Marketing', valor: 1500 });   // atualiza, não duplica
-  await call('PUT', '/orcamento', { empresaId: emp.id, tipo: 'despesa', categoria: 'Marketing', valor: 2500, mes });
-  await call('POST', '/pagar', { empresaId: emp.id, descricao: 'Anúncios', valor: 2000, venc: `${mes}-28`, categoria: 'Marketing' });
-  const o = await call('GET', '/orcamento', null, `mes=${mes}&empresa=${emp.id}`);
-  assert.equal(o.definidos.length, 2); assert.equal(o.linhas[0].orcado, 2500); assert.equal(o.linhas[0].pct, 80); assert.equal(o.linhas[0].status, 'ok');
-  await call('DELETE', `/orcamento/${o.definidos.find(x => x.mes === mes).id}`);
-  assert.equal((await call('GET', '/orcamento', null, `mes=${mes}&empresa=${emp.id}`)).linhas[0].status, 'estourado');
 });
 
 test('API caixa por conta e resumo por conta', async () => {

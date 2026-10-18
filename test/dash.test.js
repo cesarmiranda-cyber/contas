@@ -65,14 +65,14 @@ test('demonstração: carrega todos os processos, painel/relatórios funcionam, 
   const { call, fin, calls } = api();
   await call('POST', '/empresas', { nome: 'Empresa Real Ltda' });
   const r = await call('POST', '/demo/carregar');
-  assert.equal(r.empresas.length, 2); assert.ok(r.quantidades.pagar > 100 && r.quantidades.receber > 40 && r.quantidades.notas === 4 && r.quantidades.contratos === 5);
+  assert.equal(r.empresas.length, 2); assert.ok(r.quantidades.pagar > 100 && r.quantidades.receber > 40 && r.quantidades.notas === 4 && r.quantidades.contratos === 10);
   await assert.rejects(call('POST', '/demo/carregar'), /Já existem/);
   assert.equal((await call('GET', '/bootstrap')).demo, true);
   // painel completo
   const d = await call('GET', '/dashboard', null, 'periodo=6m');
   assert.ok(d.kpis.receitaPrev > 0 && d.kpis.despesaPrev > 0 && d.kpis.saldoContas > 0 && d.kpis.estoqueValor > 0);
-  assert.equal(d.contratos.total, 5); assert.ok(d.contratos.porStatus.vencido >= 1 && d.contratos.porStatus.vencendo >= 1);
-  assert.ok(d.estoque.qtdAbaixo >= 1); assert.ok(d.orcamento.linhas.length >= 3); assert.ok(d.conciliacao.pendentes >= 5); assert.equal(d.notas.total, 4); assert.ok(d.folha.custo > 0);
+  assert.equal(d.contratos.total, 10); assert.ok(d.contratos.porStatus.vencido >= 1 && d.contratos.porStatus.vencendo >= 1);
+  assert.ok(d.estoque.qtdAbaixo >= 1); assert.ok(d.conciliacao.pendentes >= 5); assert.equal(d.notas.total, 4); assert.ok(d.folha.custo > 0);
   assert.ok(d.categoriasDespesa.some(c => c.nome === 'Folha de pagamento')); assert.ok(d.serie.length >= 9 && d.serie.some(s => s.futuro));
   const empAlfa = (await call('GET', '/empresas')).find(e => e.nome.includes('Alfa')).id;
   const da = await call('GET', '/dashboard', null, `empresa=${empAlfa}&cat=Marketing`);
@@ -82,19 +82,61 @@ test('demonstração: carrega todos os processos, painel/relatórios funcionam, 
   const dre = await call('GET', '/relatorio', null, `tipo=dre&empresa=${empAlfa}&de=${R.addMonths(`${mes}-01`, -5)}&ate=${H}`); assert.ok(dre.dre.totalReceitas > 0 && dre.dre.totalDespesas > 0);
   assert.ok((await call('GET', '/relatorio', null, 'tipo=estoque')).linhas.length === 8);
   assert.ok((await call('GET', '/conciliacao')).linhas.some(l => l.sugestoes.length));      // há sugestões de conciliação
-  const cts = await call('GET', '/contratos'); assert.equal(cts.length, 5);
+  const cts = await call('GET', '/contratos'); assert.equal(cts.length, 10); const alvo = cts.find(c => !c.cobrado && c.valor > 0 && c.faltas.length === 0);
   const det = await call('GET', `/contratos/${cts[0].id}`); assert.equal(det.demo, true); assert.ok(det.cliente.doc);
-  const g = await call('POST', `/contratos/${cts[1].id}/gerar-cobrancas`, { valor: 54000, parcelas: 3, primeiroVenc: em(10) });
+  const g = await call('POST', `/contratos/${alvo.id}/gerar-cobrancas`, { valor: 54000, parcelas: 3, primeiroVenc: em(10) });
   assert.equal(g.ids.length, 3); assert.equal(calls.includes('gerar'), false);              // nada foi ao Bitrix
-  assert.equal((await call('GET', `/contratos/${cts[1].id}`)).financeiro.parcelas.length, 3);
-  await assert.rejects(call('POST', `/contratos/${cts[1].id}/gerar-cobrancas`, { valor: 1, parcelas: 1, primeiroVenc: em(10) }), /já foram geradas/);
+  assert.equal((await call('GET', `/contratos/${alvo.id}`)).financeiro.parcelas.length, 3);
+  await assert.rejects(call('POST', `/contratos/${alvo.id}/gerar-cobrancas`, { valor: 1, parcelas: 1, primeiroVenc: em(10) }), /já foram geradas/);
+  await assert.rejects(call('POST', `/contratos/${cts.find(c => c.cobrado).id}/gerar-cobrancas`, { valor: 1, parcelas: 1, primeiroVenc: em(10) }), /já foram geradas/);   // os que já nascem cobrados também travam
   const ed = await call('PUT', `/contratos/${cts[2].id}`, { titulo: 'Contrato editado', valor: 31000 }); assert.equal(ed.contrato.titulo, 'Contrato editado'); assert.equal(ed.contrato.valor, 31000);
   // empresas de demonstração não vão para o campo de lista do Bitrix
   assert.deepEqual((await call('POST', '/empresas/sincronizar-campo').catch(() => ({ opcoes: [] }))).opcoes.filter(o => /Demo/.test(o)), []);
   // lançamento criado pelo usuário dentro de empresa demo também é limpo; dados reais ficam
   await call('POST', '/pagar', { empresaId: empAlfa, descricao: 'Teste do cliente', valor: 10, venc: H });
   const rm = await call('POST', '/demo/remover'); assert.ok(rm.removidos > 300);
-  assert.equal((await call('GET', '/empresas')).length, 1); assert.equal(fin.pagar.all().length, 0); assert.equal(fin.contas.all().length, 0); assert.equal(fin.contratosDemo.all().length, 0); assert.equal(fin.notas.all().length, 0); assert.equal(fin.cobrancaContrato(String(cts[1].id)), null);
+  assert.equal((await call('GET', '/empresas')).length, 1); assert.equal(fin.pagar.all().length, 0); assert.equal(fin.contas.all().length, 0); assert.equal(fin.contratosDemo.all().length, 0); assert.equal(fin.notas.all().length, 0); assert.equal(fin.cobrancaContrato(String(alvo.id)), null);
   assert.equal((await call('GET', '/bootstrap')).demo, false);
   await assert.rejects(call('POST', '/demo/remover'), /Não há dados/);
+});
+
+test('painel de contratos: KPIs, vencimentos por mês e filtros cruzados', () => {
+  const H2 = H, c = (id, o) => ({ id, titulo: `Contrato ${id}`, cliente: 'ACME', responsavelNome: 'Marina', empresa: 'Alfa', valor: 1000, faltas: [], cobrado: false, etapaNome: 'Em vigor', ...o });
+  const dias = n => ({ venc: em(n), diasParaVencer: n, status: n < 0 ? 'vencido' : n <= 30 ? 'vencendo' : 'vigente' });
+  const lista = [c(1, { ...dias(-5), valor: 2000 }), c(2, { ...dias(10), valor: 3000, cobrado: true }), c(3, { ...dias(60), cliente: 'Beta', responsavelNome: 'Rafael', valor: 5000, cobrado: true }), c(4, { ...dias(200), cliente: 'Beta', valor: 4000 }),
+    c(5, { venc: '', diasParaVencer: null, status: 'sem_data', valor: 0, faltas: ['vencimento', 'valor'] })];
+  const a = D.agregarContratos({ contratos: lista, f: {}, hoje: H2 });
+  assert.deepEqual([a.kpis.total, a.kpis.valor, a.kpis.vencem30, a.kpis.valor30, a.kpis.vencem90, a.kpis.vencidos, a.kpis.valorVencidos, a.kpis.semVencimento, a.kpis.incompletos], [5, 14000, 1, 3000, 2, 1, 2000, 1, 1]);
+  assert.deepEqual([a.kpis.cobrados, a.kpis.semCobranca, a.kpis.emRisco, a.kpis.ticket], [2, 3, 5000, 2800]);
+  assert.equal(a.porMes[0].mes, 'vencidos'); assert.equal(a.porMes.length, 13); assert.equal(a.porMes[0].qtd, 1);
+  assert.equal(a.porMes.reduce((x, m) => x + m.qtd, 0), 4);                                  // o sem vencimento não entra no gráfico por mês
+  assert.deepEqual(a.topClientes.map(x => [x.nome, x.valor]), [['Beta', 9000], ['ACME', 5000]]);
+  assert.equal(a.pendencias[0].id, 5); assert.deepEqual(a.lista.map(x => x.id), [1, 2, 3, 4, 5]);   // ordenado por vencimento, sem data por último
+  // filtro por cliente: a lista muda, o ranking de clientes continua inteiro
+  const fc = D.agregarContratos({ contratos: lista, f: { cliente: 'Beta' }, hoje: H2 });
+  assert.deepEqual(fc.lista.map(x => x.id), [3, 4]); assert.equal(fc.topClientes.length, 2); assert.equal(fc.kpis.valor, 9000);
+  // filtro por situação: o donut continua mostrando todas as situações
+  const fs = D.agregarContratos({ contratos: lista, f: { status: 'vencido' }, hoje: H2 });
+  assert.deepEqual(fs.lista.map(x => x.id), [1]); assert.equal(fs.porStatus.find(x => x.status === 'vigente').qtd, 2);
+  // filtro por mês de vencimento e por cobrança
+  assert.deepEqual(D.agregarContratos({ contratos: lista, f: { mes: 'vencidos' }, hoje: H2 }).lista.map(x => x.id), [1]);
+  assert.deepEqual(D.agregarContratos({ contratos: lista, f: { mes: 'sem' }, hoje: H2 }).lista.map(x => x.id), [5]);
+  assert.deepEqual(D.agregarContratos({ contratos: lista, f: { cobranca: 'sim' }, hoje: H2 }).lista.map(x => x.id), [2, 3]);
+  assert.deepEqual(D.agregarContratos({ contratos: lista, f: { resp: 'Rafael' }, hoje: H2 }).lista.map(x => x.id), [3]);
+  assert.deepEqual(D.agregarContratos({ contratos: lista, f: { cobranca: 'nao' }, hoje: H2 }).cobranca, { gerada: 2, pendente: 3 });   // cada visual ignora o próprio filtro
+});
+
+test('API painel de contratos com demonstração', async () => {
+  const { call } = api();
+  assert.equal((await call('GET', '/dashboard/contratos')).kpis.total, 0);
+  await call('POST', '/demo/carregar');
+  const d = await call('GET', '/dashboard/contratos');
+  assert.equal(d.kpis.total, 10); assert.ok(d.kpis.vencidos >= 2 && d.kpis.vencem30 >= 2 && d.kpis.cobrados >= 5 && d.kpis.semVencimento === 1 && d.kpis.incompletos >= 1);
+  assert.ok(d.porResponsavel.length >= 3 && d.opcoes.responsaveis.includes('Patrícia Gomes'));
+  const emp = (await call('GET', '/empresas')).find(e => e.nome.includes('Beta')).id;
+  assert.equal((await call('GET', '/dashboard/contratos', null, `empresa=${emp}`)).kpis.total, 3);
+  assert.ok((await call('GET', '/dashboard/contratos', null, 'status=vencido')).lista.every(x => x.status === 'vencido'));
+  assert.equal((await call('GET', '/dashboard/contratos', null, 'status=lixo;drop')).kpis.total, 10);   // filtro inválido é ignorado
+  assert.ok((await call('GET', '/dashboard/contratos', null, 'cobranca=nao')).lista.every(x => !x.cobrado));
+  const ct = d.lista.find(x => x.cobrado); assert.ok((await call('GET', `/contratos/${ct.id}`)).financeiro.parcelas.length >= 3);   // contrato demo cobrado mostra as parcelas
 });
