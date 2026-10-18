@@ -129,21 +129,25 @@ test('roteador Asaas: usa a chave da empresa dentro de as() e a padrão fora', a
 });
 
 // ---------- API com Bitrix falso ----------
-function api({ deals = [], contratos = [], notify = [] } = {}) {
+function api({ deals = [], contratos = [], notify = [], minhas = [] } = {}) {
   const dir = tmp(), fin = createFinStore(dir), secrets = createSecrets(dir);
   const calls = [];
   const bitrix = {
     enabled: true, base: 'https://portal.bitrix24.com.br/rest/1/x',
     async call(m, p) {
       calls.push([m, p]);
-      if (m === 'crm.deal.userfield.list') return { result: [{ ID: '1', FIELD_NAME: 'UF_CRM_CR_EMPRESA', LIST: [{ ID: '11', VALUE: 'Alfa Ltda' }, { ID: '12', VALUE: 'Beta SA' }] }] };
+      if (m === 'crm.deal.userfield.list') return { result: [{ ID: '2', FIELD_NAME: 'UF_CRM_MBP_TIPO', USER_TYPE_ID: 'enumeration', EDIT_FORM_LABEL: { br: 'Tipo de serviço' }, LIST: [{ ID: '135', VALUE: 'Consultoria' }] }, { ID: '1', FIELD_NAME: 'UF_CRM_CR_EMPRESA', LIST: [{ ID: '11', VALUE: 'Alfa Ltda' }, { ID: '12', VALUE: 'Beta SA' }] }] };
       if (m === 'crm.status.list') return { result: [{ STATUS_ID: 'C15:NEW', NAME: 'Novo', EXTRA: { SEMANTICS: '' } }, { STATUS_ID: 'C15:LOSE', NAME: 'Perdido', EXTRA: { SEMANTICS: 'F' } }] };
       if (m === 'crm.company.list') return { result: [{ ID: '5', TITLE: 'ACME Ltda' }] };
       if (m === 'crm.company.get') return { result: { TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'a@acme.com' }] } };
+      if (m === 'user.get') return { result: [{ ID: '9', NAME: 'Marina', LAST_NAME: 'Lopes' }] };
+      if (m === 'crm.contact.list') return { result: [{ ID: '3', NAME: 'João', LAST_NAME: 'Silva' }] };
+      if (m === 'crm.contact.get') return { result: { NAME: 'João', LAST_NAME: 'Silva', POST: 'Diretor', PHONE: [{ VALUE: '+5511999990000' }] } };
+      if (m === 'profile') return { result: { NAME: 'Cesar', LAST_NAME: 'M', ADMIN: true } };
       if (m === 'im.notify.personal.add') { notify.push(p); return { result: 1 }; }
       return { result: true };
     },
-    async listAll(m) { return m === 'crm.deal.list' ? contratos : []; },
+    async listAll(m) { return m === 'crm.deal.list' ? contratos : m === 'crm.company.list' ? minhas : []; },
   };
   const empresas = createEmpresas({ fin, secrets, bitrix, createAsaas: () => ({ configure() {}, get enabled() { return false; } }) });
   const svc = { dealsCached: async () => deals };
@@ -245,4 +249,47 @@ test('API: campo de empresa no Bitrix recebe os nomes das empresas ativas', asyn
   assert.deepEqual(r.opcoes, ['Alfa Ltda', 'Gama Novo']);
   const up = calls.find(([m]) => m === 'crm.deal.userfield.update');
   assert.ok(up && up[1].fields.LIST.some(i => i.VALUE === 'Gama Novo') && up[1].fields.LIST.some(i => i.ID === '11'));   // mantém os itens existentes
+});
+
+test('empresa pela "Minha empresa" do Bitrix quando o campo de lista está vazio, e importação das minhas empresas', async () => {
+  const minhas = [{ ID: '2', TITLE: 'NUTRI MIX LTDA', UF_CRM_1790548082298: '19.340.693/0001-90' }, { ID: '8', TITLE: 'Outra Filial' }];
+  const { call, empresas, fin } = api({ minhas });
+  assert.deepEqual((await call('GET', '/status')).minhas.map(m => m.nome), ['NUTRI MIX LTDA', 'Outra Filial']);
+  const r = await call('POST', '/empresas/importar-bitrix');
+  assert.equal(r.criadas, 2);
+  const lista = await call('GET', '/empresas');
+  assert.equal(lista.find(e => e.nome === 'NUTRI MIX LTDA').cnpj, '19340693000190');   // CNPJ achado em campo personalizado
+  assert.equal((await call('POST', '/empresas/importar-bitrix')).criadas, 0);          // idempotente
+  const nutri = lista.find(e => e.nome === 'NUTRI MIX LTDA');
+  assert.equal(empresas.empresaDe({ mycompanyId: '2' }), nutri.id);
+  assert.equal(empresas.empresaDe({ MYCOMPANY_ID: '8', empresaRaw: '' }), lista.find(e => e.nome === 'Outra Filial').id);
+  assert.equal(empresas.empresaDe({ mycompanyId: '99' }), '');
+  assert.equal(fin.empresas.all().length, 2);
+});
+
+test('contrato com dados incompletos aponta o que falta e mostra campos personalizados com rótulo', async () => {
+  const hoje = R.todayBR(), em = n => new Date(Date.parse(hoje + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+  const contratos = [{ ID: '9', TITLE: 'Negócio #9', STAGE_ID: 'C15:NEW', OPPORTUNITY: '0', CLOSEDATE: em(7), BEGINDATE: em(0), ASSIGNED_BY_ID: '9', COMPANY_ID: '0', CONTACT_ID: '3', MYCOMPANY_ID: '2', UF_CRM_MBP_TIPO: '135', UF_CRM_MBP_VAZIO: '' }];
+  const { call } = api({ contratos, minhas: [{ ID: '2', TITLE: 'NUTRI MIX LTDA' }] });
+  await call('POST', '/empresas/importar-bitrix');
+  const [c] = await call('GET', '/contratos');
+  assert.equal(c.cliente, 'João Silva'); assert.equal(c.responsavelNome, 'Marina Lopes'); assert.equal(c.etapaNome, 'Novo');
+  assert.deepEqual(c.faltas, ['valor']);                                              // cliente (contato) e empresa (minha empresa) ok
+  assert.equal(c.empresa, 'NUTRI MIX LTDA');
+  const d = await call('GET', '/contratos/9');
+  assert.deepEqual(d.dados, [{ campo: 'UF_CRM_MBP_TIPO', nome: 'Tipo de serviço', valor: 'Consultoria' }]);
+  assert.equal(d.cliente.contatos[0].cargo, 'Diretor'); assert.equal(d.cliente.nome, 'João Silva');
+});
+
+test('resumo: atraso por faixa, maiores devedores e próximos vencimentos', () => {
+  const receber = [
+    { id: 'r1', empresaId: 'e1', cliente: 'ACME', valor: 100, venc: '2026-10-10', status: 'aberto' },
+    { id: 'r2', empresaId: 'e1', cliente: 'ACME', valor: 50, venc: '2026-07-01', status: 'aberto' },
+    { id: 'r3', empresaId: 'e1', cliente: 'Beta', valor: 30, venc: '2026-09-01', status: 'aberto' },
+    { id: 'r4', empresaId: 'e1', cliente: 'Beta', valor: 70, venc: '2026-10-30', status: 'aberto' },
+  ];
+  const r = F.resumo({ receber, pagar: [], hoje: HOJE, contratos: [] });
+  assert.deepEqual(r.aging, { '1-30': 100, '31-60': 30, '61-90': 0, '90+': 50 });
+  assert.deepEqual(r.devedores[0], { nome: 'ACME', valor: 150 });
+  assert.equal(r.proximosReceber[0].id, 'r2'); assert.equal(r.proximosReceber.length, 4);
 });

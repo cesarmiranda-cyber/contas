@@ -6,177 +6,288 @@
 <title>Financeiro</title>
 <link rel="icon" href="/_gw/icon">
 <style>
-:root{--bg:#f4f5f9;--surface:#fff;--surface2:#f8f9fc;--ink:#12182b;--ink2:#4a5370;--mut:#6b7491;--line:#e7e9f1;--brand:#4f46e5;--brand2:#7c6cf6;--brandbg:#eeedfd;
---amber:#b45309;--amberbg:#fff3dc;--red:#c81e1e;--redbg:#fde9e9;--green:#0b7f46;--greenbg:#e2f6ec;--blue:#1d4ed8;--bluebg:#e8f0fe;--graybg:#eef0f5;--shadow:0 1px 2px rgba(18,24,43,.04),0 8px 24px -12px rgba(18,24,43,.12);--r:14px}
-@media(prefers-color-scheme:dark){:root{--bg:#0c0f1a;--surface:#151a2a;--surface2:#1a2033;--ink:#eef1fa;--ink2:#b4bcd6;--mut:#8f99b8;--line:#252c42;--brand:#8b83ff;--brand2:#a99fff;--brandbg:#232048;
---amber:#f5b94a;--amberbg:#352a10;--red:#ff8a8a;--redbg:#3b1717;--green:#4cd694;--greenbg:#0f3023;--blue:#7aa8ff;--bluebg:#16264d;--graybg:#222a40;--shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6)}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.bar{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-h1{font-size:17px;margin:0;flex:1;min-width:120px}main{max-width:1280px;margin:0 auto;padding:16px}
-nav{max-width:1280px;margin:0 auto;padding:0 16px 8px;display:flex;gap:4px;overflow-x:auto}
-nav button{border:0;background:transparent;color:var(--ink2);padding:8px 12px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
-nav button[aria-selected=true]{background:var(--brandbg);color:var(--brand)}nav button:hover{color:var(--brand)}
-.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:10px;cursor:pointer;font:inherit;font-weight:600}
-.btn:hover{border-color:var(--brand);color:var(--brand)}.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));border-color:transparent;color:#fff}.btn.pri:hover{color:#fff;filter:brightness(1.07)}
-.btn.sm{padding:4px 9px;font-size:12.5px}.btn.danger:hover{border-color:var(--red);color:var(--red)}.btn:disabled{opacity:.55;cursor:wait}
-select,input,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:7px 9px;max-width:100%}
-input:focus,select:focus,textarea:focus,.btn:focus-visible,nav button:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
-label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600;color:var(--ink2)}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
-.card h2{font-size:14px;margin:0 0 10px}.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
-.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--shadow)}
-.kpi .l{font-size:12px;color:var(--mut);font-weight:600}.kpi .v{font-size:22px;font-weight:750;letter-spacing:-.02em;margin-top:2px}.kpi .s{font-size:12px;color:var(--mut)}
-.pos{color:var(--green)}.neg{color:var(--red)}
-.tbl{width:100%;border-collapse:collapse}.tbl th{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
-.tbl th.num{text-align:right}.tbl td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}.tbl tr:last-child td{border-bottom:0}.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.wrap{overflow-x:auto}.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:650;white-space:nowrap}
-.p-ok{background:var(--greenbg);color:var(--green)}.p-warn{background:var(--amberbg);color:var(--amber)}.p-bad{background:var(--redbg);color:var(--red)}.p-info{background:var(--bluebg);color:var(--blue)}.p-mut{background:var(--graybg);color:var(--ink2)}
-.form{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.alert{padding:10px 12px;border-radius:10px;margin-bottom:8px;font-weight:550}.alert.alta{background:var(--redbg);color:var(--red)}.alert.media{background:var(--amberbg);color:var(--amber)}
-.mut{color:var(--mut)}.empty{padding:22px;text-align:center;color:var(--mut)}
-dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);padding:18px;width:min(560px,94vw)}dialog::backdrop{background:rgba(0,0,0,.45)}
-#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:92vw}#toast.on{opacity:1}
-.bars{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:8px}.bars .c{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:34px}
-.bars .stack{display:flex;gap:2px;align-items:flex-end;height:120px}.bars .b{width:12px;border-radius:3px 3px 0 0;min-height:1px}.bars .in{background:#2f8f5b}.bars .out{background:#c45a2a}.bars small{font-size:11px;color:var(--mut)}
-.legend{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:6px}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
-@media(max-width:640px){.kpi .v{font-size:19px}main{padding:12px}}
+:root{
+  --bg:#f5f6fa;--surface:#fff;--surface2:#f8f9fc;--ink:#10162b;--ink2:#4a5270;--mut:#6a7390;--line:#e6e9f2;--line2:#d9deeb;
+  --brand:#3b4fd8;--brand2:#5b6cf0;--brandbg:#eceefd;--side:#10162b;--sideink:#c9d0ea;--sidemut:#8a94b8;--sidehi:#1c2547;
+  --s1:#2a78d6;--s2:#eb6834;
+  --ok:#0b7f46;--okbg:#e2f6ec;--warn:#9a5b00;--warnbg:#fff3dc;--bad:#c02626;--badbg:#fde9e9;--info:#1d4ed8;--infobg:#e8f0fe;--neutral:#4a5270;--neutralbg:#eef0f6;
+  --shadow:0 1px 2px rgba(16,22,43,.05),0 10px 28px -16px rgba(16,22,43,.18);--r:14px;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0b0e1a;--surface:#141a2c;--surface2:#192036;--ink:#eef1fb;--ink2:#b7bfd9;--mut:#8f99ba;--line:#242c45;--line2:#303a5a;
+  --brand:#8a95ff;--brand2:#a6aeff;--brandbg:#222850;--side:#0a0d18;--sidehi:#182040;
+  --s1:#3987e5;--s2:#d95926;
+  --ok:#4cd694;--okbg:#0f3023;--warn:#f5b94a;--warnbg:#352a10;--bad:#ff8a8a;--badbg:#3b1717;--info:#7aa8ff;--infobg:#16264d;--neutral:#b7bfd9;--neutralbg:#222a40;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px -16px rgba(0,0,0,.7)}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+svg{display:block}.ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+aside{background:var(--side);color:var(--sideink);padding:18px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;color:#fff;font-weight:750;font-size:16px;letter-spacing:-.01em}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand2),#8a5cf0);display:grid;place-items:center;color:#fff}
+aside nav{display:flex;flex-direction:column;gap:2px}
+aside nav button{display:flex;align-items:center;gap:11px;border:0;background:transparent;color:var(--sideink);padding:9px 12px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;text-align:left}
+aside nav button:hover{background:var(--sidehi);color:#fff}aside nav button[aria-current=page]{background:var(--sidehi);color:#fff;box-shadow:inset 3px 0 0 var(--brand2)}
+.sep{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--sidemut);padding:14px 12px 4px}
+.sidefoot{margin-top:auto;padding:12px;border-top:1px solid #ffffff1a;font-size:12px;color:var(--sidemut);display:flex;flex-direction:column;gap:6px}
+.dotl{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:#6b7390}.dotl.ok{background:#4cd694}.dotl.bad{background:#ff8a8a}
+.col{min-width:0}
+.top{position:sticky;top:0;z-index:15;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:12px 24px;flex-wrap:wrap}
+.top h1{margin:0;font-size:19px;letter-spacing:-.02em;flex:1;min-width:140px}
+.btn.menu{display:none}
+main{padding:22px 24px 48px;max-width:1280px}
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);background:var(--surface);color:var(--ink);padding:7px 13px;border-radius:10px;cursor:pointer;font:inherit;font-weight:600;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--brand);color:var(--brand)}.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));border-color:transparent;color:#fff}.btn.pri:hover{color:#fff;filter:brightness(1.08)}
+.btn.sm{padding:4px 10px;font-size:12.5px;border-radius:8px}.btn.danger:hover{border-color:var(--bad);color:var(--bad)}.btn:disabled{opacity:.5;cursor:not-allowed}
+select,input,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:7px 10px;max-width:100%}
+:is(button,a,input,select,textarea):focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:650;color:var(--ink2)}label.inline{flex-direction:row;align-items:center;gap:8px;font-weight:500;font-size:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.ch{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}.ch h2{margin:0;font-size:15px;letter-spacing:-.01em}.cb{padding:18px}
+.sub{color:var(--mut);font-size:12.5px;margin:2px 0 0}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:16px}
+.g2{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}.g2 .card{margin-bottom:0}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);display:flex;gap:12px}
+.kpi .ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;background:var(--brandbg);color:var(--brand)}
+.kpi .l{font-size:12px;color:var(--mut);font-weight:650}.kpi .v{font-size:22px;font-weight:760;letter-spacing:-.02em;line-height:1.25}.kpi .s{font-size:12px;color:var(--mut)}
+.kpi.bad .ico{background:var(--badbg);color:var(--bad)}.kpi.ok .ico{background:var(--okbg);color:var(--ok)}.kpi.warn .ico{background:var(--warnbg);color:var(--warn)}
+.pos{color:var(--ok)}.neg{color:var(--bad)}.mut{color:var(--mut)}
+.tbl{width:100%;border-collapse:collapse}.tbl th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);text-align:left;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}.tbl tr:last-child td{border-bottom:0}.tbl tbody tr:hover{background:var(--surface2)}
+.tbl th.num,.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.wrap{overflow-x:auto}.tbl td.emp{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tbl .t2{display:block;color:var(--mut);font-size:12px}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:650;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--ok)}.p-warn{background:var(--warnbg);color:var(--warn)}.p-bad{background:var(--badbg);color:var(--bad)}.p-info{background:var(--infobg);color:var(--info)}.p-mut{background:var(--neutralbg);color:var(--neutral)}
+.form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));align-items:end}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;border-radius:12px;margin-bottom:10px;font-weight:550}.alert.alta{background:var(--badbg);color:var(--bad)}.alert.media{background:var(--warnbg);color:var(--warn)}.alert.info{background:var(--infobg);color:var(--info)}
+.empty{padding:34px 20px;text-align:center;color:var(--mut)}.empty b{display:block;color:var(--ink);margin-bottom:4px;font-size:15px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{border:1px solid var(--line2);background:var(--surface);padding:6px 12px;border-radius:99px;cursor:pointer;font:inherit;font-weight:600;color:var(--ink2)}
+.chip[aria-pressed=true]{background:var(--brandbg);border-color:var(--brand);color:var(--brand)}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.search{min-width:220px}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}.steps li{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.steps .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;background:var(--neutralbg);color:var(--neutral);flex:none}.steps .done .n{background:var(--okbg);color:var(--ok)}.steps li div{flex:1}.steps small{display:block;color:var(--mut)}
+.list{list-style:none;margin:0;padding:0}.list li{display:flex;justify-content:space-between;gap:12px;padding:10px 18px;border-bottom:1px solid var(--line)}.list li:last-child{border-bottom:0}.list .t2{color:var(--mut);font-size:12px;display:block}
+.bar{height:8px;border-radius:99px;background:var(--neutralbg);overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;background:var(--s1)}
+.hrow{display:grid;grid-template-columns:130px 1fr 110px;gap:10px;align-items:center;padding:6px 0}
+.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:0}.dl dt{font-size:12px;color:var(--mut);font-weight:600}.dl dd{margin:0;font-weight:620;word-break:break-word}
+dialog{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink);padding:20px;width:min(580px,94vw)}dialog::backdrop{background:rgba(8,10,20,.55)}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:12px;opacity:0;pointer-events:none;transition:.2s;z-index:60;max-width:92vw;font-weight:600}#toast.on{opacity:1}
+.sk{height:96px;border-radius:var(--r);background:linear-gradient(90deg,var(--surface2),var(--line),var(--surface2));background-size:200% 100%;animation:sk 1.2s infinite;margin-bottom:14px}@keyframes sk{to{background-position:-200% 0}}
+.chart{width:100%;height:auto}.chart text{fill:var(--mut);font-size:11px}.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);padding:8px 11px;border-radius:9px;font-size:12px;z-index:70;display:none;line-height:1.5}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--ink2);margin-top:8px;flex-wrap:wrap}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+details summary{cursor:pointer;color:var(--brand);font-weight:600;padding:8px 0}
+@media(max-width:900px){.btn.menu{display:inline-flex}.app{grid-template-columns:1fr}aside{position:fixed;left:0;top:0;z-index:40;width:250px;transform:translateX(-100%);transition:.2s}aside.open{transform:none}main{padding:16px}.top{padding:10px 16px}.hrow{grid-template-columns:90px 1fr 90px}}
+@media print{aside,.top,.tools,.btn{display:none!important}.app{display:block}.card{box-shadow:none}}
 </style>
 </head>
 <body>
-<div class="top"><div class="bar">
-  <h1 id="ttl">Financeiro</h1>
-  <label id="empWrap" style="flex-direction:row;align-items:center;gap:8px">Empresa <select id="emp" aria-label="Empresa"></select></label>
-  <a class="btn" href="/" title="Contas a receber (funil de cobranças)">Cobranças</a>
-</div>
-<nav id="tabs" role="tablist"></nav></div>
-<main id="main"></main>
+<div class="app">
+<aside id="side"><div class="brand"><span class="logo"><svg class="ic" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></span>Financeiro</div><nav id="nav"></nav>
+  <div class="sidefoot" id="foot"></div></aside>
+<div class="col">
+  <div class="top"><button class="btn menu" id="menu" aria-label="Menu"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><h1 id="ttl">Painel</h1>
+    <label class="inline" id="empWrap">Empresa <select id="emp" aria-label="Empresa"></select></label>
+    <button class="btn" id="reload" title="Atualizar dados" aria-label="Atualizar dados"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg></button>
+    <a class="btn" href="/">Cobranças</a></div>
+  <main id="main"></main>
+</div></div>
 <dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
-<div id="toast" role="status" aria-live="polite"></div>
+<div id="toast" role="status" aria-live="polite"></div><div class="tip" id="tip"></div>
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const brk=v=>{v=Number(v||0);const a=Math.abs(v);return a>=1e6?(v/1e6).toFixed(1).replace('.',',')+' mi':a>=1e3?(v/1e3).toFixed(a>=1e4?0:1).replace('.',',')+' mil':String(Math.round(v))};
+const fdoc=d=>{d=String(d||'').replace(/\D/g,'');return d.length===11?d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4'):d.length===14?d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):d};
 const dt=d=>d?d.split('-').reverse().join('/'):'—';
-const P=new URLSearchParams(location.search), DEAL=P.get('deal');   // ?deal=ID: aba dentro do contrato (só contrato/cliente)
+const mesNome=m=>['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5)-1]+'/'+m.slice(2,4);
 const ls={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}}};
-let B={empresas:[],config:{}}, EMP=ls.get('fin.emp')||'todas', TAB=ls.get('fin.tab')||'painel', BUSY=false;
-async function api(m,u,b){const r=await fetch('/api/fin'+u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
-const q=(extra='')=>`?empresa=${encodeURIComponent(EMP)}${extra}`;
-function toast(m,err){const t=$('#toast');t.textContent=m;t.style.background=err?'var(--red)':'';t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),3600)}
+const P=new URLSearchParams(location.search), DEAL=P.get('deal');
+let B={empresas:[],config:{},categorias:[],hoje:'',host:''}, EMP=ls.get('fin.emp')||'todas', TAB=ls.get('fin.tab')||'painel', BUSY=false, ST=null;
+async function api(m,u,b){const r=await fetch('/api/fin'+u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}
+const q=(x='')=>`?empresa=${encodeURIComponent(EMP)}${x}`;
+function toast(m,err){const t=$('#toast');t.textContent=m;t.style.background=err?'var(--bad)':'';t.style.color=err?'#fff':'';t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),4200)}
 const act=async(fn,ok)=>{try{await fn();if(ok)toast(ok);await render()}catch(e){toast(e.message,1)}};
-const pill=(s)=>({paga:['p-ok','Paga'],pago:['p-ok','Pago'],aberta:['p-info','Em aberto'],aberto:['p-info','Em aberto'],a_vencer:['p-warn','Vence em breve'],vencida:['p-bad','Vencida'],atrasado:['p-bad','Atrasado'],cancelada:['p-mut','Cancelada'],cancelado:['p-mut','Cancelado'],vigente:['p-ok','Vigente'],vencendo:['p-warn','Vencendo'],vencido:['p-bad','Vencido'],sem_data:['p-mut','Sem data']}[s]||['p-mut',s]);
-const pl=s=>{const[c,t]=pill(s);return `<span class="pill ${c}">${t}</span>`};
-const empOpts=(sel,all)=>(all?'<option value="">—</option>':'')+B.empresas.filter(e=>e.ativa).map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.nome)}</option>`).join('');
-const table=(cols,rows,empty='Nada por aqui ainda.')=>rows.length?`<div class="wrap"><table class="tbl"><thead><tr>${cols.map(c=>`<th class="${c[0]==='>'?'num':''}">${esc(c.replace(/^>/,''))}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<div class="empty">${empty}</div>`;
-function ask(title,html,onOk,okLabel='Salvar'){const f=$('#dlgForm');f.innerHTML=`<h2 style="margin-top:0">${esc(title)}</h2><div class="form">${html}</div><div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn pri" id="dlgOk" value="ok">${okLabel}</button></div>`;
-  const d=$('#dlg');d.showModal();f.onsubmit=async ev=>{ev.preventDefault();const v=Object.fromEntries([...f.querySelectorAll('[name]')].map(i=>[i.name,i.type==='checkbox'?i.checked:i.value]));$('#dlgOk').disabled=true;try{await onOk(v);d.close();await render()}catch(e){toast(e.message,1)}finally{const b=$('#dlgOk');if(b)b.disabled=false}}}
-document.addEventListener('click',e=>{if(e.target.value==='cancel')$('#dlg').close()});
-const fld=(n,l,t='text',v='',extra='')=>`<label>${l}<input name="${n}" type="${t}" value="${esc(v)}" ${extra}></label>`;
-const sel=(n,l,opts,v)=>`<label>${l}<select name="${n}">${opts.map(o=>`<option value="${o[0]}" ${o[0]===v?'selected':''}>${esc(o[1])}</option>`).join('')}</select></label>`;
+const I={
+  chart:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',inbox:'<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/>',out:'<path d="M4 7h16v12H4z"/><path d="M4 11h16M8 15h3"/>',wallet:'<path d="M3 7h16a2 2 0 012 2v9H5a2 2 0 01-2-2z"/><path d="M3 7l12-3v3M16 13h2"/>',
+  file:'<path d="M7 3h8l4 4v14H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M17 11a3 3 0 100-6M21.5 19c-.3-2.4-1.6-4-3.5-4.7"/>',
+  doc:'<path d="M6 3h9l3 3v15H6z"/><path d="M9 11h6M9 15h6"/>',bld:'<path d="M4 21V5l8-2v18M12 9l8 2v10M8 9h1M8 13h1M8 17h1M16 15h1M16 18h1"/>',alert:'<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',trend:'<path d="M3 17l6-6 4 4 8-9"/>',cal:'<path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/>'};
+const ic=n=>`<svg class="ic" viewBox="0 0 24 24">${I[n]||''}</svg>`;
+const SK='<div class="sk"></div><div class="sk"></div><div class="sk" style="height:260px"></div>';
+const PILL={paga:['ok','Paga'],pago:['ok','Pago'],aberta:['info','Em aberto'],aberto:['info','Em aberto'],a_vencer:['warn','Vence em breve'],vencida:['bad','Vencida'],atrasado:['bad','Atrasado'],cancelada:['mut','Cancelada'],cancelado:['mut','Cancelado'],vigente:['ok','Vigente'],vencendo:['warn','Vencendo'],vencido:['bad','Vencido'],sem_data:['mut','Sem vencimento']};
+const pl=s=>{const[c,t]=PILL[s]||['mut',s];return `<span class="pill p-${c}">${t}</span>`};
+const empOpts=(sel,blank)=>(blank?'<option value="">—</option>':'')+B.empresas.filter(e=>e.ativa).map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.nome)}</option>`).join('');
 const FORMAS=[['PIX','Pix'],['BOLETO','Boleto'],['CARTAO','Cartão'],['TRANSFERENCIA','Transferência'],['DINHEIRO','Dinheiro']];
 const fnome=c=>(FORMAS.find(f=>f[0]===c)||[0,c||'—'])[1];
+const dealUrl=id=>B.host?`https://${B.host}/crm/deal/details/${id}/`:'#';
+const empty=(t,s,cta='')=>`<div class="empty"><b>${t}</b>${s||''}${cta?`<div style="margin-top:12px">${cta}</div>`:''}</div>`;
+const table=(cols,rows,emptyHtml)=>rows.length?`<div class="wrap"><table class="tbl"><thead><tr>${cols.map(c=>`<th class="${c[0]==='>'?'num':''}">${esc(c.replace(/^>/,''))}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:emptyHtml||empty('Nada por aqui ainda.');
+const kpi=(i,l,v,s,tone='')=>`<div class="kpi ${tone}"><div class="ico">${ic(i)}</div><div><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s||'&nbsp;'}</div></div></div>`;
+const card=(title,body,right='',sub='')=>`<section class="card"><div class="ch"><div><h2>${title}</h2>${sub?`<p class="sub">${sub}</p>`:''}</div>${right}</div>${body}</section>`;
+function ask(title,html,onOk,okLabel='Salvar'){const f=$('#dlgForm');f.innerHTML=`<h2 style="margin:0 0 14px;font-size:17px">${esc(title)}</h2><div class="form">${html}</div><div class="row" style="margin-top:18px;justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn pri" id="dlgOk" value="ok">${okLabel}</button></div>`;
+  const d=$('#dlg');d.showModal();f.onsubmit=async ev=>{ev.preventDefault();const v=Object.fromEntries([...f.querySelectorAll('[name]')].map(i=>[i.name,i.type==='checkbox'?i.checked:i.value]));const b=$('#dlgOk');b.disabled=true;try{await onOk(v);d.close();await render()}catch(e){toast(e.message,1)}finally{b.disabled=false}}}
+document.addEventListener('click',e=>{if(e.target.value==='cancel')$('#dlg').close()});
+const fld=(n,l,t='text',v='',x='')=>`<label>${l}<input name="${n}" type="${t}" value="${esc(v)}" ${x}></label>`;
+const sel=(n,l,o,v)=>`<label>${l}<select name="${n}">${o.map(x=>`<option value="${x[0]}" ${x[0]===v?'selected':''}>${esc(x[1])}</option>`).join('')}</select></label>`;
+const onAll=(s,ev,fn)=>document.querySelectorAll(s).forEach(el=>el['on'+ev]=()=>fn(el));
+const norm=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 
-const TABS=[['painel','Painel'],['receber','A receber'],['pagar','A pagar'],['caixa','Fluxo de caixa'],['contratos','Contratos'],['folha','Folha'],['relatorios','Relatórios'],['empresas','Empresas']];
-function drawTabs(){$('#tabs').innerHTML=TABS.map(([k,l])=>`<button role="tab" aria-selected="${k===TAB}" data-t="${k}">${l}</button>`).join('');$('#tabs').onclick=e=>{const t=e.target.dataset.t;if(t){TAB=t;ls.set('fin.tab',t);drawTabs();render()}}}
+/* ---------- gráficos (SVG, tooltip, tabela equivalente) ---------- */
+function tipOn(el,html){const t=$('#tip');const mv=e=>{t.style.left=Math.min(innerWidth-190,e.clientX+14)+'px';t.style.top=(e.clientY+14)+'px'};el.onmouseenter=e=>{t.innerHTML=html;t.style.display='block';mv(e)};el.onmousemove=mv;el.onmouseleave=()=>t.style.display='none'}
+function cashChart(L){const W=760,H=270,pl=54,pr=14,pt=14,pb=30,n=L.length,cw=(W-pl-pr)/n;
+  const vals=L.flatMap(l=>[l.entradaReal+l.entradaPrev,l.saidaReal+l.saidaPrev,l.saldo]);const mx=Math.max(1,...vals),mn=Math.min(0,...vals),rg=mx-mn||1;
+  const y=v=>pt+(H-pt-pb)*(1-(v-mn)/rg),ticks=[0,.25,.5,.75,1].map(t=>mn+rg*t);
+  const bw=Math.min(22,cw/3);let s=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Entradas, saídas e saldo por mês">`;
+  for(const t of ticks)s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${pl-8}" y="${y(t)+4}" text-anchor="end">${brk(t)}</text>`;
+  s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line2)"/>`;
+  L.forEach((l,i)=>{const cx=pl+cw*i+cw/2,e=l.entradaReal+l.entradaPrev,o=l.saidaReal+l.saidaPrev;
+    s+=`<rect x="${cx-bw-1}" y="${Math.min(y(e),y(0))}" width="${bw}" height="${Math.max(1,Math.abs(y(0)-y(e)))}" rx="4" fill="var(--s1)" ${l.futuro?'fill-opacity=".72"':''}/><rect x="${cx+1}" y="${Math.min(y(o),y(0))}" width="${bw}" height="${Math.max(1,Math.abs(y(0)-y(o)))}" rx="4" fill="var(--s2)" ${l.futuro?'fill-opacity=".72"':''}/>`;
+    s+=`<text x="${cx}" y="${H-10}" text-anchor="middle" ${l.atual?'style="font-weight:700;fill:var(--ink)"':''}>${mesNome(l.mes)}</text>`;});
+  const pts=L.map((l,i)=>[pl+cw*i+cw/2,y(l.saldo)]);s+=`<polyline fill="none" stroke="var(--ink2)" stroke-width="2" stroke-linejoin="round" points="${pts.map(p=>p.join(',')).join(' ')}"/>`;
+  pts.forEach(p=>s+=`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--surface)" stroke="var(--ink2)" stroke-width="2"/>`);
+  L.forEach((l,i)=>s+=`<rect class="hit" data-i="${i}" x="${pl+cw*i}" y="${pt}" width="${cw}" height="${H-pt-pb}" fill="transparent"/>`);
+  return s+'</svg><div class="legend"><span><i style="background:var(--s1)"></i>Entradas</span><span><i style="background:var(--s2)"></i>Saídas</span><span><i style="background:var(--ink2);border-radius:50%"></i>Saldo acumulado</span><span class="mut">Meses futuros em tom mais claro</span></div>'}
+function cashTips(L){document.querySelectorAll('.chart .hit').forEach(el=>{const l=L[+el.dataset.i];tipOn(el,`<b>${mesNome(l.mes)}</b><br>Entradas ${brl(l.entradaReal+l.entradaPrev)}<br>Saídas ${brl(l.saidaReal+l.saidaPrev)}<br>Resultado ${brl(l.resultado)}<br>Saldo ${brl(l.saldo)}`)})}
+const cashTable=L=>table(['Mês','>Entradas realizadas','>Entradas previstas','>Saídas realizadas','>Saídas previstas','>Resultado','>Saldo'],L.map(l=>`<tr ${l.atual?'style="background:var(--brandbg)"':''}><td><b>${mesNome(l.mes)}</b>${l.atual?' <span class="pill p-info">atual</span>':''}</td><td class="num">${brl(l.entradaReal)}</td><td class="num">${brl(l.entradaPrev)}</td><td class="num">${brl(l.saidaReal)}</td><td class="num">${brl(l.saidaPrev)}</td><td class="num ${l.resultado<0?'neg':'pos'}">${brl(l.resultado)}</td><td class="num ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td></tr>`));
+const hbars=(rows,color='var(--s1)')=>{const m=Math.max(1,...rows.map(r=>r.valor));return rows.map(r=>`<div class="hrow"><span title="${esc(r.nome)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.nome)}</span><div class="bar"><i style="width:${Math.max(2,r.valor/m*100)}%;background:${color}"></i></div><span class="num">${brl(r.valor)}</span></div>`).join('')};
+
+const NAV=[['painel','Painel','chart'],['receber','A receber','inbox'],['pagar','A pagar','out'],['caixa','Fluxo de caixa','wallet'],['contratos','Contratos','file'],['folha','Folha de pagamento','users'],['relatorios','Relatórios','doc'],['empresas','Empresas e ajustes','bld']];
 const VIEWS={};
+function drawNav(){$('#nav').innerHTML=`<div class="sep">Gestão</div>`+NAV.map(([k,l,i],n)=>(n===5?'<div class="sep">Pessoas e controle</div>':'')+`<button data-t="${k}" ${k===TAB?'aria-current="page"':''}>${ic(i)}${l}</button>`).join('');
+  $('#nav').onclick=e=>{const b=e.target.closest('[data-t]');if(b)go(b.dataset.t)}}
+function go(t,open=null){TAB=t;VIEWS.contratos.open=open;ls.set('fin.tab',TAB);drawNav();$('#side').classList.remove('open');render()}
+function drawFoot(){const s=ST;$('#foot').innerHTML=s?`<span><i class="dotl ${s.bitrix.ok?'ok':'bad'}"></i>Bitrix24 ${s.bitrix.ok?'conectado':'desconectado'}</span><span><i class="dotl ${s.empresasAsaas?'ok':''}"></i>Asaas: ${s.empresasAsaas} empresa(s)</span>${s.bitrix.host?`<span style="opacity:.8">${esc(s.bitrix.host)}</span>`:''}`:''}
 
-VIEWS.painel=async()=>{const r=await api('GET','/resumo'+q());
-  const k=(l,v,s,c='')=>`<div class="kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div><div class="s">${s||''}</div></div>`;
-  const max=Math.max(1,...r.caixa.flatMap(l=>[l.entradaReal+l.entradaPrev,l.saidaReal+l.saidaPrev]));
-  return `${r.alertas.map(a=>`<div class="alert ${a.sev}" role="alert">${esc(a.msg)}</div>`).join('')}
-  <div class="grid">${k('A receber',brl(r.aReceber),`${brl(r.atrasado)} atrasado · inadimplência ${r.inadimplenciaPct}%`)}${k('A pagar',brl(r.aPagar),`${brl(r.vencidoPagar)} vencido`)}
-  ${k('Recebido no mês',brl(r.recebidoMes),'')}${k('Pago no mês',brl(r.pagoMes),'')}${k('Resultado do mês',brl(r.resultadoMes),'recebido − pago',r.resultadoMes<0?'neg':'pos')}
-  ${k('Próx. 30 dias',brl(r.saldoProjetado30),`receber ${brl(r.receber30)} · pagar ${brl(r.pagar30)}`,r.saldoProjetado30<0?'neg':'pos')}
-  ${k('Folha mensal',brl(r.folhaMensal),`${r.funcionarios} funcionário(s)`)}${k('Contratos ativos',r.contratosAtivos,`${r.contratosVencer30} vencem em 30 dias`,r.contratosVencer30?'neg':'')}</div>
-  <div class="card" style="margin-top:14px"><h2>Caixa projetado — entradas e saídas por mês</h2><div class="bars" role="img" aria-label="Entradas e saídas por mês">${r.caixa.map(l=>{const i=l.entradaReal+l.entradaPrev,o=l.saidaReal+l.saidaPrev;return `<div class="c"><div class="stack"><div class="b in" style="height:${i/max*118}px" title="Entradas ${brl(i)}"></div><div class="b out" style="height:${o/max*118}px" title="Saídas ${brl(o)}"></div></div><small>${l.mes.slice(5)}/${l.mes.slice(2,4)}</small></div>`}).join('')}</div>
-  <div class="legend"><span><i style="background:#2f8f5b"></i>Entradas</span><span><i style="background:#c45a2a"></i>Saídas</span></div>
-  ${table(['Mês','>Entradas','>Saídas','>Saldo acumulado'],r.caixa.map(l=>`<tr><td>${l.mes}</td><td class="num">${brl(l.entradaReal+l.entradaPrev)}</td><td class="num">${brl(l.saidaReal+l.saidaPrev)}</td><td class="num ${l.saldo<0?'neg':''}">${brl(l.saldo)}</td></tr>`))}</div>
-  <div class="card"><h2>Despesas do mês por categoria</h2>${table(['Categoria','>Valor'],r.despesasMes.map(d=>`<tr><td>${esc(d.nome)}</td><td class="num">${brl(d.valor)}</td></tr>`),'Sem despesas neste mês.')}</div>`};
+VIEWS.painel=async()=>{const [r,s]=await Promise.all([api('GET','/resumo'+q()),api('GET','/status')]);ST=s;drawFoot();
+  const passos=[[s.bitrix.ok,'Conectar o Bitrix24',s.bitrix.ok?`Conectado como ${esc(s.bitrix.usuario||'')}${s.bitrix.admin?'':' (sem perfil de administrador: criar campos pode falhar)'}`:`${esc(s.bitrix.msg||'')}. Abra Cobranças → Configurações e informe o webhook.`,''],
+    [s.empresas>0,'Cadastrar as empresas',s.empresas?`${s.empresas} empresa(s) cadastrada(s)`:(s.minhas.length?`${s.minhas.length} “Minha empresa” encontrada(s) no Bitrix: importe com um clique`:'Cadastre ou importe as empresas do Bitrix'),s.empresas?'':`<button class="btn pri sm" data-go="empresas">Configurar</button>`],
+    [s.campoEmpresa,'Campo “CR · Empresa” no Bitrix',s.campoEmpresa?'Criado nas deals':'Cria o campo de lista usado para separar as empresas nas deals',s.campoEmpresa||!s.bitrix.ok?'':`<button class="btn sm" data-go="empresas">Criar</button>`],
+    [s.empresasAsaas>0,'Chave do Asaas por empresa',s.empresasAsaas?`${s.empresasAsaas} empresa(s) com chave`:'Necessária para emitir cobranças e pagar contas pelo Asaas',''],
+    [s.funcionarios>0,'Cadastrar funcionários (folha)',s.funcionarios?`${s.funcionarios} funcionário(s)`:'Para lançar a folha todo mês no contas a pagar',s.funcionarios?'':`<button class="btn sm" data-go="folha">Cadastrar</button>`]];
+  const faltam=passos.filter(p=>!p[0]).length;
+  setTimeout(()=>{onAll('[data-go]','click',b=>go(b.dataset.go));cashTips(r.caixa)});
+  return `${faltam?card('Primeiros passos',`<div class="cb"><ol class="steps">${passos.map((p,i)=>`<li class="${p[0]?'done':''}"><span class="n">${p[0]?'✓':i+1}</span><div><b>${p[1]}</b><small>${p[2]}</small></div>${p[3]}</li>`).join('')}</ol></div>`,'',`${faltam} etapa(s) pendente(s)`):''}
+  ${r.alertas.map(a=>`<div class="alert ${a.sev}" role="alert">${ic('alert')}<span>${esc(a.msg)}</span></div>`).join('')}
+  <div class="grid">${kpi('inbox','A receber',brl(r.aReceber),`${brl(r.atrasado)} atrasado · inadimplência ${r.inadimplenciaPct}%`,r.atrasado?'warn':'')}${kpi('out','A pagar',brl(r.aPagar),`${brl(r.vencidoPagar)} vencido`,r.vencidoPagar?'bad':'')}
+  ${kpi('trend','Resultado do mês',brl(r.resultadoMes),`recebido ${brl(r.recebidoMes)} · pago ${brl(r.pagoMes)}`,r.resultadoMes<0?'bad':'ok')}${kpi('cal','Próximos 30 dias',brl(r.saldoProjetado30),`receber ${brl(r.receber30)} · pagar ${brl(r.pagar30)}`,r.saldoProjetado30<0?'bad':'ok')}
+  ${kpi('users','Folha mensal',brl(r.folhaMensal),`${r.funcionarios} funcionário(s)`)}${kpi('file','Contratos ativos',r.contratosAtivos,`${r.contratosVencer30} vencem em 30 dias`,r.contratosVencer30?'warn':'')}</div>
+  ${card('Fluxo de caixa projetado',`<div class="cb">${cashChart(r.caixa)}<details><summary>Ver como tabela</summary>${cashTable(r.caixa)}</details></div>`,'',r.menorSaldo?`Menor saldo projetado: ${brl(r.menorSaldo.saldo)} em ${mesNome(r.menorSaldo.mes)}`:'')}
+  <div class="g2" style="margin-bottom:16px">
+   ${card('Próximos a pagar',r.proximosPagar.length?`<ul class="list">${r.proximosPagar.map(c=>`<li><span>${esc(c.descricao)}<span class="t2">${esc(c.fornecedor||'—')} · vence ${dt(c.venc)}</span></span><span class="num"><b>${brl(c.valor)}</b><span class="t2">${pl(c.situacao)}</span></span></li>`).join('')}</ul>`:empty('Nenhuma conta em aberto'))}
+   ${card('Próximos a receber',r.proximosReceber.length?`<ul class="list">${r.proximosReceber.map(c=>`<li><span>${esc(c.descricao)}<span class="t2">${esc(c.cliente||'—')} · vence ${dt(c.venc)}</span></span><span class="num"><b>${brl(c.valor)}</b><span class="t2">${pl(c.situacao)}</span></span></li>`).join('')}</ul>`:empty('Nada a receber','As cobranças do funil do Bitrix aparecem aqui.'))}
+  </div>
+  <div class="g2">
+   ${card('Despesas do mês por categoria',`<div class="cb">${r.despesasMes.length?hbars(r.despesasMes,'var(--s2)'):empty('Sem despesas neste mês')}</div>`)}
+   ${card('Atraso nos recebimentos',`<div class="cb">${hbars(Object.entries(r.aging).map(([nome,valor])=>({nome:nome+' dias',valor})))}${r.devedores.length?`<h3 style="font-size:13px;margin:16px 0 4px">Maiores devedores</h3>${hbars(r.devedores)}`:''}</div>`)}
+   ${card('Contratos por vencimento',r.contratosProximos.length?`<ul class="list">${r.contratosProximos.map(c=>`<li><span><a href="#" data-ct="${c.id}">${esc(c.titulo)}</a><span class="t2">${esc(c.cliente||'sem cliente')} · ${dt(c.venc)}</span></span><span class="num">${c.dias<0?`<span class="pill p-bad">vencido há ${-c.dias}d</span>`:`<span class="pill ${c.dias<=30?'p-warn':'p-ok'}">em ${c.dias}d</span>`}</span></li>`).join('')}</ul>`:empty('Sem contratos com vencimento','Preencha a data de fechamento (ou o campo de vencimento escolhido) nas deals do funil Contratos.'))}
+  </div>`};
+document.addEventListener('click',e=>{const a=e.target.closest('[data-ct]');if(a){e.preventDefault();go('contratos',a.dataset.ct)}});
 
-VIEWS.receber=async()=>{const l=await api('GET','/receber'+q());
-  const novo=`<button class="btn pri" id="novoRec">+ Recebimento manual</button>`;
-  setTimeout(()=>{$('#novoRec').onclick=()=>ask('Novo recebimento',`<label>Empresa<select name="empresaId">${empEsc()}</select></label>${fld('cliente','Cliente')}${fld('descricao','Descrição')}${fld('valor','Valor (R$)','number','','step="0.01" min="0.01" required')}${fld('venc','Vencimento','date','','required')}${sel('forma','Forma',[['','—'],...FORMAS])}`,v=>api('POST','/receber',v).then(()=>toast('Recebimento criado')))
-    document.querySelectorAll('[data-baixa-rec]').forEach(b=>b.onclick=()=>act(()=>api('POST',`/receber/${b.dataset.baixaRec}/baixar`,{}),'Recebimento baixado'));
-    document.querySelectorAll('[data-del-rec]').forEach(b=>b.onclick=()=>confirm('Excluir este recebimento?')&&act(()=>api('DELETE',`/receber/${b.dataset.delRec}`),'Excluído'))});
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Contas a receber</h2>${novo}</div><p class="mut">Cobranças do funil do Bitrix (sincronizadas com o Asaas) e recebimentos lançados à mão. A empresa vem do campo “CR · Empresa” da deal.</p>
-  ${table(['Vencimento','Cliente','Descrição','Empresa','Origem','Status','>Valor',''],l.map(r=>`<tr><td>${dt(r.venc)}</td><td>${esc(r.cliente)}</td><td>${esc(r.descricao)}</td><td>${esc(r.empresa||'—')}</td><td>${r.origem==='bitrix'?`<a href="/?deal=${r.dealId}">Bitrix #${r.dealId}</a>`:'Manual'}</td><td>${pl(r.status)}</td><td class="num">${brl(r.valor)}</td><td class="num">${r.origem==='manual'?`${r.status!=='pago'?`<button class="btn sm" data-baixa-rec="${r.id}">Receber</button> `:''}<button class="btn sm danger" data-del-rec="${r.id}" aria-label="Excluir">✕</button>`:''}</td></tr>`))}</div>`};
-const empEsc=()=>empOpts(EMP!=='todas'?EMP:'');
+const filtrar=(l,txt,campos)=>{const t=norm(txt);return t?l.filter(x=>campos.some(c=>norm(x[c]).includes(t))):l};
+const chips=(l,defs,cur)=>`<div class="chips">${defs.map(([k,t,fn])=>`<button class="chip" aria-pressed="${cur===k}" data-chip="${k}">${t} <b>${l.filter(fn).length}</b></button>`).join('')}</div>`;
+const bindList=V=>{onAll('[data-chip]','click',b=>{V.f=b.dataset.chip;render()});const s=$('#busca');s.oninput=()=>{V.txt=s.value;clearTimeout(V.t);V.t=setTimeout(()=>render().then(()=>{const n=$('#busca');n.focus();n.setSelectionRange(999,999)}),250)}};
 
-VIEWS.pagar=async()=>{const st=VIEWS.pagar.st||'';const l=await api('GET','/pagar'+q(st?`&status=${st}`:''));
-  setTimeout(()=>{$('#fSt').onchange=e=>{VIEWS.pagar.st=e.target.value;render()};$('#novoPag').onclick=()=>ask('Nova conta a pagar',`<label>Empresa<select name="empresaId">${empEsc()}</select></label>${fld('descricao','Descrição','text','','required')}${fld('fornecedor','Fornecedor')}${fld('valor','Valor total (R$)','number','','step="0.01" min="0.01" required')}${fld('parcelas','Parcelas','number','1','min="1" max="60"')}${fld('venc','1º vencimento','date','','required')}${sel('forma','Forma de pagamento',FORMAS.slice(0,3),'BOLETO')}<label>Categoria<select name="categoria">${B.categorias.map(c=>`<option>${esc(c)}</option>`).join('')}</select></label>${fld('codigoBarras','Linha digitável (boleto)')}`,v=>api('POST','/pagar',v).then(r=>toast(r.length>1?`${r.length} parcelas criadas`:'Conta criada')));
-    document.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>ask('Registrar pagamento',`${fld('data','Data do pagamento','date',B.hoje,`max="${B.hoje}"`)}${fld('valor','Valor pago (vazio = valor da conta)','number','','step="0.01"')}${sel('forma','Forma',FORMAS)}`,v=>api('POST',`/pagar/${b.dataset.pay}/baixar`,{data:v.data,valor:v.valor||undefined,forma:v.forma}).then(()=>toast('Pagamento registrado')),'Registrar'));
-    document.querySelectorAll('[data-asaas]').forEach(b=>b.onclick=()=>ask('Pagar pelo Asaas',`<p class="mut" style="grid-column:1/-1">Isto movimenta dinheiro real da conta Asaas da empresa. Boleto usa a linha digitável da conta; Pix usa a chave informada.</p>${fld('chavePix','Chave Pix (só para Pix)')}${sel('tipoChave','Tipo da chave',[['EVP','Aleatória'],['CPF','CPF'],['CNPJ','CNPJ'],['EMAIL','E-mail'],['PHONE','Telefone']])}<label style="flex-direction:row;gap:8px;grid-column:1/-1"><input type="checkbox" name="confirmar"> Confirmo o pagamento</label>`,v=>api('POST',`/pagar/${b.dataset.asaas}/asaas`,{chavePix:v.chavePix,tipoChave:v.tipoChave,confirmar:!!v.confirmar}).then(()=>toast('Enviado ao Asaas')),'Pagar'));
-    document.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>confirm('Cancelar esta conta?')&&act(()=>api('POST',`/pagar/${b.dataset.cancel}/cancelar`),'Conta cancelada'))});
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Contas a pagar</h2><div class="row"><select id="fSt" aria-label="Filtrar situação"><option value="">Todas</option>${[['vencida','Vencidas'],['a_vencer','Vencem em 7 dias'],['aberta','Em aberto'],['paga','Pagas']].map(([v,t])=>`<option value="${v}" ${v===st?'selected':''}>${t}</option>`).join('')}</select><button class="btn pri" id="novoPag">+ Nova conta</button></div></div>
-  ${table(['Vencimento','Descrição','Fornecedor','Empresa','Forma','Situação','>Valor',''],l.map(c=>`<tr><td>${dt(c.venc)}</td><td>${esc(c.descricao)}${c.parcela?` <span class="mut">(${c.parcela})</span>`:''}${c.origem==='folha'?' <span class="pill p-info">Folha</span>':''}</td><td>${esc(c.fornecedor)}</td><td>${esc(c.empresa)}</td><td>${fnome(c.forma)}</td><td>${pl(c.situacao)}</td><td class="num">${brl(c.valor)}</td><td class="num">${c.situacao!=='paga'&&c.situacao!=='cancelada'?`<button class="btn sm" data-pay="${c.id}">Pagar</button> ${['BOLETO','PIX'].includes(c.forma)?`<button class="btn sm" data-asaas="${c.id}" title="Pagar pelo Asaas">Asaas</button> `:''}<button class="btn sm danger" data-cancel="${c.id}" aria-label="Cancelar">✕</button>`:''}</td></tr>`))}</div>`};
+VIEWS.receber=async()=>{const all=await api('GET','/receber'+q());const V=VIEWS.receber;V.f??='';V.txt??='';
+  const defs=[['','Todas',()=>true],['atrasado','Atrasadas',x=>x.status==='atrasado'],['a_vencer','A vencer (7 dias)',x=>x.status==='a_vencer'],['aberto','Em aberto',x=>x.status==='aberto'],['pago','Recebidas',x=>x.status==='pago']];
+  const base=all.filter(x=>x.status!=='cancelado'),l=filtrar(base.filter(x=>!V.f||x.status===V.f),V.txt,['cliente','descricao','empresa']);
+  const sum=f=>brl(base.filter(f).reduce((a,x)=>a+x.valor,0));
+  setTimeout(()=>{bindList(V);
+    $('#novoRec').onclick=()=>ask('Novo recebimento',`<label>Empresa<select name="empresaId">${empOpts(EMP!=='todas'?EMP:'')}</select></label>${fld('cliente','Cliente')}${fld('descricao','Descrição')}${fld('valor','Valor (R$)','number','','step="0.01" min="0.01" required')}${fld('venc','Vencimento','date','','required')}${sel('forma','Forma',[['','—'],...FORMAS])}`,v=>api('POST','/receber',v).then(()=>toast('Recebimento criado')));
+    onAll('[data-baixa]','click',b=>act(()=>api('POST',`/receber/${b.dataset.baixa}/baixar`,{}),'Recebimento registrado'));onAll('[data-del]','click',b=>confirm('Excluir este recebimento?')&&act(()=>api('DELETE',`/receber/${b.dataset.del}`),'Excluído'))});
+  return `<div class="grid">${kpi('inbox','Em aberto',sum(x=>['aberto','a_vencer','atrasado'].includes(x.status)),'')}${kpi('alert','Atrasado',sum(x=>x.status==='atrasado'),'',base.some(x=>x.status==='atrasado')?'bad':'')}${kpi('trend','Recebido',sum(x=>x.status==='pago'),'','ok')}</div>
+  ${card('Contas a receber',`<div class="cb" style="padding-bottom:0"><div class="tools" style="justify-content:space-between">${chips(base,defs,V.f)}<input id="busca" class="search" type="search" placeholder="Buscar cliente ou descrição" value="${esc(V.txt)}" aria-label="Buscar"></div></div>
+  ${table(['Vencimento','Cliente / descrição','Empresa','Origem','Situação','>Valor',''],l.map(r=>`<tr><td>${dt(r.venc)}</td><td><b>${esc(r.cliente||'—')}</b><span class="t2">${esc(r.descricao)}</span></td><td class="emp" title="${esc(r.empresa||'—')}">${esc(r.empresa||'—')}</td><td>${r.origem==='bitrix'?`<a href="${dealUrl(r.dealId)}" target="_blank" rel="noopener">Deal #${r.dealId}</a>`:'Manual'}</td><td>${pl(r.status)}</td><td class="num"><b>${brl(r.valor)}</b></td><td class="num">${r.origem==='manual'?`${r.status!=='pago'?`<button class="btn sm" data-baixa="${r.id}">Receber</button> `:''}<button class="btn sm danger" data-del="${r.id}" aria-label="Excluir">✕</button>`:''}</td></tr>`),
+   base.length?empty('Nenhum resultado','Ajuste o filtro ou a busca.'):empty('Ainda não há contas a receber','As cobranças do funil de cobranças do Bitrix (e as emitidas no Asaas) aparecem aqui sozinhas. Você também pode lançar um recebimento manual.'))}`,`<button class="btn pri" id="novoRec">+ Recebimento manual</button>`,'Cobranças do Bitrix (funil Contas, sincronizadas com o Asaas) e recebimentos manuais. A empresa vem da deal.')}`};
 
-VIEWS.caixa=async()=>{const c=await api('GET','/caixa'+q());
-  const emp=EMP!=='todas'?B.empresas.find(e=>e.id===EMP):null;
-  setTimeout(()=>{const b=$('#saldoIni');if(b)b.onclick=()=>ask('Saldo inicial do caixa',`${fld('v','Saldo atual (R$)','number',(B.config.saldoInicial||{})[EMP]||0,'step="0.01"')}`,v=>api('PUT','/config',{saldoInicial:{...(B.config.saldoInicial||{}),[EMP]:Number(v.v)}}).then(async()=>{B=await api('GET','/bootstrap')}))});
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Fluxo de caixa</h2>${emp?`<button class="btn" id="saldoIni">Saldo inicial: ${brl((B.config.saldoInicial||{})[EMP]||0)}</button>`:'<span class="mut">Escolha uma empresa para definir o saldo inicial.</span>'}</div>
-  <p class="mut">Realizado (pago) + previsto (em aberto, por vencimento). Atrasados entram no mês atual. ${c.menorSaldo?`Menor saldo projetado: <b class="${c.menorSaldo.saldo<0?'neg':''}">${brl(c.menorSaldo.saldo)}</b> em ${c.menorSaldo.mes}.`:''}</p>
-  ${table(['Mês','>Entradas realizadas','>Entradas previstas','>Saídas realizadas','>Saídas previstas','>Resultado','>Saldo'],c.linhas.map(l=>`<tr ${l.atual?'style="background:var(--brandbg)"':''}><td>${l.mes}${l.atual?' · atual':''}</td><td class="num">${brl(l.entradaReal)}</td><td class="num">${brl(l.entradaPrev)}</td><td class="num">${brl(l.saidaReal)}</td><td class="num">${brl(l.saidaPrev)}</td><td class="num ${l.resultado<0?'neg':'pos'}">${brl(l.resultado)}</td><td class="num ${l.saldo<0?'neg':''}"><b>${brl(l.saldo)}</b></td></tr>`))}</div>`};
+VIEWS.pagar=async()=>{const V=VIEWS.pagar;V.f??='';V.txt??='';const all=await api('GET','/pagar'+q());
+  const defs=[['','Todas',x=>x.situacao!=='cancelada'],['vencida','Vencidas',x=>x.situacao==='vencida'],['a_vencer','Vencem em 7 dias',x=>x.situacao==='a_vencer'],['aberta','Em aberto',x=>x.situacao==='aberta'],['paga','Pagas',x=>x.situacao==='paga']];
+  const base=all.filter(x=>x.situacao!=='cancelada'),l=filtrar(base.filter(x=>!V.f||x.situacao===V.f),V.txt,['descricao','fornecedor','empresa','categoria']);
+  const sum=f=>brl(base.filter(f).reduce((a,x)=>a+x.valor,0));
+  setTimeout(()=>{bindList(V);
+    $('#novoPag').onclick=()=>ask('Nova conta a pagar',`<label>Empresa<select name="empresaId">${empOpts(EMP!=='todas'?EMP:'')}</select></label>${fld('descricao','Descrição','text','','required')}${fld('fornecedor','Fornecedor')}${fld('valor','Valor total (R$)','number','','step="0.01" min="0.01" required')}${fld('parcelas','Parcelas','number','1','min="1" max="60"')}${fld('venc','1º vencimento','date','','required')}${sel('forma','Forma de pagamento',FORMAS.slice(0,3),'BOLETO')}<label>Categoria<select name="categoria">${B.categorias.map(c=>`<option>${esc(c)}</option>`).join('')}</select></label>${fld('codigoBarras','Linha digitável (boleto)')}`,v=>api('POST','/pagar',v).then(r=>toast(r.length>1?`${r.length} parcelas criadas`:'Conta criada')));
+    onAll('[data-pay]','click',b=>ask('Registrar pagamento',`${fld('data','Data do pagamento','date',B.hoje,`max="${B.hoje}"`)}${fld('valor','Valor pago (vazio = valor da conta)','number','','step="0.01"')}${sel('forma','Forma',FORMAS)}`,v=>api('POST',`/pagar/${b.dataset.pay}/baixar`,{data:v.data,valor:v.valor||undefined,forma:v.forma}).then(()=>toast('Pagamento registrado')),'Registrar'));
+    onAll('[data-asaas]','click',b=>ask('Pagar pelo Asaas',`<p class="mut" style="grid-column:1/-1;margin:0">Movimenta dinheiro real da conta Asaas da empresa. Boleto usa a linha digitável da conta; Pix usa a chave informada.</p>${fld('chavePix','Chave Pix (só para Pix)')}${sel('tipoChave','Tipo da chave',[['EVP','Aleatória'],['CPF','CPF'],['CNPJ','CNPJ'],['EMAIL','E-mail'],['PHONE','Telefone']])}<label class="inline" style="grid-column:1/-1"><input type="checkbox" name="confirmar"> Confirmo o pagamento</label>`,v=>api('POST',`/pagar/${b.dataset.asaas}/asaas`,{chavePix:v.chavePix,tipoChave:v.tipoChave,confirmar:!!v.confirmar}).then(()=>toast('Pagamento enviado ao Asaas')),'Pagar'));
+    onAll('[data-cancel]','click',b=>confirm('Cancelar esta conta?')&&act(()=>api('POST',`/pagar/${b.dataset.cancel}/cancelar`),'Conta cancelada'))});
+  return `<div class="grid">${kpi('out','Em aberto',sum(x=>['aberta','a_vencer','vencida'].includes(x.situacao)),'')}${kpi('alert','Vencido',sum(x=>x.situacao==='vencida'),'',base.some(x=>x.situacao==='vencida')?'bad':'')}${kpi('trend','Pago',sum(x=>x.situacao==='paga'),'','ok')}</div>
+  ${card('Contas a pagar',`<div class="cb" style="padding-bottom:0"><div class="tools" style="justify-content:space-between">${chips(base,defs,V.f)}<input id="busca" class="search" type="search" placeholder="Buscar descrição ou fornecedor" value="${esc(V.txt)}" aria-label="Buscar"></div></div>
+  ${table(['Vencimento','Descrição','Empresa','Forma','Situação','>Valor',''],l.map(c=>`<tr><td>${dt(c.venc)}</td><td><b>${esc(c.descricao)}</b>${c.parcela?` <span class="mut">(${c.parcela})</span>`:''}${c.origem==='folha'?' <span class="pill p-info">Folha</span>':''}<span class="t2">${esc(c.fornecedor||'—')} · ${esc(c.categoria)}</span></td><td class="emp" title="${esc(c.empresa)}">${esc(c.empresa)}</td><td>${fnome(c.forma)}</td><td>${pl(c.situacao)}</td><td class="num"><b>${brl(c.valor)}</b></td><td class="num">${c.situacao!=='paga'?`<button class="btn sm" data-pay="${c.id}">Pagar</button> ${['BOLETO','PIX'].includes(c.forma)?`<button class="btn sm" data-asaas="${c.id}" title="Pagar pelo Asaas">Asaas</button> `:''}<button class="btn sm danger" data-cancel="${c.id}" aria-label="Cancelar">✕</button>`:''}</td></tr>`),
+   base.length?empty('Nenhum resultado','Ajuste o filtro ou a busca.'):empty('Nenhuma conta a pagar','Lance a primeira conta (com parcelas, se precisar) ou cadastre funcionários para gerar a folha.'))}`,`<button class="btn pri" id="novoPag">+ Nova conta</button>`,'Despesas com parcelas, forma de pagamento e baixa. A folha entra aqui automaticamente.')}`};
 
-const contratoBox=(d)=>{const c=d.contrato,f=d.financeiro;return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(c.titulo)}</h2>${pl(c.status)}</div>
-  <div class="grid" style="margin-top:10px">${[['Cliente',d.cliente.nome],['CNPJ/CPF',d.cliente.doc],['E-mail',d.cliente.email],['Telefone',d.cliente.telefone],['Empresa',c.empresa||'—'],['Valor do contrato',brl(c.valor)],['Início',dt(c.inicio)],['Vencimento',`${dt(c.venc)}${c.diasParaVencer!==null?` (${c.diasParaVencer<0?'há '+(-c.diasParaVencer):'em '+c.diasParaVencer} dia(s))`:''}`]].map(([l,v])=>`<div><div class="mut" style="font-size:12px">${l}</div><div style="font-weight:600">${esc(v||'—')}</div></div>`).join('')}</div></div>
-  <div class="grid"><div class="kpi"><div class="l">Em aberto</div><div class="v">${brl(f.aberto)}</div></div><div class="kpi"><div class="l">Atrasado</div><div class="v ${f.atrasado?'neg':''}">${brl(f.atrasado)}</div></div><div class="kpi"><div class="l">Pago</div><div class="v pos">${brl(f.pago)}</div></div></div>
-  <div class="card" style="margin-top:14px"><h2>Parcelas do cliente</h2>${table(['Vencimento','Descrição','Status','>Valor'],f.parcelas.map(p=>`<tr><td>${dt(p.venc)}</td><td>${esc(p.descricao)}</td><td>${pl(p.status)}</td><td class="num">${brl(p.valor)}</td></tr>`),'Sem cobranças geradas para este cliente.')}</div>`};
+VIEWS.caixa=async()=>{const c=await api('GET','/caixa'+q());const emp=EMP!=='todas'?B.empresas.find(e=>e.id===EMP):null;
+  setTimeout(()=>{cashTips(c.linhas);const b=$('#saldoIni');if(b)b.onclick=()=>ask('Saldo inicial do caixa',fld('v','Saldo atual em conta (R$)','number',(B.config.saldoInicial||{})[EMP]||0,'step="0.01"'),async v=>{await api('PUT','/config',{saldoInicial:{...(B.config.saldoInicial||{}),[EMP]:Number(v.v)}});Object.assign(B,await api('GET','/bootstrap'))})});
+  return `<div class="grid">${kpi('wallet','Saldo projetado final',brl(c.saldoFinal),'ao fim do período',c.saldoFinal<0?'bad':'ok')}${kpi('alert','Menor saldo',c.menorSaldo?brl(c.menorSaldo.saldo):'—',c.menorSaldo?`em ${mesNome(c.menorSaldo.mes)}`:'',c.menorSaldo&&c.menorSaldo.saldo<0?'bad':'')}</div>
+  ${card('Fluxo de caixa',`<div class="cb">${cashChart(c.linhas)}</div>`,emp?`<button class="btn" id="saldoIni">Saldo inicial: ${brl((B.config.saldoInicial||{})[EMP]||0)}</button>`:'<span class="mut">Escolha uma empresa para definir o saldo inicial</span>','Realizado (pago) + previsto (em aberto, por vencimento). Atrasados entram no mês atual.')}
+  ${card('Detalhamento mensal',cashTable(c.linhas))}`};
 
-VIEWS.contratos=async()=>{
-  const l=await api('GET','/contratos'+q());
-  if(VIEWS.contratos.open){const d=await api('GET','/contratos/'+VIEWS.contratos.open);setTimeout(()=>$('#voltar').onclick=()=>{VIEWS.contratos.open=null;render()});return `<p><button class="btn" id="voltar">← Contratos</button></p>${contratoBox(d)}`}
-  setTimeout(()=>{document.querySelectorAll('[data-ct]').forEach(b=>b.onclick=()=>{VIEWS.contratos.open=b.dataset.ct;render()});
-    $('#avisar').onclick=()=>act(async()=>{const r=await api('POST','/contratos/avisar',{});toast(r.enviados.length?`${r.enviados.length} aviso(s) enviado(s)`:'Nenhum aviso pendente')});
-    $('#cfgCt').onclick=cfgContratos});
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Contratos ativos (funil Contratos)</h2><div class="row"><button class="btn" id="cfgCt">Campos e avisos</button><button class="btn pri" id="avisar">Avisar responsáveis agora</button></div></div>
-  <p class="mut">O responsável pela deal recebe notificação no Bitrix quando o contrato chega a ${(B.config.marcosAviso||[]).join(', ')} dia(s) do vencimento (e se vencer).</p>
-  ${table(['Contrato','Cliente','Empresa','Vencimento','Dias','Status','>Valor'],l.map(c=>`<tr><td><a href="#" data-ct="${c.id}">${esc(c.titulo)}</a></td><td>${esc(c.cliente)}</td><td>${esc((B.empresas.find(e=>e.id===c.empresaId)||{}).nome||'—')}</td><td>${dt(c.venc)}</td><td>${c.diasParaVencer??'—'}</td><td>${pl(c.status)}</td><td class="num">${brl(c.valor)}</td></tr>`),'Nenhum contrato ativo.')}</div>`};
+const faltaTxt=f=>f.map(x=>`<span class="pill p-warn" title="Preencha na deal do Bitrix">sem ${x}</span>`).join(' ');
+const contratoBox=d=>{const c=d.contrato,f=d.financeiro,cl=d.cliente,url=`https://${d.host}/crm/deal/details/${c.id}/`;
+  return `${c.faltas.length?`<div class="alert media">${ic('alert')}<span>Esta deal está incompleta no Bitrix: falta preencher ${c.faltas.join(', ')}. <a href="${url}" target="_blank" rel="noopener">Abrir deal</a></span></div>`:''}
+  ${card(esc(c.titulo),`<div class="cb"><dl class="dl">${[['Cliente',cl.nome||'—'],['CNPJ / CPF',fdoc(cl.doc)||'—'],['E-mail',cl.email||'—'],['Telefone',cl.telefone||'—'],['Endereço',cl.endereco||'—'],['Empresa (financeiro)',c.empresa||'—'],['Responsável',c.responsavelNome||'—'],['Etapa',c.etapaNome],['Valor do contrato',brl(c.valor)],['Início',dt(c.inicio)],['Vencimento',c.venc?`${dt(c.venc)} (${c.diasParaVencer<0?'venceu há '+(-c.diasParaVencer):'em '+c.diasParaVencer} dia(s))`:'—'],['Avisos enviados',d.avisos.length?d.avisos.map(a=>a===-1?'vencido':'D-'+a).join(', '):'nenhum']].map(([l,v])=>`<div><dt>${l}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>${c.obs?`<p class="mut" style="margin-bottom:0">${esc(c.obs)}</p>`:''}</div>`,`<div class="row">${pl(c.status)} <a class="btn sm" href="${url}" target="_blank" rel="noopener">Abrir no Bitrix</a></div>`)}
+  ${cl.contatos.length?card('Contatos',table(['Nome','Cargo','E-mail','Telefone'],cl.contatos.map(x=>`<tr><td><b>${esc(x.nome)}</b></td><td>${esc(x.cargo||'—')}</td><td>${esc(x.email||'—')}</td><td>${esc(x.telefone||'—')}</td></tr>`))):''}
+  ${d.dados.length?card('Dados do contrato',`<div class="cb"><dl class="dl">${d.dados.map(x=>`<div><dt>${esc(x.nome)}</dt><dd>${esc(x.valor)}</dd></div>`).join('')}</dl></div>`,'','Campos preenchidos na deal'):''}
+  <div class="grid">${kpi('inbox','Em aberto',brl(f.aberto),'')}${kpi('alert','Atrasado',brl(f.atrasado),'',f.atrasado?'bad':'')}${kpi('trend','Pago',brl(f.pago),'','ok')}</div>
+  ${card('Parcelas e cobranças do cliente',table(['Vencimento','Descrição','Situação','>Valor',''],f.parcelas.map(p=>`<tr><td>${dt(p.venc)}</td><td>${esc(p.descricao)}</td><td>${pl(p.status)}</td><td class="num"><b>${brl(p.valor)}</b></td><td class="num">${p.link?`<a class="btn sm" href="${esc(p.link)}" target="_blank" rel="noopener">Link</a>`:''}</td></tr>`),empty('Sem cobranças para este cliente','Quando as cobranças forem geradas no funil de cobranças, elas aparecem aqui.')))}`};
+
+VIEWS.contratos=async()=>{const V=VIEWS.contratos;
+  if(V.open){const d=await api('GET','/contratos/'+V.open);setTimeout(()=>{$('#voltar').onclick=()=>{V.open=null;render()}});return `<p><button class="btn" id="voltar">← Voltar aos contratos</button></p>${contratoBox(d)}`}
+  const all=await api('GET','/contratos'+q());V.f??='';V.txt??='';
+  const defs=[['','Todos',()=>true],['vencido','Vencidos',x=>x.status==='vencido'],['vencendo','Vencem em 30 dias',x=>x.status==='vencendo'],['vigente','Vigentes',x=>x.status==='vigente'],['sem_data','Sem vencimento',x=>x.status==='sem_data']];
+  const l=filtrar(all.filter(x=>!V.f||x.status===V.f),V.txt,['titulo','cliente','empresa','responsavelNome']);
+  setTimeout(()=>{bindList(V);
+    $('#avisar').onclick=()=>act(async()=>{const r=await api('POST','/contratos/avisar',{});toast(r.enviados.length?`${r.enviados.length} aviso(s) enviado(s) ao(s) responsável(is)`:'Nenhum aviso pendente agora')});$('#cfgCt').onclick=cfgContratos;
+    onAll('[data-open]','click',b=>{V.open=b.dataset.open;render()})});
+  const inc=all.filter(c=>c.faltas.length).length;
+  return `${inc?`<div class="alert media">${ic('alert')}<span>${inc} contrato(s) com dados incompletos no Bitrix (cliente, valor, vencimento, empresa ou responsável). Eles aparecem marcados na lista.</span></div>`:''}
+  ${card('Contratos ativos',`<div class="cb" style="padding-bottom:0"><div class="tools" style="justify-content:space-between">${chips(all,defs,V.f)}<input id="busca" class="search" type="search" placeholder="Buscar contrato, cliente ou responsável" value="${esc(V.txt)}" aria-label="Buscar"></div></div>
+   ${table(['Contrato','Cliente','Empresa','Responsável','Vencimento','Situação','>Valor'],l.map(c=>`<tr style="cursor:pointer" data-open="${c.id}"><td><b>${esc(c.titulo)}</b><span class="t2">${esc(c.etapaNome)}${c.faltas.length?' · '+faltaTxt(c.faltas):''}</span></td><td>${esc(c.cliente||'—')}</td><td class="emp" title="${esc(c.empresa||'—')}">${esc(c.empresa||'—')}</td><td>${esc(c.responsavelNome||'—')}</td><td>${dt(c.venc)}${c.diasParaVencer!==null?`<span class="t2">${c.diasParaVencer<0?'há '+(-c.diasParaVencer)+' dia(s)':'em '+c.diasParaVencer+' dia(s)'}</span>`:''}</td><td>${pl(c.status)}</td><td class="num"><b>${brl(c.valor)}</b></td></tr>`),
+    all.length?empty('Nenhum resultado','Ajuste o filtro ou a busca.'):empty('Nenhum contrato ativo','Os contratos vêm do funil Contratos do Bitrix. Em “Campos e avisos” você escolhe o campo de vencimento e as etapas que contam como ativas.'))}`,
+   `<div class="row"><button class="btn" id="cfgCt">Campos e avisos</button><button class="btn pri" id="avisar">Avisar responsáveis agora</button></div>`,`O responsável recebe notificação no Bitrix a ${(B.config.marcosAviso||[]).join(', ')} dia(s) do vencimento e se o contrato vencer.`)}`};
 async function cfgContratos(){const c=await api('GET','/contratos/campos').catch(e=>{toast(e.message,1);return null});if(!c)return;
   ask('Contratos: campos e avisos',`<label style="grid-column:1/-1">Campo com a data de vencimento do contrato<select name="campo"><option value="">Data de fechamento (padrão)</option>${c.campos.map(x=>`<option value="${x.campo}" ${x.campo===B.config.contratoCampoVenc?'selected':''}>${esc(x.nome)}</option>`).join('')}</select></label>
   <label style="grid-column:1/-1">Dias de aviso antes do vencimento (separados por vírgula)<input name="marcos" value="${(B.config.marcosAviso||[]).join(', ')}"></label>
-  <fieldset style="grid-column:1/-1;border:1px solid var(--line);border-radius:9px"><legend class="mut">Etapas que contam como contrato ativo (nenhuma marcada = todas, menos perdidas)</legend>${c.etapas.map(s=>`<label style="flex-direction:row;gap:8px;font-weight:500"><input type="checkbox" name="et_${s.id}" ${(B.config.contratoEtapasAtivas||[]).includes(s.id)?'checked':''}> ${esc(s.nome)}</label>`).join('')}</fieldset>`,
-  async v=>{await api('PUT','/config',{contratoCampoVenc:v.campo,marcosAviso:v.marcos.split(/[ ,;]+/).filter(Boolean).map(Number),contratoEtapasAtivas:c.etapas.filter(s=>v['et_'+s.id]).map(s=>s.id)});B=await api('GET','/bootstrap');toast('Configuração salva')})}
+  <fieldset style="grid-column:1/-1;border:1px solid var(--line);border-radius:10px"><legend class="mut">Etapas que contam como contrato ativo (nenhuma marcada = todas, menos perdidas)</legend>${c.etapas.map(s=>`<label class="inline"><input type="checkbox" name="et_${s.id}" ${(B.config.contratoEtapasAtivas||[]).includes(s.id)?'checked':''}> ${esc(s.nome)}</label>`).join('')}</fieldset>`,
+  async v=>{await api('PUT','/config',{contratoCampoVenc:v.campo,marcosAviso:v.marcos.split(/[ ,;]+/).filter(Boolean).map(Number),contratoEtapasAtivas:c.etapas.filter(s=>v['et_'+s.id]).map(s=>s.id)});Object.assign(B,await api('GET','/bootstrap'));toast('Configuração salva')})}
 
-VIEWS.folha=async()=>{const comp=VIEWS.folha.comp||B.hoje.slice(0,7);const [fs,fl]=await Promise.all([api('GET','/funcionarios'+q()),api('GET',`/folha${q('&competencia='+comp)}`)]);
-  const fm=(f)=>`${fld('nome','Nome','text',f.nome||'','required')}<label>Empresa<select name="empresaId">${empOpts(f.empresaId||(EMP!=='todas'?EMP:''))}</select></label>${fld('cargo','Cargo','text',f.cargo||'')}${fld('cpf','CPF','text',f.cpf||'')}${fld('salario','Salário bruto','number',f.salario??'','step="0.01" min="0" required')}${fld('descontos','Descontos (INSS, IR…)','number',f.descontos??0,'step="0.01" min="0"')}${fld('beneficios','Benefícios','number',f.beneficios??0,'step="0.01" min="0"')}${fld('encargos','Encargos (FGTS, patronal…)','number',f.encargos??0,'step="0.01" min="0"')}${fld('diaPagamento','Dia de pagamento (1-28)','number',f.diaPagamento||5,'min="1" max="28"')}${sel('forma','Forma',FORMAS.slice(0,4),f.forma||'PIX')}${fld('admissao','Admissão','date',f.admissao||'')}${fld('desligamento','Desligamento','date',f.desligamento||'')}`;
-  setTimeout(()=>{$('#comp').onchange=e=>{VIEWS.folha.comp=e.target.value;render()};
-    $('#novoFn').onclick=()=>ask('Novo funcionário',fm({}),v=>api('POST','/funcionarios',v).then(()=>toast('Funcionário cadastrado')));
-    document.querySelectorAll('[data-fn]').forEach(b=>b.onclick=()=>{const f=fs.find(x=>x.id===b.dataset.fn);ask('Editar funcionário',fm(f),v=>api('PUT','/funcionarios/'+f.id,v).then(()=>toast('Salvo')))});
-    document.querySelectorAll('[data-gerar]').forEach(b=>b.onclick=()=>act(async()=>{const r=await api('POST','/folha/gerar',{empresaId:b.dataset.gerar,competencia:comp});toast(r.novas?`${r.novas} conta(s) a pagar lançada(s) — ${brl(r.total)}`:'Folha já estava lançada')}))});
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Folha de pagamento</h2><div class="row"><label style="flex-direction:row;align-items:center;gap:6px">Competência <input type="month" id="comp" value="${comp}"></label></div></div>
-  <p class="mut">A folha da competência é lançada no contas a pagar (salário líquido, benefícios e encargos) para pagamento no mês seguinte, automaticamente todo mês${B.config.folhaAuto===false?' (automático desligado)':''}.</p>
-  ${table(['Empresa','Funcionários','>Custo','Lançamento',''],fl.empresas.map(e=>`<tr><td>${esc(e.empresa)}</td><td>${e.funcionarios}</td><td class="num">${brl(e.custo)}</td><td>${e.gerada?`<span class="pill p-ok">Lançada ${dt(e.gerada.em.slice(0,10))}</span>`:'<span class="pill p-warn">Não lançada</span>'}</td><td class="num"><button class="btn sm" data-gerar="${e.empresaId}" ${e.funcionarios?'':'disabled'}>${e.gerada?'Lançar novos':'Lançar folha'}</button></td></tr>`),'Cadastre uma empresa primeiro.')}</div>
-  <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Funcionários</h2><button class="btn pri" id="novoFn">+ Funcionário</button></div>
-  ${table(['Nome','Cargo','Empresa','>Salário','>Benefícios','>Encargos','>Custo total','Situação',''],fs.map(f=>`<tr><td>${esc(f.nome)}</td><td>${esc(f.cargo)}</td><td>${esc(f.empresa)}</td><td class="num">${brl(f.salario)}</td><td class="num">${brl(f.beneficios)}</td><td class="num">${brl(f.encargos)}</td><td class="num"><b>${brl(f.custoTotal)}</b></td><td>${f.ativo?'<span class="pill p-ok">Ativo</span>':'<span class="pill p-mut">Inativo</span>'}</td><td class="num"><button class="btn sm" data-fn="${f.id}">Editar</button></td></tr>`),'Nenhum funcionário cadastrado.')}</div>`};
+VIEWS.folha=async()=>{const V=VIEWS.folha;const comp=V.comp||B.hoje.slice(0,7);const [fs,fl]=await Promise.all([api('GET','/funcionarios'+q()),api('GET',`/folha${q('&competencia='+comp)}`)]);
+  const fm=f=>`${fld('nome','Nome','text',f.nome||'','required')}<label>Empresa<select name="empresaId">${empOpts(f.empresaId||(EMP!=='todas'?EMP:''))}</select></label>${fld('cargo','Cargo','text',f.cargo||'')}${fld('cpf','CPF','text',f.cpf||'')}${fld('salario','Salário bruto (R$)','number',f.salario??'','step="0.01" min="0" required')}${fld('descontos','Descontos: INSS, IR… (R$)','number',f.descontos??0,'step="0.01" min="0"')}${fld('beneficios','Benefícios (R$)','number',f.beneficios??0,'step="0.01" min="0"')}${fld('encargos','Encargos: FGTS, patronal… (R$)','number',f.encargos??0,'step="0.01" min="0"')}${fld('diaPagamento','Dia de pagamento (1-28)','number',f.diaPagamento||5,'min="1" max="28"')}${sel('forma','Forma',FORMAS.slice(0,4),f.forma||'PIX')}${fld('admissao','Admissão','date',f.admissao||'')}${fld('desligamento','Desligamento','date',f.desligamento||'')}`;
+  setTimeout(()=>{$('#comp').onchange=e=>{V.comp=e.target.value;render()};$('#novoFn').onclick=()=>ask('Novo funcionário',fm({}),v=>api('POST','/funcionarios',v).then(()=>toast('Funcionário cadastrado')));
+    onAll('[data-fn]','click',b=>{const f=fs.find(x=>x.id===b.dataset.fn);ask('Editar funcionário',fm(f),v=>api('PUT','/funcionarios/'+f.id,v).then(()=>toast('Salvo')))});
+    onAll('[data-gerar]','click',b=>act(async()=>{const r=await api('POST','/folha/gerar',{empresaId:b.dataset.gerar,competencia:comp});toast(r.novas?`${r.novas} conta(s) a pagar lançada(s): ${brl(r.total)}`:'A folha já estava lançada')}))});
+  const ativos=fs.filter(f=>f.ativo);
+  return `<div class="grid">${kpi('users','Funcionários ativos',ativos.length,'')}${kpi('wallet','Custo mensal total',brl(ativos.reduce((a,f)=>a+f.custoTotal,0)),'salário + benefícios + encargos')}</div>
+  ${card('Lançamento da folha',table(['Empresa','Funcionários','>Custo','Situação',''],fl.empresas.map(e=>`<tr><td><b>${esc(e.empresa)}</b></td><td>${e.funcionarios}</td><td class="num">${brl(e.custo)}</td><td>${e.gerada?`<span class="pill p-ok">Lançada em ${dt(e.gerada.em.slice(0,10))}</span>`:'<span class="pill p-warn">Não lançada</span>'}</td><td class="num"><button class="btn sm" data-gerar="${e.empresaId}" ${e.funcionarios?'':'disabled'}>${e.gerada?'Lançar novos':'Lançar folha'}</button></td></tr>`),empty('Cadastre uma empresa primeiro')),`<label class="inline">Competência <input type="month" id="comp" value="${comp}"></label>`,`Salário líquido, benefícios e encargos viram contas a pagar para o mês seguinte${B.config.folhaAuto===false?' (lançamento automático desligado)':'; o lançamento é automático todo mês'}.`)}
+  ${card('Funcionários',table(['Nome','Empresa','>Salário','>Benefícios','>Encargos','>Custo total','Situação',''],fs.map(f=>`<tr><td><b>${esc(f.nome)}</b><span class="t2">${esc(f.cargo||'—')}</span></td><td class="emp" title="${esc(f.empresa)}">${esc(f.empresa)}</td><td class="num">${brl(f.salario)}</td><td class="num">${brl(f.beneficios)}</td><td class="num">${brl(f.encargos)}</td><td class="num"><b>${brl(f.custoTotal)}</b></td><td>${f.ativo?'<span class="pill p-ok">Ativo</span>':'<span class="pill p-mut">Inativo</span>'}</td><td class="num"><button class="btn sm" data-fn="${f.id}">Editar</button></td></tr>`),empty('Nenhum funcionário cadastrado','Cadastre a equipe para lançar a folha todo mês.')),`<button class="btn pri" id="novoFn">+ Funcionário</button>`)}`};
 
-VIEWS.relatorios=async()=>{const t=VIEWS.relatorios.t||'receber',de=VIEWS.relatorios.de||'',ate=VIEWS.relatorios.ate||'';
-  const r=await api('GET','/relatorio'+q(`&tipo=${t}&de=${de}&ate=${ate}`));
-  setTimeout(()=>{['t','de','ate'].forEach(k=>$('#r_'+k).onchange=e=>{VIEWS.relatorios[k]=e.target.value;render()});$('#csv').href='/api/fin/relatorio'+q(`&tipo=${t}&de=${de}&ate=${ate}&formato=csv`)});
-  return `<div class="card"><div class="row" style="justify-content:space-between"><div class="row"><select id="r_t" aria-label="Relatório">${[['receber','A receber'],['pagar','A pagar'],['folha','Folha']].map(([v,l])=>`<option value="${v}" ${v===t?'selected':''}>${l}</option>`).join('')}</select>${t!=='folha'?`<label style="flex-direction:row;align-items:center;gap:6px">De <input type="date" id="r_de" value="${de}"></label><label style="flex-direction:row;align-items:center;gap:6px">Até <input type="date" id="r_ate" value="${ate}"></label>`:'<span id="r_de"></span><span id="r_ate"></span>'}</div><div class="row"><a class="btn" id="csv" href="#">Baixar CSV</a><button class="btn" onclick="print()">Imprimir</button></div></div>
-  <h2 style="margin-top:14px">${esc(r.titulo)}</h2>${table(r.colunas.map((c,i)=>(typeof r.linhas[0]?.[i]==='number'?'>':'')+c),r.linhas.map(l=>`<tr>${l.map(v=>typeof v==='number'?`<td class="num">${brl(v)}</td>`:/^\d{4}-\d\d-\d\d$/.test(v)?`<td>${dt(v)}</td>`:['aberto','a_vencer','atrasado','pago','vencida','paga','aberta'].includes(v)?`<td>${pl(v)}</td>`:`<td>${esc(v)}</td>`).join('')}</tr>`))}
-  <p style="text-align:right;font-weight:700;margin-bottom:0">${r.totalLabel}: ${brl(r.total)}</p></div>`};
+VIEWS.relatorios=async()=>{const V=VIEWS.relatorios;const t=V.t||'receber',de=V.de||'',ate=V.ate||'';const r=await api('GET','/relatorio'+q(`&tipo=${t}&de=${de}&ate=${ate}`));
+  setTimeout(()=>{['t','de','ate'].forEach(k=>{const el=$('#r_'+k);if(el)el.onchange=e=>{V[k]=e.target.value;render()}});$('#csv').href='/api/fin/relatorio'+q(`&tipo=${t}&de=${de}&ate=${ate}&formato=csv`)});
+  const stat=['aberto','a_vencer','atrasado','pago','vencida','paga','aberta'];
+  return card(esc(r.titulo),`${table(r.colunas.map((c,i)=>(typeof r.linhas[0]?.[i]==='number'?'>':'')+c),r.linhas.map(l=>`<tr>${l.map(v=>typeof v==='number'?`<td class="num">${brl(v)}</td>`:/^\d{4}-\d\d-\d\d$/.test(v)?`<td>${dt(v)}</td>`:stat.includes(v)?`<td>${pl(v)}</td>`:`<td>${esc(v)}</td>`).join('')}</tr>`),empty('Sem dados no período'))}<div class="cb" style="text-align:right;font-weight:750;border-top:1px solid var(--line)">${r.totalLabel}: ${brl(r.total)}</div>`,
+   `<div class="tools"><select id="r_t" aria-label="Relatório">${[['receber','A receber'],['pagar','A pagar'],['folha','Folha']].map(([v,l])=>`<option value="${v}" ${v===t?'selected':''}>${l}</option>`).join('')}</select>${t!=='folha'?`<label class="inline">De <input type="date" id="r_de" value="${de}"></label><label class="inline">Até <input type="date" id="r_ate" value="${ate}"></label>`:''}<a class="btn" id="csv" href="#">Baixar CSV</a><button class="btn" onclick="print()">Imprimir</button></div>`)};
 
-VIEWS.empresas=async()=>{B=await api('GET','/bootstrap');
-  setTimeout(()=>{$('#novaEmp').onclick=()=>ask('Nova empresa',`${fld('nome','Nome (aparece como opção no Bitrix)','text','','required')}${fld('cnpj','CNPJ')}`,v=>api('POST','/empresas',v).then(async()=>{await api('POST','/empresas/sincronizar-campo').catch(()=>{});B=await api('GET','/bootstrap');fillEmp();toast('Empresa criada e opção criada no Bitrix')}));
+VIEWS.empresas=async()=>{Object.assign(B,await api('GET','/bootstrap'));const s=await api('GET','/status');ST=s;drawFoot();
+  const naoVinc=s.minhas.filter(m=>!m.vinculada);
+  setTimeout(()=>{$('#novaEmp').onclick=()=>ask('Nova empresa',`${fld('nome','Nome (aparece como opção no Bitrix)','text','','required')}${fld('cnpj','CNPJ')}`,v=>api('POST','/empresas',v).then(async()=>{await api('POST','/empresas/sincronizar-campo').catch(()=>{});Object.assign(B,await api('GET','/bootstrap'));fillEmp();toast('Empresa criada')}));
+    onAll('.imp','click',()=>act(async()=>{const r=await api('POST','/empresas/importar-bitrix');await api('POST','/empresas/sincronizar-campo').catch(()=>{});Object.assign(B,await api('GET','/bootstrap'));fillEmp();toast(r.criadas?`${r.criadas} empresa(s) importada(s) do Bitrix`:'Empresas já estavam vinculadas')}));
     $('#syncCampo').onclick=()=>act(async()=>{const r=await api('POST','/empresas/sincronizar-campo');toast(`Campo “CR · Empresa” atualizado: ${r.opcoes.length} opção(ões)`)});
-    document.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>{const e=B.empresas.find(x=>x.id===b.dataset.ed);ask('Editar empresa',`${fld('nome','Nome','text',e.nome,'required')}${fld('cnpj','CNPJ','text',e.cnpj)}<label style="flex-direction:row;gap:8px"><input type="checkbox" name="ativa" ${e.ativa?'checked':''}> Ativa</label>`,v=>api('PUT','/empresas/'+e.id,{nome:v.nome,cnpj:v.cnpj,ativa:v.ativa}).then(async()=>{B=await api('GET','/bootstrap');fillEmp()}))});
-    document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>{const e=B.empresas.find(x=>x.id===b.dataset.key);ask(`Asaas — ${e.nome}`,`${sel('env','Ambiente',[['sandbox','Sandbox (testes)'],['production','Produção']],e.asaas.env)}<label style="grid-column:1/-1">Chave de API ${e.asaas.configurado?`(atual ${e.asaas.dica})`:''}<input name="apiKey" type="password" autocomplete="off" placeholder="$aact_..."></label>`,async v=>{await api('PUT',`/empresas/${e.id}/asaas`,v);const t=await api('POST',`/empresas/${e.id}/asaas/test`);toast(`Chave válida${t.nome?' · '+t.nome:''} · saldo ${brl(t.saldo)}`);B=await api('GET','/bootstrap')},'Salvar e testar')});
-    document.querySelectorAll('[data-rmkey]').forEach(b=>b.onclick=()=>confirm('Remover a chave do Asaas desta empresa?')&&act(async()=>{await api('DELETE',`/empresas/${b.dataset.rmkey}/asaas`);B=await api('GET','/bootstrap')},'Chave removida'))});
-  return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Empresas</h2><div class="row"><button class="btn" id="syncCampo" title="Cria/atualiza o campo de lista no Bitrix">Atualizar campo no Bitrix</button><button class="btn pri" id="novaEmp">+ Empresa</button></div></div>
-  <p class="mut">No Bitrix, o campo de lista <b>CR · Empresa</b> (deal) define a empresa de cada cobrança e contrato. Cada empresa pode ter sua própria chave do Asaas; sem chave, usa a conta padrão das Configurações.</p>
-  ${table(['Empresa','CNPJ','Situação','Asaas',''],B.empresas.map(e=>`<tr><td>${esc(e.nome)}</td><td>${esc(e.cnpj)}</td><td>${e.ativa?'<span class="pill p-ok">Ativa</span>':'<span class="pill p-mut">Inativa</span>'}</td><td>${e.asaas.configurado?`<span class="pill p-ok">${e.asaas.env==='production'?'Produção':'Sandbox'} ${esc(e.asaas.dica)}</span>`:'<span class="pill p-mut">Conta padrão</span>'}</td><td class="num"><button class="btn sm" data-ed="${e.id}">Editar</button> <button class="btn sm" data-key="${e.id}">Chave Asaas</button>${e.asaas.configurado?` <button class="btn sm danger" data-rmkey="${e.id}">Remover chave</button>`:''}</td></tr>`),'Cadastre a primeira empresa.')}</div>
-  <div class="card"><h2>Configurações</h2><label style="flex-direction:row;gap:8px;font-weight:500"><input type="checkbox" id="folhaAuto" ${B.config.folhaAuto!==false?'checked':''}> Lançar a folha de pagamento automaticamente todo mês</label></div>`};
+    onAll('[data-ed]','click',b=>{const e=B.empresas.find(x=>x.id===b.dataset.ed);ask('Editar empresa',`${fld('nome','Nome','text',e.nome,'required')}${fld('cnpj','CNPJ','text',e.cnpj)}<label style="grid-column:1/-1">“Minha empresa” no Bitrix (vincula as deals dessa empresa)<select name="bitrixCompanyId"><option value="">— nenhuma —</option>${s.minhas.map(m=>`<option value="${m.id}" ${m.id===e.bitrixCompanyId?'selected':''}>${esc(m.nome)}</option>`).join('')}</select></label><label class="inline"><input type="checkbox" name="ativa" ${e.ativa?'checked':''}> Ativa</label>`,v=>api('PUT','/empresas/'+e.id,{nome:v.nome,cnpj:v.cnpj,ativa:v.ativa,bitrixCompanyId:v.bitrixCompanyId}).then(async()=>{Object.assign(B,await api('GET','/bootstrap'));fillEmp()}))});
+    onAll('[data-key]','click',b=>{const e=B.empresas.find(x=>x.id===b.dataset.key);ask(`Asaas — ${e.nome}`,`${sel('env','Ambiente',[['sandbox','Sandbox (testes)'],['production','Produção']],e.asaas.env)}<label style="grid-column:1/-1">Chave de API ${e.asaas.configurado?`(atual ${e.asaas.dica})`:''}<input name="apiKey" type="password" autocomplete="off" placeholder="$aact_..."></label>`,async v=>{await api('PUT',`/empresas/${e.id}/asaas`,v);const t=await api('POST',`/empresas/${e.id}/asaas/test`);toast(`Chave válida${t.nome?' · '+t.nome:''} · saldo ${brl(t.saldo)}`);Object.assign(B,await api('GET','/bootstrap'))},'Salvar e testar')});
+    onAll('[data-rmkey]','click',b=>confirm('Remover a chave do Asaas desta empresa?')&&act(async()=>{await api('DELETE',`/empresas/${b.dataset.rmkey}/asaas`);Object.assign(B,await api('GET','/bootstrap'))},'Chave removida'));
+    $('#folhaAuto').onchange=e=>api('PUT','/config',{folhaAuto:e.target.checked}).then(()=>toast('Salvo')).catch(x=>toast(x.message,1))});
+  return `${naoVinc.length?`<div class="alert info">${ic('bld')}<span>${naoVinc.length} “Minha empresa” do Bitrix ainda não cadastrada(s): ${naoVinc.map(m=>esc(m.nome)).join(', ')}. <button class="btn sm imp">Importar agora</button></span></div>`:''}
+  ${card('Empresas',table(['Empresa','CNPJ','No Bitrix','Situação','Asaas',''],B.empresas.map(e=>{const m=s.minhas.find(x=>x.id===e.bitrixCompanyId);return `<tr><td><b>${esc(e.nome)}</b></td><td>${esc(fdoc(e.cnpj)||'—')}</td><td>${m?esc(m.nome):'<span class="mut">por campo de lista</span>'}</td><td>${e.ativa?'<span class="pill p-ok">Ativa</span>':'<span class="pill p-mut">Inativa</span>'}</td><td>${e.asaas.configurado?`<span class="pill p-ok">${e.asaas.env==='production'?'Produção':'Sandbox'} ${esc(e.asaas.dica)}</span>`:'<span class="pill p-mut">Conta padrão</span>'}</td><td class="num"><button class="btn sm" data-ed="${e.id}">Editar</button> <button class="btn sm" data-key="${e.id}">Chave Asaas</button>${e.asaas.configurado?` <button class="btn sm danger" data-rmkey="${e.id}">Remover chave</button>`:''}</td></tr>`}),empty('Nenhuma empresa cadastrada','Importe as “Minhas empresas” do Bitrix ou cadastre manualmente.',s.minhas.length?`<button class="btn pri imp">Importar do Bitrix</button>`:'')),
+    `<div class="row"><button class="btn" id="syncCampo" title="Cria/atualiza o campo de lista no Bitrix">Atualizar campo no Bitrix</button><button class="btn pri" id="novaEmp">+ Empresa</button></div>`,'A empresa de cada deal vem do campo de lista “CR · Empresa”; se ele estiver vazio, vale a “Minha empresa” da deal. Cada empresa pode ter a sua chave do Asaas.')}
+  ${card('Ajustes',`<div class="cb"><label class="inline"><input type="checkbox" id="folhaAuto" ${B.config.folhaAuto!==false?'checked':''}> Lançar a folha de pagamento automaticamente todo mês</label></div>`)}`};
 
 function fillEmp(){const s=$('#emp');s.innerHTML=`<option value="todas">Todas as empresas</option>`+B.empresas.filter(e=>e.ativa).map(e=>`<option value="${e.id}">${esc(e.nome)}</option>`).join('');if(!B.empresas.some(e=>e.id===EMP))EMP='todas';s.value=EMP}
-async function render(){const m=$('#main');if(BUSY)return;BUSY=true;
-  try{if(DEAL){m.innerHTML=contratoBox(await api('GET','/contratos/'+DEAL));return}
-    const h=await VIEWS[TAB]();m.innerHTML=h;
-    if(TAB==='empresas'){const c=$('#folhaAuto');if(c)c.onchange=()=>api('PUT','/config',{folhaAuto:c.checked}).then(()=>toast('Salvo')).catch(e=>toast(e.message,1))}
-  }catch(e){m.innerHTML=`<div class="card"><div class="alert alta">${esc(e.message)}</div></div>`}finally{BUSY=false}}
-(async()=>{try{B=await api('GET','/bootstrap')}catch(e){toast(e.message,1)}
-  if(DEAL){$('#tabs').hidden=true;$('#empWrap').hidden=true;$('#ttl').textContent='Contrato';render();return}
-  fillEmp();$('#emp').onchange=e=>{EMP=e.target.value;ls.set('fin.emp',EMP);VIEWS.contratos.open=null;render()};drawTabs();render()})();
+async function render(){const m=$('#main');if(BUSY)return;BUSY=true;const scroll=scrollY;
+  try{if(DEAL){m.innerHTML=SK;m.innerHTML=contratoBox(await api('GET','/contratos/'+DEAL));return}
+    $('#ttl').textContent=(NAV.find(n=>n[0]===TAB)||[])[1]||'';$('#empWrap').style.display=TAB==='empresas'?'none':'';
+    if(m.dataset.t!==TAB)m.innerHTML=SK;
+    const h=await VIEWS[TAB]();m.innerHTML=h;m.dataset.t=TAB;scrollTo(0,scroll);
+  }catch(e){m.innerHTML=`<div class="alert alta">${ic('alert')}<span>${esc(e.message)}</span></div>${/Bitrix24 não configurado/.test(e.message)?'<p class="mut">Abra <a href="/">Cobranças</a> → Configurações e informe o webhook do Bitrix24.</p>':''}`}finally{BUSY=false}}
+(async()=>{try{Object.assign(B,await api('GET','/bootstrap'))}catch(e){toast(e.message,1)}
+  if(DEAL){document.querySelector('aside').hidden=true;document.querySelector('.app').style.display='block';$('#empWrap').hidden=true;$('#menu').hidden=true;$('#reload').hidden=true;$('#ttl').textContent='Contrato';render();return}
+  fillEmp();$('#emp').onchange=e=>{EMP=e.target.value;ls.set('fin.emp',EMP);VIEWS.contratos.open=null;render()};$('#menu').onclick=()=>$('#side').classList.toggle('open');$('#reload').onclick=()=>render();drawNav();render()})();
 </script>
 </body>
 </html>
