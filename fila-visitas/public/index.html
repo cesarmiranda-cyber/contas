@@ -243,7 +243,7 @@ async function cfg(d) {
     <div class="fld"><label>Administradores (IDs de usuário, separados por vírgula)</label><input id="ad" value="${(c.admins || []).join(',')}"></div>
     <div class="err" id="er"></div><button class="btn pri" id="sv">Salvar configuração</button></div>
     <h2>Campos descobertos no Bitrix24</h2>${campos.erro ? `<div class="err on">${esc(campos.erro)}</div>` : `
-      ${campos.faltando.length ? `<div class="err on">Faltando: ${campos.faltando.map(esc).join(' · ')}</div>` : '<div class="ok">Todos os campos e etapas foram encontrados.</div>'}
+      ${(() => { const f = campos.faltando.filter(x => !/usando/.test(x)), i = campos.faltando.filter(x => /usando/.test(x)); return (f.length ? `<div class="err on">Faltando: ${f.map(esc).join(' · ')}</div>` : '<div class="ok">Etapas e campos principais encontrados.</div>') + (i.length ? `<div class="info">Usando padrão do Bitrix (funciona, mas dá para criar o campo próprio): ${i.map(esc).join(' · ')}</div>` : ''); })()}
       ${campos.ambiguos.length ? `<div class="info">${campos.ambiguos.length} campo(s) existem em duplicidade no Bitrix. O app lê todos e usa o que tiver valor — nada a fazer.</div>` : ''}
       <details><summary>Ver mapeamento</summary><pre style="overflow:auto;font-size:12px">${esc(JSON.stringify(campos.map, null, 1))}</pre></details>`}
     <h2>Preparar o Bitrix</h2><div class="panel"><p class="hint">Cria o que falta: etapa <b>Atrasada</b> no kanban 1036, campos <b>Cargo</b> e <b>Data programada</b> na Fila e <b>Resultado</b>/<b>Acompanhamento</b> no Registro de Visita. Só cria o que ainda não existe.</p>
