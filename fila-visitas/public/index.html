@@ -6,59 +6,59 @@
 <title>Fila de Visitas</title>
 <link rel="icon" href="/_gw/icon">
 <style>
-:root{--bg:#f3f5f9;--sf:#fff;--sf2:#f7f9fc;--ink:#18212f;--ink2:#4b586d;--mut:#8592a6;--line:#e3e8f0;--brand:#2a6df4;--brand2:#1f56c9;--brandbg:#e8f0fe;
---red:#d93a3a;--redbg:#fdecec;--amber:#c27a00;--amberbg:#fff3d9;--green:#188a52;--greenbg:#e2f6ea;--r:14px;--sh:0 1px 2px rgba(20,30,50,.05),0 6px 18px -10px rgba(20,30,50,.18)}
-@media(prefers-color-scheme:dark){:root{--bg:#0f141c;--sf:#171e2a;--sf2:#1c2433;--ink:#e9eef7;--ink2:#aab6c9;--mut:#7584a0;--line:#27324a;--brand:#6ea0ff;--brand2:#8db3ff;--brandbg:#172a52;--red:#ff8a8a;--redbg:#3b1a1d;--amber:#f2b95a;--amberbg:#3a2d12;--green:#5fd697;--greenbg:#12311f;--sh:0 8px 20px -12px rgba(0,0,0,.7)}}
+:root{--bg:#eef2f4;--sf:#fff;--sf2:#f6f8fa;--ink:#1f2a37;--ink2:#525c69;--mut:#8b95a1;--line:#e2e7eb;--brand:#2066b0;--brand2:#17508f;--cy:#3bc8f5;--brandbg:#e6f1fb;
+--red:#d9372b;--redbg:#fdebea;--amber:#b86b00;--amberbg:#fff2d6;--green:#2a8a3e;--greenbg:#e5f5e8;--r:12px;--sh:0 1px 2px rgba(20,35,50,.06)}
+@media(prefers-color-scheme:dark){:root{--bg:#10171d;--sf:#18212a;--sf2:#1d2832;--ink:#e8eef4;--ink2:#a9b6c3;--mut:#7a8896;--line:#2a3743;--brand:#5aa9ec;--brand2:#7dbcf2;--cy:#3bc8f5;--brandbg:#14293c;--red:#ff8f86;--redbg:#3a1c19;--amber:#f2b95a;--amberbg:#3a2d12;--green:#63d17a;--greenbg:#12301a}}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Open Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
-.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
 .head{background:var(--sf);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
-.head .wrap{display:flex;align-items:center;gap:12px;padding-top:10px;padding-bottom:0;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
-.logo{width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:16px}
-.who{margin-left:auto;display:flex;align-items:center;gap:8px}
-.who select{width:auto;max-width:56vw;padding:7px 10px}
-nav{display:flex;gap:2px;width:100%;overflow-x:auto;scrollbar-width:none}
-nav button{border:0;background:none;color:var(--ink2);padding:10px 12px;font-weight:600;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
-nav button.on{color:var(--brand);border-bottom-color:var(--brand)}
-main{padding:18px 0 40px}
-select,input,textarea{background:var(--sf);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;outline:none;transition:border .15s,box-shadow .15s}
-select:focus,input:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 20%,transparent)}
+.head .wrap{display:flex;align-items:center;gap:14px;padding-top:10px;padding-bottom:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+.logo{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--cy),var(--brand));color:#fff;display:grid;place-items:center;font-size:17px}
+.who{margin-left:auto}.who select{width:auto;max-width:56vw;padding:7px 10px}
+nav{display:flex;gap:6px;width:100%;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+nav button{border:0;background:var(--sf2);color:var(--ink2);padding:7px 14px;font-weight:600;border-radius:99px;cursor:pointer;white-space:nowrap}
+nav button.on{background:var(--brand);color:#fff}
+main{padding:16px 0 40px}
+select,input,textarea{background:var(--sf);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%;outline:none;transition:border .15s,box-shadow .15s}
+select:focus,input:focus,textarea:focus{border-color:var(--cy);box-shadow:0 0 0 3px color-mix(in srgb,var(--cy) 28%,transparent)}
 textarea{min-height:96px;resize:vertical}
-.btn{border:1px solid var(--line);background:var(--sf);padding:10px 16px;border-radius:10px;font-weight:600;cursor:pointer;min-height:42px;transition:.15s}
-.btn:hover{border-color:var(--brand)}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{background:var(--brand2)}.btn:disabled{opacity:.55;cursor:wait}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-.stat{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;box-shadow:var(--sh);text-align:left}
-.stat b{display:block;font-size:26px;line-height:1.1}.stat span{font-size:12px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.stat.red b{color:var(--red)}.stat.amber b{color:var(--amber)}.stat.blue b{color:var(--brand)}.stat.on{outline:2px solid var(--brand)}
-.filters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
-h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+.btn{border:1px solid var(--line);background:var(--sf);padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;min-height:38px;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--brand);color:var(--brand)}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{background:var(--brand2);color:#fff}.btn:disabled{opacity:.55;cursor:wait}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.stat{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;box-shadow:var(--sh);text-align:left;display:flex;align-items:center;gap:12px}
+.stat i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:18px;flex:none}
+.stat b{display:block;font-size:24px;line-height:1.05}.stat span{font-size:12px;color:var(--mut);font-weight:600}
+.stat.red i{background:var(--redbg);color:var(--red)}.stat.amber i{background:var(--amberbg);color:var(--amber)}.stat.blue i{background:var(--brandbg);color:var(--brand)}.stat.on{outline:2px solid var(--cy)}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
 h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:99px;padding:0 8px;font-size:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-.card{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden}
-.card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--brand)}
-.card.atrasada:before{background:var(--red)}.card.dia:before{background:var(--amber)}
-.row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
-.emp{font-weight:700;font-size:15.5px;line-height:1.25}.resp{font-size:12.5px;color:var(--mut);margin-top:2px}
-.due{text-align:right;white-space:nowrap}.due b{display:block;font-size:14px}.due span{font-size:12px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--brandbg);color:var(--brand)}
-.card.atrasada .due span{background:var(--redbg);color:var(--red)}.card.dia .due span{background:var(--amberbg);color:var(--amber)}
-.tags{display:flex;flex-wrap:wrap;gap:6px}.tag{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--sf2);border:1px solid var(--line);color:var(--ink2)}.tag.seg{background:var(--brandbg);border-color:transparent;color:var(--brand)}
-.acts{display:grid;grid-template-columns:1.4fr 1fr;gap:8px}
+.list{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.item{display:grid;grid-template-columns:1fr 150px auto;gap:14px;align-items:center;padding:12px 16px 12px 20px;border-bottom:1px solid var(--line);position:relative}
+.item:last-child{border-bottom:0}.item:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cy)}
+.item.atrasada:before{background:var(--red)}.item.dia:before{background:#f5a623}
+.emp{font-weight:700;font-size:15px;line-height:1.25}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.tag{font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--sf2);border:1px solid var(--line);color:var(--ink2)}.tag.seg{background:var(--brandbg);border-color:transparent;color:var(--brand)}
+.due b{display:block;font-size:14px}.due span{display:inline-block;margin-top:2px;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--brandbg);color:var(--brand)}
+.item.atrasada .due span{background:var(--redbg);color:var(--red)}.item.dia .due span{background:var(--amberbg);color:var(--amber)}
+.acts{display:flex;gap:8px}
 .vazio{text-align:center;color:var(--mut);padding:48px 12px}
-.modal{position:fixed;inset:0;background:rgba(10,15,25,.55);display:none;align-items:flex-end;justify-content:center;z-index:50;padding:0}.modal.on{display:flex}
-.sheet{background:var(--sf);width:100%;max-width:640px;border-radius:18px 18px 0 0;max-height:94vh;display:flex;flex-direction:column}
-@media(min-width:700px){.modal{align-items:center;padding:20px}.sheet{border-radius:18px}}
-.sh-h{padding:16px 18px 12px;border-bottom:1px solid var(--line)}.sh-h h3{margin:0;font-size:18px}.sh-b{padding:6px 18px 8px;overflow:auto;flex:1}.sh-f{padding:12px 18px 16px;border-top:1px solid var(--line);display:flex;gap:8px}.sh-f .btn{flex:1}
+.modal{position:fixed;inset:0;background:rgba(10,20,30,.55);display:none;align-items:flex-end;justify-content:center;z-index:50}.modal.on{display:flex}
+.sheet{background:var(--sf);width:100%;max-width:640px;border-radius:16px 16px 0 0;max-height:94vh;display:flex;flex-direction:column}
+@media(min-width:700px){.modal{align-items:center;padding:20px}.sheet{border-radius:14px}}
+.sh-h{padding:16px 18px 12px;border-bottom:1px solid var(--line)}.sh-h h3{margin:0;font-size:18px}.sh-b{padding:6px 18px 8px;overflow:auto;flex:1}.sh-f{padding:12px 18px 16px;border-top:1px solid var(--line);display:flex;gap:8px}.sh-f .btn{flex:1;min-height:42px}
 .fld{margin:14px 0}.fld>label{display:block;font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:5px}.fld>label i{color:var(--red);font-style:normal}
 .fld.lock input,.fld.lock select{background:var(--sf2);color:var(--mut)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.err{background:var(--redbg);color:var(--red);padding:10px 12px;border-radius:10px;margin:10px 0;font-weight:600;display:none}.err.on{display:block}
-.ok{background:var(--greenbg);color:var(--green);padding:12px;border-radius:10px;margin:12px 0;font-weight:600}
+.err{background:var(--redbg);color:var(--red);padding:10px 12px;border-radius:8px;margin:10px 0;font-weight:600;display:none}.err.on{display:block}
+.ok{background:var(--greenbg);color:var(--green);padding:12px;border-radius:8px;margin:12px 0;font-weight:600}
+.info{background:var(--brandbg);color:var(--brand);padding:10px 12px;border-radius:8px;margin:10px 0;font-size:13px}
 .hint{font-size:12.5px;color:var(--mut)}.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--sf)}
 table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-size:12px;text-transform:uppercase;background:var(--sf2)}
 .panel{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:4px 16px 16px;box-shadow:var(--sh)}
-@media(max-width:560px){.filters{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.stat b{font-size:22px}}
+@media(max-width:700px){.filters{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}.item{grid-template-columns:1fr auto;gap:8px}.item .due{text-align:right}.item .acts{grid-column:1/-1}.item .acts .btn{flex:1}.stat{padding:10px}.stat b{font-size:20px}.stat i{width:32px;height:32px}}
 </style>
 </head>
 <body>
@@ -114,38 +114,40 @@ async function carrega() {
 }
 
 function lista() {
-  const todas = dados.visitas;
+  const todas = dados.visitas, busca = (F.q || '').toLowerCase();
   const cont = k => todas.filter(x => x.situacao === k).length;
-  const v = todas.filter(x => (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!foco || x.situacao === foco));
+  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!foco || x.situacao === foco));
   const segs = [...new Set(todas.map(x => x.segmento))].filter(Boolean);
   const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${cur === a ? 'selected' : ''}>${esc(b)}</option>`).join('');
   const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Próximas']];
   $('#main').innerHTML = `
     <div class="stats">
-      <button class="stat red ${foco === 'atrasada' ? 'on' : ''}" data-f="atrasada"><b>${cont('atrasada')}</b><span>Atrasadas</span></button>
-      <button class="stat amber ${foco === 'dia' ? 'on' : ''}" data-f="dia"><b>${cont('dia')}</b><span>Hoje</span></button>
-      <button class="stat blue ${foco === 'aguardando' ? 'on' : ''}" data-f="aguardando"><b>${cont('aguardando')}</b><span>Próximas</span></button>
+      <button class="stat red ${foco === 'atrasada' ? 'on' : ''}" data-f="atrasada"><i>!</i><div><b>${cont('atrasada')}</b><span>Atrasadas</span></div></button>
+      <button class="stat amber ${foco === 'dia' ? 'on' : ''}" data-f="dia"><i>★</i><div><b>${cont('dia')}</b><span>Hoje</span></div></button>
+      <button class="stat blue ${foco === 'aguardando' ? 'on' : ''}" data-f="aguardando"><i>◷</i><div><b>${cont('aguardando')}</b><span>Próximas</span></div></button>
     </div>
     <div class="filters">
+      <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
       <select id="fs"><option value="">Todos os segmentos</option>${opt(segs.map(s => [s, s]), F.seg)}</select>
       <select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
     </div>` + (v.length ? grupos.map(([k, t]) => {
       const g = v.filter(x => x.situacao === k);
-      return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="grid">${g.map(card).join('')}</div>` : '';
+      return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list">${g.map(linha).join('')}</div>` : '';
     }).join('') : '<div class="vazio">Nenhuma visita por aqui.</div>');
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? '' : b.dataset.f; lista(); });
+  const q = $('#fq'); q.oninput = () => { F.q = q.value; const p = q.selectionStart; lista(); const n = $('#fq'); n.focus(); n.setSelectionRange(p, p); };
   $('#fs').onchange = e => { F.seg = e.target.value; lista(); };
   $('#ft').onchange = e => { F.tipo = e.target.value; lista(); };
   $('#fc').onchange = e => { F.classe = e.target.value; lista(); };
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reprogramar(+b.dataset.rep));
 }
-function card(c) {
+function linha(c) {
   const q = c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-  return `<div class="card ${c.situacao}">
-    <div class="row"><div><div class="emp">${esc(c.empresa)}</div>${aba === 'equipe' ? `<div class="resp">${esc(c.responsavelNome)}</div>` : ''}</div><div class="due"><b>${fmt(c.data)}</b><span>${q}</span></div></div>
-    <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}</div>
+  return `<div class="item ${c.situacao}">
+    <div><div class="emp">${esc(c.empresa)}</div><div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${aba === 'equipe' ? `<span class="tag">${esc(c.responsavelNome)}</span>` : ''}</div></div>
+    <div class="due"><b>${fmt(c.data)}</b><span>${q}</span></div>
     <div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Reprogramar</button></div></div>`;
 }
 const modal = html => { $('#sheet').innerHTML = html; $('#m').classList.add('on'); };
@@ -242,7 +244,7 @@ async function cfg(d) {
     <div class="err" id="er"></div><button class="btn pri" id="sv">Salvar configuração</button></div>
     <h2>Campos descobertos no Bitrix24</h2>${campos.erro ? `<div class="err on">${esc(campos.erro)}</div>` : `
       ${campos.faltando.length ? `<div class="err on">Faltando: ${campos.faltando.map(esc).join(' · ')}</div>` : '<div class="ok">Todos os campos e etapas foram encontrados.</div>'}
-      ${campos.ambiguos.length ? `<p class="hint">Campos com o mesmo nome (o app lê todos e usa o que tiver valor): ${campos.ambiguos.map(a => esc(a.onde + ' → ' + a.opcoes.join(' | '))).join('<br>')}</p>` : ''}
+      ${campos.ambiguos.length ? `<div class="info">${campos.ambiguos.length} campo(s) existem em duplicidade no Bitrix. O app lê todos e usa o que tiver valor — nada a fazer.</div>` : ''}
       <details><summary>Ver mapeamento</summary><pre style="overflow:auto;font-size:12px">${esc(JSON.stringify(campos.map, null, 1))}</pre></details>`}
     <h2>Preparar o Bitrix</h2><div class="panel"><p class="hint">Cria o que falta: etapa <b>Atrasada</b> no kanban 1036, campos <b>Cargo</b> e <b>Data programada</b> na Fila e <b>Resultado</b>/<b>Acompanhamento</b> no Registro de Visita. Só cria o que ainda não existe.</p>
       <button class="btn pri" id="bp">Criar etapa e campos que faltam</button><pre id="pout" class="hint" style="white-space:pre-wrap"></pre></div>
