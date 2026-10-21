@@ -63,6 +63,9 @@ h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:9
 .info{background:var(--brandbg);color:var(--brand);padding:10px 12px;border-radius:8px;margin:10px 0;font-size:13px}
 .hint{font-size:12.5px;color:var(--mut)}.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--sf)}
 table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-size:12px;text-transform:uppercase;background:var(--sf2)}
+.stats.s4{grid-template-columns:repeat(4,1fr)}.hf{grid-template-columns:1.3fr 1.1fr 1fr 1.4fr auto}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bar{display:grid;grid-template-columns:minmax(80px,1.2fr) 2fr 28px;gap:10px;align-items:center;width:100%;border:0;background:none;padding:5px 6px;border-radius:8px;cursor:pointer;text-align:left;font-size:13px}.bar:hover,.bar.on{background:var(--brandbg)}.bar .bl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar .bt{height:8px;background:var(--sf2);border-radius:99px;overflow:hidden}.bar .bt i{display:block;height:100%;background:var(--brand);border-radius:99px}.bar b{text-align:right}
+@media(max-width:900px){.stats.s4{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.hf{grid-template-columns:1fr 1fr}}
 .panel{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:4px 16px 16px;box-shadow:var(--sh)}
 @media(max-width:900px){.item{grid-template-columns:1fr 120px;gap:10px}.item .side{grid-column:1/-1}}
 @media(max-width:700px){.filters,.filters.f5{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}.item{grid-template-columns:1fr auto;gap:8px}.item .due{text-align:right}.item .side{grid-column:1/-1}.stat{padding:10px}.stat b{font-size:20px}.stat i{width:32px;height:32px}}
@@ -233,13 +236,47 @@ function reprogramar(id) {
   };
 }
 
+const mesDe = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7);
+const mesNome = m => { const [y, n] = m.split('-'); return ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][+n - 1] + ' de ' + y; };
+const HF = { mes: null, quem: '', seg: '', motivo: '' };
 function hist(d) {
-  const h = d.reprogramacoes, porMotivo = {}, porAutor = {};
-  h.filter(x => !x.tipo).forEach(x => { porMotivo[x.motivo] = (porMotivo[x.motivo] || 0) + 1; porAutor[x.autorNome] = (porAutor[x.autorNome] || 0) + 1; });
-  const top = o => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('') || '<tr><td colspan=2 class="hint">Sem dados</td></tr>';
-  $('#main').innerHTML = `<h2>Trocas por vendedor</h2><div class="tw"><table><tr><th>Quem</th><th>Trocas</th></tr>${top(porAutor)}</table></div>
-    <h2>Trocas por motivo</h2><div class="tw"><table><tr><th>Motivo</th><th>Trocas</th></tr>${top(porMotivo)}</table></div>
-    <h2>Histórico <em>${h.length}</em></h2><div class="tw"><table><tr><th>Quando</th><th>Empresa</th><th>De → Para</th><th>Motivo</th><th>Quem</th></tr>${h.map(x => x.tipo ? `<tr><td>${new Date(x.at).toLocaleString('pt-BR')}</td><td colspan=2>Correção de visita #${x.visita}</td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td></tr>` : `<tr><td>${new Date(x.at).toLocaleString('pt-BR')}</td><td>${esc(x.empresa)}<div class="hint">${esc(x.segmento)} · ${esc(x.cargo)}</div></td><td>${fmt(x.anterior)} → ${fmt(x.nova)}</td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td></tr>`).join('') || '<tr><td colspan=5 class="hint">Nenhuma reprogramação.</td></tr>'}</table></div>`;
+  const todos = d.reprogramacoes.filter(x => !x.tipo);
+  const meses = [...new Set(todos.map(x => mesDe(x.at)))].sort().reverse();
+  if (HF.mes === null) HF.mes = meses.includes(mesDe(new Date().toISOString())) ? mesDe(new Date().toISOString()) : (meses[0] || '');
+  const h = todos.filter(x => (!HF.mes || mesDe(x.at) === HF.mes) && (!HF.quem || x.autorNome === HF.quem) && (!HF.seg || x.segmento === HF.seg) && (!HF.motivo || x.motivo.toLowerCase().includes(HF.motivo.toLowerCase())));
+  const conta = (k) => { const o = {}; h.forEach(x => { o[x[k]] = (o[x[k]] || 0) + 1; }); return Object.entries(o).sort((a, b) => b[1] - a[1]); };
+  const porAutor = conta('autorNome'), porMotivo = conta('motivo'), porSeg = conta('segmento');
+  const dias = x => Math.round((new Date(x.nova) - new Date(x.anterior)) / 864e5);
+  const media = h.length ? Math.round(h.reduce((a, x) => a + dias(x), 0) / h.length) : 0;
+  const quems = [...new Set(todos.map(x => x.autorNome))].sort(), segs = [...new Set(todos.map(x => x.segmento))].filter(Boolean).sort();
+  const barras = (lista, chave) => { const max = lista[0]?.[1] || 1; return lista.slice(0, 8).map(([k, v]) => `<button class="bar ${HF[chave] === k ? 'on' : ''}" data-hf="${chave}" data-v="${esc(k)}"><span class="bl">${esc(k)}</span><span class="bt"><i style="width:${Math.max(6, v / max * 100)}%"></i></span><b>${v}</b></button>`).join('') || '<div class="hint">Sem dados no período.</div>'; };
+  const opt = (arr, cur) => arr.map(x => `<option value="${esc(x)}" ${cur === x ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  const link = (x) => d.base ? `<div class="links" style="justify-content:flex-start;margin-top:4px">${x.empresaId ? `<a href="${d.base}/crm/company/details/${x.empresaId}/" target="_top">Abrir empresa</a>` : ''}<a href="${d.base}/crm/type/1036/details/${x.card}/" target="_top">Abrir card</a></div>` : '';
+  $('#main').innerHTML = `
+    <div class="filters hf"><select id="hm"><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${HF.mes === m ? 'selected' : ''}>${esc(mesNome(m))}</option>`).join('')}</select>
+      <select id="hq"><option value="">Todos os vendedores</option>${opt(quems, HF.quem)}</select>
+      <select id="hs"><option value="">Todos os segmentos</option>${opt(segs, HF.seg)}</select>
+      <input id="hx" type="search" placeholder="Buscar no motivo…" value="${esc(HF.motivo)}">
+      <button class="btn" id="hc">Exportar CSV</button></div>
+    <div class="stats s4">
+      <div class="stat blue"><i>↻</i><div><b>${h.length}</b><span>Reprogramações${HF.mes ? ' em ' + esc(mesNome(HF.mes)) : ''}</span></div></div>
+      <div class="stat amber"><i>☺</i><div><b>${porAutor.length}</b><span>Vendedores</span></div></div>
+      <div class="stat red"><i>⇥</i><div><b>${media > 0 ? '+' : ''}${media} dias</b><span>Adiamento médio</span></div></div>
+      <div class="stat blue"><i>?</i><div><b style="font-size:15px;line-height:1.2">${esc(porMotivo[0]?.[0] || '—')}</b><span>Motivo mais comum</span></div></div></div>
+    <div class="two"><div class="panel"><h2>Por vendedor</h2>${barras(porAutor, 'quem')}</div><div class="panel"><h2>Por motivo</h2>${barras(porMotivo, 'motivo')}</div></div>
+    ${porSeg.length > 1 ? `<div class="panel" style="margin-top:12px"><h2>Por segmento</h2>${barras(porSeg, 'seg')}</div>` : ''}
+    <h2>Histórico <em>${h.length}</em></h2>
+    <div class="tw"><table><tr><th>Quando</th><th>Empresa</th><th>De → Para</th><th>Motivo</th><th>Quem</th></tr>${h.map(x => `<tr><td>${new Date(x.at).toLocaleString('pt-BR')}</td><td><b>${esc(x.empresa)}</b><div class="hint">${esc(x.segmento)} · ${esc(x.cargo)}</div>${link(x)}</td><td>${fmt(x.anterior)} → <b>${fmt(x.nova)}</b><div class="hint">${dias(x) > 0 ? '+' : ''}${dias(x)} dia(s)</div></td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td></tr>`).join('') || '<tr><td colspan=5 class="hint">Nenhuma reprogramação neste filtro.</td></tr>'}</table></div>`;
+  $('#hm').onchange = e => { HF.mes = e.target.value; hist(d); };
+  $('#hq').onchange = e => { HF.quem = e.target.value; hist(d); };
+  $('#hs').onchange = e => { HF.seg = e.target.value; hist(d); };
+  const hx = $('#hx'); hx.oninput = () => { HF.motivo = hx.value; const p = hx.selectionStart; hist(d); const n = $('#hx'); n.focus(); n.setSelectionRange(p, p); };
+  document.querySelectorAll('[data-hf]').forEach(b => b.onclick = () => { const k = b.dataset.hf; HF[k] = HF[k] === b.dataset.v ? '' : b.dataset.v; hist(d); });
+  $('#hc').onclick = () => {
+    const q = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
+    const csv = ['Quando;Empresa;Segmento;Cargo;Data anterior;Nova data;Dias;Motivo;Quem', ...h.map(x => [new Date(x.at).toLocaleString('pt-BR'), x.empresa, x.segmento, x.cargo, fmt(x.anterior), fmt(x.nova), dias(x), x.motivo, x.autorNome].map(q).join(';'))].join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = `reprogramacoes-${HF.mes || 'todas'}.csv`; a.click();
+  };
 }
 function auditoria(d) {
   $('#main').innerHTML = `<h2>Edições bloqueadas <em>${d.bloqueios.length}</em></h2><div class="tw"><table><tr><th>Quando</th><th>O quê</th><th>Tentou</th><th>Restaurado</th></tr>${d.bloqueios.map(b => `<tr><td>${new Date(b.at).toLocaleString('pt-BR')}</td><td>${b.tipo === 'visita-data' ? 'Data da visita #' + b.visita : 'Data programada do card #' + b.card}</td><td>${esc(b.tentou)}</td><td>${esc(b.original)}</td></tr>`).join('') || '<tr><td colspan=4 class="hint">Nenhuma.</td></tr>'}</table></div>

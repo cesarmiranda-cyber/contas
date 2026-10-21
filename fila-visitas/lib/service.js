@@ -435,7 +435,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     store.setSnapCard(card.id, { data: nova, resp: card.responsavel });
     const nome = await nomeUsuario(uid);
     const agora = clock().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-    store.addHistorico({ card: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: motivo.trim(), autor: uid, autorNome: nome, responsavel: card.responsavel });
+    store.addHistorico({ card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: motivo.trim(), autor: uid, autorNome: nome, responsavel: card.responsavel });
     try {
       await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila),
         COMMENT: `Visita reprogramada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
@@ -568,6 +568,13 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     out.sort((a, b) => (a.data || '9').localeCompare(b.data || '9'));
     return { hoje: hoje(), visao: todos ? 'tudo' : (time.size > 1 || out.some(v => +v.responsavel !== +uid) ? 'equipe' : 'minhas'), visitas: out };
   }
+  // Histórico de reprogramações respeita a mesma regra de visibilidade das visitas.
+  async function historicoVisivel(uid) {
+    const todos = store.historico;
+    if (await enxergaTudo(uid)) return todos;
+    const time = await equipeDe(uid);
+    return todos.filter(h => time.has(+h.autor) || time.has(+h.responsavel));
+  }
   async function equipeDe(uid) {
     const ids = new Set([+uid]);
     try {
@@ -595,6 +602,6 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, historicoVisivel, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

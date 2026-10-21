@@ -231,3 +231,13 @@ test('tipo da empresa (industrial/marítimo) vem do setor da empresa, conforme a
   store.setConfig({ tipoPorRamo: { 'DT1036_1:LATE': '' } });
   assert.ok((await svc.listarVisitas({ uid: 10 })).visitas.every(x => x.tipoEmpresa === ''));
 });
+
+test('histórico de reprogramações só aparece para quem pode ver a visita', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: 'Cliente pediu' });
+  assert.equal((await svc.historicoVisivel(10)).length, 1);
+  assert.equal((await svc.historicoVisivel(30)).length, 1, 'diretoria vê tudo');
+  assert.equal((await svc.historicoVisivel(777)).length, 0);
+});

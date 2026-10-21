@@ -48,7 +48,7 @@ const routes = {
   'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto' }); },
   'GET /api/departamentos': async () => { exige(); return { departamentos: await svc.departamentos() }; },
   'GET /api/ramos': async () => { exige(); return { ramos: await svc.listaRamos() }; },
-  'GET /api/historico': async () => ({ reprogramacoes: store.historico }),
+  'GET /api/historico': async (_, __, id) => { let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ } return { reprogramacoes: id.uid ? await svc.historicoVisivel(id.uid) : [], base }; },
   'GET /api/log': async () => ({ log: store.logs.slice(0, 200), bloqueios: store.bloqueios }),
   'GET /api/config': async () => ({ config: store.config, hoje: R.todayBR(), webhook: bitrix.enabled, ultimaVarredura: store.lastSweep }),
   'PUT /api/config': async (_, b, id) => {
