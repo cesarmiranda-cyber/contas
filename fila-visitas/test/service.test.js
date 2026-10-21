@@ -221,3 +221,13 @@ test('visibilidade por alçada: vendedor só os seus, gerente a equipe, diretori
   assert.equal(dir.length, 10);
   assert.deepEqual(await ver(777), []);
 });
+
+test('tipo da empresa (industrial/marítimo) vem do setor da empresa, conforme a tabela configurada', async () => {
+  const { w, svc, store } = setup({ INDUSTRY: 'DT1036_1:LATE' }); // o mock devolve as etapas como lista de setores
+  store.setConfig({ tipoPorRamo: { 'DT1036_1:LATE': 'Marítimo' } });
+  await svc.sincronizarEmpresa(1);
+  const v = (await svc.listarVisitas({ uid: 10 })).visitas;
+  assert.ok(v.length && v.every(x => x.tipoEmpresa === 'Marítimo'));
+  store.setConfig({ tipoPorRamo: { 'DT1036_1:LATE': '' } });
+  assert.ok((await svc.listarVisitas({ uid: 10 })).visitas.every(x => x.tipoEmpresa === ''));
+});

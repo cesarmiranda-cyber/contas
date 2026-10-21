@@ -47,6 +47,7 @@ const routes = {
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
   'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto' }); },
   'GET /api/departamentos': async () => { exige(); return { departamentos: await svc.departamentos() }; },
+  'GET /api/ramos': async () => { exige(); return { ramos: await svc.listaRamos() }; },
   'GET /api/historico': async () => ({ reprogramacoes: store.historico }),
   'GET /api/log': async () => ({ log: store.logs.slice(0, 200), bloqueios: store.bloqueios }),
   'GET /api/config': async () => ({ config: store.config, hoje: R.todayBR(), webhook: bitrix.enabled, ultimaVarredura: store.lastSweep }),
@@ -70,6 +71,7 @@ const routes = {
         if (/^\d+$/.test(d) && Object.keys(o).length) p.alcadas[d] = o;
       }
     }
+    if (b.tipoPorRamo && typeof b.tipoPorRamo === 'object') { p.tipoPorRamo = {}; for (const [k, t] of Object.entries(b.tipoPorRamo)) if (['Industrial', 'Marítimo', ''].includes(t) && /^[\w-]+$/.test(k)) p.tipoPorRamo[k] = t; }
     if (Array.isArray(b.verTudo)) p.verTudo = b.verTudo.map(Number).filter(Boolean);
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);
     if (b.mapaManual && typeof b.mapaManual === 'object') p.mapaManual = b.mapaManual;
@@ -140,6 +142,15 @@ server.listen(PORT, () => {
       const vend = us.filter(u => ids.some(i => i.includes(`=${u.ID}:`)));
       console.log('depts-usuarios', JSON.stringify(vend.map(u => `${u.ID}:${u.NAME} ${u.LAST_NAME}|dept=${JSON.stringify(u.UF_DEPARTMENT)}|cargo=${u.WORK_POSITION || '-'}`)));
     } catch (e) { console.error('depts:', e.message); }
+  }, 2000);
+  if (bitrix.enabled && process.env.DIAG_TIPO) setTimeout(async () => {
+    try {
+      const f = (await bitrix.call('crm.company.fields')).result || {};
+      const ach = Object.entries(f).filter(([k, x]) => { const lbl = JSON.stringify([x.formLabel, x.listLabel, x.title]).toLowerCase(); const its = JSON.stringify(x.items || []).toLowerCase(); return /industri|marit|mar[ií]tim|tipo|ramo|setor|segmento/.test(lbl) || /industri|marit/.test(its); })
+        .map(([k, x]) => `${k}|${x.type}|${x.formLabel || x.title}|itens=${(x.items || []).slice(0, 12).map(i => i.VALUE || i.NAME || i.value).join('/')}`);
+      console.log('tipo-campos', JSON.stringify(ach));
+      for (const e of ['COMPANY_TYPE', 'INDUSTRY']) { const st = (await bitrix.call('crm.status.list', { filter: { ENTITY_ID: e } })).result || []; console.log('tipo-status-' + e, JSON.stringify(st.map(x => x.NAME))); }
+    } catch (e) { console.error('tipo:', e.message); }
   }, 2000);
   if (bitrix.enabled && process.env.PREPARAR) setTimeout(() => P.preparar(bitrix, svc).then(r => { console.log('preparar', JSON.stringify(r)); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); }).catch(e => console.error('preparar:', e.message)), 2000);
   if (bitrix.enabled && process.env.APAGAR_CAMPOS) setTimeout(() => D.apagar(bitrix, process.env.APAGAR_CAMPOS.split(',').map(Number).filter(Boolean), DATA_DIR).then(r => { console.log('campos-apagados', JSON.stringify(r)); store.log('config', `Campos duplicados apagados: ${(r.feitos || []).join('; ')}`); }).catch(e => console.error('campos-apagados:', e.message)), 3000);

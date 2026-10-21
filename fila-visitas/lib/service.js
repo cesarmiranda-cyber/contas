@@ -41,7 +41,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
         classe, ultima: data('ultima', 'max'), proxima: data('proxima', 'min'),
       };
     }
-    return { id: +r.ID, nome: r.TITLE, tipo: map.tipoEmpresa ? F.decode(meta, map.tipoEmpresa, r[map.tipoEmpresa]) : '', segs };
+    return { id: +r.ID, nome: r.TITLE, ramo: r.INDUSTRY || '', tipo: map.tipoEmpresa ? F.decode(meta, map.tipoEmpresa, r[map.tipoEmpresa]) : '', segs };
   }
 
   // Diretor = chefe do departamento do Gerente (sobe um nível se o próprio Gerente é o chefe).
@@ -118,6 +118,25 @@ function createService({ bitrix, store, clock = () => new Date() }) {
   }
 
   const equipeIds = sg => Object.fromEntries(['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor'].filter(k => sg && sg[k]).map(k => [k, sg[k]]));
+  // Tipo de empresa (Industrial / Marítimo) a partir do "Setor" (INDUSTRY) da empresa; a tabela ramo -> tipo é editável no app.
+  const sugestaoTipo = nome => {
+    const n = R.norm(nome);
+    if (/marit|maritm|offshore|estaleiro|fluvial|portu|naval|lazer/.test(n)) return 'Marítimo';
+    if (/energia|compress|transport|onibus|pedreira|constru|minera|agric|florestal|coleta|onshore/.test(n)) return 'Industrial';
+    return '';
+  };
+  let ramos = null, ramosAt = 0;
+  async function listaRamos() {
+    if (!ramos || Date.now() - ramosAt > CACHE_MS) { ramos = ((await bitrix.call('crm.status.list', { filter: { ENTITY_ID: 'INDUSTRY' } })).result || []).map(x => ({ id: x.STATUS_ID, nome: x.NAME })); ramosAt = Date.now(); }
+    const cfg = store.config.tipoPorRamo || {};
+    return ramos.map(r => ({ ...r, tipo: cfg[r.id] !== undefined ? cfg[r.id] : sugestaoTipo(r.nome) }));
+  }
+  async function tipoDaEmpresa(emp) {
+    if (!emp) return '';
+    if (emp.tipo) return emp.tipo;
+    if (!emp.ramo) return '';
+    return ((await listaRamos()).find(r => r.id === emp.ramo) || {}).tipo || '';
+  }
   // ---------- cards da fila ----------
   const tituloCard = (empresa, seg, cargo) => `${empresa} | ${seg} | ${cargo}`;
   async function lerCard(id) {
@@ -536,13 +555,12 @@ function createService({ bitrix, store, clock = () => new Date() }) {
         if (!eq) { if (emp === undefined) { emp = await lerEmpresa(c.empresaId).catch(() => null); empresas.set(c.empresaId, emp); } eq = equipeIds(emp?.segs?.[c.segmento]); }
         if (!Object.values(eq || {}).map(Number).includes(+uid)) continue;
       }
-      let tipo = tipos.get(c.empresaId);
-      if (tipo === undefined && map.tipoEmpresa && c.empresaId) { try { tipo = F.decode((await campos()).meta, map.tipoEmpresa, (await bitrix.call('crm.company.get', { id: c.empresaId })).result?.[map.tipoEmpresa]); } catch { tipo = ''; } tipos.set(c.empresaId, tipo); }
       if (emp === undefined) { emp = await lerEmpresa(c.empresaId).catch(() => null); empresas.set(c.empresaId, emp); }
       const sg = emp?.segs?.[c.segmento] || {};
+      if (tipos.get(c.empresaId) === undefined) tipos.set(c.empresaId, await tipoDaEmpresa(emp));
       const equipe = {};
       for (const k of ['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor']) if (sg[k]) equipe[k] = await nomeUsuario(sg[k]);
-      out.push({ ...c, tipoEmpresa: tipo || '', responsavelNome: await nomeUsuario(c.responsavel), classe: c.classe || reg.classe || '',
+      out.push({ ...c, tipoEmpresa: tipos.get(c.empresaId) || '', responsavelNome: await nomeUsuario(c.responsavel), classe: c.classe || reg.classe || '',
         situacao: R.etapaPara(c.data, hoje()), dias: c.data ? R.dayDiff(hoje(), c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, hoje()) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
         equipe, reprogramacoes: store.historico.filter(h => h.card === c.id && !h.tipo).length, urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
@@ -577,6 +595,6 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

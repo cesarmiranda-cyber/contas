@@ -140,7 +140,7 @@ function lista() {
       <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
       ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(resps, F.resp)}</select>` : ''}
       <select id="fs"><option value="">Todos os segmentos</option>${opt(segs.map(s => [s, s]), F.seg)}</select>
-      <select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>
+      ${todas.some(x => x.tipoEmpresa) ? `<select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>` : ''}
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
     </div>` + (v.length ? grupos.map(([k, t]) => {
       const g = v.filter(x => x.situacao === k);
@@ -150,7 +150,7 @@ function lista() {
   const q = $('#fq'); q.oninput = () => { F.q = q.value; const p = q.selectionStart; lista(); const n = $('#fq'); n.focus(); n.setSelectionRange(p, p); };
   if ($('#fr')) $('#fr').onchange = e => { F.resp = e.target.value; lista(); };
   $('#fs').onchange = e => { F.seg = e.target.value; lista(); };
-  $('#ft').onchange = e => { F.tipo = e.target.value; lista(); };
+  if ($('#ft')) $('#ft').onchange = e => { F.tipo = e.target.value; lista(); };
   $('#fc').onchange = e => { F.classe = e.target.value; lista(); };
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reprogramar(+b.dataset.rep));
@@ -271,6 +271,8 @@ async function cfg(d) {
       <details><summary>Ver mapeamento</summary><pre style="overflow:auto;font-size:12px">${esc(JSON.stringify(campos.map, null, 1))}</pre></details>`}
     <h2>Alçadas por departamento</h2><div class="panel"><p class="hint">Defina quem é Supervisor, Coordenador, Gerente e Diretor de cada departamento. Quando uma empresa tem Vendedor mas esses campos estão vazios, o app preenche a partir do departamento do Vendedor (vale também para os departamentos abaixo).</p>
       <div id="alc" class="hint">Carregando departamentos…</div><button class="btn pri" id="sa" style="margin-top:10px">Salvar alçadas</button> <span class="hint" id="aout"></span></div>
+    <h2>Tipo de empresa (Industrial / Marítimo)</h2><div class="panel"><p class="hint">O app descobre o tipo pelo <b>Setor</b> da empresa no Bitrix. Ajuste abaixo a que tipo pertence cada setor (a sugestão vem do nome). O filtro da tela usa esta tabela.</p>
+      <div id="ram" class="hint">Carregando setores…</div><button class="btn pri" id="sr" style="margin-top:10px">Salvar tipos</button> <span class="hint" id="rout"></span></div>
     <h2>Preparar o Bitrix</h2><div class="panel"><p class="hint">Cria o que falta: etapa <b>Atrasada</b> no kanban 1036, campos <b>Cargo</b> e <b>Data programada</b> na Fila e <b>Resultado</b>/<b>Acompanhamento</b> no Registro de Visita. Só cria o que ainda não existe.</p>
       <button class="btn pri" id="bp">Criar etapa e campos que faltam</button><pre id="pout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Testar com uma empresa</h2><div class="panel"><p class="hint">Gera a fila de <b>uma</b> empresa só (funciona mesmo com o app desativado). Use o número que aparece na URL da empresa no Bitrix (…/crm/company/details/<b>123</b>/).</p>
@@ -290,6 +292,13 @@ async function cfg(d) {
     const arvore = raiz.flatMap(r => [{ ...departamentos.find(x => x.id === r), n: 0 }, ...prof(r, 1)]);
     $('#alc').innerHTML = `<div class="tw"><table><tr><th>Departamento</th><th>Supervisor</th><th>Coordenador</th><th>Gerente</th><th>Diretor</th></tr>${arvore.map(d => `<tr><td style="padding-left:${12 + d.n * 18}px"><b>${esc(d.nome)}</b>${d.chefe ? `<div class="hint">chefe: ${esc((users.find(x => x.id === d.chefe) || {}).nome || '#' + d.chefe)}</div>` : ''}</td>${['supervisor', 'coordenador', 'gerente', 'diretor'].map(k => `<td><select data-al="${d.id}.${k}" style="min-width:140px">${opts.replace(`value="${(al[d.id] || {})[k]}"`, `value="${(al[d.id] || {})[k]}" selected`)}</select></td>`).join('')}</tr>`).join('')}</table></div>`;
   }).catch(e => { $('#alc').textContent = e.message; });
+  api('/api/ramos').then(({ ramos }) => {
+    $('#ram').innerHTML = `<div class="tw"><table><tr><th>Setor da empresa</th><th>Tipo</th></tr>${ramos.map(r => `<tr><td>${esc(r.nome)}</td><td><select data-ra="${esc(r.id)}" style="max-width:200px"><option value="">Sem tipo</option><option ${r.tipo === 'Industrial' ? 'selected' : ''}>Industrial</option><option ${r.tipo === 'Marítimo' ? 'selected' : ''}>Marítimo</option></select></td></tr>`).join('')}</table></div>`;
+  }).catch(e => { $('#ram').textContent = e.message; });
+  $('#sr').onclick = async () => {
+    const tipoPorRamo = {}; document.querySelectorAll('[data-ra]').forEach(s => { tipoPorRamo[s.dataset.ra] = s.value; });
+    try { await api('/api/config', { method: 'PUT', body: { tipoPorRamo } }); $('#rout').textContent = 'Tipos salvos.'; } catch (e) { $('#rout').textContent = e.message; }
+  };
   $('#sa').onclick = async () => {
     const alcadas = {}; document.querySelectorAll('[data-al]').forEach(s => { if (!s.value) return; const [d, k] = s.dataset.al.split('.'); (alcadas[d] ||= {})[k] = +s.value; });
     try { await api('/api/config', { method: 'PUT', body: { alcadas } }); $('#aout').textContent = 'Alçadas salvas.'; } catch (e) { $('#aout').textContent = e.message; }
