@@ -24,7 +24,7 @@ nav button.on{background:var(--brand);color:#fff}
 main{padding:16px 0 40px}
 select,input,textarea{background:var(--sf);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%;outline:none;transition:border .15s,box-shadow .15s}
 select:focus,input:focus,textarea:focus{border-color:var(--cy);box-shadow:0 0 0 3px color-mix(in srgb,var(--cy) 28%,transparent)}
-textarea{min-height:96px;resize:vertical}
+textarea{min-height:72px;resize:vertical}
 .btn{border:1px solid var(--line);background:var(--sf);padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;min-height:38px;transition:.15s;white-space:nowrap}
 .btn:hover{border-color:var(--brand);color:var(--brand)}.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}.btn.pri:hover{background:var(--brand2);color:#fff}.btn:disabled{opacity:.55;cursor:wait}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
@@ -52,10 +52,14 @@ h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:9
 .tag.warn{background:var(--amberbg);border-color:transparent;color:var(--amber)}.due small{display:block;color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
 .vazio{text-align:center;color:var(--mut);padding:48px 12px}
 .modal{position:fixed;inset:0;background:rgba(10,20,30,.55);display:none;align-items:flex-end;justify-content:center;z-index:50}.modal.on{display:flex}
-.sheet{background:var(--sf);width:100%;max-width:640px;border-radius:16px 16px 0 0;max-height:94vh;display:flex;flex-direction:column}
+.sheet{background:var(--sf);width:100%;max-width:760px;border-radius:16px 16px 0 0;max-height:94vh;display:flex;flex-direction:column}
 @media(min-width:700px){.modal{align-items:center;padding:20px}.sheet{border-radius:14px}}
 .sh-h{padding:16px 18px 12px;border-bottom:1px solid var(--line)}.sh-h h3{margin:0;font-size:18px}.sh-b{padding:6px 18px 8px;overflow:auto;flex:1}.sh-f{padding:12px 18px 16px;border-top:1px solid var(--line);display:flex;gap:8px}.sh-f .btn{flex:1;min-height:42px}
-.fld{margin:14px 0}.fld>label{display:block;font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:5px}.fld>label i{color:var(--red);font-style:normal}
+.sec{margin:16px 0 4px;padding:2px 0}.sec h4{margin:0 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--brand);padding-bottom:6px;border-bottom:1px solid var(--line)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}.grid2 .wide{grid-column:1/-1}
+.radios,.checks{display:flex;flex-wrap:wrap;gap:8px}.radios label,.checks label{display:flex;align-items:center;gap:7px;margin:0;padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-weight:600;color:var(--ink);font-size:13.5px;background:var(--sf)}.radios label:has(input:checked),.checks label:has(input:checked){border-color:var(--brand);background:var(--brandbg);color:var(--brand)}.radios input,.checks input{width:auto;margin:0}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+.fld{margin:12px 0}.fld>label{display:block;font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:5px}.fld>label i{color:var(--red);font-style:normal}
 .fld.lock input,.fld.lock select{background:var(--sf2);color:var(--mut)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .err{background:var(--redbg);color:var(--red);padding:10px 12px;border-radius:8px;margin:10px 0;font-weight:600;display:none}.err.on{display:block}
@@ -180,25 +184,40 @@ $('#m').onclick = e => { if (e.target.id === 'm') fecha(); };
 const achar = id => dados.visitas.find(x => x.id === id);
 const localDT = iso => { const d = iso ? new Date(iso) : new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
-// ---- Registrar visita: o formulário é montado com os campos do SPA 1032 ----
+// ---- Registrar visita: o formulário é montado com os campos do SPA 1032, agrupados por assunto ----
+const GRUPOS = [
+  ['Conversa com o cliente', /fato|dado|interess|sentiment|valor|perfil|necessid|dor|problema/i],
+  ['Equipamentos', /motor|popula|regime|equipament|frota|embarca|gerador|hora/i],
+  ['Oportunidades e próximos passos', /oportunid|mapeament|acompanh|pr[oó]xim|retorno|proposta|negoci/i],
+];
+const LONGO = /fato|interess|sentiment|valor|mapeament|observ|resultado|descri|conclus|motivo|acompanh|necessid|problema|coment/i;
+const grupoDe = c => (GRUPOS.find(([, re]) => re.test(c.titulo)) || ['Outras informações'])[0];
+const legivel = c => c.tipo === 'sim_nao' ? (c.valor === 'Y' ? 'Sim' : c.valor === 'N' ? 'Não' : '') : c.tipo === 'lista' ? ((c.itens.find(i => i.id === String(c.valor)) || {}).nome || '') : String(c.valor || '');
 function campoHTML(c) {
-  const id = 'f_' + c.key, req = c.obrigatorio ? ' <i>*</i>' : '', dis = c.travado ? 'disabled' : '';
+  const id = 'f_' + c.key, req = c.obrigatorio ? ' <i>*</i>' : '';
   let ctl;
-  if (c.tipo === 'texto') ctl = c.destaque || /observ|resultado|descri|conclus|motivo|acompanh/i.test(c.titulo) ? `<textarea id="${id}" ${dis} placeholder="Escreva aqui…">${esc(c.valor)}</textarea>` : `<input id="${id}" ${dis} value="${esc(c.valor)}">`;
-  else if (c.tipo === 'numero') ctl = `<input id="${id}" type="number" step="any" inputmode="decimal" ${dis} value="${esc(c.valor)}">`;
-  else if (c.tipo === 'data') ctl = `<input id="${id}" type="date" ${dis} value="${esc(String(c.valor).slice(0, 10))}">`;
-  else if (c.tipo === 'datahora') ctl = `<input id="${id}" type="datetime-local" ${dis} value="${localDT(c.valor || null)}">`;
-  else if (c.tipo === 'sim_nao') ctl = `<select id="${id}" ${dis}><option value="">—</option><option value="Y" ${c.valor === 'Y' ? 'selected' : ''}>Sim</option><option value="N" ${c.valor === 'N' ? 'selected' : ''}>Não</option></select>`;
-  else if (c.tipo === 'lista') ctl = `<select id="${id}" ${dis} ${c.multiplo ? 'multiple size="4"' : ''}>${c.multiplo ? '' : '<option value="">—</option>'}${c.itens.map(i => `<option value="${esc(i.id)}" ${String(c.valor) === i.id ? 'selected' : ''}>${esc(i.nome)}</option>`).join('')}</select>`;
-  else if (c.tipo === 'usuario') ctl = `<select id="${id}" ${dis}><option value="">—</option>${users.map(u => `<option value="${u.id}" ${String(c.valor) === String(u.id) ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}</select>`;
-  const dica = c.travado ? ' <span class="hint">(automático)</span>' : '';
-  return `<div class="fld ${c.travado ? 'lock' : ''}"><label for="${id}">${esc(c.titulo)}${req}${dica}</label>${ctl}</div>`;
+  if (c.tipo === 'texto') ctl = c.destaque || LONGO.test(c.titulo) ? `<textarea id="${id}" rows="3" placeholder="Descreva aqui…">${esc(c.valor)}</textarea>` : `<input id="${id}" value="${esc(c.valor)}">`;
+  else if (c.tipo === 'numero') ctl = `<input id="${id}" type="number" step="any" inputmode="decimal" value="${esc(c.valor)}">`;
+  else if (c.tipo === 'data') ctl = `<input id="${id}" type="date" value="${esc(String(c.valor).slice(0, 10))}">`;
+  else if (c.tipo === 'datahora') ctl = `<input id="${id}" type="datetime-local" value="${localDT(c.valor || null)}">`;
+  else if (c.tipo === 'sim_nao') ctl = `<select id="${id}"><option value="">Selecione…</option><option value="Y" ${c.valor === 'Y' ? 'selected' : ''}>Sim</option><option value="N" ${c.valor === 'N' ? 'selected' : ''}>Não</option></select>`;
+  else if (c.tipo === 'lista') ctl = c.multiplo
+    ? `<div class="checks" id="${id}">${c.itens.map(i => `<label><input type="checkbox" value="${esc(i.id)}"> ${esc(i.nome)}</label>`).join('')}</div>`
+    : (c.itens.length <= 4 ? `<div class="radios" id="${id}">${c.itens.map(i => `<label><input type="radio" name="${id}" value="${esc(i.id)}" ${String(c.valor) === i.id ? 'checked' : ''}> ${esc(i.nome)}</label>`).join('')}</div>`
+      : `<select id="${id}"><option value="">Selecione…</option>${c.itens.map(i => `<option value="${esc(i.id)}" ${String(c.valor) === i.id ? 'selected' : ''}>${esc(i.nome)}</option>`).join('')}</select>`);
+  else if (c.tipo === 'usuario') ctl = `<select id="${id}"><option value="">Selecione…</option>${users.map(x => `<option value="${x.id}" ${String(c.valor) === String(x.id) ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select>`;
+  const largo = (c.tipo === 'texto' && c.destaque) || /mapeament|observ|resultado|acompanh/i.test(c.titulo) || (c.tipo === 'lista' && (c.multiplo || c.itens.length <= 4));
+  return `<div class="fld ${largo ? 'wide' : ''}"><label for="${id}">${esc(c.titulo)}${req}</label>${ctl}</div>`;
 }
 function lerCampo(c) {
+  if (c.travado) return undefined;
   const el = document.getElementById('f_' + c.key);
-  if (!el || c.travado) return undefined;
+  if (!el) return undefined;
   if (c.tipo === 'datahora') return el.value ? new Date(el.value).toISOString() : '';
-  if (c.multiplo && el.multiple) return [...el.selectedOptions].map(o => o.value);
+  if (c.tipo === 'lista' && el.tagName !== 'SELECT') {
+    const marcados = [...el.querySelectorAll('input:checked')].map(i => i.value);
+    return c.multiplo ? marcados : (marcados[0] || '');
+  }
   return el.value;
 }
 async function registrar(id) {
@@ -206,11 +225,21 @@ async function registrar(id) {
   let form;
   try { form = await api(`/api/cards/${id}/form`); } catch (e) { modal(`<div class="sh-b"><div class="err on">${esc(e.message)}</div></div><div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button></div>`); return; }
   const c = form.card;
-  modal(`<div class="sh-h"><h3>Registrar visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span><span class="tag">Programada: ${fmt(c.data)}</span>${c.antecipada ? '<span class="tag">Antecipada</span>' : ''}</div></div>
-    <div class="sh-b">${form.campos.length ? form.campos.map(campoHTML).join('') : '<div class="hint" style="margin:14px 0">O SPA de Registro de Visita não tem campos personalizados.</div>'}
-      ${form.resultadoKey ? '' : `<div class="fld"><label>Resultado / observações <i>*</i></label><textarea id="f_resultado" placeholder="O que foi tratado com o cliente?"></textarea></div>`}
+  const auto = form.campos.filter(f => f.travado), livres = form.campos.filter(f => !f.travado);
+  const quando = livres.find(f => f.key === form.dataHoraKey);
+  const corpo = livres.filter(f => f !== quando);
+  const secoes = {};
+  for (const f of corpo) (secoes[grupoDe(f)] ||= []).push(f);
+  const ordem = [...GRUPOS.map(g => g[0]), 'Outras informações'].filter(n => secoes[n]);
+  modal(`<div class="sh-h"><h3>Registrar visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span><span class="tag">Programada: ${fmt(c.data)}</span>${c.antecipada ? '<span class="tag warn">Visita antecipada</span>' : ''}${auto.filter(f => legivel(f) && !/fila|id/i.test(f.titulo)).map(f => `<span class="tag" title="${esc(f.titulo)}">${esc(f.titulo.replace(/\?$/, ''))}: ${esc(legivel(f))}</span>`).join('')}</div></div>
+    <div class="sh-b">
+      ${quando ? `<div class="sec"><div class="grid2">${campoHTML(quando)}</div></div>` : ''}
+      ${ordem.map(n => `<div class="sec"><h4>${esc(n)}</h4><div class="grid2">${secoes[n].map(campoHTML).join('')}</div></div>`).join('')}
+      ${corpo.length || quando ? '' : '<div class="hint" style="margin:14px 0">O SPA de Registro de Visita não tem campos para preencher.</div>'}
+      ${form.resultadoKey ? '' : `<div class="sec"><h4>Resultado</h4><div class="fld wide"><label>Resultado / observações <i>*</i></label><textarea id="f_resultado" rows="4" placeholder="O que foi tratado com o cliente?"></textarea></div></div>`}
       <div class="err" id="er"></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri" id="ok">Salvar visita</button></div>`);
+  document.querySelectorAll('#sheet textarea').forEach(t => { const ajusta = () => { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, 220) + 'px'; }; t.addEventListener('input', ajusta); ajusta(); });
   $('#ok').onclick = async () => {
     $('#ok').disabled = true; $('#er').classList.remove('on');
     const campos = {};
