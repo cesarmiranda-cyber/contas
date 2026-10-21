@@ -7,6 +7,7 @@ const { createStore } = require('./lib/store');
 const { createService } = require('./lib/service');
 const { request } = require('./lib/http');
 const R = require('./lib/rules');
+const D = require('./lib/duplicados');
 
 const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -65,6 +66,7 @@ const routes = {
     const c = store.setConfig(p); await svc.campos(true).catch(() => {}); return c;
   },
   'GET /api/campos': async (u) => { exige(); return svc.campos(u.searchParams.get('refresh') === '1'); },
+  'GET /api/duplicados': async () => { exige(); const a = await D.analisar(bitrix); return { ...a, plano: D.planejar(a) }; },
   'POST /api/sincronizar': async (_, b) => { exige(); return b.empresa ? svc.sincronizarEmpresa(+b.empresa, { forcar: !!b.forcar }) : svc.sincronizarTodas(); },
   'POST /api/job': async (_, b) => { exige(); return svc.jobDiario({ forcar: !!b.forcar }); },
   'POST /api/varrer': async () => { exige(); return svc.varrer(); },
@@ -110,6 +112,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Fila de Visitas DLC em :${PORT} · Bitrix ${bitrix.enabled ? 'configurado' : 'SEM WEBHOOK (defina BITRIX_WEBHOOK)'}`);
   const tick = () => bitrix.enabled && svc.varrer().then(r => r && !r.pulado && !r.pausado && console.log('varredura', JSON.stringify(r))).catch(e => { store.log('erro', `varredura: ${e.message}`); console.error('varredura:', e.message); });
+  if (bitrix.enabled && process.env.ANALISE_DUPLICADOS) setTimeout(() => D.analisar(bitrix).then(a => { const p = D.planejar(a); console.log('duplicados', JSON.stringify({ empresas: a.empresas, apagar: p.apagar.map(c => `${c.id}:${c.campo}:${c.rotulo}`), manter: p.manter.map(c => `${c.id}:${c.campo}:${c.rotulo}:${c.comValor}`), conflitos: p.conflitos.map(g => g.campos.map(c => `${c.campo}=${c.comValor}`)) })); }).catch(e => console.error('duplicados:', e.message)), 3000);
   if (bitrix.enabled) setTimeout(() => svc.campos(true).then(d => console.log('campos', JSON.stringify({ faltando: d.faltando, ambiguos: d.ambiguos, fila: d.map.fila, visita: d.map.visita, etapas: d.map.etapas, cat: d.map.categoriaFila, tipo: d.map.tipoEmpresa, motores: d.map.empresa.Motores }))).catch(e => console.error('campos:', e.message)), 1000);
   setTimeout(tick, 5000);
   setInterval(tick, Math.max(30, store.config.sweepSegundos) * 1000);
