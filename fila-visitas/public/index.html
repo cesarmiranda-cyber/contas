@@ -244,6 +244,8 @@ async function cfg(d) {
       ${campos.faltando.length ? `<div class="err on">Faltando: ${campos.faltando.map(esc).join(' · ')}</div>` : '<div class="ok">Todos os campos e etapas foram encontrados.</div>'}
       ${campos.ambiguos.length ? `<p class="hint">Ambíguos (revise): ${campos.ambiguos.map(a => esc(a.onde + ' → ' + a.opcoes.join(' | '))).join('<br>')}</p>` : ''}
       <details><summary>Ver mapeamento</summary><pre style="overflow:auto;font-size:12px">${esc(JSON.stringify(campos.map, null, 1))}</pre></details>`}
+    <h2>Testar com uma empresa</h2><div class="panel"><p class="hint">Gera a fila de <b>uma</b> empresa só (funciona mesmo com o app desativado). Use o número que aparece na URL da empresa no Bitrix (…/crm/company/details/<b>123</b>/).</p>
+      <div style="display:flex;gap:8px"><input id="eid" type="number" inputmode="numeric" placeholder="ID da empresa" style="max-width:200px"><button class="btn pri" id="bt">Gerar fila desta empresa</button></div><pre id="tout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Ações</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="b1">Sincronizar todas as empresas</button><button class="btn" id="b2">Rodar job diário agora</button></div><p class="hint" id="out"></p>`;
   $('#sv').onclick = async () => {
     const intervalos = {}; document.querySelectorAll('[data-i]').forEach(i => { const [g, k] = i.dataset.i.split('.'); (intervalos[g] ||= {})[k] = +i.value; });
@@ -252,7 +254,13 @@ async function cfg(d) {
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
   };
-  $('#b1').onclick = async () => { $('#out').textContent = 'Sincronizando…'; try { const r = await api('/api/sincronizar', { method: 'POST', body: {} }); $('#out').textContent = `${r.length} empresa(s) processada(s); ${r.reduce((a, x) => a + (x.criados?.length || 0), 0)} card(s) criado(s).`; } catch (e) { $('#out').textContent = e.message; } };
+  $('#bt').onclick = async () => {
+    const id = +$('#eid').value; if (!id) { $('#tout').textContent = 'Informe o ID da empresa.'; return; }
+    $('#tout').textContent = 'Processando…';
+    try { const r = await api('/api/sincronizar', { method: 'POST', body: { empresa: id } }); $('#tout').textContent = r.erro ? r.erro : `Cards criados: ${r.criados.length} · atualizados: ${r.atualizados.length}\n` + (r.pendencias.length ? 'Pendências:\n - ' + r.pendencias.join('\n - ') : 'Sem pendências.'); }
+    catch (e) { $('#tout').textContent = e.message; }
+  };
+  $('#b1').onclick = async () => { if (!confirm('Isso processa TODAS as empresas e pode criar milhares de cards. Continuar?')) return; $('#out').textContent = 'Sincronizando…'; try { const r = await api('/api/sincronizar', { method: 'POST', body: {} }); $('#out').textContent = `${r.length} empresa(s) processada(s); ${r.reduce((a, x) => a + (x.criados?.length || 0), 0)} card(s) criado(s).`; } catch (e) { $('#out').textContent = e.message; } };
   $('#b2').onclick = async () => { $('#out').textContent = 'Rodando…'; try { $('#out').textContent = JSON.stringify(await api('/api/job', { method: 'POST', body: { forcar: true } })); } catch (e) { $('#out').textContent = e.message; } };
 }
 init();
