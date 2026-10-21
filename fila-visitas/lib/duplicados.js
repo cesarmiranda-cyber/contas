@@ -77,7 +77,8 @@ async function apagar(bitrix, ids, dir) {
 module.exports.apagar = apagar;
 
 // ---- campos duplicados de um SPA (ex.: Registro de Visita 1032): mesmo título em mais de um campo ----
-const numDe = k => parseInt(k.replace(/\D/g, '').slice(-13), 10);
+// código do campo = carimbo de data; normaliza segundos x milissegundos para comparar o mais novo
+const numDe = k => { const n = parseInt(String(k).replace(/^ufCrm\d+_/, '').replace(/\D/g, ''), 10); return n > 1e11 ? n / 1000 : n; };
 const vazio = v => v === null || v === undefined || v === '' || v === 0 || v === false || (Array.isArray(v) && !v.length);
 // Campo padrão de cada grupo: o que o app usa (protegido) ou, na falta, o mais novo.
 function agrupar(defs, protegidos) {

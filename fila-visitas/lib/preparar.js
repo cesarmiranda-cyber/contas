@@ -19,7 +19,7 @@ async function preparar(bitrix, svc) {
   }
   const criar = async (entityId, tipo, nome, tipoCampo, titulo, extra = {}) => {
     try {
-      await bitrix.call('userfieldconfig.add', { moduleId: 'crm', field: { entityId, fieldName: nome, userTypeId: tipoCampo, editFormLabel: { br: titulo, en: titulo }, listColumnLabel: { br: titulo, en: titulo }, listFilterLabel: { br: titulo, en: titulo }, mandatory: 'N', showFilter: 'N', ...extra } });
+      await bitrix.call('userfieldconfig.add', { moduleId: 'crm', field: { entityId, fieldName: `UF_${entityId}_${nome}`, userTypeId: tipoCampo, editFormLabel: { br: titulo, en: titulo }, listColumnLabel: { br: titulo, en: titulo }, listFilterLabel: { br: titulo, en: titulo }, mandatory: 'N', showFilter: 'N', ...extra } });
       feito.push(`${tipo}: campo "${titulo}" criado`);
     } catch (e) { erros.push(`${tipo} · ${titulo}: ${e.message}`); }
   };

@@ -167,7 +167,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
       id: +it.id, titulo: it.title, empresaId: +it.companyId || reg.empresaId, empresa: reg.empresa || parts[0],
       segmento: g('segmento') || reg.seg || parts[1], cargo: g('cargo') || reg.cargo || parts[2],
       classe: g('classe') || reg.classe || '', responsavel: +it.assignedById || null,
-      data: R.isoDate(map.fila.data ? it[map.fila.data] : it.closedate), stageId: it.stageId,
+      data: (R.isoDate(map.fila.data ? it[map.fila.data] : null) || R.isoDate(it.closedate)), stageId: it.stageId,
     };
   };
 
@@ -481,7 +481,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     let rev = 0;
     for (const it of abertos) {
       const snap = store.snapCard(it.id);
-      const atual = R.isoDate(map.fila.data ? it[map.fila.data] : it.closedate);
+      const atual = (R.isoDate(map.fila.data ? it[map.fila.data] : null) || R.isoDate(it.closedate));
       if (!snap) { store.setSnapCard(+it.id, { data: atual, resp: +it.assignedById }); continue; }
       if (atual === snap.data) continue;
       await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: it.id, fields: { [map.fila.data || 'closedate']: snap.data } });
