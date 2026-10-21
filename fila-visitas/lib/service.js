@@ -444,7 +444,8 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     try {
       await campos();
       const guardas = { visitas: await guardarVisitas(), cards: await guardarCards(await cardsAbertos()) };
-      const emp = await sincronizarTodas({ desde: store.lastSweep || undefined });
+      // primeira varredura depois de ativar: não processa as 11 mil empresas de uma vez, só as alteradas daqui em diante
+      const emp = store.lastSweep ? await sincronizarTodas({ desde: store.lastSweep }) : [];
       let job = null;
       if (R.hourBR(clock()) >= store.config.horaJob) job = await jobDiario();
       store.setLastSweep(inicio);

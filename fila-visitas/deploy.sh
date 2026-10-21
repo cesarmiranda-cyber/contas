@@ -14,6 +14,8 @@ if os.environ.get("BITRIX_WEBHOOK"): env["BITRIX_WEBHOOK"] = os.environ["BITRIX_
 if os.environ.get("ANALISE_DUPLICADOS"): env["ANALISE_DUPLICADOS"] = "1"
 if os.environ.get("APAGAR_CAMPOS"): env["APAGAR_CAMPOS"] = os.environ["APAGAR_CAMPOS"]
 if os.environ.get("PREPARAR"): env["PREPARAR"] = "1"
+if os.environ.get("ATIVAR"): env["ATIVAR"] = os.environ["ATIVAR"]
+if os.environ.get("SYNC_EMPRESA"): env["SYNC_EMPRESA"] = os.environ["SYNC_EMPRESA"]
 if os.environ.get("EVENT_TOKEN"): env["EVENT_TOKEN"] = os.environ["EVENT_TOKEN"]
 print(json.dumps({
   "source": {"content": base64.b64encode(open(out + "/fila-app.tgz","rb").read()).decode()},
