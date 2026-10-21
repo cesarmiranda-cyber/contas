@@ -95,6 +95,25 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{text-align:left
 .pbi-pg button{border:0;background:none;padding:9px 16px;font-size:13px;color:#605E5C;cursor:pointer;border-top:3px solid transparent;white-space:nowrap}.pbi-pg button:hover{background:#F3F2F1}.pbi-pg button.on{color:#252423;font-weight:600;border-top-color:#F2C811;background:#F3F2F1}.pbi-ver{margin-left:auto;font-size:11px;color:#8A8886;padding:0 8px 8px;white-space:nowrap}
 @media(max-width:1000px){.g4{grid-template-columns:1fr 1fr}.g3,.g2,.g2w{grid-template-columns:1fr}}
 @media(max-width:520px){.g4{grid-template-columns:1fr 1fr}.kv{font-size:26px}.ro{flex-direction:column;align-items:stretch}.ro svg{margin:0 auto}}
+
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.clk{cursor:pointer;transition:opacity .15s}.clk.dim{opacity:.32}.clk.on{opacity:1}
+.hb .clk{border-radius:2px}.hb .clk:hover{background:#F3F2F1}.hb .clk.on{background:#E6F6F4;outline:1px solid #01B8AA}
+.kp.clk:hover{border-color:#01B8AA;box-shadow:0 0 0 1px #01B8AA inset}.kp.clk.on{border-color:#01B8AA;box-shadow:0 0 0 2px #01B8AA inset}
+.rl .clk:hover{background:#F3F2F1}path.clk:hover,rect.clk:hover,circle.clk:hover{filter:brightness(1.08)}g.clk:hover rect{filter:brightness(1.1)}
+.stk i.clk:hover{filter:brightness(1.1)}.stk i.clk.on{box-shadow:0 0 0 2px #252423 inset}
+.dl{font-size:12px;font-weight:600;margin-left:8px;vertical-align:middle}.dl.up{color:#018F83}.dl.dn{color:#D64550}
+.chips-bar{background:#fff;border-bottom:1px solid #E1DFDD;padding:7px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:#605E5C}.chips-bar.dica{color:#8A8886;font-style:italic}
+.chip{background:#E6F6F4;border:1px solid #01B8AA;color:#0B5F58;border-radius:99px;padding:2px 10px;cursor:pointer;font-size:12px}.chip:hover{background:#D3EFEC}
+.det{padding-bottom:10px}.det-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}.det-h h3{margin:0}.det-h em{font-style:normal;color:#605E5C;font-weight:400;font-size:12px;margin-left:6px}.det-h .hint{font-weight:400;color:#8A8886}
+.det-t{display:flex;gap:8px}.det-t input{background:#fff;color:#252423;border:1px solid #8A8886;border-radius:2px;padding:5px 8px;font-size:12.5px;width:210px}
+.mini{background:#fff;border:1px solid #8A8886;border-radius:2px;padding:5px 12px;font-size:12.5px;cursor:pointer;color:#252423}.mini:hover{background:#F3F2F1}.mini:disabled{opacity:.4;cursor:default}
+.srt{cursor:pointer;user-select:none}.srt:hover{color:#252423}
+.pgn{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:8px;font-size:12px;color:#605E5C}
+.pl{display:inline-block;border-radius:99px;padding:1px 9px;font-size:11px;font-weight:600}
+.tb a{color:#106EBE;text-decoration:none}.tb a:hover{text-decoration:underline}
+.slim .hb{max-width:520px}
+@media(max-width:1000px){.g5{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -424,16 +443,15 @@ async function cfg(d) {
   $('#b1').onclick = async () => { if (!confirm('Isso processa TODAS as empresas e pode criar milhares de cards. Continuar?')) return; $('#out').textContent = 'Sincronizando…'; try { const r = await api('/api/sincronizar', { method: 'POST', body: {} }); $('#out').textContent = `${r.length} empresa(s) processada(s); ${r.reduce((a, x) => a + (x.criados?.length || 0), 0)} card(s) criado(s).`; } catch (e) { $('#out').textContent = e.message; } };
   $('#b2').onclick = async () => { $('#out').textContent = 'Rodando…'; try { $('#out').textContent = JSON.stringify(await api('/api/job', { method: 'POST', body: { forcar: true } })); } catch (e) { $('#out').textContent = e.message; } };
 }
-// ================= Dashboard (visual no estilo Power BI) =================
+// ================= Dashboard (estilo Power BI, com filtro cruzado e detalhamento) =================
 const PBI = ['#01B8AA', '#374649', '#FD625E', '#F2C80F', '#5F6B6D', '#8AD4EB', '#FE9666', '#A66999'];
 const COR = { atrasada: '#FD625E', dia: '#F2C80F', aguardando: '#01B8AA', finalizado: '#374649' };
-const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', resp: '', tipo: '', classe: '' } };
+const SIT = { atrasada: 'Atrasada', dia: 'Hoje', aguardando: 'No prazo', finalizado: 'Finalizada' };
+const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', resp: '', tipo: '', classe: '' }, sel: {}, tab: { col: null, dir: 1, q: '', pg: 0 } };
 const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
-async function dashboard() {
-  DB.dados = await api('/api/dashboard');
-  dashDesenha();
-}
+const SELNOME = { seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
+async function dashboard() { DB.dados = await api('/api/dashboard'); dashDesenha(); }
 function mesesLista(n, hoje) {
   const [y, m] = hoje.split('-').map(Number), out = [];
   for (let i = n - 1; i >= 0; i--) { const d = new Date(y, m - 1 - i, 1); out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
@@ -441,113 +459,193 @@ function mesesLista(n, hoje) {
 }
 const mesCurto = k => ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][+k.slice(5) - 1] + '/' + k.slice(2, 4);
 const contar = (arr, fn) => { const o = new Map(); arr.forEach(x => { const k = fn(x); if (k === '' || k == null) return; o.set(k, (o.get(k) || 0) + 1); }); return [...o.entries()].sort((a, b) => b[1] - a[1]); };
+const AGING = [['1 a 7 dias', 1, 7], ['8 a 15 dias', 8, 15], ['16 a 30 dias', 16, 30], ['Mais de 30 dias', 31, 1e9]];
 
-// --- componentes visuais ---
-const vz = (titulo, corpo, cls = '') => `<section class="vz ${cls}"><h3>${esc(titulo)}</h3>${corpo}</section>`;
-const kpi = (rot, val, sub, cor) => `<section class="vz kp"><div class="kv" style="${cor ? `color:${cor}` : ''}">${val}</div><div class="kl">${esc(rot)}</div>${sub ? `<div class="ks">${sub}</div>` : ''}</section>`;
-function hbar(dados, { cor = PBI[0], max, fmt: f = nf } = {}) {
-  if (!dados.length) return '<div class="vz-vazio">Sem dados</div>';
-  const m = max || Math.max(...dados.map(d => d[1]), 1);
-  return `<div class="hb">${dados.map(([k, v, c]) => `<div class="hr" title="${esc(k)}: ${f(v)}"><span class="hl">${esc(k)}</span><span class="ht"><i style="width:${Math.max(1.5, v / m * 100)}%;background:${c || cor}"></i></span><b>${f(v)}</b></div>`).join('')}</div>`;
+// --- seleção (filtro cruzado): clicar em qualquer barra/fatia/KPI filtra a página; clicar de novo limpa ---
+const selOn = (keys, vals) => keys.every((k, i) => String(DB.sel[k]) === String(vals[i]));
+const selAny = keys => keys.some(k => DB.sel[k] !== undefined);
+function sa(keys, vals, extra = '') { // atributos de um elemento clicável
+  const ks = [].concat(keys), vs = [].concat(vals), on = selOn(ks, vs), dim = selAny(ks) && !on;
+  return `data-sel="${ks.join('|')}" data-val="${vs.map(v => esc(v)).join('|')}" class="clk ${extra} ${on ? 'on' : ''} ${dim ? 'dim' : ''}"`;
 }
-function hstack(linhas, series) { // linhas: [{rot, valores:{serie:n}}]
+function clicou(el) {
+  const ks = el.dataset.sel.split('|'), vs = el.dataset.val.split('|');
+  if (selOn(ks, vs)) ks.forEach(k => delete DB.sel[k]); else ks.forEach((k, i) => { DB.sel[k] = vs[i]; });
+  DB.tab.pg = 0; dashDesenha();
+}
+
+// --- filtros: slicers + seleção. 'ex' = dimensões ignoradas (o visual em que se clicou mostra todas as categorias, com destaque) ---
+function dashFiltra(ex = []) {
+  const d = DB.dados, f = DB.f, s = DB.sel, meses = mesesLista(f.meses, d.hoje), ini = meses[0] + '-01';
+  const u = k => s[k] !== undefined && !ex.includes(k);
+  const okC = c => (!f.seg || c.segmento === f.seg) && (!f.resp || String(c.resp) === f.resp) && (!f.tipo || (c.tipo || '').toLowerCase() === f.tipo) && (!f.classe || c.classe === f.classe)
+    && (!u('seg') || c.segmento === s.seg) && (!u('cargo') || c.cargo === s.cargo) && (!u('situacao') || c.situacao === s.situacao) && (!u('resp') || String(c.resp) === s.resp) && (!u('classe') || c.classe === s.classe)
+    && (!u('semana') || (c.situacao !== 'atrasada' && c.situacao !== 'finalizado' && c.dias != null && Math.floor(c.dias / 7) === +s.semana))
+    && (!u('aging') || (c.situacao === 'atrasada' && -c.dias >= AGING[+s.aging][1] && -c.dias <= AGING[+s.aging][2]));
+  const cards = d.cards.filter(okC);
+  const visitas = d.visitas.filter(v => (!f.seg || v.segmento === f.seg) && (!f.resp || String(v.resp) === f.resp) && v.dia && v.dia >= ini
+    && (!u('seg') || v.segmento === s.seg) && (!u('cargo') || v.cargo === s.cargo) && (!u('resp') || String(v.resp) === s.resp) && (!u('mes') || v.dia.slice(0, 7) === s.mes)
+    && (!u('ant') || String(!!v.antecipada) === s.ant) && (!u('prazo') || (s.prazo === 'fora' ? v.desvio > 0 : (v.desvio === null || v.desvio <= 0))));
+  const reprog = d.reprog.filter(r => (!f.seg || r.segmento === f.seg) && r.at.slice(0, 10) >= ini
+    && (!u('seg') || r.segmento === s.seg) && (!u('mes') || r.at.slice(0, 7) === s.mes) && (!u('motivo') || r.motivo === s.motivo) && (!u('quem') || r.quem === s.quem));
+  return { meses, cards, visitas, reprog, abertos: cards.filter(c => c.situacao !== 'finalizado') };
+}
+
+// --- componentes ---
+const vz = (titulo, corpo, cls = '') => `<section class="vz ${cls}"><h3>${esc(titulo)}</h3>${corpo}</section>`;
+function kpi(rot, val, sub, cor, keys, vals, delta) {
+  const dl = delta === undefined || delta === null ? '' : `<span class="dl ${delta > 0 ? 'up' : delta < 0 ? 'dn' : ''}">${delta > 0 ? '▲' : delta < 0 ? '▼' : '■'} ${Math.abs(delta)}%</span>`;
+  return `<section ${keys ? sa(keys, vals, 'vz kp') : 'class="vz kp"'}><div class="kv" style="${cor ? `color:${cor}` : ''}">${val}${dl}</div><div class="kl">${esc(rot)}</div>${sub ? `<div class="ks">${sub}</div>` : ''}</section>`;
+}
+function hbar(dados, { cor = PBI[0], keys, f: fm = nf } = {}) { // dados: [rótulo, valor, cor?, valorSel?]
+  if (!dados.length) return '<div class="vz-vazio">Sem dados</div>';
+  const m = Math.max(...dados.map(d => d[1]), 1);
+  return `<div class="hb">${dados.map(([k, v, c, sv]) => `<div ${keys ? sa(keys, [sv ?? k]) : ''} title="${esc(k)}: ${fm(v)}"><div class="hr"><span class="hl">${esc(k)}</span><span class="ht"><i style="width:${Math.max(1.5, v / m * 100)}%;background:${c || cor}"></i></span><b>${fm(v)}</b></div></div>`).join('')}</div>`;
+}
+function hstack(linhas, series, keyLinha) { // clicar no nome filtra a linha; clicar num trecho filtra linha + série
   if (!linhas.length) return '<div class="vz-vazio">Sem dados</div>';
   const m = Math.max(...linhas.map(l => series.reduce((a, s) => a + (l.valores[s.k] || 0), 0)), 1);
-  return `<div class="hb">${linhas.map(l => { const tot = series.reduce((a, s) => a + (l.valores[s.k] || 0), 0); return `<div class="hr" title="${esc(l.rot)}: ${series.map(s => s.nome + ' ' + (l.valores[s.k] || 0)).join(' · ')}"><span class="hl">${esc(l.rot)}</span><span class="ht" style="background:transparent"><span class="stk" style="width:${Math.max(1.5, tot / m * 100)}%">${series.map(s => (l.valores[s.k] || 0) ? `<i style="flex:${l.valores[s.k]};background:${s.cor}"></i>` : '').join('')}</span></span><b>${nf(tot)}</b></div>`; }).join('')}</div><div class="lg">${series.map(s => `<span><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
+  return `<div class="hb">${linhas.map(l => { const tot = series.reduce((a, s) => a + (l.valores[s.k] || 0), 0);
+    return `<div class="hr"><span class="hl"><span ${sa([keyLinha], [l.rot])} style="cursor:pointer">${esc(l.rot)}</span></span><span class="ht" style="background:transparent"><span class="stk" style="width:${Math.max(1.5, tot / m * 100)}%">${series.map(s => (l.valores[s.k] || 0) ? `<i ${sa([keyLinha, s.sel], [l.rot, s.k])} title="${esc(l.rot)} · ${esc(s.nome)}: ${l.valores[s.k]}" style="flex:${l.valores[s.k]};background:${s.cor}"></i>` : '').join('')}</span></span><b>${nf(tot)}</b></div>`; }).join('')}</div><div class="lg">${series.map(s => `<span ${sa([s.sel], [s.k])} style="cursor:pointer"><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
 }
-function colunas(rotulos, series) { // series: [{nome, cor, valores:[...]}] empilhadas
-  const W = 560, H = 210, L = 30, B = 26, T = 12, n = rotulos.length;
+function colunas(rotulos, valoresChave, series, selKey) { // empilhadas; clicar na coluna filtra por selKey = valoresChave[i]
+  const W = 560, H = 210, L = 30, B = 26, T = 14, n = rotulos.length;
   const tot = rotulos.map((_, i) => series.reduce((a, s) => a + (s.valores[i] || 0), 0)), m = Math.max(...tot, 1);
-  const bw = Math.min(46, (W - L) / n * .62), passo = (W - L) / n;
-  const ticks = [0, .5, 1].map(f => Math.round(m * f));
-  let g = ticks.map(t => { const y = T + (H - T - B) * (1 - t / m); return `<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="#E1DFDD" stroke-width="1"/><text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#605E5C">${t}</text>`; }).join('');
+  const passo = (W - L) / n, bw = Math.min(46, passo * .62);
+  let g = [0, .5, 1].map(f => Math.round(m * f)).map(t => { const y = T + (H - T - B) * (1 - t / m); return `<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="#E1DFDD"/><text x="${L - 6}" y="${y + 4}" text-anchor="end" font-size="10" fill="#605E5C">${t}</text>`; }).join('');
   rotulos.forEach((r, i) => {
-    let y0 = H - B; const x = L + passo * i + (passo - bw) / 2;
+    const x = L + passo * i + (passo - bw) / 2, key = valoresChave[i];
+    let y0 = H - B;
+    const on = DB.sel[selKey] !== undefined && String(DB.sel[selKey]) === String(key), dim = DB.sel[selKey] !== undefined && !on;
+    g += `<g data-sel="${selKey}" data-val="${esc(key)}" class="clk ${on ? 'on' : ''} ${dim ? 'dim' : ''}"><rect x="${x - 3}" y="${T}" width="${bw + 6}" height="${H - T - B}" fill="transparent"/>`;
     series.forEach(s => { const v = s.valores[i] || 0, h = (H - T - B) * v / m; if (v) g += `<rect x="${x}" y="${y0 - h}" width="${bw}" height="${h}" fill="${s.cor}"><title>${esc(r)} · ${esc(s.nome)}: ${v}</title></rect>`; y0 -= h; });
     if (tot[i]) g += `<text x="${x + bw / 2}" y="${y0 - 4}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#252423">${tot[i]}</text>`;
-    g += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#605E5C">${esc(r)}</text>`;
+    g += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="10" fill="#605E5C">${esc(r)}</text></g>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" class="col" role="img">${g}</svg>${series.length > 1 ? `<div class="lg">${series.map(s => `<span><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('')}</div>` : ''}`;
 }
-function rosca(fatias) { // [{nome, valor, cor}]
+function rosca(fatias, selKey) { // [{nome, valor, cor, val}]
   const total = fatias.reduce((a, f) => a + f.valor, 0);
   if (!total) return '<div class="vz-vazio">Sem dados</div>';
   const R0 = 62, r0 = 38, c = 80; let ang = -Math.PI / 2, arcos = '';
   fatias.filter(f => f.valor).forEach(f => {
-    const a = f.valor / total * Math.PI * 2, e = ang + a, big = a > Math.PI ? 1 : 0;
-    const p = (r, t) => `${c + r * Math.cos(t)} ${c + r * Math.sin(t)}`;
-    arcos += f.valor === total ? `<circle cx="${c}" cy="${c}" r="${(R0 + r0) / 2}" fill="none" stroke="${f.cor}" stroke-width="${R0 - r0}"><title>${esc(f.nome)}: ${f.valor}</title></circle>` : `<path d="M${p(R0, ang)} A${R0} ${R0} 0 ${big} 1 ${p(R0, e)} L${p(r0, e)} A${r0} ${r0} 0 ${big} 0 ${p(r0, ang)} Z" fill="${f.cor}"><title>${esc(f.nome)}: ${f.valor} (${pct(f.valor, total)}%)</title></path>`;
+    const a = f.valor / total * Math.PI * 2, e = ang + a, big = a > Math.PI ? 1 : 0, p = (r, t) => `${c + r * Math.cos(t)} ${c + r * Math.sin(t)}`;
+    const at = selKey ? sa([selKey], [f.val ?? f.nome]) : '';
+    arcos += f.valor === total ? `<circle ${at} cx="${c}" cy="${c}" r="${(R0 + r0) / 2}" fill="none" stroke="${f.cor}" stroke-width="${R0 - r0}"><title>${esc(f.nome)}: ${f.valor}</title></circle>` : `<path ${at} d="M${p(R0, ang)} A${R0} ${R0} 0 ${big} 1 ${p(R0, e)} L${p(r0, e)} A${r0} ${r0} 0 ${big} 0 ${p(r0, ang)} Z" fill="${f.cor}"><title>${esc(f.nome)}: ${f.valor} (${pct(f.valor, total)}%)</title></path>`;
     ang = e;
   });
-  return `<div class="ro"><svg viewBox="0 0 160 160"><g>${arcos}</g><text x="${c}" y="${c - 2}" text-anchor="middle" font-size="22" font-weight="600" fill="#252423">${nf(total)}</text><text x="${c}" y="${c + 14}" text-anchor="middle" font-size="9.5" fill="#605E5C">total</text></svg><div class="rl">${fatias.map(f => `<div><i style="background:${f.cor}"></i><span>${esc(f.nome)}</span><b>${nf(f.valor)}</b><em>${pct(f.valor, total)}%</em></div>`).join('')}</div></div>`;
+  return `<div class="ro"><svg viewBox="0 0 160 160"><g>${arcos}</g><text x="${c}" y="${c - 2}" text-anchor="middle" font-size="22" font-weight="600" fill="#252423">${nf(total)}</text><text x="${c}" y="${c + 14}" text-anchor="middle" font-size="9.5" fill="#605E5C">total</text></svg><div class="rl">${fatias.map(f => `<div ${selKey ? sa([selKey], [f.val ?? f.nome]) : ''}><i style="background:${f.cor}"></i><span>${esc(f.nome)}</span><b>${nf(f.valor)}</b><em>${pct(f.valor, total)}%</em></div>`).join('')}</div></div>`;
 }
-const tabela = (cab, linhas) => `<div class="tb"><table><tr>${cab.map(c => `<th>${esc(c)}</th>`).join('')}</tr>${linhas.map(l => `<tr>${l.map(c => `<td>${c}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cab.length}" class="vz-vazio">Sem dados</td></tr>`}</table></div>`;
 
-function dashFiltra() {
-  const d = DB.dados, f = DB.f, meses = mesesLista(f.meses, d.hoje), ini = meses[0] + '-01';
-  const okC = c => (!f.seg || c.segmento === f.seg) && (!f.resp || String(c.resp) === f.resp) && (!f.tipo || (c.tipo || '').toLowerCase() === f.tipo) && (!f.classe || c.classe === f.classe);
-  const cards = d.cards.filter(okC);
-  const visitas = d.visitas.filter(v => (!f.seg || v.segmento === f.seg) && (!f.resp || String(v.resp) === f.resp) && v.dia && v.dia >= ini);
-  const reprog = d.reprog.filter(r => (!f.seg || r.segmento === f.seg) && r.at.slice(0, 10) >= ini);
-  return { meses, cards, visitas, reprog, abertos: cards.filter(c => c.situacao !== 'finalizado') };
+// --- tabela de detalhamento (drill-through): lista os registros por trás dos números, com busca, ordenação, CSV e links ---
+function detalhe(linhas, cols, nomeArq) {
+  const t = DB.tab, q = t.q.toLowerCase();
+  let rows = linhas.filter(r => !q || cols.some(c => String(c.txt(r)).toLowerCase().includes(q)));
+  if (t.col !== null) { const c = cols[t.col]; rows = [...rows].sort((a, b) => { const x = c.ord ? c.ord(a) : c.txt(a), y = c.ord ? c.ord(b) : c.txt(b); return (x > y ? 1 : x < y ? -1 : 0) * t.dir; }); }
+  const PG = 12, pgs = Math.max(1, Math.ceil(rows.length / PG)); if (t.pg >= pgs) t.pg = pgs - 1;
+  DB.exportar = () => { const q2 = x => `"${String(x ?? '').replace(/"/g, '""')}"`; const csv = [cols.map(c => c.h).join(';'), ...rows.map(r => cols.map(c => q2(c.txt(r))).join(';'))].join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = nomeArq + '.csv'; a.click(); };
+  const filtros = Object.entries(DB.sel).map(([k, v]) => `${SELNOME[k] || k}: ${selTxt(k, v)}`).join(' · ');
+  return `<section class="vz det"><div class="det-h"><h3>Detalhamento <em>${nf(rows.length)} registro(s)</em>${filtros ? `<span class="hint"> — filtrado por ${esc(filtros)}</span>` : ''}</h3>
+    <div class="det-t"><input id="dq" type="search" placeholder="Buscar nos registros…" value="${esc(t.q)}"><button class="mini" id="dx">Exportar CSV</button></div></div>
+    <div class="tb"><table><tr>${cols.map((c, i) => `<th data-col="${i}" class="srt">${esc(c.h)}${t.col === i ? (t.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr>${rows.slice(t.pg * PG, t.pg * PG + PG).map(r => `<tr>${cols.map(c => `<td>${c.html ? c.html(r) : esc(c.txt(r))}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="vz-vazio">Nenhum registro neste filtro.</td></tr>`}</table></div>
+    <div class="pgn"><button class="mini" data-pn="-1" ${t.pg <= 0 ? 'disabled' : ''}>‹ Anterior</button><span>Página ${t.pg + 1} de ${pgs}</span><button class="mini" data-pn="1" ${t.pg >= pgs - 1 ? 'disabled' : ''}>Próxima ›</button></div></section>`;
 }
-function paginaFila(F) {
-  const ab = F.abertos, atr = ab.filter(c => c.situacao === 'atrasada'), hoje = ab.filter(c => c.situacao === 'dia'), prox = ab.filter(c => c.situacao === 'aguardando');
+function selTxt(k, v) { if (k === 'situacao') return SIT[v] || v; if (k === 'semana') return +v === 0 ? 'esta semana' : `+${v} semana(s)`; if (k === 'aging') return AGING[+v][0]; if (k === 'mes') return mesCurto(v); if (k === 'ant') return v === 'true' ? 'Antecipadas' : 'Na data/depois'; if (k === 'prazo') return v === 'fora' ? 'Fora do prazo' : 'No prazo'; if (k === 'resp') { const x = DB.dados.cards.find(c => String(c.resp) === v) || DB.dados.visitas.find(c => String(c.resp) === v); return x ? x.respNome : v; } return v; }
+const lk = (url, t) => url ? `<a href="${esc(url)}" target="_top">${esc(t)}</a>` : esc(t);
+const urlE = id => id && DB.dados.base ? `${DB.dados.base}/crm/company/details/${id}/` : null;
+const urlC = id => id && DB.dados.base ? `${DB.dados.base}/crm/type/1036/details/${id}/` : null;
+const pill = (sit) => `<span class="pl" style="background:${COR[sit]};color:${sit === 'dia' ? '#2b1d00' : '#fff'}">${SIT[sit]}</span>`;
+
+function paginaFila() {
+  const F = dashFiltra(), ab = F.abertos, atr = ab.filter(c => c.situacao === 'atrasada'), hoje = ab.filter(c => c.situacao === 'dia'), prox = ab.filter(c => c.situacao === 'aguardando');
   const p7 = prox.filter(c => c.dias != null && c.dias <= 7).length;
-  const segs = [...new Set(ab.map(c => c.segmento))].filter(Boolean);
-  const ser = [{ k: 'atrasada', nome: 'Atrasada', cor: COR.atrasada }, { k: 'dia', nome: 'Hoje', cor: COR.dia }, { k: 'aguardando', nome: 'No prazo', cor: COR.aguardando }];
-  const porResp = contar(atr, c => c.respNome).slice(0, 8);
-  const semanas = Array.from({ length: 8 }, (_, i) => i), rotS = semanas.map(i => i === 0 ? 'Esta sem.' : `+${i} sem.`);
-  const vencem = semanas.map(i => ab.filter(c => c.situacao !== 'atrasada' && c.dias != null && Math.floor(c.dias / 7) === i).length);
-  const aging = [['1 a 7 dias', 1, 7], ['8 a 15 dias', 8, 15], ['16 a 30 dias', 16, 30], ['Mais de 30 dias', 31, 1e9]].map(([r, a, b]) => [r, atr.filter(c => -c.dias >= a && -c.dias <= b).length, COR.atrasada]);
-  const topo = [...atr].sort((a, b) => a.dias - b.dias).slice(0, 8);
-  return `<div class="g4">${kpi('Visitas em aberto', nf(ab.length), '', '#252423')}${kpi('Atrasadas', nf(atr.length), `${pct(atr.length, ab.length)}% da fila`, COR.atrasada)}${kpi('Visitas hoje', nf(hoje.length), '', '#B58B00')}${kpi('Próximos 7 dias', nf(p7), '', COR.aguardando)}</div>
-   <div class="g3">${vz('Situação da fila', rosca([{ nome: 'Atrasadas', valor: atr.length, cor: COR.atrasada }, { nome: 'Hoje', valor: hoje.length, cor: COR.dia }, { nome: 'No prazo', valor: prox.length, cor: COR.aguardando }]))}
-     ${vz('Fila por segmento', hstack(segs.map(s => ({ rot: s, valores: Object.fromEntries(ser.map(x => [x.k, ab.filter(c => c.segmento === s && c.situacao === x.k).length])) })), ser))}
-     ${vz('Fila por cargo', hstack(['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'].map(g => ({ rot: g, valores: Object.fromEntries(ser.map(x => [x.k, ab.filter(c => c.cargo === g && c.situacao === x.k).length])) })).filter(l => Object.values(l.valores).some(Boolean)), ser))}</div>
-   <div class="g3">${vz('Vencimentos nas próximas 8 semanas', colunas(rotS, [{ nome: 'Visitas', cor: PBI[0], valores: vencem }]))}
-     ${vz('Atrasadas por responsável', hbar(porResp, { cor: COR.atrasada }))}
-     ${vz('Tempo de atraso', hbar(aging))}</div>
-   <div class="g2">${vz('Fila por classe', hbar(['A', 'B', 'C'].map(k => [`Classe ${k}`, ab.filter(c => c.classe === k).length, PBI[['A', 'B', 'C'].indexOf(k)]])))}
-     ${vz('Maiores atrasos', tabela(['Empresa', 'Segmento', 'Cargo', 'Responsável', 'Atraso'], topo.map(c => [esc(c.empresa), esc(c.segmento), esc(c.cargo), esc(c.respNome), `<b style="color:${COR.atrasada}">${-c.dias} d</b>`])))}</div>`;
+  const mediaAtr = atr.length ? Math.round(atr.reduce((a, c) => a - c.dias, 0) / atr.length) : 0;
+  const ser = [{ k: 'atrasada', nome: 'Atrasada', cor: COR.atrasada, sel: 'situacao' }, { k: 'dia', nome: 'Hoje', cor: COR.dia, sel: 'situacao' }, { k: 'aguardando', nome: 'No prazo', cor: COR.aguardando, sel: 'situacao' }];
+  const aoutros = ex => dashFiltra(ex).abertos;
+  const linhas = (key, valores, getter) => { const base = aoutros([key, 'situacao']); return valores.map(v => ({ rot: v, valores: Object.fromEntries(ser.map(x => [x.k, base.filter(c => getter(c) === v && c.situacao === x.k).length])) })).filter(l => Object.values(l.valores).some(Boolean)); };
+  const segs = [...new Set(DB.dados.cards.map(c => c.segmento))].filter(Boolean).sort();
+  const respAtr = contar(aoutros(['resp']).filter(c => c.situacao === 'atrasada'), c => c.respNome).slice(0, 8).map(([n, v]) => [n, v, COR.atrasada, String((DB.dados.cards.find(c => c.respNome === n) || {}).resp)]);
+  const semBase = aoutros(['semana']).filter(c => c.situacao !== 'atrasada'), rotS = Array.from({ length: 8 }, (_, i) => i === 0 ? 'Esta sem.' : `+${i} sem.`);
+  const vencem = rotS.map((_, i) => semBase.filter(c => c.dias != null && Math.floor(c.dias / 7) === i).length);
+  const agBase = aoutros(['aging', 'situacao']).filter(c => c.situacao === 'atrasada');
+  const cl = aoutros(['classe']);
+  const dets = [...F.cards].sort((a, b) => (a.situacao === 'atrasada' ? -1 : 0) - (b.situacao === 'atrasada' ? -1 : 0) || (a.dias ?? 9e9) - (b.dias ?? 9e9));
+  const SO = { atrasada: 0, dia: 1, aguardando: 2, finalizado: 3 };
+  return `<div class="g5">${kpi('Visitas em aberto', nf(ab.length), 'fila total (clique para ver todas)', '#252423', ['situacao'], ['__todas'])}${kpi('Atrasadas', nf(atr.length), `${pct(atr.length, ab.length)}% da fila`, COR.atrasada, ['situacao'], ['atrasada'])}${kpi('Visitas hoje', nf(hoje.length), '', '#B58B00', ['situacao'], ['dia'])}${kpi('Próximos 7 dias', nf(p7), `${nf(prox.length)} no prazo no total`, COR.aguardando, ['situacao'], ['aguardando'])}${kpi('Atraso médio', mediaAtr ? mediaAtr + ' dias' : '—', atr.length ? `maior: ${Math.max(...atr.map(c => -c.dias))} dias` : 'nenhuma atrasada', mediaAtr ? COR.atrasada : '#252423')}</div>
+   <div class="g3">${vz('Situação da fila', rosca([{ nome: 'Atrasadas', valor: aoutros(['situacao']).filter(c => c.situacao === 'atrasada').length, cor: COR.atrasada, val: 'atrasada' }, { nome: 'Hoje', valor: aoutros(['situacao']).filter(c => c.situacao === 'dia').length, cor: COR.dia, val: 'dia' }, { nome: 'No prazo', valor: aoutros(['situacao']).filter(c => c.situacao === 'aguardando').length, cor: COR.aguardando, val: 'aguardando' }], 'situacao'))}
+     ${vz('Fila por segmento', hstack(linhas('seg', segs, c => c.segmento), ser, 'seg'))}
+     ${vz('Fila por cargo', hstack(linhas('cargo', ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'], c => c.cargo), ser, 'cargo'))}</div>
+   <div class="g3">${vz('Vencimentos nas próximas 8 semanas', colunas(rotS, rotS.map((_, i) => i), [{ nome: 'Visitas', cor: PBI[0], valores: vencem }], 'semana'))}
+     ${vz('Atrasadas por responsável', hbar(respAtr, { keys: ['resp'] }))}
+     ${vz('Tempo de atraso', hbar(AGING.map(([r, a, b], i) => [r, agBase.filter(c => -c.dias >= a && -c.dias <= b).length, COR.atrasada, i]), { keys: ['aging'] }))}</div>
+   ${vz('Fila por classe', hbar(['A', 'B', 'C'].map((k, i) => [`Classe ${k}`, cl.filter(c => c.classe === k).length, PBI[i], k]), { keys: ['classe'] }), 'slim')}
+   ${detalhe(dets, [
+    { h: 'Empresa', txt: r => r.empresa, html: r => lk(urlE(r.empresaId), r.empresa) }, { h: 'Segmento', txt: r => r.segmento }, { h: 'Cargo', txt: r => r.cargo }, { h: 'Classe', txt: r => r.classe },
+    { h: 'Responsável', txt: r => r.respNome }, { h: 'Programada', txt: r => (r.data || '').split('-').reverse().join('/'), ord: r => r.data || '' },
+    { h: 'Situação', txt: r => SIT[r.situacao], html: r => pill(r.situacao), ord: r => SO[r.situacao] },
+    { h: 'Prazo', txt: r => r.situacao === 'finalizado' ? '' : r.dias < 0 ? `${-r.dias} dia(s) de atraso` : r.dias === 0 ? 'Hoje' : `em ${r.dias} dia(s)`, ord: r => r.dias ?? 9e9 },
+    { h: 'Card', txt: () => 'Abrir', html: r => lk(urlC(r.id), 'Abrir card') }], 'fila-de-visitas')}`;
 }
-function paginaReg(F) {
-  const v = F.visitas, ant = v.filter(x => x.antecipada).length, comDesvio = v.filter(x => x.desvio !== null), noPrazo = comDesvio.filter(x => x.desvio <= 0).length, atr = comDesvio.filter(x => x.desvio > 0);
+function paginaReg() {
+  const F = dashFiltra(), v = F.visitas;
+  const ant = v.filter(x => x.antecipada).length, cd = v.filter(x => x.desvio !== null), np = cd.filter(x => x.desvio <= 0).length, atr = cd.filter(x => x.desvio > 0);
   const media = atr.length ? Math.round(atr.reduce((a, x) => a + x.desvio, 0) / atr.length) : 0;
-  const cx = F.meses.map(m => v.filter(x => x.dia.slice(0, 7) === m));
-  const sh = x => ({ nome: x.nome, cor: x.cor, valores: x.valores });
-  const segs = contar(v, x => x.segmento).map(([k, n], i) => [k, n, PBI[i % PBI.length]]);
-  const porVend = contar(v, x => x.respNome).slice(0, 10);
-  const ult = [...v].sort((a, b) => b.quando.localeCompare(a.quando)).slice(0, 8);
-  return `<div class="g4">${kpi('Visitas registradas', nf(v.length), `últimos ${DB.f.meses} meses`, '#252423')}${kpi('Visitas antecipadas', nf(ant), `${pct(ant, v.length)}% do total`, PBI[0])}${kpi('Cumprimento no prazo', comDesvio.length ? pct(noPrazo, comDesvio.length) + '%' : '—', 'realizadas até a data programada', PBI[0])}${kpi('Atraso médio', atr.length ? media + ' dias' : '—', `${nf(atr.length)} visita(s) fora do prazo`, atr.length ? COR.atrasada : '#252423')}</div>
-   <div class="g2w">${vz('Visitas por mês', colunas(F.meses.map(mesCurto), [{ nome: 'No prazo / antecipadas', cor: PBI[0], valores: cx.map(a => a.filter(x => x.desvio === null || x.desvio <= 0).length) }, { nome: 'Fora do prazo', cor: COR.atrasada, valores: cx.map(a => a.filter(x => x.desvio > 0).length) }]))}
-     ${vz('Antecipada x programada', rosca([{ nome: 'Antecipadas', valor: ant, cor: PBI[0] }, { nome: 'Na data / depois', valor: v.length - ant, cor: PBI[1] }]))}</div>
-   <div class="g3">${vz('Visitas por segmento', hbar(segs))}${vz('Visitas por vendedor', hbar(porVend))}${vz('Visitas por cargo', rosca(contar(v, x => x.cargo).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] }))))}</div>
-   ${vz('Últimas visitas registradas', tabela(['Quando', 'Vendedor', 'Segmento', 'Cargo', 'Prazo'], ult.map(x => [new Date(x.quando).toLocaleString('pt-BR'), esc(x.respNome), esc(x.segmento), esc(x.cargo || '—'), x.desvio === null ? '—' : x.desvio < 0 ? `<b style="color:#018F83">${-x.desvio} d antes</b>` : x.desvio === 0 ? 'No dia' : `<b style="color:${COR.atrasada}">${x.desvio} d depois</b>`])))}`;
+  const mesAtual = DB.dados.hoje.slice(0, 7), mesAnt = (() => { const [y, m] = mesAtual.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
+  const nA = v.filter(x => x.dia.slice(0, 7) === mesAtual).length, nP = v.filter(x => x.dia.slice(0, 7) === mesAnt).length;
+  const vendedores = new Set(v.map(x => x.resp)).size;
+  const vo = ex => dashFiltra(ex).visitas;
+  const mm = F.meses, cx = mm.map(m => vo(['mes']).filter(x => x.dia.slice(0, 7) === m));
+  const segs = contar(vo(['seg']), x => x.segmento).map(([k, n], i) => [k, n, PBI[i % PBI.length]]);
+  const porVend = contar(vo(['resp']), x => x.respNome).slice(0, 10).map(([n, k]) => [n, k, PBI[0], String((DB.dados.visitas.find(x => x.respNome === n) || {}).resp)]);
+  const antBase = vo(['ant']);
+  const det = [...v].sort((a, b) => b.quando.localeCompare(a.quando));
+  return `<div class="g5">${kpi('Visitas registradas', nf(v.length), `últimos ${DB.f.meses} meses`, '#252423')}${kpi('Visitas no mês', nf(nA), `mês anterior: ${nf(nP)}`, PBI[0], ['mes'], [mesAtual], nP ? Math.round((nA - nP) / nP * 100) : null)}${kpi('Visitas antecipadas', nf(ant), `${pct(ant, v.length)}% do total`, PBI[0], ['ant'], ['true'])}${kpi('Cumprimento no prazo', cd.length ? pct(np, cd.length) + '%' : '—', 'realizadas até a data programada', PBI[0], ['prazo'], ['no'])}${kpi('Atraso médio', atr.length ? media + ' dias' : '—', `${nf(atr.length)} fora do prazo · ${nf(vendedores)} vendedor(es)`, atr.length ? COR.atrasada : '#252423', ['prazo'], ['fora'])}</div>
+   <div class="g2w">${vz('Visitas por mês', colunas(mm.map(mesCurto), mm, [{ nome: 'No prazo / antecipadas', cor: PBI[0], valores: cx.map(a => a.filter(x => x.desvio === null || x.desvio <= 0).length) }, { nome: 'Fora do prazo', cor: COR.atrasada, valores: cx.map(a => a.filter(x => x.desvio > 0).length) }], 'mes'))}
+     ${vz('Antecipada x programada', rosca([{ nome: 'Antecipadas', valor: antBase.filter(x => x.antecipada).length, cor: PBI[0], val: 'true' }, { nome: 'Na data / depois', valor: antBase.filter(x => !x.antecipada).length, cor: PBI[1], val: 'false' }], 'ant'))}</div>
+   <div class="g3">${vz('Visitas por segmento', hbar(segs, { keys: ['seg'] }))}${vz('Visitas por vendedor', hbar(porVend, { keys: ['resp'] }))}${vz('Visitas por cargo', rosca(contar(vo(['cargo']), x => x.cargo).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] })), 'cargo'))}</div>
+   ${detalhe(det, [
+    { h: 'Quando', txt: r => new Date(r.quando).toLocaleString('pt-BR'), ord: r => r.quando }, { h: 'Empresa', txt: r => r.empresa || '—', html: r => lk(urlE(r.empresaId), r.empresa || '—') }, { h: 'Vendedor', txt: r => r.respNome },
+    { h: 'Segmento', txt: r => r.segmento }, { h: 'Cargo', txt: r => r.cargo || '—' }, { h: 'Programada', txt: r => (r.programada || '').split('-').reverse().join('/'), ord: r => r.programada || '' },
+    { h: 'Prazo', txt: r => r.desvio === null ? '—' : r.desvio < 0 ? `${-r.desvio} dia(s) antes` : r.desvio === 0 ? 'No dia' : `${r.desvio} dia(s) depois`, ord: r => r.desvio ?? 0, html: r => r.desvio === null ? '—' : r.desvio < 0 ? `<b style="color:#018F83">${-r.desvio} d antes</b>` : r.desvio === 0 ? 'No dia' : `<b style="color:${COR.atrasada}">${r.desvio} d depois</b>` }], 'registro-de-visitas')}`;
 }
-function paginaRep(F) {
-  const r = F.reprog, media = r.length ? Math.round(r.reduce((a, x) => a + x.dias, 0) / r.length) : 0;
-  const cx = F.meses.map(m => r.filter(x => x.at.slice(0, 7) === m).length);
-  return `<div class="g4">${kpi('Reprogramações', nf(r.length), `últimos ${DB.f.meses} meses`, '#252423')}${kpi('Vendedores que reprogramaram', nf(new Set(r.map(x => x.quem)).size), '', PBI[0])}${kpi('Adiamento médio', (media > 0 ? '+' : '') + media + ' dias', '', COR.atrasada)}${kpi('Visitas com 2 ou mais trocas', nf(contar(r, x => x.motivo + '|' + x.segmento).filter(([, n]) => n > 1).length), '', PBI[3])}</div>
-   <div class="g2w">${vz('Reprogramações por mês', colunas(F.meses.map(mesCurto), [{ nome: 'Reprogramações', cor: PBI[3], valores: cx }]))}${vz('Por segmento', rosca(contar(r, x => x.segmento).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] }))))}</div>
-   <div class="g2">${vz('Por motivo', hbar(contar(r, x => x.motivo).slice(0, 8), { cor: PBI[3] }))}${vz('Por vendedor', hbar(contar(r, x => x.quem).slice(0, 8), { cor: PBI[1] }))}</div>`;
+function paginaRep() {
+  const F = dashFiltra(), r = F.reprog, mediaD = r.length ? Math.round(r.reduce((a, x) => a + x.dias, 0) / r.length) : 0;
+  const ro = ex => dashFiltra(ex).reprog, mm = F.meses;
+  const det = [...r].sort((a, b) => b.at.localeCompare(a.at));
+  return `<div class="g4">${kpi('Reprogramações', nf(r.length), `últimos ${DB.f.meses} meses`, '#252423')}${kpi('Vendedores que reprogramaram', nf(new Set(r.map(x => x.quem)).size), '', PBI[0])}${kpi('Adiamento médio', (mediaD > 0 ? '+' : '') + mediaD + ' dias', '', COR.atrasada)}${kpi('Motivo mais comum', esc(contar(r, x => x.motivo)[0]?.[0] || '—'), '', PBI[3])}</div>
+   <div class="g2w">${vz('Reprogramações por mês', colunas(mm.map(mesCurto), mm, [{ nome: 'Reprogramações', cor: PBI[3], valores: mm.map(m => ro(['mes']).filter(x => x.at.slice(0, 7) === m).length) }], 'mes'))}${vz('Por segmento', rosca(contar(ro(['seg']), x => x.segmento).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] })), 'seg'))}</div>
+   <div class="g2">${vz('Por motivo', hbar(contar(ro(['motivo']), x => x.motivo).slice(0, 8), { cor: PBI[3], keys: ['motivo'] }))}${vz('Por vendedor', hbar(contar(ro(['quem']), x => x.quem).slice(0, 8), { cor: PBI[1], keys: ['quem'] }))}</div>
+   ${detalhe(det, [{ h: 'Quando', txt: x => new Date(x.at).toLocaleString('pt-BR'), ord: x => x.at }, { h: 'Empresa', txt: x => x.empresa || '—', html: x => lk(urlE(x.empresaId), x.empresa || '—') }, { h: 'Segmento', txt: x => x.segmento }, { h: 'Cargo', txt: x => x.cargo },
+    { h: 'Adiado', txt: x => `${x.dias > 0 ? '+' : ''}${x.dias} dia(s)`, ord: x => x.dias }, { h: 'Motivo', txt: x => x.motivo }, { h: 'Quem', txt: x => x.quem }, { h: 'Card', txt: () => 'Abrir', html: x => lk(urlC(x.card), 'Abrir card') }], 'reprogramacoes')}`;
 }
 function dashDesenha() {
-  const d = DB.dados, f = DB.f, F = dashFiltra();
+  const d = DB.dados, f = DB.f;
+  if (DB.sel.situacao === '__todas') delete DB.sel.situacao;
   const sel = (id, rot, opcoes, cur) => `<label class="sl"><span>${rot}</span><select id="${id}">${opcoes.map(([v, t]) => `<option value="${esc(v)}" ${String(cur) === String(v) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`;
   const segs = [...new Set(d.cards.map(c => c.segmento))].filter(Boolean).sort();
   const resps = [...new Map([...d.cards.map(c => [String(c.resp), c.respNome]), ...d.visitas.map(v => [String(v.resp), v.respNome])]).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const temTipo = d.cards.some(c => c.tipo);
-  const pagina = { fila: paginaFila, reg: paginaReg, rep: paginaRep }[DB.pag](F);
+  const pagina = { fila: paginaFila, reg: paginaReg, rep: paginaRep }[DB.pag]();
+  const chips = Object.entries(DB.sel).map(([k, v]) => `<span class="chip" data-rm="${k}">${esc(SELNOME[k] || k)}: <b>${esc(selTxt(k, v))}</b> ✕</span>`).join('');
+  const scrollY = window.scrollY;
   $('#main').innerHTML = `<div class="pbi">
-    <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${new Date(d.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span></div>
-      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}${sel('s_s', 'Segmento', [['', 'Todos'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar filtros</button></div></div>
+    <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${new Date(d.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · <a href="#" id="s_r2">atualizar</a></span></div>
+      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}${sel('s_s', 'Segmento', [['', 'Todos'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
+    ${chips ? `<div class="chips-bar"><span>Filtros aplicados:</span>${chips}</div>` : '<div class="chips-bar dica">Dica: clique em qualquer barra, fatia, coluna ou indicador para filtrar a página e ver os registros abaixo.</div>'}
     <div class="pbi-cv">${pagina}</div>
-    <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Reprogramações']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}<span class="pbi-ver">Atualiza a cada abertura</span></div></div>`;
-  const lig = (id, k, num) => { const e = $('#' + id); if (e) e.onchange = () => { f[k] = num ? +e.value : e.value; dashDesenha(); }; };
+    <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Reprogramações']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div></div>`;
+  const lig = (id, k, num) => { const e = $('#' + id); if (e) e.onchange = () => { f[k] = num ? +e.value : e.value; DB.tab.pg = 0; dashDesenha(); }; };
   lig('s_m', 'meses', true); lig('s_s', 'seg'); lig('s_r', 'resp'); lig('s_t', 'tipo'); lig('s_c', 'classe');
-  $('#s_x').onclick = () => { Object.assign(f, { meses: 6, seg: '', resp: '', tipo: '', classe: '' }); dashDesenha(); };
-  document.querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { DB.pag = b.dataset.pg; dashDesenha(); });
+  $('#s_x').onclick = () => { Object.assign(f, { meses: 6, seg: '', resp: '', tipo: '', classe: '' }); DB.sel = {}; DB.tab = { col: null, dir: 1, q: '', pg: 0 }; dashDesenha(); };
+  $('#s_r2').onclick = async e => { e.preventDefault(); await dashboard(); };
+  document.querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { DB.pag = b.dataset.pg; DB.sel = {}; DB.tab = { col: null, dir: 1, q: '', pg: 0 }; dashDesenha(); });
+  document.querySelectorAll('[data-rm]').forEach(c => c.onclick = () => { delete DB.sel[c.dataset.rm]; DB.tab.pg = 0; dashDesenha(); });
+  document.querySelectorAll('.pbi [data-sel]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); clicou(el); }));
+  document.querySelectorAll('.srt').forEach(th => th.onclick = () => { const i = +th.dataset.col; DB.tab.dir = DB.tab.col === i ? -DB.tab.dir : 1; DB.tab.col = i; dashDesenha(); });
+  const dq = $('#dq'); if (dq) dq.oninput = () => { DB.tab.q = dq.value; DB.tab.pg = 0; const p = dq.selectionStart; dashDesenha(); const n = $('#dq'); n.focus(); n.setSelectionRange(p, p); };
+  const dx = $('#dx'); if (dx) dx.onclick = () => DB.exportar();
+  document.querySelectorAll('[data-pn]').forEach(b => b.onclick = () => { DB.tab.pg += +b.dataset.pn; dashDesenha(); });
+  window.scrollTo(0, scrollY);
 }
 
 init();

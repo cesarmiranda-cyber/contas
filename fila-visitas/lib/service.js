@@ -635,7 +635,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     for (const [lista, finalizado] of [[abertos, false], [fin, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
       if (!visivelPor(d.responsavel, reg.equipe)) continue;
-      cards.push({ id: d.id, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
+      cards.push({ id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
         data: d.data, situacao: finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
     // registros de visita
@@ -651,11 +651,19 @@ function createService({ bitrix, store, clock = () => new Date() }) {
       const progr = fila?.data || null;
       const dia = q ? R.todayBR(new Date(q)) : null;
       const antTxt = v.antecipada ? String(F.decode(meta, v.antecipada, it[v.antecipada])).toLowerCase() : '';
-      visitas.push({ id: +it.id, quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
+      visitas.push({ id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
         antecipada: antTxt ? /^(sim|y|true|1)/.test(antTxt) : null, programada: progr, desvio: progr && dia ? R.dayDiff(progr, dia) : null, cargo: fila?.cargo || '' });
     }
-    const reprog = store.historico.filter(x => !x.tipo && (todos || [x.autor, x.responsavel].some(r => r && (+r === +uid || (time && time.has(+r)))))).map(x => ({ at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
-    const dados = { hoje: h, geradoEm: new Date().toISOString(), visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog };
+    const faltam = [...new Set(visitas.map(x => x.empresaId).filter(Boolean))];
+    const nomeEmp = new Map(cards.map(c => [c.empresaId, c.empresa]));
+    const buscar = faltam.filter(i => !nomeEmp.has(i));
+    for (let i = 0; i < buscar.length; i += 40) {
+      try { for (const c of (await bitrix.call('crm.company.list', { filter: { ID: buscar.slice(i, i + 40) }, select: ['ID', 'TITLE'] })).result || []) nomeEmp.set(+c.ID, c.TITLE); } catch { /* segue sem o nome */ }
+    }
+    visitas.forEach(x => { x.empresa = nomeEmp.get(x.empresaId) || ''; });
+    let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
+    const reprog = store.historico.filter(x => !x.tipo && (todos || [x.autor, x.responsavel].some(r => r && (+r === +uid || (time && time.has(+r)))))).map(x => ({ card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
+    const dados = { base, hoje: h, geradoEm: new Date().toISOString(), visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog };
     cacheDash.set(chave, { em: Date.now(), dados });
     return dados;
   }
