@@ -1,0 +1,449 @@
+'use strict';
+const R = require('./rules');
+const F = require('./fields');
+
+const CACHE_MS = 5 * 60 * 1000;
+const DYN = id => `dynamic_${id}`;
+const hex = n => n.toString(16);
+
+function createService({ bitrix, store, clock = () => new Date() }) {
+  let disc = null, discAt = 0;
+  const hoje = () => R.todayBR(clock());
+  const erro = (m, s = 400) => Object.assign(new Error(m), { status: s });
+
+  async function campos(force) {
+    if (!disc || force || Date.now() - discAt > CACHE_MS) { disc = await F.descobrir(bitrix, store.config); discAt = Date.now(); }
+    return disc;
+  }
+  const notificar = async (userId, msg) => {
+    if (!userId) return;
+    try { await bitrix.call('im.notify.system.add', { USER_ID: userId, MESSAGE: msg }); } catch (e) { store.log('aviso', `Falha ao avisar usuário ${userId}: ${e.message}`); }
+  };
+
+  // ---------- leitura da empresa ----------
+  async function lerEmpresa(id) {
+    const { map, meta } = await campos();
+    const r = (await bitrix.call('crm.company.get', { id })).result;
+    if (!r) return null;
+    const segs = {};
+    for (const seg of R.SEGMENTOS) {
+      const m = map.empresa[seg], v = k => (m[k] ? r[m[k]] : undefined);
+      const user = k => { const x = v(k); const n = Array.isArray(x) ? x[0] : x; return n && +n ? +n : null; };
+      segs[seg] = {
+        diretor: user('diretor'), gerente: user('gerente'), coordenador: user('coordenador'),
+        supervisor: user('supervisor'), vendedor: user('vendedor'),
+        classe: String(F.decode(meta, m.classe, v('classe'))).trim().toUpperCase().slice(0, 1),
+        ultima: R.isoDate(v('ultima')), proxima: R.isoDate(v('proxima')),
+      };
+    }
+    return { id: +r.ID, nome: r.TITLE, tipo: map.tipoEmpresa ? F.decode(meta, map.tipoEmpresa, r[map.tipoEmpresa]) : '', segs };
+  }
+
+  // Diretor = chefe do departamento do Gerente (sobe um nível se o próprio Gerente é o chefe).
+  const deptCache = new Map();
+  async function dept(id) {
+    if (!deptCache.has(id)) deptCache.set(id, ((await bitrix.call('department.get', { ID: id })).result || [])[0] || null);
+    return deptCache.get(id);
+  }
+  async function diretorDe(gerenteId) {
+    if (!gerenteId) return null;
+    try {
+      const u = ((await bitrix.call('user.get', { ID: gerenteId })).result || [])[0];
+      let did = Array.isArray(u?.UF_DEPARTMENT) ? u.UF_DEPARTMENT[0] : null;
+      for (let i = 0; did && i < 8; i++) {
+        const d = await dept(did);
+        if (!d) return null;
+        const head = +d.UF_HEAD || null;
+        if (head && head !== +gerenteId) return head;
+        did = d.PARENT || null;
+      }
+    } catch (e) { store.log('aviso', `Diretor não resolvido para gerente ${gerenteId}: ${e.message}`); }
+    return null;
+  }
+
+  // ---------- cards da fila ----------
+  const tituloCard = (empresa, seg, cargo) => `${empresa} | ${seg} | ${cargo}`;
+  async function lerCard(id) {
+    const { map } = await campos();
+    const it = (await bitrix.call('crm.item.get', { entityTypeId: F.ETYPE.fila, id })).result?.item;
+    if (!it) return null;
+    return { ...(await dadosCard(it)), aberto: it.stageId !== map.etapas.finalizado };
+  }
+  async function cardsAbertos() {
+    const { map } = await campos();
+    const out = [];
+    let start = 0;
+    for (;;) {
+      const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { '!stageId': map.etapas.finalizado }, select: ['*', 'uf*'], start });
+      out.push(...(r.result?.items || []));
+      if (r.next === undefined || r.next === null) break;
+      start = r.next;
+    }
+    return out;
+  }
+  const dadosCard = async (it) => {
+    const { map, meta } = await campos();
+    const reg = store.card(it.id) || {};
+    const parts = String(it.title || '').split(' | ');
+    const g = k => (map.fila[k] ? F.decode(meta, map.fila[k], it[map.fila[k]]) : '');
+    return {
+      id: +it.id, titulo: it.title, empresaId: +it.companyId || reg.empresaId, empresa: reg.empresa || parts[0],
+      segmento: g('segmento') || reg.seg || parts[1], cargo: g('cargo') || reg.cargo || parts[2],
+      classe: g('classe') || reg.classe || '', responsavel: +it.assignedById || null,
+      data: R.isoDate(map.fila.data ? it[map.fila.data] : it.closedate), stageId: it.stageId,
+    };
+  };
+
+  async function criarCard({ empresa, seg, cargo, classe, responsavel, data }) {
+    const { map, meta } = await campos();
+    const chave = R.chaveFila(empresa.id, seg, cargo);
+    const stage = map.etapas[R.etapaPara(data, hoje())];
+    const f = { title: tituloCard(empresa.nome, seg, cargo), companyId: empresa.id, assignedById: responsavel, stageId: stage };
+    if (map.fila.segmento) f[map.fila.segmento] = F.encode(meta, map.fila.segmento, seg);
+    if (map.fila.cargo) f[map.fila.cargo] = F.encode(meta, map.fila.cargo, cargo);
+    if (map.fila.classe) f[map.fila.classe] = F.encode(meta, map.fila.classe, classe);
+    f[map.fila.data || 'closedate'] = data;
+    const r = (await bitrix.call('crm.item.add', { entityTypeId: F.ETYPE.fila, fields: f })).result?.item;
+    store.setChave(chave, +r.id);
+    store.setCard(+r.id, { empresaId: empresa.id, empresa: empresa.nome, seg, cargo, classe, chave });
+    store.setSnapCard(+r.id, { data, resp: responsavel });
+    store.log('card-criado', `Card ${r.id} criado: ${f.title} · ${R.fmtBR(data)} · resp ${responsavel}`, { card: +r.id });
+    return +r.id;
+  }
+
+  async function atualizarCard(card, { data, responsavel, classe }, motivo) {
+    const { map, meta } = await campos();
+    const f = {};
+    if (responsavel && responsavel !== card.responsavel) f.assignedById = responsavel;
+    if (data && data !== card.data) {
+      f[map.fila.data || 'closedate'] = data;
+      const st = map.etapas[R.etapaPara(data, hoje())];
+      if (st && card.stageId !== map.etapas.finalizado) f.stageId = st;
+    }
+    if (classe && classe !== card.classe && map.fila.classe) f[map.fila.classe] = F.encode(meta, map.fila.classe, classe);
+    if (!Object.keys(f).length) return false;
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: f });
+    store.setSnapCard(card.id, { data: data || card.data, resp: responsavel || card.responsavel });
+    const reg = store.card(card.id) || {};
+    store.setCard(card.id, { ...reg, classe: classe || reg.classe });
+    store.log('card-atualizado', `Card ${card.id} atualizado (${motivo})`, { card: card.id });
+    if (f.assignedById) await notificar(f.assignedById, `Visita ${card.titulo} passou para você.`);
+    return true;
+  }
+
+  // ---------- sincronizar empresa (cria/atualiza os cards, sem duplicar) ----------
+  async function sincronizarEmpresa(id, { forcar = false } = {}) {
+    const cfg = store.config;
+    const emp = await lerEmpresa(id);
+    if (!emp) return { empresa: id, erro: 'Empresa não encontrada' };
+    const res = { empresa: id, criados: [], atualizados: [], pendencias: [] };
+    const snapAnt = store.snapEmpresa(id) || {};
+    const snapNovo = {};
+    const abertos = new Map();
+    for (const it of await cardsAbertosDaEmpresa(id)) {
+      const c = await dadosCard(it);
+      abertos.set(R.chaveFila(id, c.segmento, c.cargo), { ...c, stageId: it.stageId });
+    }
+    for (const seg of R.SEGMENTOS) {
+      const s = emp.segs[seg];
+      if (!s.vendedor && !s.supervisor && !s.coordenador && !s.gerente && !s.classe) continue; // segmento não usado
+      if (!s.diretor) s.diretor = await diretorDe(s.gerente);
+      for (const cargo of R.CARGOS) {
+        const resp = s[cargo.toLowerCase()];
+        const k = `${seg}|${cargo}`;
+        snapNovo[k] = { classe: s.classe, resp, ultima: s.ultima };
+        const motivo = [];
+        if (!resp) motivo.push('sem responsável');
+        if (!R.CLASSES.includes(s.classe)) motivo.push('classe não selecionada');
+        if (motivo.length) { res.pendencias.push(`${seg} · ${cargo}: ${motivo.join(' e ')}`); continue; }
+        const chave = R.chaveFila(id, seg, cargo);
+        const calc = R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
+        const existente = abertos.get(chave);
+        if (!existente) {
+          const idx = store.chave(chave);
+          if (idx) { // índice local aponta para card que já não está aberto: libera a chave
+            store.setChave(chave, null);
+          }
+          res.criados.push(await criarCard({ empresa: emp, seg, cargo, classe: s.classe, responsavel: resp, data: calc }));
+          continue;
+        }
+        store.setChave(chave, existente.id);
+        const ant = snapAnt[k] || {};
+        const mudouData = forcar || ant.classe !== s.classe || ant.ultima !== s.ultima;
+        const mudouResp = forcar || ant.resp !== resp || existente.responsavel !== resp;
+        if (mudouData || mudouResp) {
+          const ok = await atualizarCard(existente, { data: mudouData ? calc : null, responsavel: mudouResp ? resp : null, classe: s.classe },
+            [mudouData && 'classe/última visita', mudouResp && 'responsável'].filter(Boolean).join(' e '));
+          if (ok) res.atualizados.push(existente.id);
+        }
+      }
+      if (cfg.atualizarProxima) await gravarProxima(emp, seg).catch(e => store.log('aviso', `Próxima visita ${emp.nome}/${seg}: ${e.message}`));
+    }
+    store.setSnapEmpresa(id, snapNovo);
+    if (res.pendencias.length) store.log('pendencia', `Empresa ${emp.nome}: ${res.pendencias.join('; ')}`, { empresa: id });
+    return res;
+  }
+  async function cardsAbertosDaEmpresa(id) {
+    const { map } = await campos();
+    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { companyId: id, '!stageId': map.etapas.finalizado }, select: ['*', 'uf*'] });
+    return r.result?.items || [];
+  }
+  async function gravarProxima(emp, seg) {
+    const { map } = await campos();
+    const campo = map.empresa[seg].proxima;
+    if (!campo) return;
+    const datas = [];
+    for (const it of await cardsAbertosDaEmpresa(emp.id)) { const c = await dadosCard(it); if (c.segmento === seg && c.data) datas.push(c.data); }
+    datas.sort();
+    if (datas[0] && datas[0] !== emp.segs[seg].proxima) await bitrix.call('crm.company.update', { id: emp.id, fields: { [campo]: datas[0] } });
+  }
+
+  async function sincronizarTodas({ desde } = {}) {
+    const filter = desde ? { '>DATE_MODIFY': desde } : {};
+    const out = [];
+    let start = 0;
+    for (;;) {
+      const r = await bitrix.call('crm.company.list', { filter, select: ['ID'], start });
+      for (const c of r.result || []) {
+        try { out.push(await sincronizarEmpresa(+c.ID)); } catch (e) { store.log('erro', `Empresa ${c.ID}: ${e.message}`); out.push({ empresa: +c.ID, erro: e.message }); }
+      }
+      if (r.next === undefined || r.next === null) break;
+      start = r.next;
+    }
+    return out;
+  }
+
+  // ---------- job diário (07h) ----------
+  async function jobDiario({ forcar = false } = {}) {
+    const h = hoje();
+    if (!forcar && store.job('diario') === h) return { pulado: true };
+    const { map } = await campos();
+    const r = { dia: 0, atrasadas: 0 };
+    const porUsuario = {};
+    for (const it of await cardsAbertos()) {
+      const c = await dadosCard(it);
+      if (!c.data) continue;
+      const alvo = map.etapas[R.etapaPara(c.data, h)];
+      if (!alvo || alvo === it.stageId) continue;
+      await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: c.id, fields: { stageId: alvo } });
+      if (alvo === map.etapas.dia) { r.dia++; (porUsuario[c.responsavel] ||= []).push(c.titulo); store.log('job', `Card ${c.id} → Dia da Visita`, { card: c.id }); }
+      else if (alvo === map.etapas.atrasada) { r.atrasadas++; store.log('job', `Card ${c.id} → Atrasada`, { card: c.id }); }
+    }
+    for (const [u, l] of Object.entries(porUsuario)) await notificar(+u, `Visitas de hoje (${l.length}): ${l.slice(0, 5).join(' · ')}${l.length > 5 ? '…' : ''}`);
+    store.setJob('diario', h);
+    store.log('job', `Job diário: ${r.dia} para Dia da Visita, ${r.atrasadas} para Atrasada`);
+    return r;
+  }
+
+  // ---------- registrar visita ----------
+  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora }) {
+    const { map, meta } = await campos();
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    if (!card.aberto) throw erro('Esta visita já foi finalizada.', 409);
+    if (!uid) throw erro('Usuário não identificado.', 401);
+    if (String(resultado || '').trim().length < 3) throw erro('Descreva o resultado ou as observações da visita.');
+    const agora = clock();
+    const quando = dataHora ? new Date(dataHora) : agora;
+    if (isNaN(quando)) throw erro('Data/hora inválida.');
+    const dia = R.todayBR(quando);
+    const ant = R.antecipada(dia, card.data);
+    const emp = await lerEmpresa(card.empresaId);
+    const f = {
+      title: `${card.empresa} - ${R.fmtBR(dia)}`, companyId: card.empresaId, assignedById: uid,
+      [map.visita.dataHora || 'begindate']: quando.toISOString(),
+    };
+    const set = (k, v) => { if (map.visita[k]) f[map.visita[k]] = v; };
+    set('segmento', F.encode(meta, map.visita.segmento, card.segmento));
+    set('filaId', String(card.id));
+    set('antecipada', map.visita.antecipada && meta[map.visita.antecipada]?.itens?.length ? F.encode(meta, map.visita.antecipada, ant ? 'Sim' : 'Não') : (ant ? 'Y' : 'N'));
+    set('resultado', String(resultado).trim());
+    if (acompanhamento) set('acompanhamento', String(acompanhamento).trim());
+    const passos = [];
+    const v = (await bitrix.call('crm.item.add', { entityTypeId: F.ETYPE.visita, fields: f })).result?.item;
+    store.setSnapVisita(+v.id, { dt: quando.toISOString(), campo: map.visita.dataHora || 'begindate' });
+    passos.push(`visita ${v.id} criada`);
+    // finaliza o card na hora (sem depender de tarefa/campo de conclusão)
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.finalizado } });
+    store.setChave(R.chaveFila(card.empresaId, card.segmento, card.cargo), null);
+    passos.push('card finalizado');
+    // Última Visita do segmento + próximo card com a data nova
+    const campoUlt = map.empresa[card.segmento]?.ultima;
+    if (campoUlt) {
+      await bitrix.call('crm.company.update', { id: card.empresaId, fields: { [campoUlt]: dia } });
+      passos.push('última visita atualizada');
+    }
+    const s = emp?.segs[card.segmento];
+    const classe = s?.classe || card.classe;
+    let proximo = null;
+    const novaData = R.dataProgramada(store.config, { cargo: card.cargo, classe, ultima: dia, hoje: hoje() });
+    if (novaData && emp) {
+      proximo = await criarCard({ empresa: emp, seg: card.segmento, cargo: card.cargo, classe, responsavel: s[card.cargo.toLowerCase()] || card.responsavel || uid, data: novaData });
+      passos.push(`próximo card ${proximo} (${R.fmtBR(novaData)})`);
+    }
+    // o app grava "última visita" na empresa: atualiza o snapshot para não recalcular os outros cargos
+    const snap = store.snapEmpresa(card.empresaId) || {};
+    for (const k of Object.keys(snap)) if (k.startsWith(card.segmento + '|')) snap[k].ultima = dia;
+    store.setSnapEmpresa(card.empresaId, snap);
+    if (store.config.tarefaAtiva) await criarTarefa(v, card, uid, agora).then(() => passos.push('tarefa criada'), e => store.log('aviso', `Tarefa não criada: ${e.message}`));
+    store.log('visita', `Visita ${v.id} registrada por ${uid} no card ${card.id} (antecipada: ${ant ? 'sim' : 'não'}): ${passos.join(', ')}`, { card: card.id, visita: +v.id });
+    return { visita: +v.id, antecipada: ant, proximoCard: proximo, proximaData: novaData, passos };
+  }
+  async function criarTarefa(visita, card, uid, agora) {
+    await bitrix.call('tasks.task.add', { fields: {
+      TITLE: `Realizar Visita - ${card.empresa}`, RESPONSIBLE_ID: uid, DEADLINE: R.prazoUtil(agora, store.config.tarefaHorasUteis),
+      UF_CRM_TASK: [`T${hex(F.ETYPE.visita)}_${visita.id}`],
+    } });
+  }
+
+  // ---------- reprogramar ----------
+  async function reprogramar(cardId, { uid, nova, motivo }) {
+    const { map } = await campos();
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    if (!card.aberto) throw erro('Visita já finalizada não pode ser reprogramada.', 409);
+    if (!uid) throw erro('Usuário não identificado.', 401);
+    if (!card.data) throw erro('O card não tem data programada.');
+    const msg = R.validarReprogramacao({ atual: card.data, nova, motivo });
+    if (msg) throw erro(msg, 422);
+    const stage = map.etapas[R.etapaPara(nova, hoje())];
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { [map.fila.data || 'closedate']: nova, ...(stage ? { stageId: stage } : {}) } });
+    store.setSnapCard(card.id, { data: nova, resp: card.responsavel });
+    const nome = await nomeUsuario(uid);
+    const agora = clock().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    store.addHistorico({ card: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: motivo.trim(), autor: uid, autorNome: nome, responsavel: card.responsavel });
+    try {
+      await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila),
+        COMMENT: `Visita reprogramada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
+    } catch (e) { store.log('aviso', `Comentário na linha do tempo do card ${card.id} falhou: ${e.message}`); }
+    store.log('reprogramacao', `Card ${card.id}: ${R.fmtBR(card.data)} → ${R.fmtBR(nova)} por ${uid}: ${motivo.trim()}`, { card: card.id });
+    return { ok: true, data: nova };
+  }
+
+  const nomes = new Map();
+  async function nomeUsuario(id) {
+    if (!id) return '';
+    if (!nomes.has(id)) {
+      try { const u = ((await bitrix.call('user.get', { ID: id })).result || [])[0]; nomes.set(id, u ? `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || `#${id}` : `#${id}`); }
+      catch { return `#${id}`; }
+    }
+    return nomes.get(id);
+  }
+
+  // ---------- guardas (edição direta é revertida) ----------
+  async function guardarVisitas() {
+    const { map } = await campos();
+    const campo = map.visita.dataHora || 'begindate';
+    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, order: { id: 'desc' }, select: ['id', 'assignedById', 'title', campo], filter: store.lastSweep ? { '>updatedTime': store.lastSweep } : {} });
+    let revertidos = 0;
+    for (const it of r.result?.items || []) {
+      const atual = it[campo], snap = store.snapVisita(it.id);
+      if (!snap) { store.setSnapVisita(+it.id, { dt: atual, campo }); continue; }
+      if (sameInstant(atual, snap.dt)) continue;
+      await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.visita, id: it.id, fields: { [campo]: snap.dt } });
+      store.addBloqueio({ tipo: 'visita-data', visita: +it.id, tentou: atual, original: snap.dt, responsavel: +it.assignedById });
+      store.log('bloqueio', `Data da visita ${it.id} revertida (tentativa: ${atual}, original: ${snap.dt})`, { visita: +it.id });
+      await notificar(+it.assignedById, `A data do registro de visita "${it.title}" não pode ser alterada e foi restaurada. Para corrigir, peça a um administrador.`);
+      revertidos++;
+    }
+    return revertidos;
+  }
+  const sameInstant = (a, b) => { const x = Date.parse(a), y = Date.parse(b); return Number.isNaN(x) || Number.isNaN(y) ? a === b : x === y; };
+
+  async function guardarCards(abertos) {
+    const { map } = await campos();
+    let rev = 0;
+    for (const it of abertos) {
+      const snap = store.snapCard(it.id);
+      const atual = R.isoDate(map.fila.data ? it[map.fila.data] : it.closedate);
+      if (!snap) { store.setSnapCard(+it.id, { data: atual, resp: +it.assignedById }); continue; }
+      if (atual === snap.data) continue;
+      await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: it.id, fields: { [map.fila.data || 'closedate']: snap.data } });
+      store.addBloqueio({ tipo: 'card-data', card: +it.id, tentou: atual, original: snap.data, responsavel: +it.assignedById });
+      store.log('bloqueio', `Data programada do card ${it.id} revertida (tentativa: ${atual}, original: ${snap.data}). Use "Reprogramar visita".`, { card: +it.id });
+      await notificar(+it.assignedById, `A data programada de "${it.title}" só pode ser alterada pelo botão "Reprogramar visita". A data foi restaurada.`);
+      rev++;
+    }
+    return rev;
+  }
+
+  async function corrigirVisita(id, { uid, dataHora, motivo }) {
+    if (!isAdmin(uid)) throw erro('Apenas administradores podem corrigir registros de visita.', 403);
+    if (String(motivo || '').trim().length < 3) throw erro('Informe o motivo da correção.');
+    const novo = new Date(dataHora);
+    if (isNaN(novo)) throw erro('Data/hora inválida.');
+    const { map } = await campos();
+    const campo = map.visita.dataHora || 'begindate';
+    const snap = store.snapVisita(id);
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.visita, id, fields: { [campo]: novo.toISOString() } });
+    store.setSnapVisita(+id, { dt: novo.toISOString(), campo });
+    store.addHistorico({ tipo: 'correcao-visita', visita: +id, anterior: snap?.dt, nova: novo.toISOString(), motivo: motivo.trim(), autor: uid, autorNome: await nomeUsuario(uid) });
+    store.log('correcao', `Visita ${id} corrigida por ${uid}: ${motivo.trim()}`, { visita: +id });
+    return { ok: true };
+  }
+  const isAdmin = uid => { const a = store.config.admins || []; return a.map(Number).includes(+uid); };
+
+  // ---------- varredura periódica (alternativa aos eventos; idempotente) ----------
+  let rodando = false;
+  async function varrer() {
+    if (rodando) return { pulado: true };
+    rodando = true;
+    const inicio = new Date(Date.now() - 2 * 60e3).toISOString();
+    try {
+      await campos();
+      const guardas = { visitas: await guardarVisitas(), cards: await guardarCards(await cardsAbertos()) };
+      const emp = await sincronizarTodas({ desde: store.lastSweep || undefined });
+      let job = null;
+      if (R.hourBR(clock()) >= store.config.horaJob) job = await jobDiario();
+      store.setLastSweep(inicio);
+      return { guardas, empresas: emp.length, job };
+    } finally { rodando = false; }
+  }
+
+  // ---------- consultas para a interface ----------
+  async function listarVisitas({ uid, escopo = 'minhas' }) {
+    const { map } = await campos();
+    const itens = (await cardsAbertos());
+    let permitidos = null;
+    if (escopo === 'minhas') permitidos = new Set([+uid]);
+    else if (escopo === 'equipe' && !isAdmin(uid)) permitidos = await equipeDe(uid);
+    const out = [];
+    const tipos = new Map();
+    for (const it of itens) {
+      if (permitidos && !permitidos.has(+it.assignedById)) continue;
+      const c = await dadosCard(it);
+      const reg = store.card(it.id) || {};
+      let tipo = tipos.get(c.empresaId);
+      if (tipo === undefined && map.tipoEmpresa && c.empresaId) { try { tipo = F.decode((await campos()).meta, map.tipoEmpresa, (await bitrix.call('crm.company.get', { id: c.empresaId })).result?.[map.tipoEmpresa]); } catch { tipo = ''; } tipos.set(c.empresaId, tipo); }
+      out.push({ ...c, tipoEmpresa: tipo || '', responsavelNome: await nomeUsuario(c.responsavel), classe: c.classe || reg.classe || '',
+        situacao: R.etapaPara(c.data, hoje()), dias: c.data ? R.dayDiff(hoje(), c.data) : null });
+    }
+    out.sort((a, b) => (a.data || '9').localeCompare(b.data || '9'));
+    return { hoje: hoje(), visitas: out };
+  }
+  async function equipeDe(uid) {
+    const ids = new Set([+uid]);
+    try {
+      const deps = (await bitrix.call('department.get', {})).result || [];
+      const filhos = id => deps.filter(d => +d.PARENT === +id).map(d => +d.ID);
+      const alvo = []; const pilha = deps.filter(d => +d.UF_HEAD === +uid).map(d => +d.ID);
+      while (pilha.length) { const x = pilha.pop(); alvo.push(x); pilha.push(...filhos(x)); }
+      if (alvo.length) {
+        const us = (await bitrix.call('user.get', { filter: { UF_DEPARTMENT: alvo, ACTIVE: true } })).result || [];
+        us.forEach(u => ids.add(+u.ID));
+      }
+    } catch (e) { store.log('aviso', `Equipe de ${uid}: ${e.message}`); }
+    return ids;
+  }
+  async function usuarios() {
+    const r = (await bitrix.call('user.get', { filter: { ACTIVE: true } })).result || [];
+    return r.map(u => ({ id: +u.ID, nome: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || `#${u.ID}` })).sort((a, b) => a.nome.localeCompare(b.nome));
+  }
+  async function visitasRegistradas(limit = 50) {
+    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, order: { id: 'desc' }, select: ['*', 'uf*'] });
+    return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
+  }
+
+  return { campos, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+}
+module.exports = { createService };

@@ -1,0 +1,9 @@
+{
+  "name": "fila-visitas-dlc",
+  "version": "1.0.0",
+  "description": "Fila e registro de visitas comerciais (réplica da Odin) para o Bitrix24 da DLC",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node --test" },
+  "engines": { "node": ">=20" }
+}

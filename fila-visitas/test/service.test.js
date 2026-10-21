@@ -1,0 +1,146 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs'); const os = require('os'); const path = require('path');
+const { createStore } = require('../lib/store');
+const { createService } = require('../lib/service');
+const { createWorld } = require('./world');
+
+const NOW = new Date('2026-05-10T15:00:00Z'); // 10/05/2026 12h BRT
+function setup(extra = {}) {
+  const w = createWorld();
+  const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'fv-')));
+  const svc = createService({ bitrix: { call: w.call }, store, clock: () => NOW });
+  w.empresa(1, 'Acme Marítima', { UF_CRM_MOT_CLASSE: '1', UF_CRM_MOT_VENDEDOR: '10', UF_CRM_MOT_SUPERVISOR: '10', UF_CRM_MOT_COORDENADOR: '10', UF_CRM_MOT_GERENTE: '20', UF_CRM_MOT_ULTIMA: '2026-04-20', ...extra });
+  return { w, store, svc };
+}
+const cards = w => Object.values(w.items[1036]);
+
+test('empresa gera os cards completos e não duplica ao reexecutar', async () => {
+  const { w, svc } = setup();
+  const r = await svc.sincronizarEmpresa(1);
+  assert.equal(r.criados.length, 5);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  assert.equal(vend.ufCrm_data, '2026-05-20'); // 20/04 + 30 (classe A) ; sem campo custom -> closedate padrão
+  assert.equal(vend.assignedById, 10);
+  assert.equal(vend.stageId, w.stages.aguardando);
+  const dir = cards(w).find(c => c.title.endsWith('| Diretor'));
+  assert.equal(dir.assignedById, 30, 'diretor vem do chefe do departamento do gerente');
+  const r2 = await svc.sincronizarEmpresa(1);
+  assert.equal(r2.criados.length, 0);
+  assert.equal(cards(w).length, 5);
+});
+
+test('sem classe ou responsável vira pendência, não card incompleto', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_CLASSE: '', UF_CRM_MOT_VENDEDOR: '' });
+  const r = await svc.sincronizarEmpresa(1);
+  assert.equal(cards(w).length, 0);
+  assert.ok(r.pendencias.length >= 5);
+});
+
+test('mudar classe recalcula a data; mudar responsável troca o dono', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  w.companies[1].UF_CRM_MOT_CLASSE = '3'; // C: 90 dias
+  w.companies[1].UF_CRM_MOT_VENDEDOR = '20';
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  assert.equal(vend.ufCrm_data, '2026-07-19');
+  assert.equal(vend.assignedById, 20);
+  assert.equal(cards(w).length, 5);
+});
+
+test('job diário: hoje -> Dia da Visita, vencidos -> Atrasada e avisa o responsável', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_ULTIMA: '2026-04-10' }); // vendedor: 10/05 = hoje
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  vend.stageId = w.stages.aguardando; // como se tivesse nascido antes
+  const atras = cards(w).find(c => c.title.endsWith('| Gerente'));
+  atras.ufCrm_data = '2026-05-01'; atras.stageId = w.stages.aguardando;
+  const r = await svc.jobDiario();
+  assert.deepEqual(r, { dia: 1, atrasadas: 1 });
+  assert.equal(vend.stageId, w.stages.dia);
+  assert.equal(atras.stageId, w.stages.atrasada);
+  assert.ok(w.notifs.some(n => n.USER_ID === 10));
+  assert.deepEqual(await svc.jobDiario(), { pulado: true }, 'idempotente no mesmo dia');
+});
+
+test('registrar visita: cria 1032, calcula antecipada, finaliza, atualiza última visita e cria o próximo card', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const r = await svc.registrarVisita(vend.id, { uid: 10, resultado: 'Orçamento enviado' });
+  assert.equal(r.antecipada, true); // hoje 10/05 < 20/05
+  const v = Object.values(w.items[1032])[0];
+  assert.equal(v.title, 'Acme Marítima - 10/05/2026');
+  assert.equal(v.ufCrm_ant, 'Y'); assert.equal(v.ufCrm_fila, String(vend.id)); assert.equal(v.ufCrm_setor, 'Motores');
+  assert.equal(vend.stageId, w.stages.finalizado);
+  assert.equal(w.companies[1].UF_CRM_MOT_ULTIMA, '2026-05-10');
+  const abertos = cards(w).filter(c => c.stageId !== w.stages.finalizado && c.title.endsWith('| Vendedor'));
+  assert.equal(abertos.length, 1);
+  assert.equal(abertos[0].ufCrm_data, '2026-06-09'); // 10/05 + 30
+  // os demais cargos não são empurrados pela visita do vendedor
+  const sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
+  const antes = sup.ufCrm_data;
+  await svc.sincronizarEmpresa(1);
+  assert.equal(sup.ufCrm_data, antes);
+  assert.equal(cards(w).length, 6);
+  await assert.rejects(svc.registrarVisita(vend.id, { uid: 10, resultado: 'de novo' }), /já foi finalizada/);
+});
+
+test('reprogramar: exige motivo, recusa outro mês, grava histórico e comentário', async () => {
+  const { w, svc, store } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor')); // 20/05
+  await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: '' }), /motivo/i);
+  await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-06-02', motivo: 'Cliente pediu' }), /mesmo mês/);
+  await svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: 'Cliente pediu' });
+  assert.equal(vend.ufCrm_data, '2026-05-28');
+  assert.equal(store.historico.length, 1);
+  assert.equal(store.historico[0].anterior, '2026-05-20');
+  assert.match(w.comments[0].COMMENT, /Motivo: Cliente pediu/);
+  assert.equal(w.comments[0].ENTITY_TYPE, 'dynamic_1036');
+});
+
+test('edição direta da data da visita e da data programada é revertida, sem loop', async () => {
+  const { w, svc, store } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const r = await svc.registrarVisita(vend.id, { uid: 10, resultado: 'Visita feita' });
+  const v = w.items[1032][r.visita], orig = v.ufCrm_dh;
+  v.ufCrm_dh = '2020-01-01T10:00:00.000Z';
+  assert.equal(await svc.guardarVisitas(), 1);
+  assert.equal(v.ufCrm_dh, orig);
+  assert.equal(await svc.guardarVisitas(), 0, 'a própria reversão não dispara novo bloqueio');
+  assert.equal(store.bloqueios[0].tipo, 'visita-data');
+  assert.ok(w.notifs.some(n => /não pode ser alterada/.test(n.MESSAGE)));
+  const sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
+  const dOrig = sup.ufCrm_data;
+  await svc.guardarCards(Object.values(w.items[1036]).filter(c => c.stageId !== w.stages.finalizado)); // snapshot já existe
+  sup.ufCrm_data = '2026-12-31';
+  assert.equal(await svc.guardarCards(Object.values(w.items[1036]).filter(c => c.stageId !== w.stages.finalizado)), 1);
+  assert.equal(sup.ufCrm_data, dOrig);
+});
+
+test('correção de visita só por administrador e fica no histórico', async () => {
+  const { w, svc, store } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const r = await svc.registrarVisita(vend.id, { uid: 10, resultado: 'Visita feita' });
+  await assert.rejects(svc.corrigirVisita(r.visita, { uid: 10, dataHora: '2026-05-09T12:00:00Z', motivo: 'erro' }), /administradores/);
+  store.setConfig({ admins: [30] });
+  await svc.corrigirVisita(r.visita, { uid: 30, dataHora: '2026-05-09T12:00:00Z', motivo: 'Data errada' });
+  assert.equal(w.items[1032][r.visita].ufCrm_dh, '2026-05-09T12:00:00.000Z');
+  assert.equal(await svc.guardarVisitas(), 0);
+  assert.equal(store.historico[0].tipo, 'correcao-visita');
+});
+
+test('minhas visitas lista só as do usuário, ordenadas por data', async () => {
+  const { svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const mine = await svc.listarVisitas({ uid: 10, escopo: 'minhas' });
+  assert.equal(mine.visitas.length, 3); // vendedor, supervisor, coordenador
+  assert.ok(mine.visitas[0].data <= mine.visitas[1].data);
+  const all = await svc.listarVisitas({ uid: 30, escopo: 'todas' });
+  assert.equal(all.visitas.length, 5);
+});
