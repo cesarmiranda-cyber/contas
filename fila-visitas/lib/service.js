@@ -66,6 +66,42 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     return null;
   }
 
+  // Chefes acima de um usuário, do mais próximo ao topo, sem repetir pessoas (um chefe de vários níveis conta uma vez).
+  async function cadeiaAcima(userId) {
+    const out = [];
+    try {
+      const u = ((await bitrix.call('user.get', { ID: userId })).result || [])[0];
+      let did = Array.isArray(u?.UF_DEPARTMENT) ? u.UF_DEPARTMENT[0] : null;
+      for (let i = 0; did && i < 10; i++) {
+        const d = await dept(did);
+        if (!d) break;
+        const h = +d.UF_HEAD || null;
+        if (h && h !== +userId && !out.includes(h)) out.push(h);
+        did = d.PARENT || null;
+      }
+    } catch (e) { store.log('aviso', `Hierarquia de ${userId}: ${e.message}`); }
+    return out;
+  }
+  // Preenche Supervisor/Coordenador/Gerente/Diretor vazios a partir do departamento do Vendedor:
+  // o último chefe da cadeia é o Diretor, o anterior o Gerente, e assim por diante.
+  async function preencherHierarquia(emp, map) {
+    const ordem = ['diretor', 'gerente', 'coordenador', 'supervisor'];
+    for (const seg of R.SEGMENTOS) {
+      const s = emp.segs[seg];
+      if (!s.vendedor || ordem.every(k => s[k])) continue;
+      const cadeia = await cadeiaAcima(s.vendedor);
+      const gravar = {};
+      ordem.forEach((k, i) => {
+        const id = cadeia[cadeia.length - 1 - i];
+        if (!s[k] && id) { s[k] = id; if (map.empresa[seg][k]) gravar[map.empresa[seg][k]] = id; }
+      });
+      if (Object.keys(gravar).length) {
+        await bitrix.call('crm.company.update', { id: emp.id, fields: gravar });
+        store.log('hierarquia', `Empresa ${emp.nome} · ${seg}: preenchido pela estrutura (${Object.keys(gravar).length} campo(s))`, { empresa: emp.id });
+      }
+    }
+  }
+
   // ---------- cards da fila ----------
   const tituloCard = (empresa, seg, cargo) => `${empresa} | ${seg} | ${cargo}`;
   async function lerCard(id) {
@@ -141,6 +177,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     const cfg = store.config;
     const emp = await lerEmpresa(id);
     if (!emp) return { empresa: id, erro: 'Empresa não encontrada' };
+    if (cfg.hierarquiaAuto) await preencherHierarquia(emp, (await campos()).map).catch(e => store.log('aviso', `Hierarquia: ${e.message}`));
     const res = { empresa: id, criados: [], atualizados: [], pendencias: [] };
     const snapAnt = store.snapEmpresa(id) || {};
     const snapNovo = {};

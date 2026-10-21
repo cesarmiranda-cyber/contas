@@ -238,6 +238,7 @@ async function cfg(d) {
     <div class="fld"><label>Hora do job diário (Brasília)</label><input id="hj" type="number" min="0" max="23" value="${c.horaJob}"></div>
     <label><input type="checkbox" id="ta" style="width:auto" ${c.tarefaAtiva ? 'checked' : ''}> Criar tarefa "Realizar Visita" (prazo em horas úteis)</label>
     <div class="fld"><label>Horas úteis do prazo</label><input id="th" type="number" min="1" value="${c.tarefaHorasUteis}"></div>
+ <label><input type="checkbox" id="ha" style="width:auto" ${c.hierarquiaAuto ? 'checked' : ''}> Preencher Supervisor, Coordenador, Gerente e Diretor vazios pela estrutura da empresa (a partir do departamento do Vendedor)</label>
     <label><input type="checkbox" id="ap" style="width:auto" ${c.atualizarProxima ? 'checked' : ''}> Gravar "Próxima Visita" do segmento na empresa</label>
     <div class="fld"><label>Motores: qual par de datas é o oficial?</label><select id="md"><option value="secao" ${c.motoresDatas === 'secao' ? 'selected' : ''}>Campos da seção (Próxima/Última Visita)</option><option value="extra" ${c.motoresDatas === 'extra' ? 'selected' : ''}>Campos extras (Data Próxima Visita / Última Visita)</option></select></div>
     <div class="fld"><label>Administradores (IDs de usuário, separados por vírgula)</label><input id="ad" value="${(c.admins || []).join(',')}"></div>
@@ -254,7 +255,7 @@ async function cfg(d) {
   $('#sv').onclick = async () => {
     const intervalos = {}; document.querySelectorAll('[data-i]').forEach(i => { const [g, k] = i.dataset.i.split('.'); (intervalos[g] ||= {})[k] = +i.value; });
     try {
-      await api('/api/config', { method: 'PUT', body: { ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, motoresDatas: $('#md').value, admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
+      await api('/api/config', { method: 'PUT', body: { ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, motoresDatas: $('#md').value, admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
   };

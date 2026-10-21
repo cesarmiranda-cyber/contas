@@ -175,3 +175,15 @@ test('campos duplicados na empresa: usa o que tiver valor, a maior última visit
   assert.equal(vend.ufCrm_data, '2026-06-19', 'classe B (60 dias) a partir da maior última visita (20/04)');
   assert.equal(vend.assignedById, 10);
 });
+
+test('hierarquia automática: preenche os cargos vazios pela cadeia de chefes do vendedor', async () => {
+  const { w, svc, store } = setup({ UF_CRM_MOT_SUPERVISOR: '', UF_CRM_MOT_COORDENADOR: '', UF_CRM_MOT_GERENTE: '' });
+  store.setConfig({ hierarquiaAuto: true });
+  w.users[10].UF_DEPARTMENT = [5]; // vendedor no depto 5 (chefe 20), pai = diretoria (chefe 30)
+  await svc.sincronizarEmpresa(1);
+  assert.equal(w.companies[1].UF_CRM_MOT_DIRETOR, 30);
+  assert.equal(w.companies[1].UF_CRM_MOT_GERENTE, 20);
+  assert.ok(!w.companies[1].UF_CRM_MOT_COORDENADOR, 'sem chefe suficiente na cadeia, fica para preenchimento manual');
+  const ger = cards(w).find(c => c.title.endsWith('| Gerente'));
+  assert.equal(ger.assignedById, 20);
+});

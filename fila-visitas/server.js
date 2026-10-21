@@ -57,7 +57,7 @@ const routes = {
       for (const c of R.CARGOS) for (const k of R.CLASSES) { const n = +b.intervalos?.[c]?.[k]; if (Number.isInteger(n) && n > 0 && n < 1000) (p.intervalos[c] ||= {})[k] = n; }
     }
     if (Number.isInteger(+b.horaJob) && +b.horaJob >= 0 && +b.horaJob < 24) p.horaJob = +b.horaJob;
-    for (const k of ['tarefaAtiva', 'atualizarProxima']) if (typeof b[k] === 'boolean') p[k] = b[k];
+    for (const k of ['tarefaAtiva', 'atualizarProxima', 'hierarquiaAuto']) if (typeof b[k] === 'boolean') p[k] = b[k];
     if (typeof b.ativo === 'boolean') p.ativo = b.ativo;
     if (Number.isFinite(+b.tarefaHorasUteis) && +b.tarefaHorasUteis > 0) p.tarefaHorasUteis = +b.tarefaHorasUteis;
     if (['secao', 'extra'].includes(b.motoresDatas)) p.motoresDatas = b.motoresDatas;
@@ -118,6 +118,19 @@ server.listen(PORT, () => {
   const tick = () => bitrix.enabled && svc.varrer().then(r => r && !r.pulado && !r.pausado && console.log('varredura', JSON.stringify(r))).catch(e => { store.log('erro', `varredura: ${e.message}`); console.error('varredura:', e.message); });
   if (process.env.ATIVAR === '1' && !store.config.ativo) { store.setConfig({ ativo: true }); store.log('config', 'App ativado'); console.log('app ativado'); }
   if (bitrix.enabled && process.env.SYNC_EMPRESA) setTimeout(() => svc.sincronizarEmpresa(+process.env.SYNC_EMPRESA, { forcar: true }).then(r => console.log('sync-empresa', JSON.stringify(r))).catch(e => console.error('sync-empresa:', e.message)), 6000);
+  if (bitrix.enabled && process.env.DIAG_DEPTS) setTimeout(async () => {
+    try {
+      const deps = (await bitrix.call('department.get', {})).result || [];
+      const us = (await bitrix.call('user.get', { filter: { ACTIVE: true } })).result || [];
+      const nome = Object.fromEntries(us.map(u => [u.ID, `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim()]));
+      console.log('depts', JSON.stringify(deps.map(d => `${d.ID}|${d.NAME}|pai=${d.PARENT || '-'}|chefe=${d.UF_HEAD && d.UF_HEAD !== '0' ? d.UF_HEAD + ':' + (nome[d.UF_HEAD] || '?') : '-'}`)));
+      const emp = (await bitrix.call('crm.company.get', { id: +process.env.DIAG_DEPTS })).result || {};
+      const ids = Object.entries(emp).filter(([k, x]) => k.startsWith('UF_CRM') && /^\d+$/.test(String(Array.isArray(x) ? x[0] : x)) && nome[String(Array.isArray(x) ? x[0] : x)]).map(([k, x]) => `${k}=${Array.isArray(x) ? x[0] : x}:${nome[String(Array.isArray(x) ? x[0] : x)]}`);
+      console.log('depts-empresa', JSON.stringify(ids));
+      const vend = us.filter(u => ids.some(i => i.includes(`=${u.ID}:`)));
+      console.log('depts-usuarios', JSON.stringify(vend.map(u => `${u.ID}:${u.NAME} ${u.LAST_NAME}|dept=${JSON.stringify(u.UF_DEPARTMENT)}|cargo=${u.WORK_POSITION || '-'}`)));
+    } catch (e) { console.error('depts:', e.message); }
+  }, 2000);
   if (bitrix.enabled && process.env.PREPARAR) setTimeout(() => P.preparar(bitrix, svc).then(r => { console.log('preparar', JSON.stringify(r)); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); }).catch(e => console.error('preparar:', e.message)), 2000);
   if (bitrix.enabled && process.env.APAGAR_CAMPOS) setTimeout(() => D.apagar(bitrix, process.env.APAGAR_CAMPOS.split(',').map(Number).filter(Boolean), DATA_DIR).then(r => { console.log('campos-apagados', JSON.stringify(r)); store.log('config', `Campos duplicados apagados: ${(r.feitos || []).join('; ')}`); }).catch(e => console.error('campos-apagados:', e.message)), 3000);
   if (bitrix.enabled && process.env.ANALISE_DUPLICADOS) setTimeout(() => D.analisar(bitrix).then(a => { const p = D.planejar(a); console.log('duplicados', JSON.stringify({ empresas: a.empresas, apagar: p.apagar.map(c => `${c.id}:${c.campo}:${c.rotulo}`), manter: p.manter.map(c => `${c.id}:${c.campo}:${c.rotulo}:${c.comValor}`), conflitos: p.conflitos.map(g => g.campos.map(c => `${c.campo}=${c.comValor}`)) })); }).catch(e => console.error('duplicados:', e.message)), 3000);

@@ -24,6 +24,7 @@ const DEFAULT_CONFIG = {
   admins: [],                  // ids que podem corrigir registros de visita
   mapaManual: {},              // sobrescritas do mapeamento de campos
   sweepSegundos: 60,
+  hierarquiaAuto: false,       // preenche Supervisor/Coordenador/Gerente/Diretor vazios pela estrutura da empresa
   ativo: false,                // trava de segurança: o app só escreve no Bitrix depois que um admin ativa
 };
 
