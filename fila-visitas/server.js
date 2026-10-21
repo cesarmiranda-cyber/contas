@@ -41,18 +41,31 @@ async function quem(req, u) {
   return { uid: uid || null, verificado: false };
 }
 
+// Acesso: quem configura / quem vê o dashboard. Com listas definidas, exige identidade verificada pelo Bitrix (gateway).
+const nega = (m, s = 403) => Object.assign(new Error(m), { status: s });
+function exigeConfig(id) {
+  if (!svc.acessoRestrito()) return;
+  if (!id.verificado) throw nega('Abra o app pelo Bitrix24 para acessar as configurações.');
+  if (!svc.podeConfigurar(id.uid)) throw nega('Você não tem acesso às configurações.');
+}
+function exigeDashboard(id) {
+  if (!svc.acessoRestrito()) return;
+  if (!id.verificado) throw nega('Abra o app pelo Bitrix24 para ver o dashboard.');
+  if (!svc.podeDashboard(id.uid)) throw nega('Você não tem acesso ao dashboard.');
+}
 const routes = {
   'GET /health': async () => ({ ok: true }),
-  'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '' }),
+  'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '', podeConfig: svc.acessoRestrito() ? !!(id.verificado && svc.podeConfigurar(id.uid)) : true, podeDashboard: svc.acessoRestrito() ? !!(id.verificado && svc.podeDashboard(id.uid)) : true }),
+  'GET /api/dashboard': async (_, __, id) => { exige(); exigeDashboard(id); return svc.dashboardDados({ uid: id.uid }); },
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
   'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto' }); },
-  'GET /api/departamentos': async () => { exige(); return { departamentos: await svc.departamentos() }; },
-  'GET /api/ramos': async () => { exige(); return { ramos: await svc.listaRamos() }; },
+  'GET /api/departamentos': async (_, __, id) => { exigeConfig(id); exige(); return { departamentos: await svc.departamentos() }; },
+  'GET /api/ramos': async (_, __, id) => { exigeConfig(id); exige(); return { ramos: await svc.listaRamos() }; },
   'GET /api/historico': async (_, __, id) => { let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ } return { reprogramacoes: id.uid ? await svc.historicoVisivel(id.uid) : [], base }; },
-  'GET /api/log': async () => ({ log: store.logs.slice(0, 200), bloqueios: store.bloqueios }),
-  'GET /api/config': async () => ({ config: store.config, hoje: R.todayBR(), webhook: bitrix.enabled, ultimaVarredura: store.lastSweep }),
+  'GET /api/log': async (_, __, id) => (exigeConfig(id), { log: store.logs.slice(0, 200), bloqueios: store.bloqueios }),
+  'GET /api/config': async (_, __, id) => (exigeConfig(id), { config: store.config, hoje: R.todayBR(), webhook: bitrix.enabled, ultimaVarredura: store.lastSweep }),
   'PUT /api/config': async (_, b, id) => {
-    if (!svc.isAdmin(id.uid) && (store.config.admins || []).length) throw Object.assign(new Error('Apenas administradores.'), { status: 403 });
+    exigeConfig(id);
     const p = {};
     if (b.intervalos && typeof b.intervalos === 'object') {
       p.intervalos = {};
@@ -72,18 +85,20 @@ const routes = {
       }
     }
     if (b.tipoPorRamo && typeof b.tipoPorRamo === 'object') { p.tipoPorRamo = {}; for (const [k, t] of Object.entries(b.tipoPorRamo)) if (['Industrial', 'Marítimo', ''].includes(t) && /^[\w-]+$/.test(k)) p.tipoPorRamo[k] = t; }
+    for (const k of ['acessoConfig', 'acessoDashboard']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
+    if (p.acessoConfig && p.acessoConfig.length && id.uid && !p.acessoConfig.includes(+id.uid)) p.acessoConfig.push(+id.uid); // evita se trancar para fora
     if (Array.isArray(b.verTudo)) p.verTudo = b.verTudo.map(Number).filter(Boolean);
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);
     if (b.mapaManual && typeof b.mapaManual === 'object') p.mapaManual = b.mapaManual;
     store.log('config', `Configuração alterada por ${id.uid || 'desconhecido'}`);
     const c = store.setConfig(p); await svc.campos(true).catch(() => {}); return c;
   },
-  'GET /api/campos': async (u) => { exige(); return svc.campos(u.searchParams.get('refresh') === '1'); },
-  'GET /api/duplicados': async () => { exige(); const a = await D.analisar(bitrix); return { ...a, plano: D.planejar(a) }; },
-  'POST /api/preparar': async (_, __, id) => { exige(); if ((store.config.admins || []).length && !svc.isAdmin(id.uid)) throw Object.assign(new Error('Apenas administradores.'), { status: 403 }); const r = await P.preparar(bitrix, svc); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); return r; },
-  'POST /api/sincronizar': async (_, b) => { exige(); return b.empresa ? svc.sincronizarEmpresa(+b.empresa, { forcar: !!b.forcar }) : svc.sincronizarTodas(); },
-  'POST /api/job': async (_, b) => { exige(); return svc.jobDiario({ forcar: !!b.forcar }); },
-  'POST /api/varrer': async () => { exige(); return svc.varrer(); },
+  'GET /api/campos': async (u, _, id) => { exigeConfig(id); exige(); return svc.campos(u.searchParams.get('refresh') === '1'); },
+  'GET /api/duplicados': async (_, __, id) => { exigeConfig(id); exige(); const a = await D.analisar(bitrix); return { ...a, plano: D.planejar(a) }; },
+  'POST /api/preparar': async (_, __, id) => { exigeConfig(id); exige(); if ((store.config.admins || []).length && !svc.isAdmin(id.uid)) throw Object.assign(new Error('Apenas administradores.'), { status: 403 }); const r = await P.preparar(bitrix, svc); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); return r; },
+  'POST /api/sincronizar': async (_, b, id) => { exigeConfig(id); exige(); return b.empresa ? svc.sincronizarEmpresa(+b.empresa, { forcar: !!b.forcar }) : svc.sincronizarTodas(); },
+  'POST /api/job': async (_, b, id) => { exigeConfig(id); exige(); return svc.jobDiario({ forcar: !!b.forcar }); },
+  'POST /api/varrer': async (_, __, id) => { exigeConfig(id); exige(); return svc.varrer(); },
   'POST /api/visitas/corrigir': async (_, b, id) => { exige(); return svc.corrigirVisita(+b.id, { uid: id.uid, dataHora: b.dataHora, motivo: b.motivo }); },
 };
 // Eventos do Bitrix24 (ONCRMCOMPANYADD/UPDATE, ONCRMDYNAMICITEMUPDATE...): disparam uma varredura imediata.

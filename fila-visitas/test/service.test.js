@@ -282,3 +282,30 @@ test('mapeamento de oportunidades vem do cadastro da empresa, travado e gravado 
   assert.equal(unico?.valor, '3'); assert.equal(unico?.travado, true);
   if (multi) assert.deepEqual([...multi.valor].sort(), ['1', '3']);
 });
+
+test('acesso: aberto sem listas; com listas só entra quem está nelas (admin sempre)', async () => {
+  const { svc, store } = setup();
+  assert.equal(svc.podeConfigurar(99), true); assert.equal(svc.podeDashboard(99), true); assert.equal(svc.acessoRestrito(), false);
+  store.setConfig({ acessoConfig: [30], acessoDashboard: [10, 20], admins: [20] });
+  assert.equal(svc.acessoRestrito(), true);
+  assert.equal(svc.podeConfigurar(30), true); assert.equal(svc.podeConfigurar(20), true, 'admin'); assert.equal(svc.podeConfigurar(10), false);
+  assert.equal(svc.podeDashboard(10), true); assert.equal(svc.podeDashboard(99), false); assert.equal(svc.podeDashboard(30), true, 'quem configura também vê');
+});
+
+test('dashboard: dados em nível de linha (fila + registros + reprogramações) respeitando a visibilidade', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const r = await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  const sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
+  await svc.reprogramar(sup.id, { uid: 10, nova: '2026-06-20', motivo: 'Cliente pediu' });
+  const d = await svc.dashboardDados({ uid: 30 }); // diretoria
+  assert.equal(d.visao, 'tudo');
+  assert.ok(d.cards.some(c => c.situacao === 'finalizado'), 'card finalizado entra');
+  assert.ok(d.cards.filter(c => c.situacao !== 'finalizado').length >= 5);
+  assert.equal(d.visitas.length, 1);
+  assert.equal(d.visitas[0].antecipada, true); assert.equal(d.visitas[0].segmento, 'Motores'); assert.equal(d.visitas[0].desvio, -10);
+  assert.equal(d.reprog.length, 1);
+  const nada = await svc.dashboardDados({ uid: 777 });
+  assert.equal(nada.cards.length, 0); assert.equal(nada.visitas.length, 0);
+});
