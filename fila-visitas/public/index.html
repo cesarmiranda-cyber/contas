@@ -32,17 +32,18 @@ textarea{min-height:96px;resize:vertical}
 .stat i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:18px;flex:none}
 .stat b{display:block;font-size:24px;line-height:1.05}.stat span{font-size:12px;color:var(--mut);font-weight:600}
 .stat.red i{background:var(--redbg);color:var(--red)}.stat.amber i{background:var(--amberbg);color:var(--amber)}.stat.blue i{background:var(--brandbg);color:var(--brand)}.stat.on{outline:2px solid var(--cy)}
-.filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.filters{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}.filters.f5{grid-template-columns:2fr 1.2fr 1fr 1fr 1fr}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
 h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:99px;padding:0 8px;font-size:12px}
 .list{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
 .item{display:grid;grid-template-columns:1fr 130px 190px;gap:16px;align-items:start;padding:14px 16px 14px 20px;border-bottom:1px solid var(--line);position:relative}
 .item:last-child{border-bottom:0}.item:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cy)}
+.item:before{width:6px}.item.atrasada{background:color-mix(in srgb,var(--red) 9%,var(--sf))}.item.dia{background:color-mix(in srgb,#f5a623 16%,var(--sf))}
 .item.atrasada:before{background:var(--red)}.item.dia:before{background:#f5a623}
 .emp{font-weight:700;font-size:15px;line-height:1.25}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.tag{font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--sf2);border:1px solid var(--line);color:var(--ink2)}.tag.seg{background:var(--brandbg);border-color:transparent;color:var(--brand)}
 .due b{display:block;font-size:14px}.due span{display:inline-block;margin-top:2px;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--brandbg);color:var(--brand)}
-.item.atrasada .due span{background:var(--redbg);color:var(--red)}.item.dia .due span{background:var(--amberbg);color:var(--amber)}
+.item.atrasada .due span{background:var(--red);color:#fff}.item.dia .due span{background:#f5a623;color:#2b1d00}.item.atrasada .due b{color:var(--red)}
 .acts{display:flex;gap:8px;flex-wrap:wrap}.side{display:flex;flex-direction:column;gap:8px;align-items:stretch}.side .acts .btn{flex:1}
 .emp a{color:inherit;text-decoration:none}.emp a:hover{color:var(--brand);text-decoration:underline}
 .meta{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:12.5px;color:var(--ink2)}.meta b{color:var(--ink)}
@@ -64,7 +65,7 @@ h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:9
 table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-size:12px;text-transform:uppercase;background:var(--sf2)}
 .panel{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:4px 16px 16px;box-shadow:var(--sh)}
 @media(max-width:900px){.item{grid-template-columns:1fr 120px;gap:10px}.item .side{grid-column:1/-1}}
-@media(max-width:700px){.filters{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}.item{grid-template-columns:1fr auto;gap:8px}.item .due{text-align:right}.item .side{grid-column:1/-1}.stat{padding:10px}.stat b{font-size:20px}.stat i{width:32px;height:32px}}
+@media(max-width:700px){.filters,.filters.f5{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}.item{grid-template-columns:1fr auto;gap:8px}.item .due{text-align:right}.item .side{grid-column:1/-1}.stat{padding:10px}.stat b{font-size:20px}.stat i{width:32px;height:32px}}
 </style>
 </head>
 <body>
@@ -82,7 +83,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const fmt = iso => iso ? iso.split('-').reverse().join('/') : '—';
 let uid = null, eu = {}, aba = 'minhas', dados = null, users = [], foco = '';
 try { uid = +localStorage.getItem('fv.uid') || null; } catch {}
-const F = { seg: '', tipo: '', classe: '' };
+const F = { seg: '', tipo: '', classe: '', resp: '' };
 
 async function api(path, opt = {}) {
   const sep = path.includes('?') ? '&' : '?';
@@ -103,7 +104,7 @@ async function init() {
   montaAbas(); carrega();
 }
 function montaAbas() {
-  const abas = [['minhas', 'Minhas visitas'], ['equipe', 'Equipe'], ['hist', 'Reprogramações'], ['log', 'Auditoria'], ['cfg', 'Configurações']];
+  const abas = [['minhas', 'Visitas'], ['hist', 'Reprogramações'], ['log', 'Auditoria'], ['cfg', 'Configurações']];
   $('#tabs').innerHTML = abas.map(([k, t]) => `<button class="${aba === k ? 'on' : ''}" data-k="${k}">${t}</button>`).join('');
   $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => { aba = b.dataset.k; foco = ''; montaAbas(); carrega(); });
 }
@@ -112,7 +113,7 @@ async function carrega() {
   if (!uid && aba !== 'cfg') { m.innerHTML = '<div class="vazio">Escolha o seu nome no topo para ver as suas visitas.</div>'; return; }
   m.innerHTML = '<div class="vazio">Carregando…</div>';
   try {
-    if (aba === 'minhas' || aba === 'equipe') { dados = await api(`/api/visitas?escopo=${aba}`); lista(); }
+    if (aba === 'minhas') { dados = await api('/api/visitas?escopo=auto'); lista(); }
     else if (aba === 'hist') hist(await api('/api/historico'));
     else if (aba === 'log') auditoria(await api('/api/log'));
     else cfg(await api('/api/config'));
@@ -122,8 +123,10 @@ async function carrega() {
 function lista() {
   const todas = dados.visitas, busca = (F.q || '').toLowerCase();
   const cont = k => todas.filter(x => x.situacao === k).length;
-  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!foco || x.situacao === foco));
+  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!F.resp || String(x.responsavel) === F.resp) && (!foco || x.situacao === foco));
   const segs = [...new Set(todas.map(x => x.segmento))].filter(Boolean);
+  const resps = [...new Map(todas.map(x => [String(x.responsavel), x.responsavelNome])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const verEquipe = dados.visao !== 'minhas';
   const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${cur === a ? 'selected' : ''}>${esc(b)}</option>`).join('');
   const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Próximas']];
   $('#main').innerHTML = `
@@ -132,8 +135,10 @@ function lista() {
       <button class="stat amber ${foco === 'dia' ? 'on' : ''}" data-f="dia"><i>★</i><div><b>${cont('dia')}</b><span>Hoje</span></div></button>
       <button class="stat blue ${foco === 'aguardando' ? 'on' : ''}" data-f="aguardando"><i>◷</i><div><b>${cont('aguardando')}</b><span>Próximas</span></div></button>
     </div>
-    <div class="filters">
+    ${verEquipe ? `<div class="info">${dados.visao === 'tudo' ? 'Você está vendo as visitas de <b>todos</b>.' : 'Você está vendo as visitas da <b>sua equipe</b>.'}</div>` : ''}
+    <div class="filters ${verEquipe ? 'f5' : ''}">
       <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
+      ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(resps, F.resp)}</select>` : ''}
       <select id="fs"><option value="">Todos os segmentos</option>${opt(segs.map(s => [s, s]), F.seg)}</select>
       <select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
@@ -143,6 +148,7 @@ function lista() {
     }).join('') : '<div class="vazio">Nenhuma visita por aqui.</div>');
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? '' : b.dataset.f; lista(); });
   const q = $('#fq'); q.oninput = () => { F.q = q.value; const p = q.selectionStart; lista(); const n = $('#fq'); n.focus(); n.setSelectionRange(p, p); };
+  if ($('#fr')) $('#fr').onchange = e => { F.resp = e.target.value; lista(); };
   $('#fs').onchange = e => { F.seg = e.target.value; lista(); };
   $('#ft').onchange = e => { F.tipo = e.target.value; lista(); };
   $('#fc').onchange = e => { F.classe = e.target.value; lista(); };
@@ -158,7 +164,7 @@ function linha(c) {
     <div class="main">
       <div class="emp">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</div>
       <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Reprogramada ${c.reprogramacoes}×</span>` : ''}</div>
-      <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${aba === 'equipe' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
+      <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${dados.visao !== 'minhas' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
       ${eq ? `<div class="pessoas">${eq}</div>` : ''}
     </div>
     <div class="due"><small>Programada</small><b>${fmt(c.data)}</b><span>${q}</span></div>
@@ -256,6 +262,7 @@ async function cfg(d) {
  <label><input type="checkbox" id="ha" style="width:auto" ${c.hierarquiaAuto ? 'checked' : ''}> Preencher Supervisor, Coordenador, Gerente e Diretor vazios pela estrutura da empresa (a partir do departamento do Vendedor)</label>
     <label><input type="checkbox" id="ap" style="width:auto" ${c.atualizarProxima ? 'checked' : ''}> Gravar "Próxima Visita" do segmento na empresa</label>
     <div class="fld"><label>Motores: qual par de datas é o oficial?</label><select id="md"><option value="secao" ${c.motoresDatas === 'secao' ? 'selected' : ''}>Campos da seção (Próxima/Última Visita)</option><option value="extra" ${c.motoresDatas === 'extra' ? 'selected' : ''}>Campos extras (Data Próxima Visita / Última Visita)</option></select></div>
+    <div class="fld"><label>Quem enxerga todas as visitas (IDs de usuário). O chefe do departamento raiz já enxerga tudo.</label><input id="vt" value="${(c.verTudo || []).join(',')}"></div>
     <div class="fld"><label>Administradores (IDs de usuário, separados por vírgula)</label><input id="ad" value="${(c.admins || []).join(',')}"></div>
     <div class="err" id="er"></div><button class="btn pri" id="sv">Salvar configuração</button></div>
     <h2>Campos descobertos no Bitrix24</h2>${campos.erro ? `<div class="err on">${esc(campos.erro)}</div>` : `
@@ -272,7 +279,7 @@ async function cfg(d) {
   $('#sv').onclick = async () => {
     const intervalos = {}; document.querySelectorAll('[data-i]').forEach(i => { const [g, k] = i.dataset.i.split('.'); (intervalos[g] ||= {})[k] = +i.value; });
     try {
-      await api('/api/config', { method: 'PUT', body: { ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, motoresDatas: $('#md').value, admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
+      await api('/api/config', { method: 'PUT', body: { ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, motoresDatas: $('#md').value, verTudo: $('#vt').value.split(',').map(s => +s.trim()).filter(Boolean), admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
   };

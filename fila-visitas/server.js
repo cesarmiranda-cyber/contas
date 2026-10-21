@@ -45,7 +45,7 @@ const routes = {
   'GET /health': async () => ({ ok: true }),
   'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '' }),
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
-  'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'minhas' }); },
+  'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto' }); },
   'GET /api/departamentos': async () => { exige(); return { departamentos: await svc.departamentos() }; },
   'GET /api/historico': async () => ({ reprogramacoes: store.historico }),
   'GET /api/log': async () => ({ log: store.logs.slice(0, 200), bloqueios: store.bloqueios }),
@@ -70,6 +70,7 @@ const routes = {
         if (/^\d+$/.test(d) && Object.keys(o).length) p.alcadas[d] = o;
       }
     }
+    if (Array.isArray(b.verTudo)) p.verTudo = b.verTudo.map(Number).filter(Boolean);
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);
     if (b.mapaManual && typeof b.mapaManual === 'object') p.mapaManual = b.mapaManual;
     store.log('config', `Configuração alterada por ${id.uid || 'desconhecido'}`);

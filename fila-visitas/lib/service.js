@@ -117,6 +117,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     }
   }
 
+  const equipeIds = sg => Object.fromEntries(['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor'].filter(k => sg && sg[k]).map(k => [k, sg[k]]));
   // ---------- cards da fila ----------
   const tituloCard = (empresa, seg, cargo) => `${empresa} | ${seg} | ${cargo}`;
   async function lerCard(id) {
@@ -161,7 +162,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     f[map.fila.data || 'closedate'] = data;
     const r = (await bitrix.call('crm.item.add', { entityTypeId: F.ETYPE.fila, fields: f })).result?.item;
     store.setChave(chave, +r.id);
-    store.setCard(+r.id, { empresaId: empresa.id, empresa: empresa.nome, seg, cargo, classe, chave });
+    store.setCard(+r.id, { empresaId: empresa.id, empresa: empresa.nome, seg, cargo, classe, chave, equipe: equipeIds(empresa.segs[seg]) });
     store.setSnapCard(+r.id, { data, resp: responsavel });
     store.log('card-criado', `Card ${r.id} criado: ${f.title} · ${R.fmtBR(data)} · resp ${responsavel}`, { card: +r.id });
     return +r.id;
@@ -225,6 +226,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
           continue;
         }
         store.setChave(chave, existente.id);
+        { const reg = store.card(existente.id) || {}, eq = equipeIds(s); if (JSON.stringify(reg.equipe) !== JSON.stringify(eq)) store.setCard(existente.id, { ...reg, empresaId: id, empresa: emp.nome, seg, cargo, equipe: eq }); }
         const ant = snapAnt[k] || {};
         const mudouData = forcar || ant.classe !== s.classe || ant.ultima !== s.ultima;
         const mudouResp = forcar || ant.resp !== resp || existente.responsavel !== resp;
@@ -506,22 +508,36 @@ function createService({ bitrix, store, clock = () => new Date() }) {
   }
 
   // ---------- consultas para a interface ----------
-  async function listarVisitas({ uid, escopo = 'minhas' }) {
+  // Quem enxerga tudo: administradores, quem está em "verTudo" e o chefe do departamento raiz (a diretoria).
+  async function enxergaTudo(uid) {
+    const c = store.config;
+    if ((c.admins || []).map(Number).includes(+uid) || (c.verTudo || []).map(Number).includes(+uid)) return true;
+    try { const deps = (await bitrix.call('department.get', {})).result || []; return deps.some(d => !+d.PARENT && +d.UF_HEAD === +uid); } catch { return false; }
+  }
+  // escopo 'auto': vendedor vê os seus; supervisor/coordenador/gerente veem a equipe (quem aparece acima do vendedor na empresa
+  // ou chefia o departamento do responsável); diretoria/administração vê tudo.
+  async function listarVisitas({ uid, escopo = 'auto' }) {
     const { map } = await campos();
     const itens = (await cardsAbertos());
-    let permitidos = null;
-    if (escopo === 'minhas') permitidos = new Set([+uid]);
-    else if (escopo === 'equipe' && !isAdmin(uid)) permitidos = await equipeDe(uid);
+    const todos = escopo === 'todas' || (escopo === 'auto' && await enxergaTudo(uid));
+    const time = escopo === 'auto' && !todos ? await equipeDe(uid) : new Set([+uid]);
     const out = [];
     const tipos = new Map(), empresas = new Map();
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
     for (const it of itens) {
-      if (permitidos && !permitidos.has(+it.assignedById)) continue;
       const c = await dadosCard(it);
       const reg = store.card(it.id) || {};
+      let emp = empresas.get(c.empresaId);
+      const propria = +c.responsavel === +uid;
+      if (!todos && !propria && escopo === 'minhas') continue;
+      if (!todos && !propria && escopo === 'auto' && !time.has(+c.responsavel)) {
+        // fora da equipe por departamento: só vê se aparece nos cargos da empresa (índice local; cai na empresa se ainda não houver)
+        let eq = reg.equipe;
+        if (!eq) { if (emp === undefined) { emp = await lerEmpresa(c.empresaId).catch(() => null); empresas.set(c.empresaId, emp); } eq = equipeIds(emp?.segs?.[c.segmento]); }
+        if (!Object.values(eq || {}).map(Number).includes(+uid)) continue;
+      }
       let tipo = tipos.get(c.empresaId);
       if (tipo === undefined && map.tipoEmpresa && c.empresaId) { try { tipo = F.decode((await campos()).meta, map.tipoEmpresa, (await bitrix.call('crm.company.get', { id: c.empresaId })).result?.[map.tipoEmpresa]); } catch { tipo = ''; } tipos.set(c.empresaId, tipo); }
-      let emp = empresas.get(c.empresaId);
       if (emp === undefined) { emp = await lerEmpresa(c.empresaId).catch(() => null); empresas.set(c.empresaId, emp); }
       const sg = emp?.segs?.[c.segmento] || {};
       const equipe = {};
@@ -532,7 +548,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
         equipe, reprogramacoes: store.historico.filter(h => h.card === c.id && !h.tipo).length, urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     }
     out.sort((a, b) => (a.data || '9').localeCompare(b.data || '9'));
-    return { hoje: hoje(), visitas: out };
+    return { hoje: hoje(), visao: todos ? 'tudo' : (time.size > 1 || out.some(v => +v.responsavel !== +uid) ? 'equipe' : 'minhas'), visitas: out };
   }
   async function equipeDe(uid) {
     const ids = new Set([+uid]);

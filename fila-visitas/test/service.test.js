@@ -206,3 +206,18 @@ test('lista de visitas traz responsável, equipe, última visita e ciclo', async
   assert.equal(v.ultima, '2026-04-20'); assert.equal(v.ciclo, 30); assert.equal(v.diasDesdeUltima, 20);
   assert.equal(v.equipe.gerente, 'Gil Gerente');
 });
+
+test('visibilidade por alçada: vendedor só os seus, gerente a equipe, diretoria tudo, estranho nada', async () => {
+  const { w, svc } = setup();
+  w.users[99] = { ID: 99, NAME: 'Zé', LAST_NAME: 'Ninguém', UF_DEPARTMENT: [5] };
+  w.empresa(2, 'Outra Ltda', { UF_CRM_MOT_CLASSE: '1', UF_CRM_MOT_VENDEDOR: '99', UF_CRM_MOT_SUPERVISOR: '99', UF_CRM_MOT_COORDENADOR: '99', UF_CRM_MOT_GERENTE: '99', UF_CRM_MOT_ULTIMA: '2026-04-20' });
+  await svc.sincronizarEmpresa(1); await svc.sincronizarEmpresa(2);
+  const ver = async uid => (await svc.listarVisitas({ uid })).visitas.map(v => v.empresa);
+  const vend = await ver(99);
+  assert.ok(vend.length && vend.every(e => e === 'Outra Ltda'), 'vendedor 99 só vê a empresa dele');
+  const ger = await ver(20); // gerente de Acme (aparece nos cargos) e chefe do depto 5 (onde está o 99)
+  assert.ok(ger.includes('Acme Marítima') && ger.includes('Outra Ltda'));
+  const dir = await ver(30); // chefe do departamento raiz
+  assert.equal(dir.length, 10);
+  assert.deepEqual(await ver(777), []);
+});
