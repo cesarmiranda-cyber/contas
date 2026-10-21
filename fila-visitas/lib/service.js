@@ -1,6 +1,7 @@
 'use strict';
 const R = require('./rules');
 const F = require('./fields');
+const Duplicados = require('./duplicados');
 
 const CACHE_MS = 5 * 60 * 1000;
 const DYN = id => `dynamic_${id}`;
@@ -328,8 +329,9 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     if (v.antecipada) pre[v.antecipada] = meta[v.antecipada]?.itens?.length ? F.encode(meta, v.antecipada, ant ? 'Sim' : 'Não') : (ant ? 'Y' : 'N');
     const travados = new Set([v.segmento, v.filaId, v.antecipada].filter(Boolean));
     const lista = [];
+    const ocultos = new Set(Duplicados.agrupar(defs, Object.values(map.visita)).flatMap(g => g.outros)); // duplicados: mostra só o campo padrão
     for (const [k, d] of Object.entries(defs)) {
-      if (!k.startsWith('ufCrm')) continue;
+      if (!k.startsWith('ufCrm') || ocultos.has(k)) continue;
       const tipo = TIPOS[d.type];
       if (!tipo) continue; // arquivo, vínculo com CRM etc. não cabem no formulário enxuto
       const itens = (d.items || []).map(i => ({ id: String(i.ID ?? i.id), nome: String(i.VALUE ?? i.value ?? '') }));

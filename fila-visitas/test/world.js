@@ -18,9 +18,12 @@ function createWorld() {
   w.call = async (method, p = {}) => {
     switch (method) {
       case 'crm.company.fields': return { result: companyFields };
-      case 'crm.item.fields': return { result: { fields: p.entityTypeId === 1036
-        ? { ufCrm_seg: { title: 'Segmento', type: 'string' }, ufCrm_cargo: { title: 'Cargo', type: 'string' }, ufCrm_classe: { title: 'Classe', type: 'string' }, ufCrm_data: { title: 'Data programada', type: 'date' } }
-        : { ufCrm_setor: { title: 'Setor', type: 'string' }, ufCrm_fila: { title: 'ID da Fila', type: 'string' }, ufCrm_ant: { title: 'Antecipada', type: 'string' }, ufCrm_res: { title: 'Resultado ou observações', type: 'string', isRequired: true }, ufCrm_nota: { title: 'Nota do cliente', type: 'integer' }, ufCrm_ret: { title: 'Precisa retorno', type: 'boolean' }, ufCrm_dh: { title: 'Data/Hora da visita', type: 'datetime' } } } };
+      case 'crm.item.fields': {
+        const base = p.entityTypeId === 1036
+          ? { ufCrm_seg: { title: 'Segmento', type: 'string' }, ufCrm_cargo: { title: 'Cargo', type: 'string' }, ufCrm_classe: { title: 'Classe', type: 'string' }, ufCrm_data: { title: 'Data programada', type: 'date' } }
+          : { ufCrm_setor: { title: 'Setor', type: 'string' }, ufCrm_fila: { title: 'ID da Fila', type: 'string' }, ufCrm_ant: { title: 'Antecipada', type: 'string' }, ufCrm_res: { title: 'Resultado ou observações', type: 'string', isRequired: true }, ufCrm_nota: { title: 'Nota do cliente', type: 'integer' }, ufCrm_ret: { title: 'Precisa retorno', type: 'boolean' }, ufCrm_dh: { title: 'Data/Hora da visita', type: 'datetime' } };
+        return { result: { fields: { ...base, ...(w.extraFields?.[p.entityTypeId] || {}) } } };
+      }
       case 'crm.category.list': return { result: { categories: [{ id: 1, isDefault: 'Y' }] } };
       case 'crm.status.list': return { result: stages };
       case 'crm.company.get': { const c = w.companies[p.id]; return { result: c ? { ...c } : null }; }

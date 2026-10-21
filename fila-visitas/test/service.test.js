@@ -241,3 +241,20 @@ test('histórico de reprogramações só aparece para quem pode ver a visita', a
   assert.equal((await svc.historicoVisivel(30)).length, 1, 'diretoria vê tudo');
   assert.equal((await svc.historicoVisivel(777)).length, 0);
 });
+
+test('campos duplicados no Registro de Visita: formulário mostra só o padrão e a migração copia os valores antigos', async () => {
+  const D = require('../lib/duplicados');
+  const { w, svc } = setup();
+  w.extraFields = { 1032: { ufCrm_res_old: { title: 'Resultado ou observações ', type: 'string' }, ufCrm_nota_old: { title: 'Nota do cliente', type: 'integer' } } };
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const f = await svc.camposVisita(vend.id);
+  assert.equal(f.campos.filter(c => /Resultado/.test(c.titulo)).length, 1);
+  assert.ok(!f.campos.some(c => c.key.endsWith('_old')), 'duplicados antigos ficam fora do formulário');
+  w.items[1032][500] = { id: 500, ufCrm_res_old: 'texto antigo', ufCrm_nota_old: 7 };
+  const r = await D.migrarSpa({ call: w.call }, 1032, ['ufCrm_res']);
+  assert.equal(r.copiados, 2);
+  assert.equal(w.items[1032][500].ufCrm_res, 'texto antigo');
+  assert.equal(w.items[1032][500].ufCrm_nota, 7);
+  assert.equal(w.items[1032][500].ufCrm_res_old, 'texto antigo', 'migração não apaga o valor antigo');
+});

@@ -152,6 +152,15 @@ server.listen(PORT, () => {
       for (const e of ['COMPANY_TYPE', 'INDUSTRY']) { const st = (await bitrix.call('crm.status.list', { filter: { ENTITY_ID: e } })).result || []; console.log('tipo-status-' + e, JSON.stringify(st.map(x => x.NAME))); }
     } catch (e) { console.error('tipo:', e.message); }
   }, 2000);
+  if (bitrix.enabled && process.env.SPA_DUPLICADOS) setTimeout(async () => {
+    try {
+      const { map } = await svc.campos(true);
+      const prot = Object.values(map.visita);
+      const modo = process.env.SPA_DUPLICADOS;
+      if (modo === 'apagar') console.log('spa-apagar', JSON.stringify(await D.apagarSpa(bitrix, 1032, DATA_DIR, prot)));
+      else { const a = await D.analisarSpa(bitrix, 1032, prot); console.log('spa-analise', JSON.stringify({ itens: a.itens, grupos: a.grupos.map(g => `${g.titulo}: padrão ${g.padrao}(${g.usoPadrao}) outros ${g.usoOutros.map(([k, n]) => k + '(' + n + ')').join(',')}`) })); }
+    } catch (e) { console.error('spa-duplicados:', e.message); }
+  }, 3000);
   if (bitrix.enabled && process.env.PREPARAR) setTimeout(() => P.preparar(bitrix, svc).then(r => { console.log('preparar', JSON.stringify(r)); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); }).catch(e => console.error('preparar:', e.message)), 2000);
   if (bitrix.enabled && process.env.APAGAR_CAMPOS) setTimeout(() => D.apagar(bitrix, process.env.APAGAR_CAMPOS.split(',').map(Number).filter(Boolean), DATA_DIR).then(r => { console.log('campos-apagados', JSON.stringify(r)); store.log('config', `Campos duplicados apagados: ${(r.feitos || []).join('; ')}`); }).catch(e => console.error('campos-apagados:', e.message)), 3000);
   if (bitrix.enabled && process.env.ANALISE_DUPLICADOS) setTimeout(() => D.analisar(bitrix).then(a => { const p = D.planejar(a); console.log('duplicados', JSON.stringify({ empresas: a.empresas, apagar: p.apagar.map(c => `${c.id}:${c.campo}:${c.rotulo}`), manter: p.manter.map(c => `${c.id}:${c.campo}:${c.rotulo}:${c.comValor}`), conflitos: p.conflitos.map(g => g.campos.map(c => `${c.campo}=${c.comValor}`)) })); }).catch(e => console.error('duplicados:', e.message)), 3000);
