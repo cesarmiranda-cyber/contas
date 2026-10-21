@@ -235,14 +235,53 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     return r;
   }
 
+  // ---------- formulário de registro: todos os campos do SPA 1032 ----------
+  const TIPOS = { string: 'texto', char: 'texto', integer: 'numero', double: 'numero', money: 'numero', date: 'data', datetime: 'datahora', boolean: 'sim_nao', enumeration: 'lista', employee: 'usuario', url: 'texto', address: 'texto' };
+  async function camposVisita(cardId) {
+    const { map, meta } = await campos();
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    const defs = (await bitrix.call('crm.item.fields', { entityTypeId: F.ETYPE.visita })).result?.fields || {};
+    const dia = hoje(), ant = R.antecipada(dia, card.data);
+    const pre = {};
+    const v = map.visita;
+    if (v.segmento) pre[v.segmento] = F.encode(meta, v.segmento, card.segmento);
+    if (v.filaId) pre[v.filaId] = String(card.id);
+    if (v.antecipada) pre[v.antecipada] = meta[v.antecipada]?.itens?.length ? F.encode(meta, v.antecipada, ant ? 'Sim' : 'Não') : (ant ? 'Y' : 'N');
+    const travados = new Set([v.segmento, v.filaId, v.antecipada].filter(Boolean));
+    const lista = [];
+    for (const [k, d] of Object.entries(defs)) {
+      if (!k.startsWith('ufCrm')) continue;
+      const tipo = TIPOS[d.type];
+      if (!tipo) continue; // arquivo, vínculo com CRM etc. não cabem no formulário enxuto
+      const itens = (d.items || []).map(i => ({ id: String(i.ID ?? i.id), nome: String(i.VALUE ?? i.value ?? '') }));
+      lista.push({
+        key: k, titulo: d.title || d.formLabel || k, tipo, obrigatorio: !!d.isRequired || k === v.resultado, multiplo: !!d.isMultiple, itens,
+        valor: pre[k] ?? (k === v.dataHora ? new Date().toISOString() : ''), travado: travados.has(k),
+        destaque: k === v.resultado,
+      });
+    }
+    lista.sort((a, b) => (b.destaque - a.destaque) || (b.obrigatorio - a.obrigatorio));
+    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null };
+  }
+
   // ---------- registrar visita ----------
-  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora }) {
+  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, campos: extra = {} }) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
     if (!card.aberto) throw erro('Esta visita já foi finalizada.', 409);
     if (!uid) throw erro('Usuário não identificado.', 401);
-    if (String(resultado || '').trim().length < 3) throw erro('Descreva o resultado ou as observações da visita.');
+    const form = await camposVisita(cardId);
+    const dados = { ...extra };
+    const dhKey = map.visita.dataHora;
+    if (dhKey && dados[dhKey] && !dataHora) dataHora = dados[dhKey];
+    if (resultado && map.visita.resultado && !dados[map.visita.resultado]) dados[map.visita.resultado] = resultado;
+    if (acompanhamento && map.visita.acompanhamento && !dados[map.visita.acompanhamento]) dados[map.visita.acompanhamento] = acompanhamento;
+    const vazio = x => x === undefined || x === null || String(x).trim() === '' || (Array.isArray(x) && !x.length);
+    const faltam = form.campos.filter(c => c.obrigatorio && !c.travado && c.key !== dhKey && vazio(dados[c.key])).map(c => c.titulo);
+    if (!map.visita.resultado && String(resultado || '').trim().length < 3 && !form.campos.some(c => c.obrigatorio)) faltam.push('Resultado / observações');
+    if (faltam.length) throw erro(`Preencha: ${faltam.join(', ')}.`, 422);
     const agora = clock();
     const quando = dataHora ? new Date(dataHora) : agora;
     if (isNaN(quando)) throw erro('Data/hora inválida.');
@@ -253,16 +292,23 @@ function createService({ bitrix, store, clock = () => new Date() }) {
       title: `${card.empresa} - ${R.fmtBR(dia)}`, companyId: card.empresaId, assignedById: uid,
       [map.visita.dataHora || 'begindate']: quando.toISOString(),
     };
+    const permitidos = new Map(form.campos.filter(c => !c.travado && c.key !== dhKey).map(c => [c.key, c]));
+    for (const [k, val] of Object.entries(dados)) {
+      const c = permitidos.get(k);
+      if (!c || vazio(val)) continue;
+      f[k] = c.tipo === 'sim_nao' ? (val === true || val === 'Y' || val === 'true' ? 'Y' : 'N') : c.tipo === 'numero' ? Number(val) : val;
+    }
     const set = (k, v) => { if (map.visita[k]) f[map.visita[k]] = v; };
     set('segmento', F.encode(meta, map.visita.segmento, card.segmento));
     set('filaId', String(card.id));
     set('antecipada', map.visita.antecipada && meta[map.visita.antecipada]?.itens?.length ? F.encode(meta, map.visita.antecipada, ant ? 'Sim' : 'Não') : (ant ? 'Y' : 'N'));
-    set('resultado', String(resultado).trim());
-    if (acompanhamento) set('acompanhamento', String(acompanhamento).trim());
     const passos = [];
     const v = (await bitrix.call('crm.item.add', { entityTypeId: F.ETYPE.visita, fields: f })).result?.item;
     store.setSnapVisita(+v.id, { dt: quando.toISOString(), campo: map.visita.dataHora || 'begindate' });
     passos.push(`visita ${v.id} criada`);
+    if (String(resultado || '').trim() && !map.visita.resultado) {
+      await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: +v.id, ENTITY_TYPE: DYN(F.ETYPE.visita), COMMENT: `Resultado: ${String(resultado).trim()}${acompanhamento ? `\nAcompanhamento: ${acompanhamento}` : ''}` } }).catch(e => store.log('aviso', `Resultado não gravado como comentário: ${e.message}`));
+    }
     // finaliza o card na hora (sem depender de tarefa/campo de conclusão)
     await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.finalizado } });
     store.setChave(R.chaveFila(card.empresaId, card.segmento, card.cargo), null);
@@ -445,6 +491,6 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

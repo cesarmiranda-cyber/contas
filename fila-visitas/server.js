@@ -90,6 +90,8 @@ const server = http.createServer(async (req, res) => {
       const body = ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {};
       return send(res, 200, await routes[key](u, body, id));
     }
+    const mf = u.pathname.match(/^\/api\/cards\/(\d+)\/form$/);
+    if (mf && req.method === 'GET') { exige(); return send(res, 200, await svc.camposVisita(+mf[1])); }
     let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar)$/);
     if (m && req.method === 'POST') {
       exige();

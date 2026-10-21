@@ -144,3 +144,21 @@ test('minhas visitas lista só as do usuário, ordenadas por data', async () => 
   const all = await svc.listarVisitas({ uid: 30, escopo: 'todas' });
   assert.equal(all.visitas.length, 5);
 });
+
+test('formulário de registro lista os campos do 1032, pré-preenchidos e travados, e valida obrigatórios', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const f = await svc.camposVisita(vend.id);
+  const por = k => f.campos.find(c => c.key === k);
+  assert.equal(por('ufCrm_res').obrigatorio, true);
+  assert.equal(f.campos[0].key, 'ufCrm_res', 'resultado vem primeiro');
+  assert.equal(por('ufCrm_setor').valor, 'Motores'); assert.equal(por('ufCrm_setor').travado, true);
+  assert.equal(por('ufCrm_fila').valor, String(vend.id));
+  assert.equal(por('ufCrm_ant').valor, 'Y');
+  assert.equal(por('ufCrm_nota').tipo, 'numero'); assert.equal(por('ufCrm_ret').tipo, 'sim_nao');
+  await assert.rejects(svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_nota: 9 } }), /Preencha: Resultado ou observações/);
+  const r = await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok', ufCrm_nota: '9', ufCrm_ret: true, ufCrm_setor: 'HACK' } });
+  const v = w.items[1032][r.visita];
+  assert.equal(v.ufCrm_nota, 9); assert.equal(v.ufCrm_ret, 'Y'); assert.equal(v.ufCrm_setor, 'Motores', 'campo travado não é sobrescrito');
+});
