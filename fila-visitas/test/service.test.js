@@ -258,3 +258,15 @@ test('campos duplicados no Registro de Visita: formulário mostra só o padrão 
   assert.equal(w.items[1032][500].ufCrm_nota, 7);
   assert.equal(w.items[1032][500].ufCrm_res_old, 'texto antigo', 'migração não apaga o valor antigo');
 });
+
+test('alçada da visita vem do cargo do card, travada, e é gravada no registro', async () => {
+  const { w, svc } = setup();
+  w.extraFields = { 1032: { ufCrm_alc: { title: 'Alçada', type: 'enumeration', items: [{ ID: '7', VALUE: 'Vendedor' }, { ID: '8', VALUE: 'Gerente' }] } } };
+  await svc.sincronizarEmpresa(1);
+  const ger = cards(w).find(c => c.title.endsWith('| Gerente'));
+  const f = await svc.camposVisita(ger.id);
+  const alc = f.campos.find(c => c.key === 'ufCrm_alc');
+  assert.equal(alc.valor, '8'); assert.equal(alc.travado, true);
+  const r = await svc.registrarVisita(ger.id, { uid: 20, campos: { ufCrm_res: 'Ok' } });
+  assert.equal(w.items[1032][r.visita].ufCrm_alc, '8');
+});

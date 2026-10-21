@@ -322,12 +322,19 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     if (!card) throw erro('Card da fila não encontrado.', 404);
     const defs = (await bitrix.call('crm.item.fields', { entityTypeId: F.ETYPE.visita })).result?.fields || {};
     const dia = hoje(), ant = R.antecipada(dia, card.data);
-    const pre = {};
+    const pre = {}, alcadaKeys = [];
     const v = map.visita;
     if (v.segmento) pre[v.segmento] = F.encode(meta, v.segmento, card.segmento);
     if (v.filaId) pre[v.filaId] = String(card.id);
     if (v.antecipada) pre[v.antecipada] = meta[v.antecipada]?.itens?.length ? F.encode(meta, v.antecipada, ant ? 'Sim' : 'Não') : (ant ? 'Y' : 'N');
-    const travados = new Set([v.segmento, v.filaId, v.antecipada].filter(Boolean));
+    // Alçada da visita = cargo do card (Vendedor, Supervisor, Coordenador, Gerente, Diretor); vem preenchida e travada.
+    for (const [k, d] of Object.entries(defs)) {
+      if (!k.startsWith('ufCrm') || !/al[cç]ada/i.test(d.title || '')) continue;
+      const it = (d.items || []).map(i => ({ id: String(i.ID ?? i.id), nome: String(i.VALUE ?? i.value ?? '') })).find(i => R.norm(i.nome) === R.norm(card.cargo));
+      pre[k] = it ? it.id : card.cargo;
+      alcadaKeys.push(k);
+    }
+    const travados = new Set([v.segmento, v.filaId, v.antecipada, ...alcadaKeys].filter(Boolean));
     const lista = [];
     const ocultos = new Set(Duplicados.agrupar(defs, Object.values(map.visita)).flatMap(g => g.outros)); // duplicados: mostra só o campo padrão
     for (const [k, d] of Object.entries(defs)) {
@@ -378,6 +385,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
       if (!c || vazio(val)) continue;
       f[k] = c.tipo === 'sim_nao' ? (val === true || val === 'Y' || val === 'true' ? 'Y' : 'N') : c.tipo === 'numero' ? Number(val) : val;
     }
+    for (const c of form.campos) if (c.travado && c.valor !== '' && c.valor !== undefined) f[c.key] = c.valor; // campos automáticos (ex.: Alçada)
     const set = (k, v) => { if (map.visita[k]) f[map.visita[k]] = v; };
     set('segmento', F.encode(meta, map.visita.segmento, card.segmento));
     set('filaId', String(card.id));
