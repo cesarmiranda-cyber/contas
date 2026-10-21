@@ -7,6 +7,7 @@ function createWorld() {
   for (const s of SEG) for (const [k, l] of [['Diretor', 'Diretor Responsável'], ['Gerente', 'Gerente Responsável'], ['Coordenador', 'Coordenador Responsável'], ['Supervisor', 'Supervisor Responsável'], ['Vendedor', 'Vendedor Responsável'], ['Classe', 'Classe'], ['Proxima', 'Próxima Visita'], ['Ultima', 'Última Visita']]) {
     companyFields[`UF_CRM_${s.slice(0, 3).toUpperCase()}_${k.toUpperCase()}`] = { formLabel: `[${s}] ${l}`, type: k === 'Classe' ? 'enumeration' : 'string', items: k === 'Classe' ? [{ ID: '1', VALUE: 'A' }, { ID: '2', VALUE: 'B' }, { ID: '3', VALUE: 'C' }] : undefined };
   }
+  w.companyFields = companyFields;
   const stages = [{ STATUS_ID: 'DT1036_1:NEW', NAME: 'Aguardando' }, { STATUS_ID: 'DT1036_1:DIA', NAME: 'Dia da Visita' }, { STATUS_ID: 'DT1036_1:LATE', NAME: 'Atrasada' }, { STATUS_ID: 'DT1036_1:DONE', NAME: 'Finalizado' }];
   w.stages = { aguardando: 'DT1036_1:NEW', dia: 'DT1036_1:DIA', atrasada: 'DT1036_1:LATE', finalizado: 'DT1036_1:DONE' };
   const match = (it, filter = {}) => Object.entries(filter).every(([k, v]) => {

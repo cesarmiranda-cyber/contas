@@ -8,6 +8,7 @@ const { createService } = require('./lib/service');
 const { request } = require('./lib/http');
 const R = require('./lib/rules');
 const D = require('./lib/duplicados');
+const P = require('./lib/preparar');
 
 const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -67,6 +68,7 @@ const routes = {
   },
   'GET /api/campos': async (u) => { exige(); return svc.campos(u.searchParams.get('refresh') === '1'); },
   'GET /api/duplicados': async () => { exige(); const a = await D.analisar(bitrix); return { ...a, plano: D.planejar(a) }; },
+  'POST /api/preparar': async (_, __, id) => { exige(); if ((store.config.admins || []).length && !svc.isAdmin(id.uid)) throw Object.assign(new Error('Apenas administradores.'), { status: 403 }); const r = await P.preparar(bitrix, svc); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); return r; },
   'POST /api/sincronizar': async (_, b) => { exige(); return b.empresa ? svc.sincronizarEmpresa(+b.empresa, { forcar: !!b.forcar }) : svc.sincronizarTodas(); },
   'POST /api/job': async (_, b) => { exige(); return svc.jobDiario({ forcar: !!b.forcar }); },
   'POST /api/varrer': async () => { exige(); return svc.varrer(); },

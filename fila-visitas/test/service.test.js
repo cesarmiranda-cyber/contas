@@ -162,3 +162,16 @@ test('formulário de registro lista os campos do 1032, pré-preenchidos e travad
   const v = w.items[1032][r.visita];
   assert.equal(v.ufCrm_nota, 9); assert.equal(v.ufCrm_ret, 'Y'); assert.equal(v.ufCrm_setor, 'Motores', 'campo travado não é sobrescrito');
 });
+
+test('campos duplicados na empresa: usa o que tiver valor, a maior última visita e grava no principal', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_CLASSE: '', UF_CRM_MOT_VENDEDOR: '', UF_CRM_MOT_ULTIMA: '2026-03-01' });
+  w.companyFields.UF_CRM_OLD_CLASSE = { formLabel: 'Classe Motores', type: 'string' };
+  w.companyFields.UF_CRM_OLD_VEND = { formLabel: '[Motores] Vendedor Responsável', type: 'string' };
+  w.companyFields.UF_CRM_OLD_ULT = { formLabel: '[Motores] Última Visita', type: 'date' };
+  Object.assign(w.companies[1], { UF_CRM_OLD_CLASSE: 'B', UF_CRM_OLD_VEND: '10', UF_CRM_OLD_ULT: '2026-04-20' });
+  const r = await svc.sincronizarEmpresa(1);
+  assert.equal(r.criados.length, 5);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  assert.equal(vend.ufCrm_data, '2026-06-19', 'classe B (60 dias) a partir da maior última visita (20/04)');
+  assert.equal(vend.assignedById, 10);
+});

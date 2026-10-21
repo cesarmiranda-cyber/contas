@@ -242,8 +242,10 @@ async function cfg(d) {
     <div class="err" id="er"></div><button class="btn pri" id="sv">Salvar configuração</button></div>
     <h2>Campos descobertos no Bitrix24</h2>${campos.erro ? `<div class="err on">${esc(campos.erro)}</div>` : `
       ${campos.faltando.length ? `<div class="err on">Faltando: ${campos.faltando.map(esc).join(' · ')}</div>` : '<div class="ok">Todos os campos e etapas foram encontrados.</div>'}
-      ${campos.ambiguos.length ? `<p class="hint">Ambíguos (revise): ${campos.ambiguos.map(a => esc(a.onde + ' → ' + a.opcoes.join(' | '))).join('<br>')}</p>` : ''}
+      ${campos.ambiguos.length ? `<p class="hint">Campos com o mesmo nome (o app lê todos e usa o que tiver valor): ${campos.ambiguos.map(a => esc(a.onde + ' → ' + a.opcoes.join(' | '))).join('<br>')}</p>` : ''}
       <details><summary>Ver mapeamento</summary><pre style="overflow:auto;font-size:12px">${esc(JSON.stringify(campos.map, null, 1))}</pre></details>`}
+    <h2>Preparar o Bitrix</h2><div class="panel"><p class="hint">Cria o que falta: etapa <b>Atrasada</b> no kanban 1036, campos <b>Cargo</b> e <b>Data programada</b> na Fila e <b>Resultado</b>/<b>Acompanhamento</b> no Registro de Visita. Só cria o que ainda não existe.</p>
+      <button class="btn pri" id="bp">Criar etapa e campos que faltam</button><pre id="pout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Testar com uma empresa</h2><div class="panel"><p class="hint">Gera a fila de <b>uma</b> empresa só (funciona mesmo com o app desativado). Use o número que aparece na URL da empresa no Bitrix (…/crm/company/details/<b>123</b>/).</p>
       <div style="display:flex;gap:8px"><input id="eid" type="number" inputmode="numeric" placeholder="ID da empresa" style="max-width:200px"><button class="btn pri" id="bt">Gerar fila desta empresa</button></div><pre id="tout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Ações</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="b1">Sincronizar todas as empresas</button><button class="btn" id="b2">Rodar job diário agora</button></div><p class="hint" id="out"></p>`;
@@ -253,6 +255,11 @@ async function cfg(d) {
       await api('/api/config', { method: 'PUT', body: { ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, motoresDatas: $('#md').value, admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
+  };
+  $('#bp').onclick = async () => {
+    $('#pout').textContent = 'Criando…';
+    try { const r = await api('/api/preparar', { method: 'POST', body: {} }); $('#pout').textContent = [...r.feito.map(x => '✔ ' + x), ...r.erros.map(x => '✖ ' + x), r.faltando.length ? 'Ainda falta: ' + r.faltando.join(' · ') : 'Tudo pronto.'].join('\n'); }
+    catch (e) { $('#pout').textContent = e.message; }
   };
   $('#bt').onclick = async () => {
     const id = +$('#eid').value; if (!id) { $('#tout').textContent = 'Informe o ID da empresa.'; return; }

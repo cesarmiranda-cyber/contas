@@ -17,9 +17,9 @@ async function descobrir(bitrix, cfg) {
   const faltando = [], ambiguos = [];
   const ef = (await bitrix.call('crm.company.fields')).result || {};
   const empresaMeta = {};
-  const empresa = {};
+  const empresa = {}, alt = {};
   for (const seg of R.SEGMENTOS) {
-    empresa[seg] = {};
+    empresa[seg] = {}; alt[seg] = {};
     const ns = R.norm(seg);
     const cands = Object.entries(ef).filter(([k, f]) => k.startsWith('UF_CRM') && R.norm(label(f)).includes(ns));
     for (const [campo, re] of Object.entries(CAMPOS_EMPRESA)) {
@@ -33,8 +33,10 @@ async function descobrir(bitrix, cfg) {
         }
       }
       if (campo === 'diretor' || campo === 'gerente' || campo === 'coordenador' || campo === 'supervisor' || campo === 'vendedor') m = m.filter(([, f]) => !/classe|visita/.test(R.norm(label(f))));
-      if (m.length > 1) ambiguos.push({ onde: `Empresa ${seg} ${campo}`, opcoes: m.map(([k, f]) => `${k} (${label(f)})`) });
-      if (m[0]) { empresa[seg][campo] = m[0][0]; empresaMeta[m[0][0]] = { tipo: m[0][1].type, itens: enumItems(m[0][1]) }; }
+      // campos com o mesmo nome: o app lê os dois (usa o que tiver valor) e grava no primeiro
+      if (m.length > 1) { alt[seg][campo] = m.slice(1).map(([k]) => k); ambiguos.push({ onde: `Empresa ${seg} ${campo}`, opcoes: m.map(([k, f]) => `${k} (${label(f)})`) }); }
+      for (const [k, f] of m) empresaMeta[k] = { tipo: f.type, itens: enumItems(f) };
+      if (m[0]) empresa[seg][campo] = m[0][0];
       else faltando.push(`Empresa · ${seg} · ${campo}`);
     }
   }
@@ -74,7 +76,7 @@ async function descobrir(bitrix, cfg) {
   if (!fila.out.data) faltando.push('Fila · Data programada (usando "Data de encerramento" padrão)');
   if (!visita.out.dataHora) faltando.push('Registro · Data/Hora da visita (usando "Data de início" padrão)');
 
-  const map = { empresa, fila: fila.out, visita: visita.out, etapas, categoriaFila, tipoEmpresa: tipoEmp?.[0] || null };
+  const map = { empresa, alt, fila: fila.out, visita: visita.out, etapas, categoriaFila, tipoEmpresa: tipoEmp?.[0] || null };
   // sobrescritas manuais da tela de configurações
   const man = cfg.mapaManual || {};
   for (const k of ['fila', 'visita', 'etapas']) Object.assign(map[k], man[k] || {});

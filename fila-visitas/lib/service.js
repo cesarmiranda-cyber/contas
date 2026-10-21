@@ -26,14 +26,19 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     const r = (await bitrix.call('crm.company.get', { id })).result;
     if (!r) return null;
     const segs = {};
+    const vazio = x => x === undefined || x === null || x === '' || x === '0' || x === 0 || (Array.isArray(x) && !x.length);
     for (const seg of R.SEGMENTOS) {
-      const m = map.empresa[seg], v = k => (m[k] ? r[m[k]] : undefined);
-      const user = k => { const x = v(k); const n = Array.isArray(x) ? x[0] : x; return n && +n ? +n : null; };
+      const m = map.empresa[seg];
+      // cada campo pode existir em duplicidade: lê o principal e os alternativos
+      const chaves = k => (m[k] ? [m[k], ...((map.alt?.[seg] || {})[k] || [])] : []);
+      const user = k => { for (const c of chaves(k)) { const x = r[c]; const n = Array.isArray(x) ? x[0] : x; if (!vazio(n) && +n) return +n; } return null; };
+      const data = (k, pick) => { const ds = chaves(k).map(c => R.isoDate(r[c])).filter(Boolean).sort(); return ds.length ? (pick === 'max' ? ds[ds.length - 1] : ds[0]) : null; };
+      let classe = '';
+      for (const c of chaves('classe')) { const x = String(F.decode(meta, c, r[c])).trim().toUpperCase().slice(0, 1); if (R.CLASSES.includes(x)) { classe = x; break; } }
       segs[seg] = {
         diretor: user('diretor'), gerente: user('gerente'), coordenador: user('coordenador'),
         supervisor: user('supervisor'), vendedor: user('vendedor'),
-        classe: String(F.decode(meta, m.classe, v('classe'))).trim().toUpperCase().slice(0, 1),
-        ultima: R.isoDate(v('ultima')), proxima: R.isoDate(v('proxima')),
+        classe, ultima: data('ultima', 'max'), proxima: data('proxima', 'min'),
       };
     }
     return { id: +r.ID, nome: r.TITLE, tipo: map.tipoEmpresa ? F.decode(meta, map.tipoEmpresa, r[map.tipoEmpresa]) : '', segs };
