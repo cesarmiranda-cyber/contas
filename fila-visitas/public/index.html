@@ -36,14 +36,19 @@ textarea{min-height:96px;resize:vertical}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
 h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:99px;padding:0 8px;font-size:12px}
 .list{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
-.item{display:grid;grid-template-columns:1fr 150px auto;gap:14px;align-items:center;padding:12px 16px 12px 20px;border-bottom:1px solid var(--line);position:relative}
+.item{display:grid;grid-template-columns:1fr 130px 190px;gap:16px;align-items:start;padding:14px 16px 14px 20px;border-bottom:1px solid var(--line);position:relative}
 .item:last-child{border-bottom:0}.item:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cy)}
 .item.atrasada:before{background:var(--red)}.item.dia:before{background:#f5a623}
 .emp{font-weight:700;font-size:15px;line-height:1.25}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.tag{font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--sf2);border:1px solid var(--line);color:var(--ink2)}.tag.seg{background:var(--brandbg);border-color:transparent;color:var(--brand)}
 .due b{display:block;font-size:14px}.due span{display:inline-block;margin-top:2px;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--brandbg);color:var(--brand)}
 .item.atrasada .due span{background:var(--redbg);color:var(--red)}.item.dia .due span{background:var(--amberbg);color:var(--amber)}
-.acts{display:flex;gap:8px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}.side{display:flex;flex-direction:column;gap:8px;align-items:stretch}.side .acts .btn{flex:1}
+.emp a{color:inherit;text-decoration:none}.emp a:hover{color:var(--brand);text-decoration:underline}
+.meta{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:12.5px;color:var(--ink2)}.meta b{color:var(--ink)}
+.pessoas{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px}.pp{display:flex;align-items:center;gap:7px;font-size:12.5px;line-height:1.15}.pp i{width:26px;height:26px;border-radius:50%;background:var(--sf2);border:1px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:700;color:var(--ink2)}.pp.me i{background:var(--brand);border-color:var(--brand);color:#fff}.pp small{display:block;color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em}
+.links{display:flex;gap:12px;justify-content:center;font-size:12px}.links a{color:var(--brand);text-decoration:none}.links a:hover{text-decoration:underline}
+.tag.warn{background:var(--amberbg);border-color:transparent;color:var(--amber)}.due small{display:block;color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
 .vazio{text-align:center;color:var(--mut);padding:48px 12px}
 .modal{position:fixed;inset:0;background:rgba(10,20,30,.55);display:none;align-items:flex-end;justify-content:center;z-index:50}.modal.on{display:flex}
 .sheet{background:var(--sf);width:100%;max-width:640px;border-radius:16px 16px 0 0;max-height:94vh;display:flex;flex-direction:column}
@@ -58,7 +63,8 @@ h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:9
 .hint{font-size:12.5px;color:var(--mut)}.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--sf)}
 table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-size:12px;text-transform:uppercase;background:var(--sf2)}
 .panel{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:4px 16px 16px;box-shadow:var(--sh)}
-@media(max-width:700px){.filters{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}.item{grid-template-columns:1fr auto;gap:8px}.item .due{text-align:right}.item .acts{grid-column:1/-1}.item .acts .btn{flex:1}.stat{padding:10px}.stat b{font-size:20px}.stat i{width:32px;height:32px}}
+@media(max-width:900px){.item{grid-template-columns:1fr 120px;gap:10px}.item .side{grid-column:1/-1}}
+@media(max-width:700px){.filters{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}.item{grid-template-columns:1fr auto;gap:8px}.item .due{text-align:right}.item .side{grid-column:1/-1}.stat{padding:10px}.stat b{font-size:20px}.stat i{width:32px;height:32px}}
 </style>
 </head>
 <body>
@@ -143,12 +149,21 @@ function lista() {
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reprogramar(+b.dataset.rep));
 }
+const ini = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 function linha(c) {
   const q = c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
+  const eq = [['vendedor', 'Vendedor'], ['supervisor', 'Supervisor'], ['coordenador', 'Coordenador'], ['gerente', 'Gerente'], ['diretor', 'Diretor']].filter(([k]) => c.equipe && c.equipe[k])
+    .map(([k, t]) => `<span class="pp ${c.cargo.toLowerCase() === k ? 'me' : ''}" title="${t}"><i>${esc(ini(c.equipe[k]))}</i><span><small>${t}</small>${esc(c.equipe[k])}</span></span>`).join('');
   return `<div class="item ${c.situacao}">
-    <div><div class="emp">${esc(c.empresa)}</div><div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${aba === 'equipe' ? `<span class="tag">${esc(c.responsavelNome)}</span>` : ''}</div></div>
-    <div class="due"><b>${fmt(c.data)}</b><span>${q}</span></div>
-    <div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Reprogramar</button></div></div>`;
+    <div class="main">
+      <div class="emp">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</div>
+      <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Reprogramada ${c.reprogramacoes}×</span>` : ''}</div>
+      <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${aba === 'equipe' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
+      ${eq ? `<div class="pessoas">${eq}</div>` : ''}
+    </div>
+    <div class="due"><small>Programada</small><b>${fmt(c.data)}</b><span>${q}</span></div>
+    <div class="side"><div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Reprogramar</button></div>
+      <div class="links">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
 }
 const modal = html => { $('#sheet').innerHTML = html; $('#m').classList.add('on'); };
 const fecha = () => $('#m').classList.remove('on');
@@ -247,6 +262,8 @@ async function cfg(d) {
       ${(() => { const f = campos.faltando.filter(x => !/usando/.test(x)), i = campos.faltando.filter(x => /usando/.test(x)); return (f.length ? `<div class="err on">Faltando: ${f.map(esc).join(' · ')}</div>` : '<div class="ok">Etapas e campos principais encontrados.</div>') + (i.length ? `<div class="info">Usando padrão do Bitrix (funciona, mas dá para criar o campo próprio): ${i.map(esc).join(' · ')}</div>` : ''); })()}
       ${campos.ambiguos.length ? `<div class="info">${campos.ambiguos.length} campo(s) existem em duplicidade no Bitrix. O app lê todos e usa o que tiver valor — nada a fazer.</div>` : ''}
       <details><summary>Ver mapeamento</summary><pre style="overflow:auto;font-size:12px">${esc(JSON.stringify(campos.map, null, 1))}</pre></details>`}
+    <h2>Alçadas por departamento</h2><div class="panel"><p class="hint">Defina quem é Supervisor, Coordenador, Gerente e Diretor de cada departamento. Quando uma empresa tem Vendedor mas esses campos estão vazios, o app preenche a partir do departamento do Vendedor (vale também para os departamentos abaixo).</p>
+      <div id="alc" class="hint">Carregando departamentos…</div><button class="btn pri" id="sa" style="margin-top:10px">Salvar alçadas</button> <span class="hint" id="aout"></span></div>
     <h2>Preparar o Bitrix</h2><div class="panel"><p class="hint">Cria o que falta: etapa <b>Atrasada</b> no kanban 1036, campos <b>Cargo</b> e <b>Data programada</b> na Fila e <b>Resultado</b>/<b>Acompanhamento</b> no Registro de Visita. Só cria o que ainda não existe.</p>
       <button class="btn pri" id="bp">Criar etapa e campos que faltam</button><pre id="pout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Testar com uma empresa</h2><div class="panel"><p class="hint">Gera a fila de <b>uma</b> empresa só (funciona mesmo com o app desativado). Use o número que aparece na URL da empresa no Bitrix (…/crm/company/details/<b>123</b>/).</p>
@@ -258,6 +275,17 @@ async function cfg(d) {
       await api('/api/config', { method: 'PUT', body: { ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, motoresDatas: $('#md').value, admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
+  };
+  api('/api/departamentos').then(({ departamentos }) => {
+    const al = c.alcadas || {}, opts = '<option value="">—</option>' + users.map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join('');
+    const prof = (d, n = 0) => departamentos.filter(x => (x.pai || null) === d).flatMap(x => [{ ...x, n }, ...prof(x.id, n + 1)]);
+    const raiz = departamentos.filter(x => !x.pai || !departamentos.some(y => y.id === x.pai)).map(x => x.id);
+    const arvore = raiz.flatMap(r => [{ ...departamentos.find(x => x.id === r), n: 0 }, ...prof(r, 1)]);
+    $('#alc').innerHTML = `<div class="tw"><table><tr><th>Departamento</th><th>Supervisor</th><th>Coordenador</th><th>Gerente</th><th>Diretor</th></tr>${arvore.map(d => `<tr><td style="padding-left:${12 + d.n * 18}px"><b>${esc(d.nome)}</b>${d.chefe ? `<div class="hint">chefe: ${esc((users.find(x => x.id === d.chefe) || {}).nome || '#' + d.chefe)}</div>` : ''}</td>${['supervisor', 'coordenador', 'gerente', 'diretor'].map(k => `<td><select data-al="${d.id}.${k}" style="min-width:140px">${opts.replace(`value="${(al[d.id] || {})[k]}"`, `value="${(al[d.id] || {})[k]}" selected`)}</select></td>`).join('')}</tr>`).join('')}</table></div>`;
+  }).catch(e => { $('#alc').textContent = e.message; });
+  $('#sa').onclick = async () => {
+    const alcadas = {}; document.querySelectorAll('[data-al]').forEach(s => { if (!s.value) return; const [d, k] = s.dataset.al.split('.'); (alcadas[d] ||= {})[k] = +s.value; });
+    try { await api('/api/config', { method: 'PUT', body: { alcadas } }); $('#aout').textContent = 'Alçadas salvas.'; } catch (e) { $('#aout').textContent = e.message; }
   };
   $('#bp').onclick = async () => {
     $('#pout').textContent = 'Criando…';

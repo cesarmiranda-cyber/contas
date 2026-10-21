@@ -46,6 +46,7 @@ const routes = {
   'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '' }),
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
   'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'minhas' }); },
+  'GET /api/departamentos': async () => { exige(); return { departamentos: await svc.departamentos() }; },
   'GET /api/historico': async () => ({ reprogramacoes: store.historico }),
   'GET /api/log': async () => ({ log: store.logs.slice(0, 200), bloqueios: store.bloqueios }),
   'GET /api/config': async () => ({ config: store.config, hoje: R.todayBR(), webhook: bitrix.enabled, ultimaVarredura: store.lastSweep }),
@@ -61,6 +62,14 @@ const routes = {
     if (typeof b.ativo === 'boolean') p.ativo = b.ativo;
     if (Number.isFinite(+b.tarefaHorasUteis) && +b.tarefaHorasUteis > 0) p.tarefaHorasUteis = +b.tarefaHorasUteis;
     if (['secao', 'extra'].includes(b.motoresDatas)) p.motoresDatas = b.motoresDatas;
+    if (b.alcadas && typeof b.alcadas === 'object') {
+      p.alcadas = {};
+      for (const [d, r] of Object.entries(b.alcadas)) {
+        const o = {};
+        for (const k of ['supervisor', 'coordenador', 'gerente', 'diretor']) if (+r?.[k] > 0) o[k] = +r[k];
+        if (/^\d+$/.test(d) && Object.keys(o).length) p.alcadas[d] = o;
+      }
+    }
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);
     if (b.mapaManual && typeof b.mapaManual === 'object') p.mapaManual = b.mapaManual;
     store.log('config', `Configuração alterada por ${id.uid || 'desconhecido'}`);

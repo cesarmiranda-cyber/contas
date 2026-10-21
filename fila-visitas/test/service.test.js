@@ -187,3 +187,22 @@ test('hierarquia automática: preenche os cargos vazios pela cadeia de chefes do
   const ger = cards(w).find(c => c.title.endsWith('| Gerente'));
   assert.equal(ger.assignedById, 20);
 });
+
+test('alçadas configuradas por departamento preenchem os cargos vazios da empresa', async () => {
+  const { w, svc, store } = setup({ UF_CRM_MOT_SUPERVISOR: '', UF_CRM_MOT_COORDENADOR: '', UF_CRM_MOT_GERENTE: '' });
+  w.users[10].UF_DEPARTMENT = [5];
+  store.setConfig({ alcadas: { 5: { supervisor: 20, coordenador: 20, gerente: 30 }, 1: { diretor: 30 } } });
+  await svc.sincronizarEmpresa(1);
+  assert.equal(w.companies[1].UF_CRM_MOT_SUPERVISOR, 20);
+  assert.equal(w.companies[1].UF_CRM_MOT_GERENTE, 30);
+  assert.equal(w.companies[1].UF_CRM_MOT_DIRETOR, 30, 'diretor vem do departamento pai');
+  assert.equal(cards(w).length, 5);
+});
+
+test('lista de visitas traz responsável, equipe, última visita e ciclo', async () => {
+  const { svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const v = (await svc.listarVisitas({ uid: 10, escopo: 'minhas' })).visitas.find(x => x.cargo === 'Vendedor');
+  assert.equal(v.ultima, '2026-04-20'); assert.equal(v.ciclo, 30); assert.equal(v.diasDesdeUltima, 20);
+  assert.equal(v.equipe.gerente, 'Gil Gerente');
+});

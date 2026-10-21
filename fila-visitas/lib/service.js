@@ -84,17 +84,32 @@ function createService({ bitrix, store, clock = () => new Date() }) {
   }
   // Preenche Supervisor/Coordenador/Gerente/Diretor vazios a partir do departamento do Vendedor:
   // o último chefe da cadeia é o Diretor, o anterior o Gerente, e assim por diante.
+  // Alçadas configuradas no app por departamento: o primeiro departamento (do Vendedor para cima) que define o cargo vale.
+  async function alcadaConfigurada(vendedorId, cargo) {
+    const al = store.config.alcadas || {};
+    if (!Object.keys(al).length) return null;
+    const u = ((await bitrix.call('user.get', { ID: vendedorId })).result || [])[0];
+    let did = Array.isArray(u?.UF_DEPARTMENT) ? u.UF_DEPARTMENT[0] : null;
+    for (let i = 0; did && i < 10; i++) {
+      const v = al[did]?.[cargo];
+      if (v) return +v;
+      const d = await dept(did);
+      did = d?.PARENT || null;
+    }
+    return null;
+  }
   async function preencherHierarquia(emp, map) {
     const ordem = ['diretor', 'gerente', 'coordenador', 'supervisor'];
     for (const seg of R.SEGMENTOS) {
       const s = emp.segs[seg];
       if (!s.vendedor || ordem.every(k => s[k])) continue;
-      const cadeia = await cadeiaAcima(s.vendedor);
+      const cadeia = store.config.hierarquiaAuto ? await cadeiaAcima(s.vendedor) : [];
       const gravar = {};
-      ordem.forEach((k, i) => {
-        const id = cadeia[cadeia.length - 1 - i];
-        if (!s[k] && id) { s[k] = id; if (map.empresa[seg][k]) gravar[map.empresa[seg][k]] = id; }
-      });
+      for (const [i, k] of ordem.entries()) {
+        if (s[k]) continue;
+        const id = (await alcadaConfigurada(s.vendedor, k)) || cadeia[cadeia.length - 1 - i];
+        if (id) { s[k] = id; if (map.empresa[seg][k]) gravar[map.empresa[seg][k]] = id; }
+      }
       if (Object.keys(gravar).length) {
         await bitrix.call('crm.company.update', { id: emp.id, fields: gravar });
         store.log('hierarquia', `Empresa ${emp.nome} · ${seg}: preenchido pela estrutura (${Object.keys(gravar).length} campo(s))`, { empresa: emp.id });
@@ -177,7 +192,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     const cfg = store.config;
     const emp = await lerEmpresa(id);
     if (!emp) return { empresa: id, erro: 'Empresa não encontrada' };
-    if (cfg.hierarquiaAuto) await preencherHierarquia(emp, (await campos()).map).catch(e => store.log('aviso', `Hierarquia: ${e.message}`));
+    if (cfg.hierarquiaAuto || Object.keys(cfg.alcadas || {}).length) await preencherHierarquia(emp, (await campos()).map).catch(e => store.log('aviso', `Hierarquia: ${e.message}`));
     const res = { empresa: id, criados: [], atualizados: [], pendencias: [] };
     const snapAnt = store.snapEmpresa(id) || {};
     const snapNovo = {};
@@ -498,15 +513,23 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     if (escopo === 'minhas') permitidos = new Set([+uid]);
     else if (escopo === 'equipe' && !isAdmin(uid)) permitidos = await equipeDe(uid);
     const out = [];
-    const tipos = new Map();
+    const tipos = new Map(), empresas = new Map();
+    let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
     for (const it of itens) {
       if (permitidos && !permitidos.has(+it.assignedById)) continue;
       const c = await dadosCard(it);
       const reg = store.card(it.id) || {};
       let tipo = tipos.get(c.empresaId);
       if (tipo === undefined && map.tipoEmpresa && c.empresaId) { try { tipo = F.decode((await campos()).meta, map.tipoEmpresa, (await bitrix.call('crm.company.get', { id: c.empresaId })).result?.[map.tipoEmpresa]); } catch { tipo = ''; } tipos.set(c.empresaId, tipo); }
+      let emp = empresas.get(c.empresaId);
+      if (emp === undefined) { emp = await lerEmpresa(c.empresaId).catch(() => null); empresas.set(c.empresaId, emp); }
+      const sg = emp?.segs?.[c.segmento] || {};
+      const equipe = {};
+      for (const k of ['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor']) if (sg[k]) equipe[k] = await nomeUsuario(sg[k]);
       out.push({ ...c, tipoEmpresa: tipo || '', responsavelNome: await nomeUsuario(c.responsavel), classe: c.classe || reg.classe || '',
-        situacao: R.etapaPara(c.data, hoje()), dias: c.data ? R.dayDiff(hoje(), c.data) : null });
+        situacao: R.etapaPara(c.data, hoje()), dias: c.data ? R.dayDiff(hoje(), c.data) : null,
+        ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, hoje()) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
+        equipe, reprogramacoes: store.historico.filter(h => h.card === c.id && !h.tipo).length, urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     }
     out.sort((a, b) => (a.data || '9').localeCompare(b.data || '9'));
     return { hoje: hoje(), visitas: out };
@@ -525,6 +548,10 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     } catch (e) { store.log('aviso', `Equipe de ${uid}: ${e.message}`); }
     return ids;
   }
+  async function departamentos() {
+    const deps = (await bitrix.call('department.get', {})).result || [];
+    return deps.map(d => ({ id: +d.ID, nome: String(d.NAME || '').trim(), pai: +d.PARENT || null, chefe: +d.UF_HEAD || null }));
+  }
   async function usuarios() {
     const r = (await bitrix.call('user.get', { filter: { ACTIVE: true } })).result || [];
     return r.map(u => ({ id: +u.ID, nome: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || `#${u.ID}` })).sort((a, b) => a.nome.localeCompare(b.nome));
@@ -534,6 +561,6 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };
