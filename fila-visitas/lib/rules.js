@@ -24,6 +24,7 @@ const DEFAULT_CONFIG = {
   admins: [],                  // ids que podem corrigir registros de visita
   mapaManual: {},              // sobrescritas do mapeamento de campos
   sweepSegundos: 60,
+  ativo: false,                // trava de segurança: o app só escreve no Bitrix depois que um admin ativa
 };
 
 const pad = n => String(n).padStart(2, '0');

@@ -386,6 +386,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
   // ---------- varredura periódica (alternativa aos eventos; idempotente) ----------
   let rodando = false;
   async function varrer() {
+    if (!store.config.ativo) return { pausado: true };
     if (rodando) return { pulado: true };
     rodando = true;
     const inicio = new Date(Date.now() - 2 * 60e3).toISOString();

@@ -56,6 +56,7 @@ const routes = {
     }
     if (Number.isInteger(+b.horaJob) && +b.horaJob >= 0 && +b.horaJob < 24) p.horaJob = +b.horaJob;
     for (const k of ['tarefaAtiva', 'atualizarProxima']) if (typeof b[k] === 'boolean') p[k] = b[k];
+    if (typeof b.ativo === 'boolean') p.ativo = b.ativo;
     if (Number.isFinite(+b.tarefaHorasUteis) && +b.tarefaHorasUteis > 0) p.tarefaHorasUteis = +b.tarefaHorasUteis;
     if (['secao', 'extra'].includes(b.motoresDatas)) p.motoresDatas = b.motoresDatas;
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);
@@ -108,7 +109,8 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Fila de Visitas DLC em :${PORT} · Bitrix ${bitrix.enabled ? 'configurado' : 'SEM WEBHOOK (defina BITRIX_WEBHOOK)'}`);
-  const tick = () => bitrix.enabled && svc.varrer().catch(e => store.log('erro', `varredura: ${e.message}`));
+  const tick = () => bitrix.enabled && svc.varrer().then(r => r && !r.pulado && !r.pausado && console.log('varredura', JSON.stringify(r))).catch(e => { store.log('erro', `varredura: ${e.message}`); console.error('varredura:', e.message); });
+  if (bitrix.enabled) setTimeout(() => svc.campos(true).then(d => console.log('campos', JSON.stringify({ faltando: d.faltando, ambiguos: d.ambiguos, fila: d.map.fila, visita: d.map.visita, etapas: d.map.etapas, cat: d.map.categoriaFila, tipo: d.map.tipoEmpresa, motores: d.map.empresa.Motores }))).catch(e => console.error('campos:', e.message)), 1000);
   setTimeout(tick, 5000);
   setInterval(tick, Math.max(30, store.config.sweepSegundos) * 1000);
 });
