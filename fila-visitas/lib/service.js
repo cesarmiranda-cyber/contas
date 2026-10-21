@@ -334,6 +334,17 @@ function createService({ bitrix, store, clock = () => new Date() }) {
       pre[k] = it ? it.id : card.cargo;
       alcadaKeys.push(k);
     }
+    // Mapeamento de oportunidades: vem do cadastro da empresa (segmentos em que ela está cadastrada), não do vendedor.
+    const emp = await lerEmpresa(card.empresaId).catch(() => null);
+    const cadastrados = R.SEGMENTOS.filter(sg => { const x = emp?.segs?.[sg]; return x && (R.CLASSES.includes(x.classe) || x.vendedor || x.supervisor || x.coordenador || x.gerente); });
+    for (const [k, d] of Object.entries(defs)) {
+      if (!k.startsWith('ufCrm') || !/mapeament/i.test(R.norm(d.title || '')) || !/oportunid/i.test(R.norm(d.title || ''))) continue;
+      const itens = (d.items || []).map(i => ({ id: String(i.ID ?? i.id), nome: String(i.VALUE ?? i.value ?? '') }));
+      const ids = itens.filter(i => cadastrados.some(sg => R.norm(sg) === R.norm(i.nome))).map(i => i.id);
+      const doCard = itens.find(i => R.norm(i.nome) === R.norm(card.segmento));
+      pre[k] = d.isMultiple ? ids : (doCard ? doCard.id : (ids[0] || ''));
+      alcadaKeys.push(k);
+    }
     const travados = new Set([v.segmento, v.filaId, v.antecipada, ...alcadaKeys].filter(Boolean));
     const lista = [];
     const ocultos = new Set(Duplicados.agrupar(defs, Object.values(map.visita)).flatMap(g => g.outros)); // duplicados: mostra só o campo padrão
@@ -385,7 +396,7 @@ function createService({ bitrix, store, clock = () => new Date() }) {
       if (!c || vazio(val)) continue;
       f[k] = c.tipo === 'sim_nao' ? (val === true || val === 'Y' || val === 'true' ? 'Y' : 'N') : c.tipo === 'numero' ? Number(val) : val;
     }
-    for (const c of form.campos) if (c.travado && c.valor !== '' && c.valor !== undefined) f[c.key] = c.valor; // campos automáticos (ex.: Alçada)
+    for (const c of form.campos) if (c.travado && !vazio(c.valor)) f[c.key] = c.valor; // campos automáticos (ex.: Alçada)
     const set = (k, v) => { if (map.visita[k]) f[map.visita[k]] = v; };
     set('segmento', F.encode(meta, map.visita.segmento, card.segmento));
     set('filaId', String(card.id));

@@ -19,6 +19,7 @@ if os.environ.get("SYNC_EMPRESA"): env["SYNC_EMPRESA"] = os.environ["SYNC_EMPRES
 if os.environ.get("DIAG_DEPTS"): env["DIAG_DEPTS"] = os.environ["DIAG_DEPTS"]
 if os.environ.get("DIAG_TIPO"): env["DIAG_TIPO"] = "1"
 if os.environ.get("SPA_DUPLICADOS"): env["SPA_DUPLICADOS"] = os.environ["SPA_DUPLICADOS"]
+if os.environ.get("DIAG_OPORT"): env["DIAG_OPORT"] = "1"
 if os.environ.get("EVENT_TOKEN"): env["EVENT_TOKEN"] = os.environ["EVENT_TOKEN"]
 print(json.dumps({
   "source": {"content": base64.b64encode(open(out + "/fila-app.tgz","rb").read()).decode()},

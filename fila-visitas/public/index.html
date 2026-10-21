@@ -192,7 +192,7 @@ const GRUPOS = [
 ];
 const LONGO = /fato|interess|sentiment|valor|mapeament|observ|resultado|descri|conclus|motivo|acompanh|necessid|problema|coment/i;
 const grupoDe = c => (GRUPOS.find(([, re]) => re.test(c.titulo)) || ['Outras informações'])[0];
-const legivel = c => c.tipo === 'sim_nao' ? (c.valor === 'Y' ? 'Sim' : c.valor === 'N' ? 'Não' : '') : c.tipo === 'lista' ? ((c.itens.find(i => i.id === String(c.valor)) || {}).nome || '') : String(c.valor || '');
+const legivel = c => c.tipo === 'sim_nao' ? (c.valor === 'Y' ? 'Sim' : c.valor === 'N' ? 'Não' : '') : c.tipo === 'lista' ? [].concat(c.valor || []).map(v => (c.itens.find(i => i.id === String(v)) || {}).nome || '').filter(Boolean).join(', ') : String(c.valor || '');
 function campoHTML(c) {
   const id = 'f_' + c.key, req = c.obrigatorio ? ' <i>*</i>' : '';
   let ctl;

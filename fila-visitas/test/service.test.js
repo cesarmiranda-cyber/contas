@@ -270,3 +270,15 @@ test('alçada da visita vem do cargo do card, travada, e é gravada no registro'
   const r = await svc.registrarVisita(ger.id, { uid: 20, campos: { ufCrm_res: 'Ok' } });
   assert.equal(w.items[1032][r.visita].ufCrm_alc, '8');
 });
+
+test('mapeamento de oportunidades vem do cadastro da empresa, travado e gravado no registro', async () => {
+  const { w, svc } = setup({ UF_CRM_PEC_CLASSE: '2', UF_CRM_PEC_VENDEDOR: '10' });
+  const itens = [{ ID: '1', VALUE: 'Peças' }, { ID: '2', VALUE: 'Serviços' }, { ID: '3', VALUE: 'Motores' }];
+  w.extraFields = { 1032: { ufCrm_opo: { title: 'Mapeamento de oportunidades futuras', type: 'enumeration', items: itens }, ufCrm_opm: { title: 'Mapeamento de oportunidades futuras', type: 'enumeration', isMultiple: true, items: itens } } };
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor') && /Motores/.test(c.title));
+  const f = await svc.camposVisita(vend.id);
+  const unico = f.campos.find(c => c.key === 'ufCrm_opo'), multi = f.campos.find(c => c.key === 'ufCrm_opm');
+  assert.equal(unico?.valor, '3'); assert.equal(unico?.travado, true);
+  if (multi) assert.deepEqual([...multi.valor].sort(), ['1', '3']);
+});
