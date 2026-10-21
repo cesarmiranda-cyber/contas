@@ -12,6 +12,7 @@ out = sys.argv[1]
 env = {"DATA_DIR": "/opt/data/state", "VIBE_APP_KEY": os.environ["VIBE_APP_KEY"]}
 if os.environ.get("BITRIX_WEBHOOK"): env["BITRIX_WEBHOOK"] = os.environ["BITRIX_WEBHOOK"]
 if os.environ.get("ANALISE_DUPLICADOS"): env["ANALISE_DUPLICADOS"] = "1"
+if os.environ.get("APAGAR_CAMPOS"): env["APAGAR_CAMPOS"] = os.environ["APAGAR_CAMPOS"]
 if os.environ.get("EVENT_TOKEN"): env["EVENT_TOKEN"] = os.environ["EVENT_TOKEN"]
 print(json.dumps({
   "source": {"content": base64.b64encode(open(out + "/fila-app.tgz","rb").read()).decode()},

@@ -46,3 +46,32 @@ function planejar(analise) {
   return { apagar, manter, conflitos };
 }
 module.exports = { analisar, planejar };
+
+// Apaga campos (por ID do userfield) depois de rechecar: continuam vazios em todas as empresas e o nome continua existindo em outro campo.
+// Antes de apagar, grava a definição completa de cada campo em DATA_DIR/backup-campos-*.json.
+async function apagar(bitrix, ids, dir) {
+  const fs = require('fs'), path = require('path');
+  const marca = path.join(dir, 'campos-apagados.json');
+  if (fs.existsSync(marca)) return { pulado: 'já executado', ...JSON.parse(fs.readFileSync(marca, 'utf8')) };
+  const a = await analisar(bitrix);
+  const alvo = [], recusados = [];
+  for (const id of ids) {
+    const g = a.grupos.find(x => x.campos.some(c => c.id === id));
+    const c = g?.campos.find(x => x.id === id);
+    const sobra = g?.campos.some(x => x.id !== id && !ids.includes(x.id));
+    if (c && c.comValor === 0 && sobra) alvo.push({ ...c, grupo: g.nome }); else recusados.push({ id, motivo: !c ? 'não é duplicado' : c.comValor ? `tem valor em ${c.comValor} empresa(s)` : 'seria o último com esse nome' });
+  }
+  const defs = [];
+  for (const c of alvo) defs.push((await bitrix.call('crm.company.userfield.get', { id: c.id })).result);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `backup-campos-${Date.now()}.json`), JSON.stringify(defs, null, 1));
+  const feitos = [], erros = [];
+  for (const c of alvo) {
+    try { await bitrix.call('crm.company.userfield.delete', { id: c.id }); feitos.push(`${c.id}:${c.campo}:${c.rotulo}`); }
+    catch (e) { erros.push(`${c.id}:${c.campo}: ${e.message}`); }
+  }
+  const res = { feitos, erros, recusados };
+  fs.writeFileSync(marca, JSON.stringify(res));
+  return res;
+}
+module.exports.apagar = apagar;
