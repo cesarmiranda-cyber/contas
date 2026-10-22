@@ -89,10 +89,16 @@ function prazoUtil(now, horas) {
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}T${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:00-03:00`;
 }
 
+// Data/hora com deslocamento explícito de Brasília: o Bitrix interpreta filtros de data no fuso do portal e uma 'Z' pode deslocar a janela em 3 horas.
+function brIso(d) {
+  const t = new Date(new Date(d).getTime() - 3 * 3600e3), p = n => String(n).padStart(2, '0');
+  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}T${p(t.getUTCHours())}:${p(t.getUTCMinutes())}:${p(t.getUTCSeconds())}-03:00`;
+}
+
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 const chaveFila = (empresaId, seg, cargo) => `${empresaId}|${norm(seg)}|${norm(cargo)}`;
 
 module.exports = {
   SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
-  intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
+  brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
 };

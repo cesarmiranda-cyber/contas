@@ -278,7 +278,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   async function sincronizarTodas({ desde } = {}) {
-    const filter = desde ? { '>DATE_MODIFY': desde } : {};
+    const filter = desde ? { '>DATE_MODIFY': R.brIso(desde) } : {};
     const out = [];
     let start = 0;
     for (;;) {
@@ -506,7 +506,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   async function guardarVisitas() {
     const { map } = await campos();
     const campo = map.visita.dataHora || 'begindate';
-    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, order: { id: 'desc' }, select: ['id', 'assignedById', 'title', 'createdTime', 'companyId', campo, ...(map.visita.filaId ? [map.visita.filaId] : [])], filter: store.lastSweep ? { '>updatedTime': store.lastSweep } : {} });
+    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, order: { id: 'desc' }, select: ['id', 'assignedById', 'title', 'createdTime', 'companyId', campo, ...(map.visita.filaId ? [map.visita.filaId] : [])], filter: store.lastSweep ? { '>updatedTime': R.brIso(store.lastSweep) } : {} });
     let revertidos = 0;
     if (!store.job('inicioVisitasExternas')) store.setJob('inicioVisitasExternas', new Date().toISOString());
     for (const it of r.result?.items || []) {
@@ -567,7 +567,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (!store.config.ativo) return { pausado: true };
     if (rodando) return { pulado: true };
     rodando = true;
-    const inicio = new Date(Date.now() - 2 * 60e3).toISOString();
+    const inicio = new Date(Date.now() - 5 * 60e3).toISOString();
     try {
       await campos();
       const guardas = { visitas: await guardarVisitas(), cards: await guardarCards(await cardsAbertos()) };
@@ -576,7 +576,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       let job = null;
       if (R.hourBR(clock()) >= store.config.horaJob) job = await jobDiario();
       store.setLastSweep(inicio);
-      return { guardas, empresas: emp.length, job };
+      const resumo = emp.filter(e => (e.criados && e.criados.length) || (e.atualizados && e.atualizados.length) || e.erro).map(e => ({ empresa: e.empresa, criados: (e.criados || []).length, atualizados: (e.atualizados || []).length, pendencias: (e.pendencias || []).slice(0, 4), erro: e.erro }));
+      return { guardas, empresas: emp.length, job, resumo };
     } finally { rodando = false; }
   }
 
@@ -672,7 +673,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     // fila: abertos + finalizados no período
     const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
     const abertos = (await cardsAbertos()).filter(it => !permCards || permCards.has(+it.id));
-    const fin = (await listar(F.ETYPE.fila, { stageId: map.etapas.finalizado, '>updatedTime': desde }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id));
+    const fin = (await listar(F.ETYPE.fila, { stageId: map.etapas.finalizado, '>updatedTime': R.brIso(desde) }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id));
     const nomes = new Map();
     const nome = async id => { if (!nomes.has(id)) nomes.set(id, await nomeUsuario(id)); return nomes.get(id); };
     const tipos = new Map(), emps = new Map();
@@ -689,7 +690,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     // registros de visita
     const v = map.visita, campoDH = v.dataHora || 'begindate';
     const sel = ['id', 'createdTime', 'assignedById', 'companyId', campoDH, ...[v.segmento, v.antecipada, v.filaId].filter(Boolean), ...Object.keys(meta).filter(k => /^ufCrm9_/.test(k) && /al[cç]ada/i.test(k))];
-    const regs = await listar(F.ETYPE.visita, { '>createdTime': desde }, ['*', 'uf*']);
+    const regs = await listar(F.ETYPE.visita, { '>createdTime': R.brIso(desde) }, ['*', 'uf*']);
     const porId = new Map(cards.map(c => [String(c.id), c]));
     const visitas = [];
     for (const it of regs) {

@@ -31,3 +31,7 @@ test('prazo em horas úteis pula o fim de semana', () => {
   // sexta 16:00 (BRT) + 8h úteis = segunda 15:00
   assert.equal(R.prazoUtil(new Date('2026-05-08T19:00:00Z'), 8), '2026-05-11T15:00:00-03:00');
 });
+
+test('brIso formata a data com deslocamento de Brasília', () => {
+  assert.equal(R.brIso('2026-10-22T00:11:05.000Z'), '2026-10-21T21:11:05-03:00');
+});
