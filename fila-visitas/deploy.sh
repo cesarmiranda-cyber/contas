@@ -25,7 +25,7 @@ print(json.dumps({
   "source": {"content": base64.b64encode(open(out + "/fila-app.tgz","rb").read()).decode()},
   "runtime": "node20", "start": "cd /opt/app && node server.js", "port": 3000,
   "env": env, "dataDirs": ["/opt/data/state"], "healthPath": "/health",
-  "displayName": "Fila de Visitas", "description": "Fila e registro de visitas comerciais da DLC (SPAs 1036 e 1032).",
+  "displayName": "Registro de Visitas", "description": "Fila e registro de visitas comerciais da DLC (SPAs 1036 e 1032).",
   "changelog": os.environ.get("CHANGELOG", "Atualização do app"),
   **({"baseVersionId": os.environ["BASE_VERSION"]} if os.environ.get("BASE_VERSION") else {})}))
 PY

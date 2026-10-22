@@ -364,6 +364,44 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- registrar visita ----------
+  // Depois de uma visita (registrada pelo app ou direto no Bitrix): finaliza o card, cria o próximo e atualiza o cadastro
+  // da empresa (Última e Próxima Visita do segmento) — desde que o segmento tenha Vendedor e Classe preenchidos.
+  async function posVisita({ card, emp, dia, uid, visita, agora }) {
+    const { map } = await campos();
+    const passos = [];
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.finalizado } });
+    store.setChave(R.chaveFila(card.empresaId, card.segmento, card.cargo), null);
+    passos.push('card finalizado');
+    const s = emp?.segs?.[card.segmento] || {};
+    const classe = s.classe || card.classe;
+    let proximo = null;
+    const novaData = R.dataProgramada(store.config, { cargo: card.cargo, classe, ultima: dia, hoje: hoje() });
+    if (novaData && emp) {
+      proximo = await criarCard({ empresa: emp, seg: card.segmento, cargo: card.cargo, classe, responsavel: s[card.cargo.toLowerCase()] || card.responsavel || uid, data: novaData });
+      passos.push(`próximo card ${proximo} (${R.fmtBR(novaData)})`);
+    }
+    if (emp && s.vendedor && R.CLASSES.includes(s.classe)) {
+      const c = map.empresa[card.segmento] || {}, fields = {};
+      if (c.ultima) fields[c.ultima] = dia;
+      if (c.proxima) {
+        const datas = [];
+        for (const it of await cardsAbertosDaEmpresa(emp.id)) { const x = await dadosCard(it); if (x.segmento === card.segmento && x.data) datas.push(x.data); }
+        datas.sort();
+        if (datas[0]) fields[c.proxima] = datas[0];
+      }
+      if (Object.keys(fields).length) {
+        await bitrix.call('crm.company.update', { id: card.empresaId, fields });
+        passos.push(`cadastro da empresa atualizado (${card.segmento}: última ${R.fmtBR(dia)}${fields[c.proxima] ? `, próxima ${R.fmtBR(fields[c.proxima])}` : ''})`);
+      }
+    } else store.log('aviso', `Cadastro da empresa ${card.empresa} (${card.segmento}) não atualizado: falta Vendedor ou Classe`, { empresa: card.empresaId });
+    // o app gravou "última visita" na empresa: atualiza o snapshot para não recalcular os outros cargos
+    const snap = store.snapEmpresa(card.empresaId) || {};
+    for (const k of Object.keys(snap)) if (k.startsWith(card.segmento + '|')) snap[k].ultima = dia;
+    store.setSnapEmpresa(card.empresaId, snap);
+    if (store.config.tarefaAtiva && visita) await criarTarefa(visita, card, uid, agora || clock()).then(() => passos.push('tarefa criada'), e => store.log('aviso', `Tarefa não criada: ${e.message}`));
+    return { proximo, novaData, passos };
+  }
+
   async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, campos: extra = {} }) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
@@ -408,29 +446,9 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (String(resultado || '').trim() && !map.visita.resultado) {
       await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: +v.id, ENTITY_TYPE: DYN(F.ETYPE.visita), COMMENT: `Resultado: ${String(resultado).trim()}${acompanhamento ? `\nAcompanhamento: ${acompanhamento}` : ''}` } }).catch(e => store.log('aviso', `Resultado não gravado como comentário: ${e.message}`));
     }
-    // finaliza o card na hora (sem depender de tarefa/campo de conclusão)
-    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.finalizado } });
-    store.setChave(R.chaveFila(card.empresaId, card.segmento, card.cargo), null);
-    passos.push('card finalizado');
-    // Última Visita do segmento + próximo card com a data nova
-    const campoUlt = map.empresa[card.segmento]?.ultima;
-    if (campoUlt) {
-      await bitrix.call('crm.company.update', { id: card.empresaId, fields: { [campoUlt]: dia } });
-      passos.push('última visita atualizada');
-    }
-    const s = emp?.segs[card.segmento];
-    const classe = s?.classe || card.classe;
-    let proximo = null;
-    const novaData = R.dataProgramada(store.config, { cargo: card.cargo, classe, ultima: dia, hoje: hoje() });
-    if (novaData && emp) {
-      proximo = await criarCard({ empresa: emp, seg: card.segmento, cargo: card.cargo, classe, responsavel: s[card.cargo.toLowerCase()] || card.responsavel || uid, data: novaData });
-      passos.push(`próximo card ${proximo} (${R.fmtBR(novaData)})`);
-    }
-    // o app grava "última visita" na empresa: atualiza o snapshot para não recalcular os outros cargos
-    const snap = store.snapEmpresa(card.empresaId) || {};
-    for (const k of Object.keys(snap)) if (k.startsWith(card.segmento + '|')) snap[k].ultima = dia;
-    store.setSnapEmpresa(card.empresaId, snap);
-    if (store.config.tarefaAtiva) await criarTarefa(v, card, uid, agora).then(() => passos.push('tarefa criada'), e => store.log('aviso', `Tarefa não criada: ${e.message}`));
+    const pos = await posVisita({ card, emp, dia, uid, visita: v, agora });
+    passos.push(...pos.passos);
+    const proximo = pos.proximo, novaData = pos.novaData;
     store.log('visita', `Visita ${v.id} registrada por ${uid} no card ${card.id} (antecipada: ${ant ? 'sim' : 'não'}): ${passos.join(', ')}`, { card: card.id, visita: +v.id });
     return { visita: +v.id, antecipada: ant, proximoCard: proximo, proximaData: novaData, passos };
   }
@@ -446,7 +464,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const { map } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
-    if (!card.aberto) throw erro('Visita já finalizada não pode ser reprogramada.', 409);
+    if (!card.aberto) throw erro('Visita já finalizada não pode ser reagendada.', 409);
     if (!uid) throw erro('Usuário não identificado.', 401);
     if (!card.data) throw erro('O card não tem data programada.');
     const msg = R.validarReprogramacao({ atual: card.data, nova, motivo });
@@ -459,7 +477,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     store.addHistorico({ card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: motivo.trim(), autor: uid, autorNome: nome, responsavel: card.responsavel });
     try {
       await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila),
-        COMMENT: `Visita reprogramada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
+        COMMENT: `Visita reagendada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
     } catch (e) { store.log('aviso', `Comentário na linha do tempo do card ${card.id} falhou: ${e.message}`); }
     store.log('reprogramacao', `Card ${card.id}: ${R.fmtBR(card.data)} → ${R.fmtBR(nova)} por ${uid}: ${motivo.trim()}`, { card: card.id });
     return { ok: true, data: nova };
@@ -476,14 +494,29 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- guardas (edição direta é revertida) ----------
+  async function fecharVisitaExterna(it, campo) {
+    const { map } = await campos();
+    const card = await lerCard(+it[map.visita.filaId]);
+    if (!card || !card.aberto) return;
+    const dia = R.todayBR(new Date(it[campo] || it.createdTime));
+    const emp = await lerEmpresa(card.empresaId);
+    const pos = await posVisita({ card, emp, dia, uid: +it.assignedById, visita: { id: it.id }, agora: clock() });
+    store.log('visita', `Visita ${it.id} criada direto no Bitrix (card ${card.id}): ${pos.passos.join(', ')}`, { card: card.id, visita: +it.id });
+  }
   async function guardarVisitas() {
     const { map } = await campos();
     const campo = map.visita.dataHora || 'begindate';
-    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, order: { id: 'desc' }, select: ['id', 'assignedById', 'title', campo], filter: store.lastSweep ? { '>updatedTime': store.lastSweep } : {} });
+    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, order: { id: 'desc' }, select: ['id', 'assignedById', 'title', 'createdTime', 'companyId', campo, ...(map.visita.filaId ? [map.visita.filaId] : [])], filter: store.lastSweep ? { '>updatedTime': store.lastSweep } : {} });
     let revertidos = 0;
+    if (!store.job('inicioVisitasExternas')) store.setJob('inicioVisitasExternas', new Date().toISOString());
     for (const it of r.result?.items || []) {
       const atual = it[campo], snap = store.snapVisita(it.id);
-      if (!snap) { store.setSnapVisita(+it.id, { dt: atual, campo }); continue; }
+      if (!snap) {
+        store.setSnapVisita(+it.id, { dt: atual, campo });
+        // visita criada direto no Bitrix (depois da ativação deste recurso): fecha o card e atualiza o cadastro da empresa
+        if (it.createdTime && it.createdTime >= store.job('inicioVisitasExternas') && map.visita.filaId && it[map.visita.filaId]) await fecharVisitaExterna(it, campo).catch(e => store.log('erro', `Visita ${it.id} criada no Bitrix: ${e.message}`));
+        continue;
+      }
       if (sameInstant(atual, snap.dt)) continue;
       await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.visita, id: it.id, fields: { [campo]: snap.dt } });
       store.addBloqueio({ tipo: 'visita-data', visita: +it.id, tentou: atual, original: snap.dt, responsavel: +it.assignedById });
@@ -506,7 +539,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: it.id, fields: { [map.fila.data || 'closedate']: snap.data } });
       store.addBloqueio({ tipo: 'card-data', card: +it.id, tentou: atual, original: snap.data, responsavel: +it.assignedById });
       store.log('bloqueio', `Data programada do card ${it.id} revertida (tentativa: ${atual}, original: ${snap.data}). Use "Reprogramar visita".`, { card: +it.id });
-      await notificar(+it.assignedById, `A data programada de "${it.title}" só pode ser alterada pelo botão "Reprogramar visita". A data foi restaurada.`);
+      await notificar(+it.assignedById, `A data programada de "${it.title}" só pode ser alterada pelo botão "Reagendar visita". A data foi restaurada.`);
       rev++;
     }
     return rev;

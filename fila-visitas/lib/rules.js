@@ -65,7 +65,7 @@ function etapaPara(dataIso, hoje) {
 // Reprogramação: motivo obrigatório, data válida, mesmo mês da data programada original.
 function validarReprogramacao({ atual, nova, motivo }) {
   if (!isoDate(nova)) return 'Informe a nova data.';
-  if (String(motivo || '').trim().length < 3) return 'O motivo da reprogramação é obrigatório.';
+  if (String(motivo || '').trim().length < 3) return 'O motivo do reagendamento é obrigatório.';
   if (!sameMonth(atual, nova)) {
     const [y, m] = atual.split('-');
     return `A nova data precisa ficar no mesmo mês da data programada (${m}/${y}). Escolha um dia de ${m}/${y}.`;

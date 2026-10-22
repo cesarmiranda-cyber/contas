@@ -338,3 +338,27 @@ test('dashboard: cada linha traz o vendedor (inclusive de cards antigos, sem ín
   assert.ok(d.cards.length && d.cards.every(c => c.vendedor === 'Vera Vendedora'));
   assert.equal(d.visitas[0].vendedor, 'Vera Vendedora');
 });
+
+test('após a visita o cadastro da empresa recebe Última e Próxima Visita do segmento', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  assert.equal(w.companies[1].UF_CRM_MOT_ULTIMA, '2026-05-10');
+  assert.equal(w.companies[1].UF_CRM_MOT_PROXIMA, '2026-06-09', 'próxima = menor data entre os cards abertos do segmento');
+});
+
+test('visita criada direto no Bitrix (com ID da Fila) também finaliza o card e atualiza a empresa', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await svc.guardarVisitas();                                   // marca o início do recurso
+  w.items[1032][900] = { id: 900, assignedById: 10, companyId: 1, createdTime: new Date(Date.now() + 5000).toISOString(), ufCrm_dh: '2026-05-10T15:00:00.000Z', ufCrm_fila: String(vend.id), ufCrm_setor: 'Motores' };
+  w.items[1032][900].updatedTime = new Date(Date.now() + 6000).toISOString();
+  await svc.guardarVisitas();
+  assert.equal(vend.stageId, w.stages.finalizado);
+  assert.equal(w.companies[1].UF_CRM_MOT_ULTIMA, '2026-05-10');
+  assert.equal(cards(w).filter(c => c.stageId !== w.stages.finalizado && c.title.endsWith('| Vendedor')).length, 1);
+  await svc.guardarVisitas();                                   // idempotente
+  assert.equal(cards(w).filter(c => c.title.endsWith('| Vendedor')).length, 2);
+});
