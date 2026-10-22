@@ -9,6 +9,7 @@ function createWorld() {
   }
   w.companyFields = companyFields;
   const stages = [{ STATUS_ID: 'DT1036_1:NEW', NAME: 'Aguardando' }, { STATUS_ID: 'DT1036_1:DIA', NAME: 'Dia da Visita' }, { STATUS_ID: 'DT1036_1:LATE', NAME: 'Atrasada' }, { STATUS_ID: 'DT1036_1:DONE', NAME: 'Finalizado' }];
+  w.stageList = stages;
   w.stages = { aguardando: 'DT1036_1:NEW', dia: 'DT1036_1:DIA', atrasada: 'DT1036_1:LATE', finalizado: 'DT1036_1:DONE' };
   const match = (it, filter = {}) => Object.entries(filter).every(([k, v]) => {
     if (k.startsWith('!')) return it[k.slice(1)] !== v;

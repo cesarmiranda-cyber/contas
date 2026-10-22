@@ -66,11 +66,14 @@ async function descobrir(bitrix, cfg) {
   const etapas = {};
   for (const s of st) {
     const n = R.norm(s.NAME);
-    if (/dia da visita/.test(n)) etapas.dia = s.STATUS_ID;
+    if (/dia da visita|hoje/.test(n)) etapas.dia = s.STATUS_ID;
     else if (/atrasad/.test(n)) etapas.atrasada = s.STATUS_ID;
-    else if (/finaliz|conclu/.test(n)) etapas.finalizado = s.STATUS_ID;
+    else if (s.SEMANTICS === 'S' || /finaliz|conclu|encerr|fechad|realizad/.test(n)) etapas.finalizado ||= s.STATUS_ID;
     else if (!etapas.aguardando && /aguard|nova|novo|fila|programad/.test(n)) etapas.aguardando = s.STATUS_ID;
   }
+  // etapa de sucesso (semântica do Bitrix) tem prioridade sobre o nome
+  const sucesso = st.find(s => s.SEMANTICS === 'S');
+  if (sucesso) etapas.finalizado = sucesso.STATUS_ID;
   if (!etapas.aguardando && st[0]) etapas.aguardando = st[0].STATUS_ID;
   for (const e of ['aguardando', 'dia', 'atrasada', 'finalizado']) if (!etapas[e]) faltando.push(`Etapa da fila · ${e} (crie a etapa no kanban 1036)`);
   if (!fila.out.data) faltando.push('Fila · Data programada (usando "Data de encerramento" padrão)');

@@ -362,3 +362,18 @@ test('visita criada direto no Bitrix (com ID da Fila) também finaliza o card e 
   await svc.guardarVisitas();                                   // idempotente
   assert.equal(cards(w).filter(c => c.title.endsWith('| Vendedor')).length, 2);
 });
+
+test('etapa final com outro nome (Encerrado) e card aberto com visita registrada é finalizado', async () => {
+  const { w, svc } = setup();
+  w.stageList.find(s => s.STATUS_ID === 'DT1036_1:DONE').NAME = 'Encerrado';
+  await svc.sincronizarEmpresa(1);
+  const d = await svc.campos(true);
+  assert.equal(d.map.etapas.finalizado, w.stages.finalizado);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  assert.equal(vend.stageId, w.stages.finalizado);
+  vend.stageId = w.stages.aguardando;                                   // simula a falha antiga: visita existe, card ficou aberto
+  const r = await svc.reconciliarVisitas();
+  assert.equal(r.finalizados, 1); assert.equal(vend.stageId, w.stages.finalizado);
+  assert.equal((await svc.reconciliarVisitas()).finalizados, 0, 'idempotente');
+});

@@ -369,6 +369,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   async function posVisita({ card, emp, dia, uid, visita, agora }) {
     const { map } = await campos();
     const passos = [];
+    if (!map.etapas.finalizado) throw erro('Não encontrei a etapa final (Finalizado/Encerrado) do kanban da Fila. Confira as etapas em Configurações.', 500);
     await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.finalizado } });
     store.setChave(R.chaveFila(card.empresaId, card.segmento, card.cargo), null);
     passos.push('card finalizado');
@@ -494,6 +495,29 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- guardas (edição direta é revertida) ----------
+  // Qualquer card ainda aberto que tenha uma visita registrada (ID da Fila) deve estar finalizado.
+  async function reconciliarVisitas() {
+    const { map } = await campos();
+    if (!map.visita.filaId || !map.etapas.finalizado) return { finalizados: 0 };
+    const feitos = new Set();
+    let start = 0;
+    for (;;) {
+      const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, select: ['id', map.visita.filaId], start });
+      for (const it of r.result?.items || []) { const k = +it[map.visita.filaId]; if (k) feitos.add(k); }
+      if (r.next === undefined || r.next === null) break;
+      start = r.next;
+    }
+    let n = 0;
+    for (const it of await cardsAbertos()) {
+      if (!feitos.has(+it.id)) continue;
+      await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: it.id, fields: { stageId: map.etapas.finalizado } });
+      const reg = store.card(it.id);
+      if (reg && store.chave(reg.chave) === +it.id) store.setChave(reg.chave, null);
+      store.log('card-finalizado', `Card ${it.id} finalizado: já tem visita registrada`, { card: +it.id });
+      n++;
+    }
+    return { finalizados: n };
+  }
   async function fecharVisitaExterna(it, campo) {
     const { map } = await campos();
     const card = await lerCard(+it[map.visita.filaId]);
@@ -571,6 +595,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     try {
       await campos();
       const guardas = { visitas: await guardarVisitas(), cards: await guardarCards(await cardsAbertos()) };
+      if (!store.job('reconciliado') || Date.now() - Date.parse(store.job('reconciliado')) > 3600e3) { guardas.reconciliados = (await reconciliarVisitas()).finalizados; store.setJob('reconciliado', new Date().toISOString()); }
       // primeira varredura depois de ativar: não processa as 11 mil empresas de uma vez, só as alteradas daqui em diante
       const emp = store.lastSweep ? await sincronizarTodas({ desde: store.lastSweep }) : [];
       let job = null;
@@ -753,6 +778,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };
