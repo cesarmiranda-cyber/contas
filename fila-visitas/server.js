@@ -60,7 +60,7 @@ const routes = {
   'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '', podeConfig: svc.acessoRestrito() ? !!(id.verificado && svc.podeConfigurar(id.uid)) : true, podeDashboard: svc.acessoRestrito() ? !!(id.verificado && svc.podeDashboard(id.uid)) : true }),
   'GET /api/dashboard': async (_, __, id) => { exige(); exigeDashboard(id); return svc.dashboardDados({ uid: id.uid, bearer: id.bearer }); },
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
-  'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto', bearer: id.bearer }); },
+  'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto', bearer: id.bearer, encerradas: u.searchParams.get('encerradas') === '1' }); },
   'GET /api/departamentos': async (_, __, id) => { exigeConfig(id); exige(); return { departamentos: await svc.departamentos() }; },
   'GET /api/ramos': async (_, __, id) => { exigeConfig(id); exige(); return { ramos: await svc.listaRamos() }; },
   'GET /api/historico': async (_, __, id) => { let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ } return { reprogramacoes: id.uid ? await svc.historicoVisivel(id.uid, id.bearer) : [], base }; },

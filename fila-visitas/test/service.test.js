@@ -470,3 +470,16 @@ test('empresa que já tem Última e Próxima Visita: a fila do Vendedor nasce na
   assert.equal(sup.ufCrm_data, '2026-06-19', 'outros cargos seguem a regra de intervalo');
   assert.equal(Object.keys(w.items[1032]).length, 0, 'nenhum registro de visita é criado');
 });
+
+test('lista de visitas pode incluir as encerradas (e não realizadas) com a data do encerramento', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  const so = await svc.listarVisitas({ uid: 10 });
+  assert.ok(!so.visitas.some(v => v.id === vend.id));
+  const com = await svc.listarVisitas({ uid: 10, encerradas: true });
+  const enc = com.visitas.find(v => v.id === vend.id);
+  assert.equal(enc.situacao, 'finalizado'); assert.ok(enc.encerradoEm); assert.equal(enc.dias, null);
+  assert.ok(com.visitas.some(v => v.situacao === 'aguardando'), 'as abertas continuam na lista');
+});

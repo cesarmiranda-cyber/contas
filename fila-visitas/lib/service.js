@@ -742,10 +742,25 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   // escopo 'auto': vendedor vê os seus; supervisor/coordenador/gerente veem a equipe (quem aparece acima do vendedor na empresa
   // ou chefia o departamento do responsável); diretoria/administração vê tudo.
-  async function listarVisitas({ uid, escopo = 'auto', bearer = null }) {
+  async function listarVisitas({ uid, escopo = 'auto', bearer = null, encerradas = false }) {
     const { map } = await campos();
     const permitidos = await permitidosBitrix(bearer, F.ETYPE.fila);
-    const itens = (await cardsAbertos()).filter(it => !permitidos || permitidos.has(+it.id));
+    const abertosL = (await cardsAbertos()).filter(it => !permitidos || permitidos.has(+it.id));
+    let fechadosL = [];
+    if (encerradas) {
+      const desde = R.brIso(new Date(Date.now() - 120 * 864e5));
+      const etapas = [...(map.etapas.concluidas || []), map.etapas.naoRealizada].filter(Boolean);
+      let start = 0;
+      for (;;) {
+        const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { stageId: etapas, '>updatedTime': desde }, select: ['*', 'uf*'], start });
+        fechadosL.push(...(r.result?.items || []));
+        if (r.next === undefined || r.next === null) break;
+        start = r.next;
+      }
+      fechadosL = fechadosL.filter(it => !permitidos || permitidos.has(+it.id));
+    }
+    const itens = [...abertosL, ...fechadosL];
+    const fechadoSet = new Set(fechadosL.map(i => i.id));
     const todos = escopo === 'todas' || (escopo === 'auto' && await enxergaTudo(uid));
     const time = escopo === 'auto' && !todos ? await equipeDe(uid) : new Set([+uid]);
     const out = [];
@@ -768,8 +783,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       if (tipos.get(c.empresaId) === undefined) tipos.set(c.empresaId, await tipoDaEmpresa(emp));
       const equipe = {};
       for (const k of ['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor']) if (sg[k]) equipe[k] = await nomeUsuario(sg[k]);
+      const fechado = fechadoSet.has(it.id);
+      const situacao = fechado ? (it.stageId === map.etapas.naoRealizada ? 'naorealizada' : 'finalizado') : R.etapaPara(c.data, hoje());
       out.push({ ...c, tipoEmpresa: tipos.get(c.empresaId) || '', responsavelNome: await nomeUsuario(c.responsavel), classe: c.classe || reg.classe || '',
-        situacao: R.etapaPara(c.data, hoje()), dias: c.data ? R.dayDiff(hoje(), c.data) : null,
+        situacao, encerradoEm: fechado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null, dias: !fechado && c.data ? R.dayDiff(hoje(), c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, hoje()) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
         altMin: R.addDays(hoje(), 1), altMax: R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || hoje().slice(0, 7)),
         equipe, reprogramacoes: store.historico.filter(h => h.card === c.id && !h.tipo).length, urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });

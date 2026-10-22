@@ -190,6 +190,15 @@ body.wide main{padding-top:12px}
 @media(max-width:700px){.filters,.filters.f5,.filters.f6{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}}
 .g5{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
 .pl2.nr,.pl.nr{background:#94a3b8;color:#fff}
+
+.stats.s5{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.stat.green i{background:#dcfce7;color:#16a34a}.stat.gray i{background:#f1f5f9;color:#64748b}
+.enc{display:flex;align-items:center;justify-content:center;gap:8px;min-height:42px;border-radius:10px;font-weight:700;font-size:13.5px;flex-direction:column}
+.enc.finalizado{background:#dcfce7;color:#15803d}.enc.naorealizada{background:#f1f5f9;color:#64748b}.enc small{font-weight:500;font-size:12px}
+.list.cards .item.finalizado{background:color-mix(in srgb,#16a34a 6%,var(--sf))}.list.cards .item.finalizado:before{background:#16a34a}
+.list.cards .item.naorealizada{background:color-mix(in srgb,#94a3b8 10%,var(--sf))}.list.cards .item.naorealizada:before{background:#94a3b8}
+.tbv tr.t-finalizado td{background:color-mix(in srgb,#16a34a 6%,var(--sf))}.tbv tr.t-naorealizada td{background:color-mix(in srgb,#94a3b8 10%,var(--sf))}
+.item.finalizado .due span,.item.naorealizada .due span{background:#e2e8f0;color:#475569}
 </style>
 </head>
 <body>
@@ -205,7 +214,8 @@ body.wide main{padding-top:12px}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmt = iso => iso ? iso.split('-').reverse().join('/') : '—';
-let uid = null, eu = {}, aba = 'minhas', dados = null, users = [], foco = '';
+let uid = null, eu = {}, aba = 'minhas', dados = null, users = [], foco = 'abertas';
+const VD = { per: '', de: '', ate: '' };   // filtro de data: '' | hoje | semana | mes | custom
 try { uid = +localStorage.getItem('fv.uid') || null; } catch {}
 const F = { seg: '', tipo: '', classe: '', resp: '', vend: '' };
 
@@ -233,7 +243,7 @@ function montaAbas() {
   if (eu.podeConfig !== false) abas.push(['cfg', 'Configurações']);
   if (!abas.some(x => x[0] === aba)) aba = 'minhas';
   $('#tabs').innerHTML = abas.map(([k, t]) => `<button class="${aba === k ? 'on' : ''}" data-k="${k}">${t}</button>`).join('');
-  $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => { aba = b.dataset.k; foco = ''; montaAbas(); carrega(); });
+  $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => { aba = b.dataset.k; foco = 'abertas'; montaAbas(); carrega(); });
 }
 async function carrega() {
   document.body.classList.add('wide');
@@ -241,7 +251,7 @@ async function carrega() {
   if (!uid && aba !== 'cfg') { m.innerHTML = '<div class="vazio">Escolha o seu nome no topo para ver as suas visitas.</div>'; return; }
   m.innerHTML = '<div class="vazio">Carregando…</div>';
   try {
-    if (aba === 'minhas') { dados = await api('/api/visitas?escopo=auto'); lista(); }
+    if (aba === 'minhas') { dados = await api('/api/visitas?escopo=auto&encerradas=1'); lista(); }
     else if (aba === 'hist') { const h = await api('/api/historico'); try { dados = await api('/api/visitas?escopo=auto'); } catch { dados = { visitas: [] }; } hist(h); }
     else if (aba === 'dash') await dashboard();
     else cfg(await api('/api/config'));
@@ -256,14 +266,26 @@ const ORD = { data: (a, b) => (a.data || '9').localeCompare(b.data || '9'), empr
 function lista() {
   const todas = dados.visitas, busca = (F.q || '').toLowerCase();
   const cont = k => todas.filter(x => x.situacao === k).length;
-  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!F.resp || String(x.responsavel) === F.resp) && (!F.vend || (x.equipe && x.equipe.vendedor) === F.vend) && (!foco || x.situacao === foco))
+  const ABERTAS = ['atrasada', 'dia', 'aguardando'];
+  const hojeIso = dados.hoje;
+  const soma = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const faixa = (() => {
+    if (VD.per === 'hoje') return [hojeIso, hojeIso];
+    if (VD.per === 'semana') { const dow = (new Date(hojeIso + 'T12:00:00Z').getUTCDay() + 6) % 7; return [soma(hojeIso, -dow), soma(hojeIso, 6 - dow)]; }
+    if (VD.per === 'mes') { const [y, m] = hojeIso.split('-').map(Number); return [`${hojeIso.slice(0, 7)}-01`, `${hojeIso.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`]; }
+    if (VD.per === 'custom') return [VD.de || '0000-01-01', VD.ate || '9999-12-31'];
+    return null;
+  })();
+  const passaStatus = x => foco === 'todas' || (foco === 'abertas' ? ABERTAS.includes(x.situacao) : x.situacao === foco);
+  const passaData = x => !faixa || (x.data && x.data >= faixa[0] && x.data <= faixa[1]);
+  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!F.resp || String(x.responsavel) === F.resp) && (!F.vend || (x.equipe && x.equipe.vendedor) === F.vend) && passaStatus(x) && passaData(x))
     .sort((a, b) => ORD[VP.ord](a, b) * VP.dir);
   const segs = [...new Set(todas.map(x => x.segmento))].filter(Boolean);
   const resps = [...new Map(todas.map(x => [String(x.responsavel), x.responsavelNome])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const verEquipe = dados.visao !== 'minhas';
   const vends = [...new Set(todas.map(x => x.equipe && x.equipe.vendedor).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${cur === a ? 'selected' : ''}>${esc(b)}</option>`).join('');
-  const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Próximas']];
+  const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Em aberto · próximas'], ['finalizado', 'Encerradas'], ['naorealizada', 'Não realizadas']];
   let restante = VP.n;
   const mostra = l => { const r = l.slice(0, Math.max(0, restante)); restante -= r.length; return r; };
   const corpo = !v.length ? '<div class="vazio">Nenhuma visita por aqui.</div>' : VP.view === 'tabela' ? tabelaVisitas(v.slice(0, VP.n), verEquipe) : grupos.map(([k, t]) => {
@@ -271,28 +293,36 @@ function lista() {
     return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list cards">${mostra(g).map(linha).join('')}</div>` : '';
   }).join('');
   $('#main').innerHTML = `
-    <div class="stats s4">
+    <div class="stats s5">
+      <button class="stat ${foco === 'abertas' ? 'on' : ''}" data-f="abertas"><i>◷</i><div><b>${ABERTAS.reduce((a, k) => a + cont(k), 0)}</b><span>Em aberto</span></div></button>
       <button class="stat red ${foco === 'atrasada' ? 'on' : ''}" data-f="atrasada"><i>!</i><div><b>${cont('atrasada')}</b><span>Atrasadas</span></div></button>
       <button class="stat amber ${foco === 'dia' ? 'on' : ''}" data-f="dia"><i>★</i><div><b>${cont('dia')}</b><span>Hoje</span></div></button>
-      <button class="stat blue ${foco === 'aguardando' ? 'on' : ''}" data-f="aguardando"><i>◷</i><div><b>${cont('aguardando')}</b><span>Próximas</span></div></button>
-      <button class="stat ${foco === '' ? 'on' : ''}" data-f=""><i>Σ</i><div><b>${todas.length}</b><span>Total na fila</span></div></button>
+      <button class="stat green ${foco === 'finalizado' ? 'on' : ''}" data-f="finalizado"><i>✓</i><div><b>${cont('finalizado')}</b><span>Encerradas</span></div></button>
+      <button class="stat gray ${foco === 'naorealizada' ? 'on' : ''}" data-f="naorealizada"><i>✕</i><div><b>${cont('naorealizada')}</b><span>Não realizadas</span></div></button>
     </div>
     ${verEquipe ? `<div class="info">${dados.visao === 'tudo' ? 'Você está vendo as visitas de <b>todos</b>.' : 'Você está vendo as visitas da <b>sua equipe</b>.'}${dados.bitrix ? ' Aplicadas também as suas permissões do Bitrix24.' : ''}</div>` : ''}
     <div class="filters ${verEquipe ? 'f5' : ''} ">
       <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
+      <select id="fst" title="Status">${opt([['abertas', 'Status: Em aberto'], ['atrasada', 'Status: Atrasadas'], ['dia', 'Status: Hoje'], ['finalizado', 'Status: Encerradas'], ['naorealizada', 'Status: Não realizadas'], ['todas', 'Status: Todas']], foco)}</select>
+      <select id="fdt" title="Data programada">${opt([['', 'Data: qualquer'], ['hoje', 'Data: hoje'], ['semana', 'Data: esta semana'], ['mes', 'Data: este mês'], ['custom', 'Data: personalizado']], VD.per)}</select>
+      ${VD.per === 'custom' ? `<input id="fde" type="date" value="${VD.de}" title="De"><input id="fate" type="date" value="${VD.ate}" title="Até">` : ''}
       ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(resps, F.resp)}</select>` : ''}
       ${vends.length >= 1 ? `<select id="fv"><option value="">Todos os vendedores</option>${opt(vends.map(s => [s, s]), F.vend)}</select>` : ''}
       <select id="fs"><option value="">Todos os segmentos</option>${opt(segs.map(s => [s, s]), F.seg)}</select>
       ${todas.some(x => x.tipoEmpresa) ? `<select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>` : ''}
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
     </div>
-    <div class="bar2"><span class="hint">${v.length} visita(s)${F.seg || F.tipo || F.classe || F.resp || F.vend || foco || busca ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
+    <div class="bar2"><span class="hint">${v.length} visita(s)${F.seg || F.tipo || F.classe || F.resp || F.vend || foco !== 'abertas' || VD.per || busca ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
       <div class="bar2r"><label class="sl2">Ordenar<select id="fo">${opt([['data', 'Data programada'], ['prazo', 'Mais atrasadas primeiro'], ['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ['ultima', 'Última visita'], ...(verEquipe ? [['responsavel', 'Responsável']] : [])], VP.ord)}</select></label>
         <div class="seg2"><button data-vw="cards" class="${VP.view === 'cards' ? 'on' : ''}" title="Cartões">▦ Cartões</button><button data-vw="tabela" class="${VP.view === 'tabela' ? 'on' : ''}" title="Tabela">☰ Tabela</button></div>
         <button class="btn sm" id="vcsv">Exportar CSV</button></div></div>
     ${corpo}
     ${v.length > VP.n ? `<div style="text-align:center;margin:16px"><button class="btn" id="vmais">Mostrar mais (${v.length - VP.n} restantes)</button></div>` : ''}`;
-  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? '' : b.dataset.f; VP.n = 40; lista(); });
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? 'abertas' : b.dataset.f; VP.n = 40; lista(); });
+  $('#fst').onchange = e => { foco = e.target.value; VP.n = 40; lista(); };
+  $('#fdt').onchange = e => { VD.per = e.target.value; if (VD.per === 'custom' && !VD.de) { VD.de = hojeIso; VD.ate = hojeIso; } VP.n = 40; lista(); };
+  if ($('#fde')) $('#fde').onchange = e => { VD.de = e.target.value; lista(); };
+  if ($('#fate')) $('#fate').onchange = e => { VD.ate = e.target.value; lista(); };
   const q = $('#fq'); q.oninput = () => { F.q = q.value; VP.n = 40; const p = q.selectionStart; lista(); const n = $('#fq'); n.focus(); n.setSelectionRange(p, p); };
   if ($('#fr')) $('#fr').onchange = e => { F.resp = e.target.value; lista(); };
   if ($('#fv')) $('#fv').onchange = e => { F.vend = e.target.value; lista(); };
@@ -302,7 +332,7 @@ function lista() {
   $('#fo').onchange = e => { VP.ord = e.target.value; VP.dir = 1; salvaVP(); lista(); };
   document.querySelectorAll('[data-vw]').forEach(b => b.onclick = () => { VP.view = b.dataset.vw; salvaVP(); lista(); });
   document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); lista(); });
-  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = ''; salvaF(); lista(); };
+  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: '', de: '', ate: '' }); salvaF(); lista(); };
   if ($('#vmais')) $('#vmais').onclick = () => { VP.n += 60; lista(); };
   $('#vcsv').onclick = () => {
     const q2 = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
@@ -314,25 +344,25 @@ function lista() {
 }
 function tabelaVisitas(v, verEquipe) {
   const cab = [['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : []), ['ultima', 'Última visita'], ['data', 'Programada'], ['prazo', 'Prazo']];
-  const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'] };
+  const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
   return `<div class="tw tbv"><table><tr>${cab.map(([k, t]) => `<th data-oc="${k}" style="cursor:pointer">${t}${VP.ord === k ? (VP.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th></th></tr>${v.map(c => {
-    const q = c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-    return `<tr class="t-${c.situacao}"><td><b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}</td><td>${esc(c.segmento)}</td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap"><button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button></td></tr>`; }).join('')}</table></div>`;
+    const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
+    return `<tr class="t-${c.situacao}"><td><b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}</td><td>${esc(c.segmento)}</td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`; }).join('')}</table></div>`;
 }
 const ini = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 function linha(c) {
-  const q = c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
+  const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
   const eq = [['vendedor', 'Vendedor'], ['supervisor', 'Supervisor'], ['coordenador', 'Coordenador'], ['gerente', 'Gerente'], ['diretor', 'Diretor']].filter(([k]) => c.equipe && c.equipe[k])
     .map(([k, t]) => `<span class="pp ${c.cargo.toLowerCase() === k ? 'me' : ''}" title="${t}"><i>${esc(ini(c.equipe[k]))}</i><span><small>${t}</small>${esc(c.equipe[k])}</span></span>`).join('');
   return `<div class="item ${c.situacao}">
     <div class="main">
       <div class="emp">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</div>
       <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
-      <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${dados.visao !== 'minhas' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
+      <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null && c.diasDesdeUltima !== undefined ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${dados.visao !== 'minhas' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
       ${eq ? `<div class="pessoas">${eq}</div>` : ''}
     </div>
     <div class="due"><small>Programada</small><b>${fmt(c.data)}</b><span>${q}</span></div>
-    <div class="side"><div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>
+    <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
       <div class="links">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
 }
 const modal = html => { $('#sheet').innerHTML = html; $('#m').classList.add('on'); };
