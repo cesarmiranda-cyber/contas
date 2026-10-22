@@ -173,6 +173,12 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     } catch (e) { store.log('aviso', `Tarefa do card ${cardId} não criada: ${e.message}`); }
   }
 
+  // ---------- cache curto (deixa as telas rápidas); qualquer escrita limpa ----------
+  const memoria = new Map();
+  const memo = async (chave, ttl, fn) => { const c = memoria.get(chave); if (c && Date.now() - c.em < ttl) return c.v; const v = await fn(); memoria.set(chave, { em: Date.now(), v }); return v; };
+  const invalida = () => memoria.clear();
+  const empresaCurta = id => memo(`emp:${id}`, 120e3, () => lerEmpresa(id).catch(() => null));
+
   // ---------- cards da fila ----------
   const tituloCard = (empresa, seg, cargo) => `${empresa} | ${seg} | ${cargo}`;
   async function lerCard(id) {
@@ -256,6 +262,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   const sincronizarEmpresa = (id, op) => comTrava(`empresa:${id}`, () => sincronizarEmpresaSemTrava(id, op));
   async function sincronizarEmpresaSemTrava(id, { forcar = false } = {}) {
+    invalida();
     const cfg = store.config;
     const emp = await lerEmpresa(id);
     if (!emp) return { empresa: id, erro: 'Empresa não encontrada' };
@@ -429,6 +436,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   // da empresa (Última e Próxima Visita do segmento) — desde que o segmento tenha Vendedor e Classe preenchidos.
   const posVisita = args => comTrava(`empresa:${args.card.empresaId}`, () => posVisitaSemTrava(args));
   async function posVisitaSemTrava({ card, emp, dia, uid, visita, agora }) {
+    invalida();
     const { map } = await campos();
     const passos = [];
     if (!map.etapas.finalizado) throw erro('Não encontrei a etapa final (Finalizado/Encerrado) do kanban da Fila. Confira as etapas em Configurações.', 500);
@@ -518,6 +526,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   // ---------- reprogramar ----------
   async function reprogramar(cardId, { uid, nova, motivo }) {
+    invalida();
     const { map } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
@@ -794,6 +803,113 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     out.sort((a, b) => (a.data || '9').localeCompare(b.data || '9'));
     return { hoje: hoje(), bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || out.some(v => +v.responsavel !== +uid) ? 'equipe' : 'minhas'), visitas: out };
   }
+  // ---------- listagem paginada no servidor ----------
+  // Filtra/ordena/pagina com os dados baratos do card e do índice local; só as linhas da página buscam empresa e nomes.
+  const RANK = { atrasada: 0, dia: 1, aguardando: 2, finalizado: 3, naorealizada: 4 };
+  async function listarVisitasPag(p) {
+    const { uid, bearer = null, escopo = 'auto', q = '', status = 'abertas', per = '', de = '', ate = '', seg = '', tipo = '', classe = '', resp = '', vend = '', ord = 'data', dir = 1 } = p;
+    const size = Math.max(1, Math.min(+p.size || 20, 5000));
+    const { map } = await campos();
+    const permitidos = await permitidosBitrix(bearer, F.ETYPE.fila);
+    const todos = escopo === 'todas' || (escopo === 'auto' && await enxergaTudo(uid));
+    const time = escopo === 'auto' && !todos ? await memo(`equipe:${uid}`, 60e3, () => equipeDe(uid)) : new Set([+uid]);
+    const abertosL = await memo('cards-abertos', 15e3, () => cardsAbertos());
+    const fechadosL = await memo('cards-fechados', 60e3, async () => {
+      const desde = R.brIso(new Date(Date.now() - 120 * 864e5));
+      const etapas = [...(map.etapas.concluidas || []), map.etapas.naoRealizada].filter(Boolean);
+      const out = []; let start = 0;
+      for (;;) {
+        const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { stageId: etapas, '>updatedTime': desde }, select: ['*', 'uf*'], start });
+        out.push(...(r.result?.items || []));
+        if (r.next === undefined || r.next === null) break;
+        start = r.next;
+      }
+      return out;
+    });
+    const h = hoje();
+    // 1) linhas leves + visibilidade
+    const leves = [];
+    for (const [lista, fechado] of [[abertosL, false], [fechadosL, true]]) for (const it of lista) {
+      if (permitidos && !permitidos.has(+it.id)) continue;
+      const c = await dadosCard(it), reg = store.card(it.id) || {};
+      const propria = +c.responsavel === +uid;
+      if (!todos && !propria) {
+        if (escopo === 'minhas') continue;
+        if (escopo === 'auto' && !time.has(+c.responsavel)) {
+          let eq = reg.equipe;
+          if (!eq) { const e = await empresaCurta(c.empresaId); eq = equipeIds(e?.segs?.[c.segmento]); }
+          if (!Object.values(eq || {}).map(Number).includes(+uid)) continue;
+        }
+      }
+      const situacao = fechado ? (it.stageId === map.etapas.naoRealizada ? 'naorealizada' : 'finalizado') : R.etapaPara(c.data, h);
+      leves.push({ it, c, reg, fechado, situacao, vendId: (reg.equipe || {}).vendedor || null });
+    }
+    // 2) contadores e opções (sobre tudo o que o usuário pode ver)
+    const counts = { abertas: 0, atrasada: 0, dia: 0, aguardando: 0, finalizado: 0, naorealizada: 0 };
+    for (const l of leves) { counts[l.situacao]++; if (!l.fechado) counts.abertas++; }
+    const nomeDe = id => memo(`nome:${id}`, 600e3, () => nomeUsuario(id));
+    const vendIds = [...new Set(leves.map(l => l.vendId).filter(Boolean))], respIds = [...new Set(leves.map(l => +l.c.responsavel).filter(Boolean))];
+    const opcoes = {
+      segmentos: [...new Set(leves.map(l => l.c.segmento).filter(Boolean))].sort(),
+      vendedores: (await Promise.all(vendIds.map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
+      responsaveis: (await Promise.all(respIds.map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
+    };
+    // 3) filtros
+    const faixa = (() => {
+      if (per === 'hoje') return [h, h];
+      if (per === 'semana') { const dow = (new Date(h + 'T12:00:00Z').getUTCDay() + 6) % 7; return [R.addDays(h, -dow), R.addDays(h, 6 - dow)]; }
+      if (per === 'mes') return [`${h.slice(0, 7)}-01`, R.ultimoDiaDoMes(h.slice(0, 7))];
+      if (per === 'custom') return [R.isoDate(de) || '0000-01-01', R.isoDate(ate) || '9999-12-31'];
+      return null;
+    })();
+    const busca = R.norm(q);
+    let sel = leves.filter(l => (status === 'todas' || (status === 'abertas' ? !l.fechado : l.situacao === status))
+      && (!faixa || (l.c.data && l.c.data >= faixa[0] && l.c.data <= faixa[1]))
+      && (!busca || R.norm(l.c.empresa).includes(busca)) && (!seg || l.c.segmento === seg) && (!classe || (l.c.classe || l.reg.classe) === classe)
+      && (!resp || String(l.c.responsavel) === String(resp)));
+    if (p.cardId) sel = sel.filter(l => String(l.c.id) === String(p.cardId));
+    if (vend) {
+      const out = [];
+      for (const l of sel) { let vid = l.vendId; if (!vid) { const e = await empresaCurta(l.c.empresaId); vid = (e?.segs?.[l.c.segmento] || {}).vendedor; } if (String(vid) === String(vend)) out.push(l); }
+      sel = out;
+    }
+    if (tipo) {
+      const out = [];
+      for (const l of sel) { const t = await memo(`tipo:${l.c.empresaId}`, 300e3, async () => tipoDaEmpresa(await empresaCurta(l.c.empresaId))); if (R.norm(t) === R.norm(tipo)) out.push(l); }
+      sel = out;
+    }
+    if (p.soIds) return { ids: sel.map(l => l.c.id), total: sel.length };
+    // 4) ordenação e página
+    const nomesResp = new Map(); for (const id of respIds) nomesResp.set(id, await nomeDe(id));
+    const chaves = {
+      data: (a, b) => (RANK[a.situacao] - RANK[b.situacao]) || (a.c.data || '9').localeCompare(b.c.data || '9'),
+      prazo: (a, b) => (a.c.data || '9').localeCompare(b.c.data || '9'),
+      empresa: (a, b) => a.c.empresa.localeCompare(b.c.empresa), segmento: (a, b) => a.c.segmento.localeCompare(b.c.segmento), cargo: (a, b) => a.c.cargo.localeCompare(b.c.cargo),
+      classe: (a, b) => String(a.c.classe).localeCompare(String(b.c.classe)), responsavel: (a, b) => String(nomesResp.get(+a.c.responsavel)).localeCompare(String(nomesResp.get(+b.c.responsavel))),
+    };
+    sel.sort((a, b) => (chaves[ord] || chaves.data)(a, b) * (+dir || 1));
+    const total = sel.length, paginas = Math.max(1, Math.ceil(total / size)), pagina = Math.min(Math.max(1, +p.page || 1), paginas);
+    const fatia = sel.slice((pagina - 1) * size, pagina * size);
+    // 5) só a página busca empresa/nomes
+    let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
+    const visitas = [];
+    for (const l of fatia) {
+      const { it, c, reg } = l;
+      const emp = await empresaCurta(c.empresaId);
+      const sg = emp?.segs?.[c.segmento] || {};
+      const equipe = {};
+      for (const k of ['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor']) if (sg[k]) equipe[k] = await nomeDe(sg[k]);
+      if (emp && JSON.stringify(reg.equipe) !== JSON.stringify(equipeIds(sg))) store.setCard(it.id, { ...reg, empresaId: c.empresaId, empresa: emp.nome, seg: c.segmento, cargo: c.cargo, equipe: equipeIds(sg) });
+      const tipoEmp = await memo(`tipo:${c.empresaId}`, 300e3, () => tipoDaEmpresa(emp));
+      visitas.push({ ...c, tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
+        encerradoEm: l.fechado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null, dias: !l.fechado && c.data ? R.dayDiff(h, c.data) : null,
+        ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, h) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
+        altMin: R.addDays(h, 1), altMax: R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || h.slice(0, 7)),
+        equipe, reprogramacoes: store.historico.filter(x => x.card === c.id && !x.tipo).length,
+        urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
+    }
+    return { hoje: h, bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || leves.some(l => +l.c.responsavel !== +uid) ? 'equipe' : 'minhas'), total, pagina, paginas, tamanho: size, counts, opcoes, visitas };
+  }
   // Dados em nível de linha para o dashboard (a tela agrega e filtra). Respeita a visibilidade de quem consulta.
   const cacheDash = new Map();
   async function dashboardDados({ uid, meses = 13, bearer = null }) {
@@ -900,6 +1016,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

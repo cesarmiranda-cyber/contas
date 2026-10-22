@@ -483,3 +483,32 @@ test('lista de visitas pode incluir as encerradas (e não realizadas) com a data
   assert.equal(enc.situacao, 'finalizado'); assert.ok(enc.encerradoEm); assert.equal(enc.dias, null);
   assert.ok(com.visitas.some(v => v.situacao === 'aguardando'), 'as abertas continuam na lista');
 });
+
+test('lista paginada no servidor: total, páginas, contadores, filtros e ordenação', async () => {
+  const { w, svc } = setup();
+  w.empresa(2, 'Beta Ltda', { UF_CRM_MOT_CLASSE: '2', UF_CRM_MOT_VENDEDOR: '20', UF_CRM_MOT_SUPERVISOR: '20', UF_CRM_MOT_ULTIMA: '2026-04-01' });
+  await svc.sincronizarEmpresa(1); await svc.sincronizarEmpresa(2);          // 5 + 2 = 7 cards em aberto
+  const base = { uid: 30, size: 3 };
+  const p1 = await svc.listarVisitasPag({ ...base, page: 1 });
+  assert.equal(p1.total, 7); assert.equal(p1.paginas, 3); assert.equal(p1.visitas.length, 3);
+  assert.equal(p1.counts.abertas, 7);
+  const p3 = await svc.listarVisitasPag({ ...base, page: 3 });
+  assert.equal(p3.visitas.length, 1);
+  assert.equal((await svc.listarVisitasPag({ ...base, page: 99 })).pagina, 3, 'página fora do intervalo vai para a última');
+  const ids = [...p1.visitas, ...(await svc.listarVisitasPag({ ...base, page: 2 })).visitas, ...p3.visitas].map(v => v.id);
+  assert.equal(new Set(ids).size, 7, 'nenhuma linha repetida entre as páginas');
+  const so = await svc.listarVisitasPag({ ...base, page: 1, q: 'beta' });
+  assert.equal(so.total, 2); assert.ok(so.visitas.every(v => v.empresa === 'Beta Ltda'));
+  const vend = await svc.listarVisitasPag({ ...base, page: 1, vend: '20', size: 50 });
+  assert.ok(vend.total >= 1 && vend.visitas.every(v => v.equipe.vendedor === 'Gil Gerente'));
+  assert.ok(p1.opcoes.vendedores.length >= 1 && p1.opcoes.segmentos.includes('Motores'));
+  const mes = await svc.listarVisitasPag({ ...base, page: 1, per: 'mes', size: 50 });                 // hoje = 10/05/2026
+  assert.ok(mes.visitas.every(v => v.data.startsWith('2026-05')));
+  const custom = await svc.listarVisitasPag({ ...base, page: 1, per: 'custom', de: '2026-07-01', ate: '2026-07-31', size: 50 });
+  assert.ok(custom.visitas.every(v => v.data >= '2026-07-01' && v.data <= '2026-07-31'));
+  const vend1 = cards(w).find(c => c.title.startsWith('Acme') && c.title.endsWith('| Vendedor'));
+  await svc.registrarVisita(vend1.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  const enc = await svc.listarVisitasPag({ ...base, page: 1, status: 'finalizado' });
+  assert.equal(enc.total, 1); assert.equal(enc.visitas[0].situacao, 'finalizado');
+  assert.equal((await svc.listarVisitasPag({ uid: 777, page: 1 })).total, 0, 'quem não pode ver nada recebe lista vazia');
+});

@@ -199,6 +199,10 @@ body.wide main{padding-top:12px}
 .list.cards .item.naorealizada{background:color-mix(in srgb,#94a3b8 10%,var(--sf))}.list.cards .item.naorealizada:before{background:#94a3b8}
 .tbv tr.t-finalizado td{background:color-mix(in srgb,#16a34a 6%,var(--sf))}.tbv tr.t-naorealizada td{background:color-mix(in srgb,#94a3b8 10%,var(--sf))}
 .item.finalizado .due span,.item.naorealizada .due span{background:#e2e8f0;color:#475569}
+
+.pager{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 6px}.pg-i{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut)}.pg-i select{width:auto;padding:6px 10px}
+.pg-b{display:flex;gap:4px;flex-wrap:wrap}.pg-b button{min-width:36px;height:36px;border:1px solid var(--line);background:var(--sf);border-radius:8px;cursor:pointer;font-weight:600;color:var(--ink2);padding:0 10px}.pg-b button:hover:not(:disabled){border-color:var(--brand);color:var(--brand)}.pg-b button.on{background:var(--brand);border-color:var(--brand);color:#fff}.pg-b button:disabled{opacity:.4;cursor:default}
+#main.carregando{opacity:.55;pointer-events:none;transition:opacity .15s}
 </style>
 </head>
 <body>
@@ -251,93 +255,91 @@ async function carrega() {
   if (!uid && aba !== 'cfg') { m.innerHTML = '<div class="vazio">Escolha o seu nome no topo para ver as suas visitas.</div>'; return; }
   m.innerHTML = '<div class="vazio">Carregando…</div>';
   try {
-    if (aba === 'minhas') { dados = await api('/api/visitas?escopo=auto&encerradas=1'); lista(); }
-    else if (aba === 'hist') { const h = await api('/api/historico'); try { dados = await api('/api/visitas?escopo=auto'); } catch { dados = { visitas: [] }; } hist(h); }
+    if (aba === 'minhas') await carregaVisitas();
+    else if (aba === 'hist') { const h = await api('/api/historico'); try { const r = await api('/api/visitas?escopo=auto&page=1&size=1&status=abertas&soIds=1'); dados = { hoje: null, visitas: r.ids.map(id => ({ id, parcial: true })) }; } catch { dados = { visitas: [] }; } hist(h); }
     else if (aba === 'dash') await dashboard();
     else cfg(await api('/api/config'));
   } catch (e) { m.innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 
-const VP = (() => { try { return { view: 'cards', ord: 'data', dir: 1, n: 40, ...JSON.parse(localStorage.getItem('fv.vp') || '{}') }; } catch { return { view: 'cards', ord: 'data', dir: 1, n: 40 }; } })();
+const VP = (() => { try { return { view: 'cards', ord: 'data', dir: 1, ...JSON.parse(localStorage.getItem('fv.vp') || '{}') }; } catch { return { view: 'cards', ord: 'data', dir: 1 }; } })();
 const salvaVP = () => { try { localStorage.setItem('fv.vp', JSON.stringify({ view: VP.view, ord: VP.ord, dir: VP.dir })); } catch {} };
 try { Object.assign(F, JSON.parse(localStorage.getItem('fv.f') || '{}')); } catch {}
 const salvaF = () => { try { localStorage.setItem('fv.f', JSON.stringify({ seg: F.seg, tipo: F.tipo, classe: F.classe })); } catch {} };
-const ORD = { data: (a, b) => (a.data || '9').localeCompare(b.data || '9'), empresa: (a, b) => a.empresa.localeCompare(b.empresa), responsavel: (a, b) => (a.responsavelNome || '').localeCompare(b.responsavelNome || ''), segmento: (a, b) => a.segmento.localeCompare(b.segmento), cargo: (a, b) => a.cargo.localeCompare(b.cargo), classe: (a, b) => (a.classe || '').localeCompare(b.classe || ''), ultima: (a, b) => (a.ultima || '').localeCompare(b.ultima || ''), prazo: (a, b) => (a.dias ?? 9e9) - (b.dias ?? 9e9) };
+const VQ = { page: 1, size: (() => { try { return +localStorage.getItem('fv.size') || 20; } catch { return 20; } })() };
+const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VQ.size, q: F.q || '', status: foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
+let reqVisitas = 0;
+async function carregaVisitas() {
+  const n = ++reqVisitas;
+  $('#main').classList.add('carregando');
+  try { const r = await api('/api/visitas?' + consultaVisitas()); if (n !== reqVisitas) return; dados = r; VQ.page = r.pagina; lista(); }
+  catch (e) { $('#main').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
+  finally { $('#main').classList.remove('carregando'); }
+}
+const refaz = (resetaPagina = true) => { if (resetaPagina) VQ.page = 1; return carregaVisitas(); };
+let tDebounce = null;
 function lista() {
-  const todas = dados.visitas, busca = (F.q || '').toLowerCase();
-  const cont = k => todas.filter(x => x.situacao === k).length;
-  const ABERTAS = ['atrasada', 'dia', 'aguardando'];
-  const hojeIso = dados.hoje;
-  const soma = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-  const faixa = (() => {
-    if (VD.per === 'hoje') return [hojeIso, hojeIso];
-    if (VD.per === 'semana') { const dow = (new Date(hojeIso + 'T12:00:00Z').getUTCDay() + 6) % 7; return [soma(hojeIso, -dow), soma(hojeIso, 6 - dow)]; }
-    if (VD.per === 'mes') { const [y, m] = hojeIso.split('-').map(Number); return [`${hojeIso.slice(0, 7)}-01`, `${hojeIso.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`]; }
-    if (VD.per === 'custom') return [VD.de || '0000-01-01', VD.ate || '9999-12-31'];
-    return null;
-  })();
-  const passaStatus = x => foco === 'todas' || (foco === 'abertas' ? ABERTAS.includes(x.situacao) : x.situacao === foco);
-  const passaData = x => !faixa || (x.data && x.data >= faixa[0] && x.data <= faixa[1]);
-  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!F.resp || String(x.responsavel) === F.resp) && (!F.vend || (x.equipe && x.equipe.vendedor) === F.vend) && passaStatus(x) && passaData(x))
-    .sort((a, b) => ORD[VP.ord](a, b) * VP.dir);
-  const segs = [...new Set(todas.map(x => x.segmento))].filter(Boolean);
-  const resps = [...new Map(todas.map(x => [String(x.responsavel), x.responsavelNome])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  const verEquipe = dados.visao !== 'minhas';
-  const vends = [...new Set(todas.map(x => x.equipe && x.equipe.vendedor).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${cur === a ? 'selected' : ''}>${esc(b)}</option>`).join('');
+  const v = dados.visitas, c = dados.counts, op = dados.opcoes, verEquipe = dados.visao !== 'minhas';
+  const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${String(cur) === String(a) ? 'selected' : ''}>${esc(b)}</option>`).join('');
   const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Em aberto · próximas'], ['finalizado', 'Encerradas'], ['naorealizada', 'Não realizadas']];
-  let restante = VP.n;
-  const mostra = l => { const r = l.slice(0, Math.max(0, restante)); restante -= r.length; return r; };
-  const corpo = !v.length ? '<div class="vazio">Nenhuma visita por aqui.</div>' : VP.view === 'tabela' ? tabelaVisitas(v.slice(0, VP.n), verEquipe) : grupos.map(([k, t]) => {
+  const corpo = !v.length ? '<div class="vazio">Nenhuma visita neste filtro.</div>' : VP.view === 'tabela' ? tabelaVisitas(v, verEquipe) : grupos.map(([k, t]) => {
     const g = v.filter(x => x.situacao === k);
-    return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list cards">${mostra(g).map(linha).join('')}</div>` : '';
+    return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list cards">${g.map(linha).join('')}</div>` : '';
   }).join('');
+  const de = (dados.pagina - 1) * dados.tamanho + 1, ate = Math.min(dados.total, dados.pagina * dados.tamanho);
+  const janela = (() => { const a = Math.max(1, dados.pagina - 2), b = Math.min(dados.paginas, a + 4); return Array.from({ length: b - a + 1 }, (_, i) => a + i); })();
+  const filtrado = F.seg || F.tipo || F.classe || F.resp || F.vend || foco !== 'abertas' || VD.per || F.q;
   $('#main').innerHTML = `
     <div class="stats s5">
-      <button class="stat ${foco === 'abertas' ? 'on' : ''}" data-f="abertas"><i>◷</i><div><b>${ABERTAS.reduce((a, k) => a + cont(k), 0)}</b><span>Em aberto</span></div></button>
-      <button class="stat red ${foco === 'atrasada' ? 'on' : ''}" data-f="atrasada"><i>!</i><div><b>${cont('atrasada')}</b><span>Atrasadas</span></div></button>
-      <button class="stat amber ${foco === 'dia' ? 'on' : ''}" data-f="dia"><i>★</i><div><b>${cont('dia')}</b><span>Hoje</span></div></button>
-      <button class="stat green ${foco === 'finalizado' ? 'on' : ''}" data-f="finalizado"><i>✓</i><div><b>${cont('finalizado')}</b><span>Encerradas</span></div></button>
-      <button class="stat gray ${foco === 'naorealizada' ? 'on' : ''}" data-f="naorealizada"><i>✕</i><div><b>${cont('naorealizada')}</b><span>Não realizadas</span></div></button>
+      <button class="stat ${foco === 'abertas' ? 'on' : ''}" data-f="abertas"><i>◷</i><div><b>${c.abertas}</b><span>Em aberto</span></div></button>
+      <button class="stat red ${foco === 'atrasada' ? 'on' : ''}" data-f="atrasada"><i>!</i><div><b>${c.atrasada}</b><span>Atrasadas</span></div></button>
+      <button class="stat amber ${foco === 'dia' ? 'on' : ''}" data-f="dia"><i>★</i><div><b>${c.dia}</b><span>Hoje</span></div></button>
+      <button class="stat green ${foco === 'finalizado' ? 'on' : ''}" data-f="finalizado"><i>✓</i><div><b>${c.finalizado}</b><span>Encerradas</span></div></button>
+      <button class="stat gray ${foco === 'naorealizada' ? 'on' : ''}" data-f="naorealizada"><i>✕</i><div><b>${c.naorealizada}</b><span>Não realizadas</span></div></button>
     </div>
     ${verEquipe ? `<div class="info">${dados.visao === 'tudo' ? 'Você está vendo as visitas de <b>todos</b>.' : 'Você está vendo as visitas da <b>sua equipe</b>.'}${dados.bitrix ? ' Aplicadas também as suas permissões do Bitrix24.' : ''}</div>` : ''}
-    <div class="filters ${verEquipe ? 'f5' : ''} ">
+    <div class="filters">
       <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
       <select id="fst" title="Status">${opt([['abertas', 'Status: Em aberto'], ['atrasada', 'Status: Atrasadas'], ['dia', 'Status: Hoje'], ['finalizado', 'Status: Encerradas'], ['naorealizada', 'Status: Não realizadas'], ['todas', 'Status: Todas']], foco)}</select>
       <select id="fdt" title="Data programada">${opt([['', 'Data: qualquer'], ['hoje', 'Data: hoje'], ['semana', 'Data: esta semana'], ['mes', 'Data: este mês'], ['custom', 'Data: personalizado']], VD.per)}</select>
       ${VD.per === 'custom' ? `<input id="fde" type="date" value="${VD.de}" title="De"><input id="fate" type="date" value="${VD.ate}" title="Até">` : ''}
-      ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(resps, F.resp)}</select>` : ''}
-      ${vends.length >= 1 ? `<select id="fv"><option value="">Todos os vendedores</option>${opt(vends.map(s => [s, s]), F.vend)}</select>` : ''}
-      <select id="fs"><option value="">Todos os segmentos</option>${opt(segs.map(s => [s, s]), F.seg)}</select>
-      ${todas.some(x => x.tipoEmpresa) ? `<select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>` : ''}
+      ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(op.responsaveis.map(x => [x.id, x.nome]), F.resp)}</select>` : ''}
+      <select id="fv"><option value="">Todos os vendedores</option>${opt(op.vendedores.map(x => [x.id, x.nome]), F.vend)}</select>
+      <select id="fs"><option value="">Todos os segmentos</option>${opt(op.segmentos.map(s => [s, s]), F.seg)}</select>
+      <select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
     </div>
-    <div class="bar2"><span class="hint">${v.length} visita(s)${F.seg || F.tipo || F.classe || F.resp || F.vend || foco !== 'abertas' || VD.per || busca ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
-      <div class="bar2r"><label class="sl2">Ordenar<select id="fo">${opt([['data', 'Data programada'], ['prazo', 'Mais atrasadas primeiro'], ['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ['ultima', 'Última visita'], ...(verEquipe ? [['responsavel', 'Responsável']] : [])], VP.ord)}</select></label>
+    <div class="bar2"><span class="hint">${dados.total ? `${de}–${ate} de ${dados.total}` : '0'} visita(s)${filtrado ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
+      <div class="bar2r"><label class="sl2">Ordenar<select id="fo">${opt([['data', 'Situação e data'], ['prazo', 'Data programada'], ['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : [])], VP.ord)}</select></label>
         <div class="seg2"><button data-vw="cards" class="${VP.view === 'cards' ? 'on' : ''}" title="Cartões">▦ Cartões</button><button data-vw="tabela" class="${VP.view === 'tabela' ? 'on' : ''}" title="Tabela">☰ Tabela</button></div>
         <button class="btn sm" id="vcsv">Exportar CSV</button></div></div>
     ${corpo}
-    ${v.length > VP.n ? `<div style="text-align:center;margin:16px"><button class="btn" id="vmais">Mostrar mais (${v.length - VP.n} restantes)</button></div>` : ''}`;
-  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? 'abertas' : b.dataset.f; VP.n = 40; lista(); });
-  $('#fst').onchange = e => { foco = e.target.value; VP.n = 40; lista(); };
-  $('#fdt').onchange = e => { VD.per = e.target.value; if (VD.per === 'custom' && !VD.de) { VD.de = hojeIso; VD.ate = hojeIso; } VP.n = 40; lista(); };
-  if ($('#fde')) $('#fde').onchange = e => { VD.de = e.target.value; lista(); };
-  if ($('#fate')) $('#fate').onchange = e => { VD.ate = e.target.value; lista(); };
-  const q = $('#fq'); q.oninput = () => { F.q = q.value; VP.n = 40; const p = q.selectionStart; lista(); const n = $('#fq'); n.focus(); n.setSelectionRange(p, p); };
-  if ($('#fr')) $('#fr').onchange = e => { F.resp = e.target.value; lista(); };
-  if ($('#fv')) $('#fv').onchange = e => { F.vend = e.target.value; lista(); };
-  $('#fs').onchange = e => { F.seg = e.target.value; salvaF(); lista(); };
-  if ($('#ft')) $('#ft').onchange = e => { F.tipo = e.target.value; salvaF(); lista(); };
-  $('#fc').onchange = e => { F.classe = e.target.value; salvaF(); lista(); };
-  $('#fo').onchange = e => { VP.ord = e.target.value; VP.dir = 1; salvaVP(); lista(); };
+    ${dados.total > 0 ? `<div class="pager"><div class="pg-i">Itens por página <select id="psz">${opt([[10, '10'], [20, '20'], [50, '50'], [100, '100']], VQ.size)}</select></div>
+      <div class="pg-b"><button data-p="1" ${dados.pagina <= 1 ? 'disabled' : ''} title="Primeira">«</button><button data-p="${dados.pagina - 1}" ${dados.pagina <= 1 ? 'disabled' : ''}>‹ Anterior</button>
+      ${janela.map(n => `<button data-p="${n}" class="${n === dados.pagina ? 'on' : ''}">${n}</button>`).join('')}
+      <button data-p="${dados.pagina + 1}" ${dados.pagina >= dados.paginas ? 'disabled' : ''}>Próxima ›</button><button data-p="${dados.paginas}" ${dados.pagina >= dados.paginas ? 'disabled' : ''} title="Última">»</button></div></div>` : ''}`;
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? 'abertas' : b.dataset.f; refaz(); });
+  const q = $('#fq'); q.oninput = () => { F.q = q.value; clearTimeout(tDebounce); tDebounce = setTimeout(async () => { const p = q.selectionStart; await refaz(); const n = $('#fq'); if (n) { n.focus(); n.setSelectionRange(p, p); } }, 350); };
+  $('#fst').onchange = e => { foco = e.target.value; refaz(); };
+  $('#fdt').onchange = e => { VD.per = e.target.value; if (VD.per === 'custom' && !VD.de) { VD.de = dados.hoje; VD.ate = dados.hoje; } refaz(); };
+  if ($('#fde')) $('#fde').onchange = e => { VD.de = e.target.value; refaz(); };
+  if ($('#fate')) $('#fate').onchange = e => { VD.ate = e.target.value; refaz(); };
+  if ($('#fr')) $('#fr').onchange = e => { F.resp = e.target.value; refaz(); };
+  $('#fv').onchange = e => { F.vend = e.target.value; refaz(); };
+  $('#fs').onchange = e => { F.seg = e.target.value; salvaF(); refaz(); };
+  $('#ft').onchange = e => { F.tipo = e.target.value; salvaF(); refaz(); };
+  $('#fc').onchange = e => { F.classe = e.target.value; salvaF(); refaz(); };
+  $('#fo').onchange = e => { VP.ord = e.target.value; VP.dir = 1; salvaVP(); refaz(); };
   document.querySelectorAll('[data-vw]').forEach(b => b.onclick = () => { VP.view = b.dataset.vw; salvaVP(); lista(); });
-  document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); lista(); });
-  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: '', de: '', ate: '' }); salvaF(); lista(); };
-  if ($('#vmais')) $('#vmais').onclick = () => { VP.n += 60; lista(); };
-  $('#vcsv').onclick = () => {
+  document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); refaz(); });
+  document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { VQ.page = +b.dataset.p; refaz(false); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  $('#psz') && ($('#psz').onchange = e => { VQ.size = +e.target.value; try { localStorage.setItem('fv.size', VQ.size); } catch {} refaz(); });
+  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: '', de: '', ate: '' }); salvaF(); refaz(); };
+  $('#vcsv').onclick = async () => {
+    const todas = (await api('/api/visitas?' + consultaVisitas({ page: 1, size: 5000 }))).visitas;
     const q2 = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
-    const csv = ['Empresa;Segmento;Cargo;Classe;Tipo;Responsável;Última visita;Programada;Situação;Dias', ...v.map(c => [c.empresa, c.segmento, c.cargo, c.classe, c.tipoEmpresa, c.responsavelNome, fmt(c.ultima), fmt(c.data), c.situacao, c.dias].map(q2).join(';'))].join('\n');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'fila-de-visitas.csv'; a.click();
+    const csv = ['Empresa;Segmento;Cargo;Classe;Tipo;Responsável;Última visita;Programada;Situação;Dias', ...todas.map(c => [c.empresa, c.segmento, c.cargo, c.classe, c.tipoEmpresa, c.responsavelNome, fmt(c.ultima), fmt(c.data), c.situacao, c.dias].map(q2).join(';'))].join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'registro-de-visitas.csv'; a.click();
   };
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
@@ -491,7 +493,7 @@ function hist(d) {
     <h2>Histórico <em>${h.length}</em></h2>
     <div class="tw"><table><tr><th>Quando</th><th>Empresa</th><th>De → Para</th><th>Motivo</th><th>Quem</th><th>Ações</th></tr>${h.map(x => `<tr><td>${new Date(x.at).toLocaleString('pt-BR')}</td><td><b>${esc(x.empresa)}</b><div class="hint">${esc(x.segmento)} · ${esc(x.cargo)}</div>${link(x)}</td><td>${fmt(x.anterior)} → <b>${fmt(x.nova)}</b><div class="hint">${dias(x) > 0 ? '+' : ''}${dias(x)} dia(s)</div></td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td><td style="white-space:nowrap">${abre(x) ? `<button class="btn sm pri" data-reg="${x.card}">Registrar visita</button> <button class="btn sm" data-rep="${x.card}">Alterar visita</button>` : '<span class="hint">Visita já realizada</span>'}</td></tr>`).join('') || '<tr><td colspan=6 class="hint">Nenhuma alteração neste filtro.</td></tr>'}</table></div>`;
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
-  document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
+  document.querySelectorAll('[data-rep]').forEach(b => b.onclick = async () => { const id = +b.dataset.rep; const r = await api(`/api/visitas?escopo=auto&page=1&size=1&status=abertas&cardId=${id}`); dados = { hoje: r.hoje, visitas: r.visitas }; reagendarVisita(id); });
   $('#hm').onchange = e => { HF.mes = e.target.value; hist(d); };
   $('#hq').onchange = e => { HF.quem = e.target.value; hist(d); };
   $('#hs').onchange = e => { HF.seg = e.target.value; hist(d); };
