@@ -62,14 +62,22 @@ function etapaPara(dataIso, hoje) {
   return 'aguardando';
 }
 
-// Reprogramação: motivo obrigatório, data válida, mesmo mês da data programada original.
-function validarReprogramacao({ atual, nova, motivo }) {
+// Mês em que a visita precisa acontecer: o da data programada; cards que nasceram já vencidos (carga inicial) ganham o mês em que nasceram.
+function mesLimite(dataIso, criadoIso) {
+  const base = [isoDate(dataIso), isoDate(criadoIso)].filter(Boolean).sort().pop();
+  return base ? base.slice(0, 7) : null;
+}
+const ultimoDiaDoMes = mes => { const [y, m] = mes.split('-').map(Number); return `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
+// Alteração da data: motivo obrigatório, só do dia seguinte em diante e dentro do mês da visita (nunca para o mês seguinte).
+function validarReprogramacao({ atual, nova, motivo, hoje, mes }) {
   if (!isoDate(nova)) return 'Informe a nova data.';
   if (String(motivo || '').trim().length < 3) return 'O motivo da alteração é obrigatório.';
-  if (!sameMonth(atual, nova)) {
-    const [y, m] = atual.split('-');
-    return `A nova data precisa ficar no mesmo mês da data programada (${m}/${y}). Escolha um dia de ${m}/${y}.`;
+  const mesVisita = mes || atual.slice(0, 7);
+  if (nova.slice(0, 7) !== mesVisita) {
+    const [y, m] = mesVisita.split('-');
+    return `A nova data precisa ficar dentro de ${m}/${y}, o mês desta visita. Não é permitido passar a visita para outro mês: se ela não for realizada no mês, será marcada como não realizada.`;
   }
+  if (hoje && nova <= hoje) return `A nova data precisa ser a partir de amanhã (${addDays(hoje, 1).split('-').reverse().join('/')}) e até ${ultimoDiaDoMes(mesVisita).split('-').reverse().join('/')}.`;
   if (nova === atual) return 'A nova data é igual à data atual.';
   return null;
 }
@@ -100,5 +108,5 @@ const chaveFila = (empresaId, seg, cargo) => `${empresaId}|${norm(seg)}|${norm(c
 
 module.exports = {
   SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
-  brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
+  mesLimite, ultimoDiaDoMes, brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
 };

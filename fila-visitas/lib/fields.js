@@ -68,6 +68,7 @@ async function descobrir(bitrix, cfg) {
     const n = R.norm(s.NAME);
     if (/dia da visita|hoje/.test(n)) etapas.dia = s.STATUS_ID;
     else if (/atrasad/.test(n)) etapas.atrasada = s.STATUS_ID;
+    else if (/nao realiz|nao cumprid/.test(n)) etapas.naoRealizada = s.STATUS_ID;
     else if (!etapas.aguardando && /aguard|nova|novo|fila|programad/.test(n)) etapas.aguardando = s.STATUS_ID;
   }
   // etapa final: a coluna que o time usa ("Encerrado"); senão "Finalizado"/similar; senão a etapa de sucesso do Bitrix
@@ -77,10 +78,10 @@ async function descobrir(bitrix, cfg) {
   // etapas "fechadas": qualquer card nelas não é mais uma visita em aberto
   const sucesso = st.filter(s => s.SEMANTICS === 'S').map(s => s.STATUS_ID);
   etapas.concluidas = [...new Set([etapas.finalizado, ...sucesso].filter(Boolean))];
-  etapas.fechadas = [...new Set([...etapas.concluidas, ...st.filter(s => s.SEMANTICS === 'F').map(s => s.STATUS_ID)])];
+  etapas.fechadas = [...new Set([...etapas.concluidas, etapas.naoRealizada, ...st.filter(s => s.SEMANTICS === 'F').map(s => s.STATUS_ID)].filter(Boolean))];
   etapas.abertas = st.map(s => s.STATUS_ID).filter(x => !etapas.fechadas.includes(x)); // o Bitrix não aceita "não está em" com lista: filtra pelas abertas
   if (!etapas.aguardando && st[0]) etapas.aguardando = st[0].STATUS_ID;
-  for (const e of ['aguardando', 'dia', 'atrasada', 'finalizado']) if (!etapas[e]) faltando.push(`Etapa da fila · ${e} (crie a etapa no kanban 1036)`);
+  for (const e of ['aguardando', 'dia', 'atrasada', 'finalizado', 'naoRealizada']) if (!etapas[e]) faltando.push(`Etapa da fila · ${e} (crie a etapa no kanban 1036)`);
   if (!fila.out.data) faltando.push('Fila · Data programada (usando "Data de encerramento" padrão)');
   if (!visita.out.dataHora) faltando.push('Registro · Data/Hora da visita (usando "Data de início" padrão)');
 

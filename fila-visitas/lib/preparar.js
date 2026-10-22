@@ -17,6 +17,14 @@ async function preparar(bitrix, svc) {
       feito.push('Etapa "Atrasada" criada no kanban 1036');
     } catch (e) { erros.push(`Etapa Atrasada: ${e.message}`); }
   }
+  if (!d.map.etapas.naoRealizada) {
+    try {
+      const st = (await bitrix.call('crm.status.list', { filter: { ENTITY_ID: `DYNAMIC_${F.ETYPE.fila}_STAGE_${cat}` } })).result || [];
+      const fim = st.find(s => s.STATUS_ID === d.map.etapas.finalizado);
+      await bitrix.call('crm.status.add', { fields: { ENTITY_ID: `DYNAMIC_${F.ETYPE.fila}_STAGE_${cat}`, STATUS_ID: `DT${F.ETYPE.fila}_${cat}:NAOREAL`, NAME: 'Não realizada', SORT: fim ? +fim.SORT + 5 : 600, COLOR: '#94A3B8' } });
+      feito.push('Etapa "Não realizada" criada no kanban 1036');
+    } catch (e) { erros.push(`Etapa Não realizada: ${e.message}`); }
+  }
   const criar = async (entityId, tipo, nome, tipoCampo, titulo, extra = {}) => {
     try {
       await bitrix.call('userfieldconfig.add', { moduleId: 'crm', field: { entityId, fieldName: `UF_${entityId}_${nome}`, userTypeId: tipoCampo, editFormLabel: { br: titulo, en: titulo }, listColumnLabel: { br: titulo, en: titulo }, listFilterLabel: { br: titulo, en: titulo }, mandatory: 'N', showFilter: 'N', ...extra } });

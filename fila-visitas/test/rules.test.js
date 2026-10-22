@@ -23,7 +23,7 @@ test('reprogramação: motivo obrigatório e mesmo mês', () => {
   const ok = { atual: '2026-05-10', nova: '2026-05-25', motivo: 'Cliente viajando' };
   assert.equal(R.validarReprogramacao(ok), null);
   assert.match(R.validarReprogramacao({ ...ok, motivo: ' ' }), /motivo/i);
-  assert.match(R.validarReprogramacao({ ...ok, nova: '2026-06-01' }), /mesmo mês.*05\/2026/);
+  assert.match(R.validarReprogramacao({ ...ok, nova: '2026-06-01' }), /dentro de 05\/2026/);
   assert.match(R.validarReprogramacao({ ...ok, nova: '' }), /nova data/i);
   assert.match(R.validarReprogramacao({ ...ok, nova: '2026-05-10' }), /igual/);
 });
@@ -34,4 +34,16 @@ test('prazo em horas úteis pula o fim de semana', () => {
 
 test('brIso formata a data com deslocamento de Brasília', () => {
   assert.equal(R.brIso('2026-10-22T00:11:05.000Z'), '2026-10-21T21:11:05-03:00');
+});
+
+test('alteração da data: só do dia seguinte em diante e dentro do mês da visita', () => {
+  const base = { atual: '2026-05-20', motivo: 'Cliente pediu', hoje: '2026-05-10' };
+  assert.equal(R.validarReprogramacao({ ...base, nova: '2026-05-11' }), null);
+  assert.equal(R.validarReprogramacao({ ...base, nova: '2026-05-31' }), null);
+  assert.match(R.validarReprogramacao({ ...base, nova: '2026-06-01' }), /não é permitido passar a visita para outro mês/i);
+  assert.match(R.validarReprogramacao({ ...base, nova: '2026-05-10' }), /a partir de amanhã \(11\/05\/2026\) e até 31\/05\/2026/);
+  assert.match(R.validarReprogramacao({ ...base, nova: '2026-05-02' }), /a partir de amanhã/);
+  assert.equal(R.mesLimite('2026-03-10', '2026-05-02'), '2026-05', 'card nascido vencido ganha o mês em que nasceu');
+  assert.equal(R.mesLimite('2026-06-10', '2026-05-02'), '2026-06');
+  assert.equal(R.ultimoDiaDoMes('2026-02'), '2026-02-28');
 });

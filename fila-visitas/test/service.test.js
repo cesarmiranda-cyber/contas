@@ -8,7 +8,7 @@ const { createWorld } = require('./world');
 
 const NOW = new Date('2026-05-10T15:00:00Z'); // 10/05/2026 12h BRT
 function setup(extra = {}) {
-  const w = createWorld();
+  const w = createWorld(); w.now = () => NOW;
   const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'fv-')));
   const svc = createService({ bitrix: { call: w.call }, store, clock: () => NOW });
   w.empresa(1, 'Acme Marítima', { UF_CRM_MOT_CLASSE: '1', UF_CRM_MOT_VENDEDOR: '10', UF_CRM_MOT_SUPERVISOR: '10', UF_CRM_MOT_COORDENADOR: '10', UF_CRM_MOT_GERENTE: '20', UF_CRM_MOT_ULTIMA: '2026-04-20', ...extra });
@@ -58,7 +58,7 @@ test('job diário: hoje -> Dia da Visita, vencidos -> Atrasada e avisa o respons
   const atras = cards(w).find(c => c.title.endsWith('| Gerente'));
   atras.ufCrm_data = '2026-05-01'; atras.stageId = w.stages.aguardando;
   const r = await svc.jobDiario();
-  assert.deepEqual(r, { dia: 1, atrasadas: 1 });
+  assert.deepEqual(r, { dia: 1, atrasadas: 1, naoRealizadas: 0 });
   assert.equal(vend.stageId, w.stages.dia);
   assert.equal(atras.stageId, w.stages.atrasada);
   assert.ok(w.notifs.some(n => n.USER_ID === 10));
@@ -93,7 +93,7 @@ test('reprogramar: exige motivo, recusa outro mês, grava histórico e comentár
   await svc.sincronizarEmpresa(1);
   const vend = cards(w).find(c => c.title.endsWith('| Vendedor')); // 20/05
   await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: '' }), /motivo/i);
-  await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-06-02', motivo: 'Cliente pediu' }), /mesmo mês/);
+  await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-06-02', motivo: 'Cliente pediu' }), /outro mês/);
   await svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: 'Cliente pediu' });
   assert.equal(vend.ufCrm_data, '2026-05-28');
   assert.equal(store.historico.length, 1);
@@ -415,4 +415,47 @@ test('etapa final é "Encerrado"; cards em "Finalizado" (sucesso do Bitrix) não
   assert.ok(!(await svc.listarVisitas({ uid: 30 })).visitas.some(v => v.id === antigo.id), 'não aparece como aberto');
   const m = await svc.migrarFinalizadas();
   assert.equal(m.movidos, 1); assert.equal(antigo.stageId, 'DT1036_1:UC_ENC');
+});
+
+test('tarefa vinculada ao card: é criada com o card, muda de prazo ao alterar a data e é encerrada ao registrar a visita', async () => {
+  const { w, svc, store } = setup();
+  store.setConfig({ tarefaAtiva: true });
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const t = w.tasks.find(x => (x.ufCrmTask || []).includes(`T40c_${vend.id}`));
+  assert.ok(t, 'tarefa criada e vinculada ao card'); assert.equal(t.deadline, '2026-05-20T18:00:00-03:00');
+  const r = await svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: 'Cliente pediu' });
+  assert.equal(r.tarefasAtualizadas, 1); assert.equal(t.deadline, '2026-05-28T18:00:00-03:00');
+  await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  assert.equal(t.status, 5, 'tarefa encerrada ao registrar a visita');
+  assert.equal(w.tasks.filter(x => x.status !== 5 && (x.ufCrmTask || []).includes(`T40c_${vend.id}`)).length, 0);
+});
+
+test('alterar a data: só de amanhã em diante e nunca para outro mês', async () => {
+  const { w, svc } = setup();                                           // hoje = 10/05/2026
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));      // programada 20/05
+  await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-06-01', motivo: 'viagem' }), /outro mês/);
+  await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-10', motivo: 'viagem' }), /a partir de amanhã/);
+  await assert.rejects(svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-09', motivo: 'viagem' }), /a partir de amanhã/);
+  await svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-31', motivo: 'viagem' });
+  assert.equal(vend.ufCrm_data, '2026-05-31');
+});
+
+test('visita não realizada no mês: card vira "Não realizada", a data não muda mais e a próxima é gerada', async () => {
+  const { w, svc, store } = setup();
+  w.stageList.push({ STATUS_ID: 'DT1036_1:NAOREAL', NAME: 'Não realizada' });
+  await svc.campos(true);
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));     // programada 20/05/2026
+  const jun = new Date('2026-06-01T11:00:00Z');                          // virou o mês sem registrar a visita
+  const svc2 = createService({ bitrix: { call: w.call }, store, clock: () => jun });
+  const r = await svc2.encerrarNaoRealizadas();
+  assert.ok(r.marcadas >= 1);
+  assert.equal(vend.stageId, 'DT1036_1:NAOREAL');
+  await assert.rejects(svc2.reprogramar(vend.id, { uid: 10, nova: '2026-06-25', motivo: 'tentativa' }), /já finalizada/);
+  const prox = cards(w).filter(c => c.title.endsWith('| Vendedor') && c.stageId !== 'DT1036_1:NAOREAL');
+  assert.equal(prox.length, 1);
+  assert.equal(prox[0].ufCrm_data, '2026-06-19', 'próxima = programada (20/05) + 30 dias (classe A), no futuro');
+  assert.equal((await svc2.encerrarNaoRealizadas()).marcadas, 0, 'idempotente');
 });

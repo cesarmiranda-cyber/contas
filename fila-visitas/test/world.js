@@ -33,14 +33,18 @@ function createWorld() {
       case 'crm.company.update': Object.assign(w.companies[p.id], p.fields); return { result: true };
       case 'crm.item.get': return { result: { item: w.items[p.entityTypeId][p.id] } };
       case 'crm.item.list': { const l = Object.values(w.items[p.entityTypeId]).filter(i => match(i, p.filter)); return { result: { items: l.map(i => ({ ...i })) } }; }
-      case 'crm.item.add': { const id = ++w.seq; const it = { id, createdTime: new Date().toISOString(), ...p.fields }; w.items[p.entityTypeId][id] = it; return { result: { item: { ...it } } }; }
+      case 'crm.item.add': { const id = ++w.seq; const it = { id, createdTime: (w.now ? w.now() : new Date()).toISOString(), ...p.fields }; w.items[p.entityTypeId][id] = it; return { result: { item: { ...it } } }; }
       case 'crm.item.update': Object.assign(w.items[p.entityTypeId][p.id], p.fields); w.items[p.entityTypeId][p.id].updatedTime = new Date(Date.now() + 1000).toISOString(); return { result: { item: {} } };
       case 'crm.item.delete': delete w.items[p.entityTypeId][p.id]; return { result: [] };
       case 'user.get': if (p.ID) return { result: w.users[p.ID] ? [w.users[p.ID]] : [] }; return { result: Object.values(w.users) };
       case 'department.get': if (p.ID) return { result: w.depts.filter(d => String(d.ID) === String(p.ID)) }; return { result: w.depts };
       case 'crm.timeline.comment.add': w.comments.push(p.fields); return { result: 1 };
       case 'im.notify.system.add': w.notifs.push(p); return { result: 1 };
-      case 'tasks.task.add': w.tasks.push(p.fields); return { result: { task: { id: 1 } } };
+      case 'tasks.task.add': { const id = w.tasks.length + 1; w.tasks.push({ id, title: p.fields.TITLE, deadline: p.fields.DEADLINE, status: 2, ufCrmTask: p.fields.UF_CRM_TASK }); return { result: { task: { id } } }; }
+      case 'tasks.task.list': return { result: { tasks: w.tasks.filter(t => (t.ufCrmTask || []).includes(p.filter.UF_CRM_TASK)).map(t => ({ ...t })) } };
+      case 'tasks.task.complete': w.tasks.find(t => t.id === p.taskId).status = 5; return { result: { task: {} } };
+      case 'tasks.task.update': Object.assign(w.tasks.find(t => t.id === p.taskId), { deadline: p.fields.DEADLINE }); return { result: { task: {} } };
+      case 'task.commentitem.add': return { result: 1 };
       default: throw new Error('método não suportado no mock: ' + method);
     }
   };

@@ -138,6 +138,41 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (!emp.ramo) return '';
     return ((await listaRamos()).find(r => r.id === emp.ramo) || {}).tipo || '';
   }
+  // ---------- tarefas vinculadas ao card (CRM binding T40c_<id>) ----------
+  const vinculoCard = id => `T${hex(F.ETYPE.fila)}_${id}`;
+  const prazoTarefa = dataIso => `${dataIso}T18:00:00-03:00`;
+  async function tarefasAbertas(cardId) {
+    try {
+      const r = await bitrix.call('tasks.task.list', { filter: { UF_CRM_TASK: vinculoCard(cardId) }, select: ['ID', 'TITLE', 'STATUS', 'DEADLINE'] });
+      const l = r.result?.tasks || r.result || [];
+      return (Array.isArray(l) ? l : []).filter(t => +(t.status ?? t.STATUS) !== 5).map(t => ({ id: +(t.id ?? t.ID), titulo: t.title ?? t.TITLE }));
+    } catch (e) { store.log('aviso', `Tarefas do card ${cardId} não consultadas: ${e.message}`); return []; }
+  }
+  async function encerrarTarefas(cardId, motivo) {
+    let n = 0;
+    for (const t of await tarefasAbertas(cardId)) {
+      try {
+        if (motivo) await bitrix.call('task.commentitem.add', { TASKID: t.id, FIELDS: { POST_MESSAGE: motivo } }).catch(() => {});
+        await bitrix.call('tasks.task.complete', { taskId: t.id });
+        n++; store.log('tarefa', `Tarefa ${t.id} encerrada (card ${cardId})`, { card: cardId });
+      } catch (e) { store.log('aviso', `Tarefa ${t.id} não encerrada: ${e.message}`); }
+    }
+    return n;
+  }
+  async function moverPrazoTarefas(cardId, dataIso) {
+    let n = 0;
+    for (const t of await tarefasAbertas(cardId)) {
+      try { await bitrix.call('tasks.task.update', { taskId: t.id, fields: { DEADLINE: prazoTarefa(dataIso) } }); n++; store.log('tarefa', `Prazo da tarefa ${t.id} movido para ${R.fmtBR(dataIso)} (card ${cardId})`, { card: cardId }); }
+      catch (e) { store.log('aviso', `Prazo da tarefa ${t.id} não alterado: ${e.message}`); }
+    }
+    return n;
+  }
+  async function criarTarefaCard(cardId, { empresa, seg, cargo, responsavel, data }) {
+    try {
+      await bitrix.call('tasks.task.add', { fields: { TITLE: `Realizar Visita - ${empresa} (${seg} · ${cargo})`, RESPONSIBLE_ID: responsavel, DEADLINE: prazoTarefa(data), UF_CRM_TASK: [vinculoCard(cardId)] } });
+    } catch (e) { store.log('aviso', `Tarefa do card ${cardId} não criada: ${e.message}`); }
+  }
+
   // ---------- cards da fila ----------
   const tituloCard = (empresa, seg, cargo) => `${empresa} | ${seg} | ${cargo}`;
   async function lerCard(id) {
@@ -167,7 +202,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       id: +it.id, titulo: it.title, empresaId: +it.companyId || reg.empresaId, empresa: reg.empresa || parts[0],
       segmento: g('segmento') || reg.seg || parts[1], cargo: g('cargo') || reg.cargo || parts[2],
       classe: g('classe') || reg.classe || '', responsavel: +it.assignedById || null,
-      data: (R.isoDate(map.fila.data ? it[map.fila.data] : null) || R.isoDate(it.closedate)), stageId: it.stageId,
+      data: (R.isoDate(map.fila.data ? it[map.fila.data] : null) || R.isoDate(it.closedate)), stageId: it.stageId, criadoEm: it.createdTime || null,
     };
   };
 
@@ -184,6 +219,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     store.setChave(chave, +r.id);
     store.setCard(+r.id, { empresaId: empresa.id, empresa: empresa.nome, seg, cargo, classe, chave, equipe: equipeIds(empresa.segs[seg]) });
     store.setSnapCard(+r.id, { data, resp: responsavel });
+    if (store.config.tarefaAtiva) await criarTarefaCard(+r.id, { empresa: empresa.nome, seg, cargo, responsavel, data });
     store.log('card-criado', `Card ${r.id} criado: ${f.title} · ${R.fmtBR(data)} · resp ${responsavel}`, { card: +r.id });
     return +r.id;
   }
@@ -318,7 +354,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const h = hoje();
     if (!forcar && store.job('diario') === h) return { pulado: true };
     const { map } = await campos();
-    const r = { dia: 0, atrasadas: 0 };
+    const r = { dia: 0, atrasadas: 0, naoRealizadas: (await encerrarNaoRealizadas()).marcadas };
     const porUsuario = {};
     for (const it of await cardsAbertos()) {
       const c = await dadosCard(it);
@@ -421,7 +457,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const snap = store.snapEmpresa(card.empresaId) || {};
     for (const k of Object.keys(snap)) if (k.startsWith(card.segmento + '|')) snap[k].ultima = dia;
     store.setSnapEmpresa(card.empresaId, snap);
-    if (store.config.tarefaAtiva && visita) await criarTarefa(visita, card, uid, agora || clock()).then(() => passos.push('tarefa criada'), e => store.log('aviso', `Tarefa não criada: ${e.message}`));
+    const fechadas = await encerrarTarefas(card.id, 'Visita registrada.');
+    if (fechadas) passos.push(`${fechadas} tarefa(s) encerrada(s)`);
     return { proximo, novaData, passos };
   }
 
@@ -475,13 +512,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     store.log('visita', `Visita ${v.id} registrada por ${uid} no card ${card.id} (antecipada: ${ant ? 'sim' : 'não'}): ${passos.join(', ')}`, { card: card.id, visita: +v.id });
     return { visita: +v.id, antecipada: ant, proximoCard: proximo, proximaData: novaData, passos };
   }
-  async function criarTarefa(visita, card, uid, agora) {
-    await bitrix.call('tasks.task.add', { fields: {
-      TITLE: `Realizar Visita - ${card.empresa}`, RESPONSIBLE_ID: uid, DEADLINE: R.prazoUtil(agora, store.config.tarefaHorasUteis),
-      UF_CRM_TASK: [`T${hex(F.ETYPE.visita)}_${visita.id}`],
-    } });
-  }
-
   // ---------- reprogramar ----------
   async function reprogramar(cardId, { uid, nova, motivo }) {
     const { map } = await campos();
@@ -490,11 +520,12 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (!card.aberto) throw erro('Visita já finalizada não pode ser alterada.', 409);
     if (!uid) throw erro('Usuário não identificado.', 401);
     if (!card.data) throw erro('O card não tem data programada.');
-    const msg = R.validarReprogramacao({ atual: card.data, nova, motivo });
+    const msg = R.validarReprogramacao({ atual: card.data, nova, motivo, hoje: hoje(), mes: R.mesLimite(card.data, card.criadoEm ? R.todayBR(new Date(card.criadoEm)) : null) });
     if (msg) throw erro(msg, 422);
     const stage = map.etapas[R.etapaPara(nova, hoje())];
     await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { [map.fila.data || 'closedate']: nova, ...(stage ? { stageId: stage } : {}) } });
     store.setSnapCard(card.id, { data: nova, resp: card.responsavel });
+    const tarefas = await moverPrazoTarefas(card.id, nova);
     const nome = await nomeUsuario(uid);
     const agora = clock().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     store.addHistorico({ card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: motivo.trim(), autor: uid, autorNome: nome, responsavel: card.responsavel });
@@ -503,7 +534,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         COMMENT: `Visita alterada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
     } catch (e) { store.log('aviso', `Comentário na linha do tempo do card ${card.id} falhou: ${e.message}`); }
     store.log('reprogramacao', `Card ${card.id}: ${R.fmtBR(card.data)} → ${R.fmtBR(nova)} por ${uid}: ${motivo.trim()}`, { card: card.id });
-    return { ok: true, data: nova };
+    return { ok: true, data: nova, tarefasAtualizadas: tarefas };
   }
 
   const nomes = new Map();
@@ -517,6 +548,41 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- guardas (edição direta é revertida) ----------
+  // Visita que não aconteceu até o fim do mês dela: vira "Não realizada" (sem poder alterar a data) e a próxima do ciclo é gerada.
+  async function encerrarNaoRealizadas() {
+    const { map } = await campos();
+    if (!map.etapas.naoRealizada) return { marcadas: 0, semEtapa: true };
+    const h = hoje(), mesHoje = h.slice(0, 7);
+    let marcadas = 0;
+    for (const it of await cardsAbertos()) {
+      const c = await dadosCard(it);
+      const lim = R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null);
+      if (!lim || lim >= mesHoje) continue;
+      await comTrava(`empresa:${c.empresaId}`, async () => {
+        await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: c.id, fields: { stageId: map.etapas.naoRealizada } });
+        const reg = store.card(c.id);
+        const chave = R.chaveFila(c.empresaId, c.segmento, c.cargo);
+        if (store.chave(chave) === c.id) store.setChave(chave, null);
+        store.log('nao-realizada', `Card ${c.id} marcado como não realizada (${c.titulo}, programada ${R.fmtBR(c.data)})`, { card: c.id });
+        try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: c.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `Visita não realizada no mês (${lim.split('-').reverse().join('/')}). A data não pode mais ser alterada.` } }); } catch { /* sem comentário */ }
+        await encerrarTarefas(c.id, 'Visita não realizada no mês.');
+        await notificar(c.responsavel, `A visita "${c.titulo}" não foi realizada no mês e foi marcada como não realizada.`);
+        const aberto = (await cardsAbertosDaEmpresa(c.empresaId)).some(x => String(x.title).split(' | ').slice(1).join('|') === String(it.title).split(' | ').slice(1).join('|'));
+        const emp = await lerEmpresa(c.empresaId);
+        const sg = emp?.segs?.[c.segmento] || {};
+        const classe = sg.classe || c.classe;
+        const n = R.intervalo(store.config, c.cargo, classe);
+        if (!aberto && emp && n) {
+          const nova = [R.addDays(c.data, n), R.addDays(h, 1)].sort().pop();
+          const novoId = await criarCard({ empresa: emp, seg: c.segmento, cargo: c.cargo, classe, responsavel: sg[c.cargo.toLowerCase()] || c.responsavel, data: nova });
+          store.log('card-criado', `Próximo card ${novoId} gerado após não realizada: ${R.fmtBR(nova)}`, { card: novoId });
+          if (store.config.atualizarProxima) await gravarProxima(emp, c.segmento).catch(() => {});
+        }
+      });
+      marcadas++;
+    }
+    return { marcadas };
+  }
   // Cards finalizados antes de a etapa final ser "Encerrado" ficaram na etapa de sucesso do Bitrix: move para a etapa final.
   async function migrarFinalizadas() {
     const { map } = await campos();
@@ -701,6 +767,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       out.push({ ...c, tipoEmpresa: tipos.get(c.empresaId) || '', responsavelNome: await nomeUsuario(c.responsavel), classe: c.classe || reg.classe || '',
         situacao: R.etapaPara(c.data, hoje()), dias: c.data ? R.dayDiff(hoje(), c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, hoje()) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
+        altMin: R.addDays(hoje(), 1), altMax: R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || hoje().slice(0, 7)),
         equipe, reprogramacoes: store.historico.filter(h => h.card === c.id && !h.tipo).length, urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     }
     out.sort((a, b) => (a.data || '9').localeCompare(b.data || '9'));
@@ -732,18 +799,19 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
     const abertos = (await cardsAbertos()).filter(it => !permCards || permCards.has(+it.id));
     const fin = (await listar(F.ETYPE.fila, { stageId: map.etapas.concluidas, '>updatedTime': R.brIso(desde) }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id));
+    const naoReal = map.etapas.naoRealizada ? (await listar(F.ETYPE.fila, { stageId: [map.etapas.naoRealizada], '>updatedTime': R.brIso(desde) }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id)) : [];
     const nomes = new Map();
     const nome = async id => { if (!nomes.has(id)) nomes.set(id, await nomeUsuario(id)); return nomes.get(id); };
     const tipos = new Map(), emps = new Map();
     const empDe = async id => { if (!id) return null; let e = emps.get(id); if (e === undefined) { e = await lerEmpresa(id).catch(() => null); emps.set(id, e); } return e; };
     const tipoDe = async id => { if (!id) return ''; if (!tipos.has(id)) tipos.set(id, await tipoDaEmpresa(await empDe(id))); return tipos.get(id); };
     const cards = [];
-    for (const [lista, finalizado] of [[abertos, false], [fin, true]]) for (const it of lista) {
+    for (const [lista, finalizado, naoRealizada] of [[abertos, false, false], [fin, true, false], [naoReal, false, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
       if (!visivelPor(d.responsavel, reg.equipe)) continue;
       const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
       cards.push({ vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
-        data: d.data, situacao: finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
+        data: d.data, situacao: naoRealizada ? 'naorealizada' : finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
     // registros de visita
     const v = map.visita, campoDH = v.dataHora || 'begindate';
@@ -811,6 +879,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

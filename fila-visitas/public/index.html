@@ -188,6 +188,8 @@ body.wide main{padding-top:12px}
 @media(max-width:700px){.pbi-top{padding:12px}.pbi-t b{font-size:17px}.kv{font-size:30px}}
 .filters,.filters.f5,.filters.f6{display:grid;grid-template-columns:minmax(220px,2fr) repeat(auto-fit,minmax(160px,1fr));gap:8px}
 @media(max-width:700px){.filters,.filters.f5,.filters.f6{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}}
+.g5{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.pl2.nr,.pl.nr{background:#94a3b8;color:#fff}
 </style>
 </head>
 <body>
@@ -406,13 +408,19 @@ async function registrar(id) {
   };
 }
 function reagendarVisita(id) {
-  const c = achar(id), mes = c.data.slice(0, 7), [y, m] = mes.split('-');
-  const ult = String(new Date(+y, +m, 0).getDate()).padStart(2, '0');
+  const c = achar(id);
+  const hojeIso = (dados && dados.hoje) || new Date().toISOString().slice(0, 10);
+  const soma = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const fimMes = iso => { const [y, m] = iso.slice(0, 7).split('-').map(Number); return `${iso.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
+  const min = c.altMin || soma(hojeIso, 1), max = c.altMax || fimMes(c.data), [y, m] = max.slice(0, 7).split('-');
+  const semDia = min > max;
   modal(`<div class="sh-h"><h3>Alterar visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span></div></div>
-    <div class="sh-b"><div class="hint" style="margin-top:12px">Data atual: <b>${fmt(c.data)}</b>. Só é possível escolher um dia de ${m}/${y}.</div>
-    <div class="fld"><label>Nova data <i>*</i></label><input type="date" id="nd" min="${mes}-01" max="${mes}-${ult}" value="${c.data}"></div>
-    <div class="fld"><label>Motivo <i>*</i></label><textarea id="mo" placeholder="Por que a visita muda de data?"></textarea></div><div class="err" id="er"></div></div>
-    <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri" id="ok">Alterar visita</button></div>`);
+    <div class="sh-b"><div class="hint" style="margin-top:12px">Data atual: <b>${fmt(c.data)}</b>.</div>
+    <div class="info">A visita só pode ser alterada <b>do dia seguinte em diante</b> e <b>dentro do mês ${m}/${y}</b>. Não dá para passar para o mês seguinte: se a visita não for registrada no mês, ela é marcada como <b>não realizada</b> e a data não pode mais ser alterada.</div>
+    ${semDia ? `<div class="err on">Não há mais dias disponíveis em ${m}/${y}. Registre a visita ou ela será marcada como não realizada.</div>` : `<div class="fld"><label>Nova data <i>*</i> <span class="hint">(${fmt(min)} a ${fmt(max)})</span></label><input type="date" id="nd" min="${min}" max="${max}" value="${c.data >= min && c.data <= max ? c.data : min}"></div>
+    <div class="fld"><label>Motivo <i>*</i></label><textarea id="mo" placeholder="Por que a visita muda de data?"></textarea></div>`}<div class="err" id="er"></div></div>
+    <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button>${semDia ? '' : '<button class="btn pri" id="ok">Alterar visita</button>'}</div>`);
+  if (semDia) return;
   $('#ok').onclick = async () => {
     $('#ok').disabled = true; $('#er').classList.remove('on');
     try { await api(`/api/cards/${id}/reprogramar`, { method: 'POST', body: { nova: $('#nd').value, motivo: $('#mo').value } }); fecha(); carrega(); }
@@ -559,8 +567,8 @@ async function cfg(d) {
 }
 // ================= Dashboard (estilo Power BI, com filtro cruzado e detalhamento) =================
 const PBI = ['#6366f1', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'];
-const COR = { atrasada: '#ef4444', dia: '#f59e0b', aguardando: '#10b981', finalizado: '#64748b' };
-const SIT = { atrasada: 'Atrasada', dia: 'Hoje', aguardando: 'No prazo', finalizado: 'Finalizada' };
+const COR = { atrasada: '#ef4444', dia: '#f59e0b', aguardando: '#10b981', finalizado: '#64748b' , naorealizada: '#94a3b8' };
+const SIT = { atrasada: 'Atrasada', dia: 'Hoje', aguardando: 'No prazo', finalizado: 'Finalizada', naorealizada: 'Não realizada' };
 const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', resp: '', tipo: '', classe: '', emp: '', vend: '' }, sel: {}, tab: { col: null, dir: 1, q: '', pg: 0 } };
 const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
@@ -603,7 +611,7 @@ function dashFiltra(ex = []) {
     && (!u('ant') || String(!!v.antecipada) === s.ant) && (!u('prazo') || (s.prazo === 'fora' ? v.desvio > 0 : (v.desvio === null || v.desvio <= 0))));
   const reprog = d.reprog.filter(r => eq(r.empresa) && (!f.vend || r.vendedor === f.vend) && (!f.seg || r.segmento === f.seg) && r.at.slice(0, 10) >= ini
     && (!u('seg') || r.segmento === s.seg) && (!u('mes') || r.at.slice(0, 7) === s.mes) && (!u('motivo') || r.motivo === s.motivo) && (!u('quem') || r.quem === s.quem));
-  return { meses, cards, visitas, reprog, abertos: cards.filter(c => c.situacao !== 'finalizado') };
+  return { meses, cards, visitas, reprog, abertos: cards.filter(c => c.situacao !== 'finalizado' && c.situacao !== 'naorealizada') };
 }
 
 // --- componentes ---
@@ -699,8 +707,8 @@ function paginaFila() {
   const agBase = aoutros(['aging', 'situacao']).filter(c => c.situacao === 'atrasada');
   const cl = aoutros(['classe']);
   const dets = [...F.cards].sort((a, b) => (a.situacao === 'atrasada' ? -1 : 0) - (b.situacao === 'atrasada' ? -1 : 0) || (a.dias ?? 9e9) - (b.dias ?? 9e9));
-  const SO = { atrasada: 0, dia: 1, aguardando: 2, finalizado: 3 };
-  return `<div class="g5">${kpi('Visitas em aberto', nf(ab.length), 'fila total (clique para ver todas)', '#6366f1', ['situacao'], ['__todas'], null, '◷')}${kpi('Atrasadas', nf(atr.length), `${pct(atr.length, ab.length)}% da fila`, COR.atrasada, ['situacao'], ['atrasada'], null, '!')}${kpi('Visitas hoje', nf(hoje.length), '', '#d97706', ['situacao'], ['dia'], null, '★')}${kpi('Próximos 7 dias', nf(p7), `${nf(prox.length)} no prazo no total`, COR.aguardando, ['situacao'], ['aguardando'], null, '→')}${kpi('Atraso médio', mediaAtr ? mediaAtr + ' dias' : '—', atr.length ? `maior: ${Math.max(...atr.map(c => -c.dias))} dias` : 'nenhuma atrasada', mediaAtr ? COR.atrasada : '#64748b', null, null, null, '⏱')}</div>
+  const SO = { atrasada: 0, dia: 1, aguardando: 2, finalizado: 3, naorealizada: 4 };
+  return `<div class="g5">${kpi('Visitas em aberto', nf(ab.length), 'fila total (clique para ver todas)', '#6366f1', ['situacao'], ['__todas'], null, '◷')}${kpi('Atrasadas', nf(atr.length), `${pct(atr.length, ab.length)}% da fila`, COR.atrasada, ['situacao'], ['atrasada'], null, '!')}${kpi('Visitas hoje', nf(hoje.length), '', '#d97706', ['situacao'], ['dia'], null, '★')}${kpi('Próximos 7 dias', nf(p7), `${nf(prox.length)} no prazo no total`, COR.aguardando, ['situacao'], ['aguardando'], null, '→')}${kpi('Não realizadas', nf(F.cards.filter(c => c.situacao === 'naorealizada').length), 'perdidas por não registrar no mês', '#64748b', ['situacao'], ['naorealizada'], null, '✕')}${kpi('Atraso médio', mediaAtr ? mediaAtr + ' dias' : '—', atr.length ? `maior: ${Math.max(...atr.map(c => -c.dias))} dias` : 'nenhuma atrasada', mediaAtr ? COR.atrasada : '#64748b', null, null, null, '⏱')}</div>
    <div class="g3">${vz('Situação da fila', rosca([{ nome: 'Atrasadas', valor: aoutros(['situacao']).filter(c => c.situacao === 'atrasada').length, cor: COR.atrasada, val: 'atrasada' }, { nome: 'Hoje', valor: aoutros(['situacao']).filter(c => c.situacao === 'dia').length, cor: COR.dia, val: 'dia' }, { nome: 'No prazo', valor: aoutros(['situacao']).filter(c => c.situacao === 'aguardando').length, cor: COR.aguardando, val: 'aguardando' }], 'situacao'))}
      ${vz('Fila por segmento', hstack(linhas('seg', segs, c => c.segmento), ser, 'seg'))}
      ${vz('Fila por cargo', hstack(linhas('cargo', ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'], c => c.cargo), ser, 'cargo'))}</div>
@@ -715,9 +723,9 @@ function paginaFila() {
     { h: 'Empresa', txt: r => r.empresa, html: r => lk(urlE(r.empresaId), r.empresa) }, { h: 'Segmento', txt: r => r.segmento }, { h: 'Cargo', txt: r => r.cargo }, { h: 'Classe', txt: r => r.classe },
     { h: 'Responsável', txt: r => r.respNome }, { h: 'Programada', txt: r => (r.data || '').split('-').reverse().join('/'), ord: r => r.data || '' },
     { h: 'Situação', txt: r => SIT[r.situacao], html: r => pill(r.situacao), ord: r => SO[r.situacao] },
-    { h: 'Prazo', txt: r => r.situacao === 'finalizado' ? '' : r.dias < 0 ? `${-r.dias} dia(s) de atraso` : r.dias === 0 ? 'Hoje' : `em ${r.dias} dia(s)`, ord: r => r.dias ?? 9e9 },
+    { h: 'Prazo', txt: r => r.situacao === 'finalizado' || r.situacao === 'naorealizada' ? '' : r.dias < 0 ? `${-r.dias} dia(s) de atraso` : r.dias === 0 ? 'Hoje' : `em ${r.dias} dia(s)`, ord: r => r.dias ?? 9e9 },
     { h: 'Card', txt: () => 'Abrir', html: r => lk(urlC(r.id), 'Abrir card') },
-    { h: 'Ações', txt: () => '', html: r => r.situacao === 'finalizado' ? '<span class="hint">Realizada</span>' : `<button class="mini" data-reg="${r.id}">Registrar visita</button> <button class="mini" data-rep="${r.id}">Alterar visita</button>` }], 'fila-de-visitas')}`;
+    { h: 'Ações', txt: () => '', html: r => r.situacao === 'naorealizada' ? '<span class="hint">Não realizada</span>' : r.situacao === 'finalizado' ? '<span class="hint">Realizada</span>' : `<button class="mini" data-reg="${r.id}">Registrar visita</button> <button class="mini" data-rep="${r.id}">Alterar visita</button>` }], 'fila-de-visitas')}`;
 }
 function paginaReg() {
   const F = dashFiltra(), v = F.visitas;
@@ -726,13 +734,14 @@ function paginaReg() {
   const mesAtual = DB.dados.hoje.slice(0, 7), mesAnt = (() => { const [y, m] = mesAtual.split('-').map(Number); const d = new Date(y, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; })();
   const nA = v.filter(x => x.dia.slice(0, 7) === mesAtual).length, nP = v.filter(x => x.dia.slice(0, 7) === mesAnt).length;
   const vendedores = new Set(v.map(x => x.resp)).size;
+  const nReal = DB.dados.cards.filter(c => c.situacao === 'naorealizada').length;
   const vo = ex => dashFiltra(ex).visitas;
   const mm = F.meses, cx = mm.map(m => vo(['mes']).filter(x => x.dia.slice(0, 7) === m));
   const segs = contar(vo(['seg']), x => x.segmento).map(([k, n], i) => [k, n, PBI[i % PBI.length]]);
   const porVend = contar(vo(['resp']), x => x.respNome).slice(0, 10).map(([n, k]) => [n, k, PBI[0], String((DB.dados.visitas.find(x => x.respNome === n) || {}).resp)]);
   const antBase = vo(['ant']);
   const det = [...v].sort((a, b) => b.quando.localeCompare(a.quando));
-  return `<div class="g5">${kpi('Visitas registradas', nf(v.length), `últimos ${DB.f.meses} meses`, '#6366f1', null, null, null, '✓')}${kpi('Visitas no mês', nf(nA), `mês anterior: ${nf(nP)}`, PBI[0], ['mes'], [mesAtual], nP ? Math.round((nA - nP) / nP * 100) : null, '▤')}${kpi('Visitas antecipadas', nf(ant), `${pct(ant, v.length)}% do total`, PBI[0], ['ant'], ['true'], null, '⚑')}${kpi('Cumprimento no prazo', cd.length ? pct(np, cd.length) + '%' : '—', 'realizadas até a data programada', PBI[0], ['prazo'], ['no'], null, '◎')}${kpi('Atraso médio', atr.length ? media + ' dias' : '—', `${nf(atr.length)} fora do prazo · ${nf(vendedores)} vendedor(es)`, atr.length ? COR.atrasada : '#64748b', ['prazo'], ['fora'], null, '⏱')}</div>
+  return `<div class="g5">${kpi('Visitas registradas', nf(v.length), `últimos ${DB.f.meses} meses`, '#6366f1', null, null, null, '✓')}${kpi('Visitas no mês', nf(nA), `mês anterior: ${nf(nP)}`, PBI[0], ['mes'], [mesAtual], nP ? Math.round((nA - nP) / nP * 100) : null, '▤')}${kpi('Visitas antecipadas', nf(ant), `${pct(ant, v.length)}% do total`, PBI[0], ['ant'], ['true'], null, '⚑')}${kpi('Visitas não realizadas', nf(nReal), 'perdidas por não registrar no mês', '#64748b', null, null, null, '✕')}${kpi('Cumprimento no prazo', cd.length ? pct(np, cd.length) + '%' : '—', 'realizadas até a data programada', PBI[0], ['prazo'], ['no'], null, '◎')}${kpi('Atraso médio', atr.length ? media + ' dias' : '—', `${nf(atr.length)} fora do prazo · ${nf(vendedores)} vendedor(es)`, atr.length ? COR.atrasada : '#64748b', ['prazo'], ['fora'], null, '⏱')}</div>
    <div class="g2w">${vz('Visitas por mês', colunas(mm.map(mesCurto), mm, [{ nome: 'No prazo / antecipadas', cor: PBI[0], valores: cx.map(a => a.filter(x => x.desvio === null || x.desvio <= 0).length) }, { nome: 'Fora do prazo', cor: COR.atrasada, valores: cx.map(a => a.filter(x => x.desvio > 0).length) }], 'mes'))}
      ${vz('Antecipada x programada', rosca([{ nome: 'Antecipadas', valor: antBase.filter(x => x.antecipada).length, cor: PBI[0], val: 'true' }, { nome: 'Na data / depois', valor: antBase.filter(x => !x.antecipada).length, cor: PBI[1], val: 'false' }], 'ant'))}</div>
    <div class="g3">${vz('Visitas por segmento', hbar(segs, { keys: ['seg'] }))}${vz('Visitas por vendedor', hbar(porVend, { keys: ['resp'] }))}${vz('Visitas por cargo', rosca(contar(vo(['cargo']), x => x.cargo).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] })), 'cargo'))}</div>
@@ -783,7 +792,7 @@ function dashDesenha() {
   const dq = $('#dq'); if (dq) dq.oninput = () => { DB.tab.q = dq.value; DB.tab.pg = 0; const p = dq.selectionStart; dashDesenha(); const n = $('#dq'); n.focus(); n.setSelectionRange(p, p); };
   const dx = $('#dx'); if (dx) dx.onclick = () => DB.exportar();
   document.querySelectorAll('[data-pn]').forEach(b => b.onclick = () => { DB.tab.pg += +b.dataset.pn; dashDesenha(); });
-  dados = { visitas: DB.dados.cards.filter(c => c.situacao !== 'finalizado') };
+  dados = { hoje: DB.dados.hoje, visitas: DB.dados.cards.filter(c => c.situacao !== 'finalizado' && c.situacao !== 'naorealizada') };
   document.querySelectorAll('.pbi [data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('.pbi [data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
   window.scrollTo(0, scrollY);
