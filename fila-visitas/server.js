@@ -7,6 +7,7 @@ const { createStore } = require('./lib/store');
 const { createService } = require('./lib/service');
 const { request } = require('./lib/http');
 const R = require('./lib/rules');
+const { createAcesso } = require('./lib/acesso');
 const D = require('./lib/duplicados');
 const P = require('./lib/preparar');
 
@@ -14,7 +15,8 @@ const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const store = createStore(DATA_DIR);
 const bitrix = createBitrix(process.env.BITRIX_WEBHOOK || '');
-const svc = createService({ bitrix, store });
+const acesso = createAcesso({ apiKey: process.env.VIBE_APP_KEY, log: m => store.log('aviso', m) });
+const svc = createService({ bitrix, store, acesso });
 const EVENT_TOKEN = process.env.EVENT_TOKEN || '';
 
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
@@ -34,7 +36,7 @@ async function quem(req, u) {
     try {
       const r = await request('https://vibecode.bitrix24.com/v1/me', { headers: { 'X-Api-Key': process.env.VIBE_APP_KEY, Authorization: bearer } });
       const id = r.json?.data?.currentUser?.bitrixUserId;
-      if (id) return { uid: +id, verificado: true };
+      if (id) return { uid: +id, verificado: true, bearer };
     } catch { /* cai no seletor */ }
   }
   const uid = +(u.searchParams.get('uid') || 0);
@@ -56,12 +58,12 @@ function exigeDashboard(id) {
 const routes = {
   'GET /health': async () => ({ ok: true }),
   'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '', podeConfig: svc.acessoRestrito() ? !!(id.verificado && svc.podeConfigurar(id.uid)) : true, podeDashboard: svc.acessoRestrito() ? !!(id.verificado && svc.podeDashboard(id.uid)) : true }),
-  'GET /api/dashboard': async (_, __, id) => { exige(); exigeDashboard(id); return svc.dashboardDados({ uid: id.uid }); },
+  'GET /api/dashboard': async (_, __, id) => { exige(); exigeDashboard(id); return svc.dashboardDados({ uid: id.uid, bearer: id.bearer }); },
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
-  'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto' }); },
+  'GET /api/visitas': async (u, _, id) => { exige(); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto', bearer: id.bearer }); },
   'GET /api/departamentos': async (_, __, id) => { exigeConfig(id); exige(); return { departamentos: await svc.departamentos() }; },
   'GET /api/ramos': async (_, __, id) => { exigeConfig(id); exige(); return { ramos: await svc.listaRamos() }; },
-  'GET /api/historico': async (_, __, id) => { let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ } return { reprogramacoes: id.uid ? await svc.historicoVisivel(id.uid) : [], base }; },
+  'GET /api/historico': async (_, __, id) => { let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ } return { reprogramacoes: id.uid ? await svc.historicoVisivel(id.uid, id.bearer) : [], base }; },
   'GET /api/log': async (_, __, id) => (exigeConfig(id), { log: store.logs.slice(0, 200), bloqueios: store.bloqueios }),
   'GET /api/config': async (_, __, id) => (exigeConfig(id), { config: store.config, hoje: R.todayBR(), webhook: bitrix.enabled, ultimaVarredura: store.lastSweep }),
   'PUT /api/config': async (_, b, id) => {
@@ -72,7 +74,7 @@ const routes = {
       for (const c of R.CARGOS) for (const k of R.CLASSES) { const n = +b.intervalos?.[c]?.[k]; if (Number.isInteger(n) && n > 0 && n < 1000) (p.intervalos[c] ||= {})[k] = n; }
     }
     if (Number.isInteger(+b.horaJob) && +b.horaJob >= 0 && +b.horaJob < 24) p.horaJob = +b.horaJob;
-    for (const k of ['tarefaAtiva', 'atualizarProxima', 'hierarquiaAuto']) if (typeof b[k] === 'boolean') p[k] = b[k];
+    for (const k of ['tarefaAtiva', 'atualizarProxima', 'hierarquiaAuto', 'respeitarBitrix']) if (typeof b[k] === 'boolean') p[k] = b[k];
     if (typeof b.ativo === 'boolean') p.ativo = b.ativo;
     if (Number.isFinite(+b.tarefaHorasUteis) && +b.tarefaHorasUteis > 0) p.tarefaHorasUteis = +b.tarefaHorasUteis;
     if (['secao', 'extra'].includes(b.motoresDatas)) p.motoresDatas = b.motoresDatas;
@@ -120,11 +122,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await routes[key](u, body, id));
     }
     const mf = u.pathname.match(/^\/api\/cards\/(\d+)\/form$/);
-    if (mf && req.method === 'GET') { exige(); return send(res, 200, await svc.camposVisita(+mf[1])); }
+    if (mf && req.method === 'GET') { exige(); { const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); } return send(res, 200, await svc.camposVisita(+mf[1])); }
     let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar)$/);
     if (m && req.method === 'POST') {
       exige();
       const id = await quem(req, u), b = await readBody(req);
+      if (!(await svc.podeVerCard(id.bearer, +m[1]))) throw nega('Você não tem permissão no Bitrix24 para este registro.');
       const uid = id.verificado ? id.uid : +(b.uid || id.uid) || null;
       return send(res, 200, m[2] === 'registrar' ? await svc.registrarVisita(+m[1], { ...b, uid }) : await svc.reprogramar(+m[1], { ...b, uid }));
     }

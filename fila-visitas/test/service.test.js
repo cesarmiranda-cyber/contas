@@ -309,3 +309,21 @@ test('dashboard: dados em nível de linha (fila + registros + reprogramações) 
   const nada = await svc.dashboardDados({ uid: 777 });
   assert.equal(nada.cards.length, 0); assert.equal(nada.visitas.length, 0);
 });
+
+test('permissões do Bitrix prevalecem: o que o Bitrix nega ao usuário some da lista, do dashboard e do histórico', async () => {
+  const { w, store } = setup();
+  const permitido = new Set();
+  const acesso = { ids: async (bearer, et) => (bearer ? (et === 1036 ? permitido : new Set()) : null) };
+  const svc = createService({ bitrix: { call: w.call }, store, acesso, clock: () => NOW });
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor')), sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
+  permitido.add(vend.id);
+  const l = await svc.listarVisitas({ uid: 30, bearer: 'sessao' });                       // diretoria, mas o Bitrix só libera 1 card
+  assert.deepEqual(l.visitas.map(v => v.id), [vend.id]);
+  assert.equal((await svc.listarVisitas({ uid: 30 })).visitas.length, 5, 'sem sessão do usuário valem só as regras do app');
+  assert.equal(await svc.podeVerCard('sessao', sup.id), false); assert.equal(await svc.podeVerCard('sessao', vend.id), true);
+  const d = await svc.dashboardDados({ uid: 30, bearer: 'sessao' });
+  assert.deepEqual(d.cards.filter(c => c.situacao !== 'finalizado').map(c => c.id), [vend.id]);
+  store.setConfig({ respeitarBitrix: false });
+  assert.equal((await svc.listarVisitas({ uid: 30, bearer: 'sessao' })).visitas.length, 5, 'desligando a opção, vale só o app');
+});

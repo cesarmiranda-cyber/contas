@@ -7,7 +7,7 @@ const CACHE_MS = 5 * 60 * 1000;
 const DYN = id => `dynamic_${id}`;
 const hex = n => n.toString(16);
 
-function createService({ bitrix, store, clock = () => new Date() }) {
+function createService({ bitrix, store, acesso = null, clock = () => new Date() }) {
   let disc = null, discAt = 0;
   const hoje = () => R.todayBR(clock());
   const erro = (m, s = 400) => Object.assign(new Error(m), { status: s });
@@ -547,6 +547,17 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     } finally { rodando = false; }
   }
 
+  // Permissões do Bitrix prevalecem: se o usuário não pode ver o registro no Bitrix, o app também não mostra.
+  const respeitaBitrix = () => store.config.respeitarBitrix !== false;
+  async function permitidosBitrix(bearer, etype) {
+    if (!acesso || !bearer || !respeitaBitrix()) return null;
+    return acesso.ids(bearer, etype);
+  }
+  async function podeVerCard(bearer, cardId) {
+    const set = await permitidosBitrix(bearer, F.ETYPE.fila);
+    return !set || set.has(+cardId);
+  }
+
   // ---------- acesso: quem configura e quem vê o dashboard ----------
   // Sem nenhuma lista configurada o app fica aberto (primeiro uso). Depois, só quem está nas listas (administradores sempre entram).
   const ids = l => (l || []).map(Number).filter(Boolean);
@@ -569,9 +580,10 @@ function createService({ bitrix, store, clock = () => new Date() }) {
   }
   // escopo 'auto': vendedor vê os seus; supervisor/coordenador/gerente veem a equipe (quem aparece acima do vendedor na empresa
   // ou chefia o departamento do responsável); diretoria/administração vê tudo.
-  async function listarVisitas({ uid, escopo = 'auto' }) {
+  async function listarVisitas({ uid, escopo = 'auto', bearer = null }) {
     const { map } = await campos();
-    const itens = (await cardsAbertos());
+    const permitidos = await permitidosBitrix(bearer, F.ETYPE.fila);
+    const itens = (await cardsAbertos()).filter(it => !permitidos || permitidos.has(+it.id));
     const todos = escopo === 'todas' || (escopo === 'auto' && await enxergaTudo(uid));
     const time = escopo === 'auto' && !todos ? await equipeDe(uid) : new Set([+uid]);
     const out = [];
@@ -600,12 +612,12 @@ function createService({ bitrix, store, clock = () => new Date() }) {
         equipe, reprogramacoes: store.historico.filter(h => h.card === c.id && !h.tipo).length, urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     }
     out.sort((a, b) => (a.data || '9').localeCompare(b.data || '9'));
-    return { hoje: hoje(), visao: todos ? 'tudo' : (time.size > 1 || out.some(v => +v.responsavel !== +uid) ? 'equipe' : 'minhas'), visitas: out };
+    return { hoje: hoje(), bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || out.some(v => +v.responsavel !== +uid) ? 'equipe' : 'minhas'), visitas: out };
   }
   // Dados em nível de linha para o dashboard (a tela agrega e filtra). Respeita a visibilidade de quem consulta.
   const cacheDash = new Map();
-  async function dashboardDados({ uid, meses = 13 }) {
-    const chave = `${uid}`;
+  async function dashboardDados({ uid, meses = 13, bearer = null }) {
+    const chave = `${uid}|${bearer ? bearer.slice(-12) : ''}`;
     const c0 = cacheDash.get(chave);
     if (c0 && Date.now() - c0.em < 60e3) return c0.dados;
     const { map, meta } = await campos();
@@ -625,8 +637,9 @@ function createService({ bitrix, store, clock = () => new Date() }) {
       return out;
     };
     // fila: abertos + finalizados no período
-    const abertos = await cardsAbertos();
-    const fin = await listar(F.ETYPE.fila, { stageId: map.etapas.finalizado, '>updatedTime': desde }, ['*', 'uf*']);
+    const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
+    const abertos = (await cardsAbertos()).filter(it => !permCards || permCards.has(+it.id));
+    const fin = (await listar(F.ETYPE.fila, { stageId: map.etapas.finalizado, '>updatedTime': desde }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id));
     const nomes = new Map();
     const nome = async id => { if (!nomes.has(id)) nomes.set(id, await nomeUsuario(id)); return nomes.get(id); };
     const tipos = new Map(), emps = new Map();
@@ -635,7 +648,8 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     for (const [lista, finalizado] of [[abertos, false], [fin, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
       if (!visivelPor(d.responsavel, reg.equipe)) continue;
-      cards.push({ id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
+      const vendId = (reg.equipe || {}).vendedor;
+      cards.push({ vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
         data: d.data, situacao: finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
     // registros de visita
@@ -645,13 +659,14 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     const porId = new Map(cards.map(c => [String(c.id), c]));
     const visitas = [];
     for (const it of regs) {
+      if (permVis && !permVis.has(+it.id)) continue;
       if (!visivelPor(it.assignedById, null) && !(todos)) continue;
       const q = it[campoDH] || it.createdTime;
       const fila = v.filaId ? porId.get(String(it[v.filaId])) : null;
       const progr = fila?.data || null;
       const dia = q ? R.todayBR(new Date(q)) : null;
       const antTxt = v.antecipada ? String(F.decode(meta, v.antecipada, it[v.antecipada])).toLowerCase() : '';
-      visitas.push({ id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
+      visitas.push({ vendedor: await nome(+it.assignedById), id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
         antecipada: antTxt ? /^(sim|y|true|1)/.test(antTxt) : null, programada: progr, desvio: progr && dia ? R.dayDiff(progr, dia) : null, cargo: fila?.cargo || '' });
     }
     const faltam = [...new Set(visitas.map(x => x.empresaId).filter(Boolean))];
@@ -662,15 +677,16 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     }
     visitas.forEach(x => { x.empresa = nomeEmp.get(x.empresaId) || ''; });
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
-    const reprog = store.historico.filter(x => !x.tipo && (todos || [x.autor, x.responsavel].some(r => r && (+r === +uid || (time && time.has(+r)))))).map(x => ({ card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
+    const reprog = store.historico.filter(x => !x.tipo && (todos || [x.autor, x.responsavel].some(r => r && (+r === +uid || (time && time.has(+r)))))).map(x => ({ vendedor: x.autorNome, card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
     const dados = { base, hoje: h, geradoEm: new Date().toISOString(), visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog };
     cacheDash.set(chave, { em: Date.now(), dados });
     return dados;
   }
 
   // Histórico de reprogramações respeita a mesma regra de visibilidade das visitas.
-  async function historicoVisivel(uid) {
-    const todos = store.historico;
+  async function historicoVisivel(uid, bearer = null) {
+    const perm = await permitidosBitrix(bearer, F.ETYPE.fila);
+    const todos = store.historico.filter(h => !perm || !h.card || perm.has(+h.card));
     if (await enxergaTudo(uid)) return todos;
     const time = await equipeDe(uid);
     return todos.filter(h => time.has(+h.autor) || time.has(+h.responsavel));
@@ -702,6 +718,6 @@ function createService({ bitrix, store, clock = () => new Date() }) {
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, historicoVisivel, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };
