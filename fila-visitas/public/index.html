@@ -133,6 +133,25 @@ body.wide main{padding-top:12px}
 .tb table{font-size:13px}.tb th{font-size:12px}.tb td{padding:8px 10px}
 @media(max-width:1000px){.g3 .vz.s2{grid-column:auto}}
 @media(min-width:1700px){.kv{font-size:44px}.vz h3{font-size:15.5px}.hr{font-size:14.5px}}
+
+/* ---- todas as telas em largura total ---- */
+.wrap{max-width:none;padding-left:24px;padding-right:24px}
+.stats.s4{grid-template-columns:repeat(4,1fr)}
+.filters.f5{grid-template-columns:2fr 1.2fr 1fr 1fr 1fr}
+.list.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(640px,1fr));gap:12px;background:none;border:0;box-shadow:none;overflow:visible}
+.list.cards .item{background:var(--sf);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);border-bottom:1px solid var(--line);overflow:hidden}
+.list.cards .item.atrasada{background:color-mix(in srgb,var(--red) 9%,var(--sf))}.list.cards .item.dia{background:color-mix(in srgb,#f5a623 16%,var(--sf))}
+.bar2{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 6px}.bar2r{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sl2{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}.sl2 select{width:auto;padding:6px 10px}
+.seg2{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg2 button{border:0;background:var(--sf);padding:7px 12px;cursor:pointer;font-weight:600;color:var(--ink2)}.seg2 button.on{background:var(--brand);color:#fff}
+.tbv table{font-size:13.5px}.tbv th{white-space:nowrap}.tbv td{vertical-align:middle}.tbv tr.t-atrasada td{background:color-mix(in srgb,var(--red) 8%,var(--sf))}.tbv tr.t-dia td{background:color-mix(in srgb,#f5a623 15%,var(--sf))}
+.tbv a{color:inherit;text-decoration:none}.tbv a:hover{color:var(--brand);text-decoration:underline}
+.pl2{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.cfgcols{column-width:520px;column-gap:24px}.cfgcols>*{break-inside:avoid}.cfgcols h2{break-after:avoid;margin-top:0;padding-top:14px}.cfgcols .panel,.cfgcols .tw{margin-bottom:6px}
+.sheet{max-width:900px}
+.two{grid-template-columns:1fr 1fr}.hf{grid-template-columns:1.3fr 1.1fr 1fr 1.4fr auto}
+@media(max-width:1000px){.stats.s4{grid-template-columns:1fr 1fr}.list.cards{grid-template-columns:1fr}.cfgcols{column-width:auto}}
+@media(max-width:700px){.wrap{padding-left:14px;padding-right:14px}.filters.f5{grid-template-columns:1fr 1fr}.bar2{align-items:flex-start}}
 </style>
 </head>
 <body>
@@ -180,7 +199,7 @@ function montaAbas() {
   $('#tabs').querySelectorAll('button').forEach(b => b.onclick = () => { aba = b.dataset.k; foco = ''; montaAbas(); carrega(); });
 }
 async function carrega() {
-  document.body.classList.remove('wide');
+  document.body.classList.add('wide');
   const m = $('#main');
   if (!uid && aba !== 'cfg') { m.innerHTML = '<div class="vazio">Escolha o seu nome no topo para ver as suas visitas.</div>'; return; }
   m.innerHTML = '<div class="vazio">Carregando…</div>';
@@ -192,20 +211,33 @@ async function carrega() {
   } catch (e) { m.innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
 }
 
+const VP = (() => { try { return { view: 'cards', ord: 'data', dir: 1, n: 40, ...JSON.parse(localStorage.getItem('fv.vp') || '{}') }; } catch { return { view: 'cards', ord: 'data', dir: 1, n: 40 }; } })();
+const salvaVP = () => { try { localStorage.setItem('fv.vp', JSON.stringify({ view: VP.view, ord: VP.ord, dir: VP.dir })); } catch {} };
+try { Object.assign(F, JSON.parse(localStorage.getItem('fv.f') || '{}')); } catch {}
+const salvaF = () => { try { localStorage.setItem('fv.f', JSON.stringify({ seg: F.seg, tipo: F.tipo, classe: F.classe })); } catch {} };
+const ORD = { data: (a, b) => (a.data || '9').localeCompare(b.data || '9'), empresa: (a, b) => a.empresa.localeCompare(b.empresa), responsavel: (a, b) => (a.responsavelNome || '').localeCompare(b.responsavelNome || ''), segmento: (a, b) => a.segmento.localeCompare(b.segmento), cargo: (a, b) => a.cargo.localeCompare(b.cargo), classe: (a, b) => (a.classe || '').localeCompare(b.classe || ''), ultima: (a, b) => (a.ultima || '').localeCompare(b.ultima || ''), prazo: (a, b) => (a.dias ?? 9e9) - (b.dias ?? 9e9) };
 function lista() {
   const todas = dados.visitas, busca = (F.q || '').toLowerCase();
   const cont = k => todas.filter(x => x.situacao === k).length;
-  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!F.resp || String(x.responsavel) === F.resp) && (!foco || x.situacao === foco));
+  const v = todas.filter(x => (!busca || x.empresa.toLowerCase().includes(busca)) && (!F.seg || x.segmento === F.seg) && (!F.tipo || (x.tipoEmpresa || '').toLowerCase() === F.tipo) && (!F.classe || x.classe === F.classe) && (!F.resp || String(x.responsavel) === F.resp) && (!foco || x.situacao === foco))
+    .sort((a, b) => ORD[VP.ord](a, b) * VP.dir);
   const segs = [...new Set(todas.map(x => x.segmento))].filter(Boolean);
   const resps = [...new Map(todas.map(x => [String(x.responsavel), x.responsavelNome])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const verEquipe = dados.visao !== 'minhas';
   const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${cur === a ? 'selected' : ''}>${esc(b)}</option>`).join('');
   const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Próximas']];
+  let restante = VP.n;
+  const mostra = l => { const r = l.slice(0, Math.max(0, restante)); restante -= r.length; return r; };
+  const corpo = !v.length ? '<div class="vazio">Nenhuma visita por aqui.</div>' : VP.view === 'tabela' ? tabelaVisitas(v.slice(0, VP.n), verEquipe) : grupos.map(([k, t]) => {
+    const g = v.filter(x => x.situacao === k);
+    return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list cards">${mostra(g).map(linha).join('')}</div>` : '';
+  }).join('');
   $('#main').innerHTML = `
-    <div class="stats">
+    <div class="stats s4">
       <button class="stat red ${foco === 'atrasada' ? 'on' : ''}" data-f="atrasada"><i>!</i><div><b>${cont('atrasada')}</b><span>Atrasadas</span></div></button>
       <button class="stat amber ${foco === 'dia' ? 'on' : ''}" data-f="dia"><i>★</i><div><b>${cont('dia')}</b><span>Hoje</span></div></button>
       <button class="stat blue ${foco === 'aguardando' ? 'on' : ''}" data-f="aguardando"><i>◷</i><div><b>${cont('aguardando')}</b><span>Próximas</span></div></button>
+      <button class="stat ${foco === '' ? 'on' : ''}" data-f=""><i>Σ</i><div><b>${todas.length}</b><span>Total na fila</span></div></button>
     </div>
     ${verEquipe ? `<div class="info">${dados.visao === 'tudo' ? 'Você está vendo as visitas de <b>todos</b>.' : 'Você está vendo as visitas da <b>sua equipe</b>.'}</div>` : ''}
     <div class="filters ${verEquipe ? 'f5' : ''}">
@@ -214,18 +246,38 @@ function lista() {
       <select id="fs"><option value="">Todos os segmentos</option>${opt(segs.map(s => [s, s]), F.seg)}</select>
       ${todas.some(x => x.tipoEmpresa) ? `<select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>` : ''}
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
-    </div>` + (v.length ? grupos.map(([k, t]) => {
-      const g = v.filter(x => x.situacao === k);
-      return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list">${g.map(linha).join('')}</div>` : '';
-    }).join('') : '<div class="vazio">Nenhuma visita por aqui.</div>');
-  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? '' : b.dataset.f; lista(); });
-  const q = $('#fq'); q.oninput = () => { F.q = q.value; const p = q.selectionStart; lista(); const n = $('#fq'); n.focus(); n.setSelectionRange(p, p); };
+    </div>
+    <div class="bar2"><span class="hint">${v.length} visita(s)${F.seg || F.tipo || F.classe || F.resp || foco || busca ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
+      <div class="bar2r"><label class="sl2">Ordenar<select id="fo">${opt([['data', 'Data programada'], ['prazo', 'Mais atrasadas primeiro'], ['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ['ultima', 'Última visita'], ...(verEquipe ? [['responsavel', 'Responsável']] : [])], VP.ord)}</select></label>
+        <div class="seg2"><button data-vw="cards" class="${VP.view === 'cards' ? 'on' : ''}" title="Cartões">▦ Cartões</button><button data-vw="tabela" class="${VP.view === 'tabela' ? 'on' : ''}" title="Tabela">☰ Tabela</button></div>
+        <button class="btn sm" id="vcsv">Exportar CSV</button></div></div>
+    ${corpo}
+    ${v.length > VP.n ? `<div style="text-align:center;margin:16px"><button class="btn" id="vmais">Mostrar mais (${v.length - VP.n} restantes)</button></div>` : ''}`;
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? '' : b.dataset.f; VP.n = 40; lista(); });
+  const q = $('#fq'); q.oninput = () => { F.q = q.value; VP.n = 40; const p = q.selectionStart; lista(); const n = $('#fq'); n.focus(); n.setSelectionRange(p, p); };
   if ($('#fr')) $('#fr').onchange = e => { F.resp = e.target.value; lista(); };
-  $('#fs').onchange = e => { F.seg = e.target.value; lista(); };
-  if ($('#ft')) $('#ft').onchange = e => { F.tipo = e.target.value; lista(); };
-  $('#fc').onchange = e => { F.classe = e.target.value; lista(); };
+  $('#fs').onchange = e => { F.seg = e.target.value; salvaF(); lista(); };
+  if ($('#ft')) $('#ft').onchange = e => { F.tipo = e.target.value; salvaF(); lista(); };
+  $('#fc').onchange = e => { F.classe = e.target.value; salvaF(); lista(); };
+  $('#fo').onchange = e => { VP.ord = e.target.value; VP.dir = 1; salvaVP(); lista(); };
+  document.querySelectorAll('[data-vw]').forEach(b => b.onclick = () => { VP.view = b.dataset.vw; salvaVP(); lista(); });
+  document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); lista(); });
+  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', tipo: '', classe: '', resp: '', q: '' }); foco = ''; salvaF(); lista(); };
+  if ($('#vmais')) $('#vmais').onclick = () => { VP.n += 60; lista(); };
+  $('#vcsv').onclick = () => {
+    const q2 = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
+    const csv = ['Empresa;Segmento;Cargo;Classe;Tipo;Responsável;Última visita;Programada;Situação;Dias', ...v.map(c => [c.empresa, c.segmento, c.cargo, c.classe, c.tipoEmpresa, c.responsavelNome, fmt(c.ultima), fmt(c.data), c.situacao, c.dias].map(q2).join(';'))].join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'fila-de-visitas.csv'; a.click();
+  };
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reprogramar(+b.dataset.rep));
+}
+function tabelaVisitas(v, verEquipe) {
+  const cab = [['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : []), ['ultima', 'Última visita'], ['data', 'Programada'], ['prazo', 'Prazo']];
+  const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'] };
+  return `<div class="tw tbv"><table><tr>${cab.map(([k, t]) => `<th data-oc="${k}" style="cursor:pointer">${t}${VP.ord === k ? (VP.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th></th></tr>${v.map(c => {
+    const q = c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
+    return `<tr class="t-${c.situacao}"><td><b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}</td><td>${esc(c.segmento)}</td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap"><button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Reprogramar</button></td></tr>`; }).join('')}</table></div>`;
 }
 const ini = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 function linha(c) {
@@ -380,11 +432,11 @@ async function cfg(d) {
   const c = d.config;
   let campos = null; try { campos = await api('/api/campos'); } catch (e) { campos = { erro: e.message }; }
   const cargos = ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'];
-  $('#main').innerHTML = `
+  $('#main').innerHTML = `<div class="cfgcols">
     ${d.webhook ? '' : '<div class="err on">BITRIX_WEBHOOK não definido: o app ainda não está ligado ao Bitrix24.</div>'}
     <div class="panel"><h2>Automação</h2>
       <label><input type="checkbox" id="at" style="width:auto" ${c.ativo ? 'checked' : ''}> <b>App ativo</b> — cria/atualiza cards, roda o job diário e reverte edições diretas</label>
-      <p class="hint">Mantenha desligado até conferir os campos descobertos abaixo.</p></div>
+      <p class="hint">Desligue para pausar toda a automação. A consulta de visitas e o registro continuam funcionando.</p></div>
     <h2>Intervalos entre visitas (dias)</h2><div class="tw"><table><tr><th>Cargo</th><th>A</th><th>B</th><th>C</th></tr>${cargos.map(g => `<tr><td>${g}</td>${['A', 'B', 'C'].map(k => `<td><input data-i="${g}.${k}" type="number" min="1" value="${c.intervalos[g][k]}"></td>`).join('')}</tr>`).join('')}</table></div>
     <h2>Geral</h2><div class="panel">
     <div class="fld"><label>Hora do job diário (Brasília)</label><input id="hj" type="number" min="0" max="23" value="${c.horaJob}"></div>
@@ -413,7 +465,7 @@ async function cfg(d) {
     <h2>Testar com uma empresa</h2><div class="panel"><p class="hint">Gera a fila de <b>uma</b> empresa só (funciona mesmo com o app desativado). Use o número que aparece na URL da empresa no Bitrix (…/crm/company/details/<b>123</b>/).</p>
       <div style="display:flex;gap:8px"><input id="eid" type="number" inputmode="numeric" placeholder="ID da empresa" style="max-width:200px"><button class="btn pri" id="bt">Gerar fila desta empresa</button></div><pre id="tout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Auditoria</h2><div id="aud" class="hint">Carregando…</div>
-    <h2>Ações</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="b1">Sincronizar todas as empresas</button><button class="btn" id="b2">Rodar job diário agora</button></div><p class="hint" id="out"></p>`;
+    <h2>Ações</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="b1">Sincronizar todas as empresas</button><button class="btn" id="b2">Rodar job diário agora</button></div><p class="hint" id="out"></p></div>`;
   $('#sv').onclick = async () => {
     const intervalos = {}; document.querySelectorAll('[data-i]').forEach(i => { const [g, k] = i.dataset.i.split('.'); (intervalos[g] ||= {})[k] = +i.value; });
     try {
