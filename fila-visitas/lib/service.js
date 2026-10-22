@@ -287,6 +287,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         const resp = s[cargo.toLowerCase()];
         const k = `${seg}|${cargo}`;
         snapNovo[k] = { classe: s.classe, resp, ultima: s.ultima };
+        // A chave da fila é Vendedor + Classe. Cargos acima do vendedor só geram visita quando preenchidos, sem acusar pendência.
+        if (!resp && cargo !== 'Vendedor') continue;
         const motivo = [];
         if (!resp) motivo.push('sem responsável');
         if (!R.CLASSES.includes(s.classe)) motivo.push('classe não selecionada');

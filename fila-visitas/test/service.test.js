@@ -35,7 +35,8 @@ test('sem classe ou responsável vira pendência, não card incompleto', async (
   const { w, svc } = setup({ UF_CRM_MOT_CLASSE: '', UF_CRM_MOT_VENDEDOR: '' });
   const r = await svc.sincronizarEmpresa(1);
   assert.equal(cards(w).length, 0);
-  assert.ok(r.pendencias.length >= 5);
+  assert.ok(r.pendencias.length >= 1 && r.pendencias.some(p => /Vendedor: sem responsável e classe/.test(p)));
+  assert.ok(!r.pendencias.some(p => /Diretor: sem responsável/.test(p)), 'cargo acima do vendedor sem responsável não é pendência');
 });
 
 test('mudar classe recalcula a data; mudar responsável troca o dono', async () => {
