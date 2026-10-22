@@ -193,7 +193,7 @@ server.listen(PORT, () => {
     try {
       const { map } = await svc.campos(true);
       const nome = process.env.DIAG_EMPRESA;
-      const emp = (await bitrix.call('crm.company.list', { filter: { '%TITLE': nome }, select: ['ID', 'TITLE'] })).result || [];
+      const emp = (await bitrix.call('crm.company.list', { filter: /^\d+$/.test(nome) ? { ID: nome } : { '%TITLE': nome }, select: ['ID', 'TITLE'] })).result || [];
       console.log('diag-empresas', JSON.stringify(emp));
       console.log('diag-etapas', JSON.stringify(((await bitrix.call('crm.status.list', { filter: { ENTITY_ID: `DYNAMIC_1036_STAGE_${map.categoriaFila}` } })).result || []).map(s => `${s.STATUS_ID}=${s.NAME}/${s.SEMANTICS || '-'}`)));
       for (const e of emp.slice(0, 3)) {
