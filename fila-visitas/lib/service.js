@@ -464,7 +464,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const { map } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
-    if (!card.aberto) throw erro('Visita já finalizada não pode ser reagendada.', 409);
+    if (!card.aberto) throw erro('Visita já finalizada não pode ser alterada.', 409);
     if (!uid) throw erro('Usuário não identificado.', 401);
     if (!card.data) throw erro('O card não tem data programada.');
     const msg = R.validarReprogramacao({ atual: card.data, nova, motivo });
@@ -477,7 +477,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     store.addHistorico({ card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: motivo.trim(), autor: uid, autorNome: nome, responsavel: card.responsavel });
     try {
       await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila),
-        COMMENT: `Visita reagendada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
+        COMMENT: `Visita alterada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
     } catch (e) { store.log('aviso', `Comentário na linha do tempo do card ${card.id} falhou: ${e.message}`); }
     store.log('reprogramacao', `Card ${card.id}: ${R.fmtBR(card.data)} → ${R.fmtBR(nova)} por ${uid}: ${motivo.trim()}`, { card: card.id });
     return { ok: true, data: nova };
@@ -539,7 +539,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: it.id, fields: { [map.fila.data || 'closedate']: snap.data } });
       store.addBloqueio({ tipo: 'card-data', card: +it.id, tentou: atual, original: snap.data, responsavel: +it.assignedById });
       store.log('bloqueio', `Data programada do card ${it.id} revertida (tentativa: ${atual}, original: ${snap.data}). Use "Reprogramar visita".`, { card: +it.id });
-      await notificar(+it.assignedById, `A data programada de "${it.title}" só pode ser alterada pelo botão "Reagendar visita". A data foi restaurada.`);
+      await notificar(+it.assignedById, `A data programada de "${it.title}" só pode ser alterada pelo botão "Alterar visita". A data foi restaurada.`);
       rev++;
     }
     return rev;
