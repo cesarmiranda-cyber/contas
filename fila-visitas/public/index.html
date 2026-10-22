@@ -186,6 +186,8 @@ body.wide main{padding-top:12px}
 .filters.f6{grid-template-columns:2fr 1.2fr 1.2fr 1fr 1fr 1fr}
 @media(max-width:1000px){.filters.f6{grid-template-columns:1fr 1fr}}
 @media(max-width:700px){.pbi-top{padding:12px}.pbi-t b{font-size:17px}.kv{font-size:30px}}
+.filters,.filters.f5,.filters.f6{display:grid;grid-template-columns:minmax(220px,2fr) repeat(auto-fit,minmax(160px,1fr));gap:8px}
+@media(max-width:700px){.filters,.filters.f5,.filters.f6{grid-template-columns:1fr 1fr}.filters input{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -275,10 +277,10 @@ function lista() {
       <button class="stat ${foco === '' ? 'on' : ''}" data-f=""><i>Σ</i><div><b>${todas.length}</b><span>Total na fila</span></div></button>
     </div>
     ${verEquipe ? `<div class="info">${dados.visao === 'tudo' ? 'Você está vendo as visitas de <b>todos</b>.' : 'Você está vendo as visitas da <b>sua equipe</b>.'}${dados.bitrix ? ' Aplicadas também as suas permissões do Bitrix24.' : ''}</div>` : ''}
-    <div class="filters ${verEquipe ? 'f5' : ''} ${vends.length > 1 ? 'f6' : ''}">
+    <div class="filters ${verEquipe ? 'f5' : ''} ">
       <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
       ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(resps, F.resp)}</select>` : ''}
-      ${vends.length > 1 ? `<select id="fv"><option value="">Todos os vendedores</option>${opt(vends.map(s => [s, s]), F.vend)}</select>` : ''}
+      ${vends.length >= 1 ? `<select id="fv"><option value="">Todos os vendedores</option>${opt(vends.map(s => [s, s]), F.vend)}</select>` : ''}
       <select id="fs"><option value="">Todos os segmentos</option>${opt(segs.map(s => [s, s]), F.seg)}</select>
       ${todas.some(x => x.tipoEmpresa) ? `<select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>` : ''}
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
@@ -761,7 +763,7 @@ function dashDesenha() {
   const scrollY = window.scrollY;
   $('#main').innerHTML = `<div class="pbi">
     <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${new Date(d.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · <a href="#" id="s_r2">atualizar</a></span></div>
-      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${vends.length > 1 ? sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend) : ''}${sel('s_s', 'Segmento', [['', 'Todos'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
+      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${vends.length >= 1 ? sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend) : ''}${sel('s_s', 'Segmento', [['', 'Todos'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
     <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Reprogramações']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
     ${chips ? `<div class="chips-bar"><span>Filtros aplicados:</span>${chips}</div>` : '<div class="chips-bar dica">Dica: clique em qualquer barra, fatia, coluna ou indicador para filtrar a página e ver os registros abaixo.</div>'}
     <div class="pbi-cv">${pagina}</div>
