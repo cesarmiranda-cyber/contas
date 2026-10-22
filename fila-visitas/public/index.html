@@ -506,6 +506,8 @@ async function cfg(d) {
       <div id="alc" class="hint">Carregando departamentos…</div><button class="btn pri" id="sa" style="margin-top:10px">Salvar alçadas</button> <span class="hint" id="aout"></span></div>
     <h2>Tipo de empresa (Industrial / Marítimo)</h2><div class="panel"><p class="hint">O app descobre o tipo pelo <b>Setor</b> da empresa no Bitrix. Ajuste abaixo a que tipo pertence cada setor (a sugestão vem do nome). O filtro da tela usa esta tabela.</p>
       <div id="ram" class="hint">Carregando setores…</div><button class="btn pri" id="sr" style="margin-top:10px">Salvar tipos</button> <span class="hint" id="rout"></span></div>
+    <h2>Tempo real</h2><div class="panel"><p class="hint">Hoje o app confere as empresas alteradas a cada 30 segundos. Ativando os <b>eventos do Bitrix24</b>, a fila passa a nascer <b>na hora</b> em que a empresa é salva. Faça isso uma vez, abrindo o app pelo Bitrix24.</p>
+      <button class="btn pri" id="bev">Ativar eventos em tempo real</button><pre id="evout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Preparar o Bitrix</h2><div class="panel"><p class="hint">Cria o que falta: etapa <b>Atrasada</b> no kanban 1036, campos <b>Cargo</b> e <b>Data programada</b> na Fila e <b>Resultado</b>/<b>Acompanhamento</b> no Registro de Visita. Só cria o que ainda não existe.</p>
       <button class="btn pri" id="bp">Criar etapa e campos que faltam</button><pre id="pout" class="hint" style="white-space:pre-wrap"></pre></div>
     <h2>Acesso</h2><div class="panel"><p class="hint">Defina quem pode abrir as <b>Configurações</b> e quem pode ver o <b>Dashboard</b>. Lista vazia = todos. Administradores e quem acessa Configurações também veem o Dashboard. Com listas definidas, o app só libera quem estiver logado pelo Bitrix24.</p>
@@ -550,6 +552,11 @@ async function cfg(d) {
   $('#sa').onclick = async () => {
     const alcadas = {}; document.querySelectorAll('[data-al]').forEach(s => { if (!s.value) return; const [d, k] = s.dataset.al.split('.'); (alcadas[d] ||= {})[k] = +s.value; });
     try { await api('/api/config', { method: 'PUT', body: { alcadas } }); $('#aout').textContent = 'Alçadas salvas.'; } catch (e) { $('#aout').textContent = e.message; }
+  };
+  $('#bev').onclick = async () => {
+    $('#evout').textContent = 'Ativando…';
+    try { const r = await api('/api/eventos/ativar', { method: 'POST', body: {} }); $('#evout').textContent = r.eventos.map(e => (e.ok ? '✔ ' : '✖ ') + e.evento + (e.erro ? ' — ' + e.erro : '')).join('\n'); }
+    catch (e) { $('#evout').textContent = e.message; }
   };
   $('#bp').onclick = async () => {
     $('#pout').textContent = 'Criando…';

@@ -98,6 +98,20 @@ const routes = {
   'GET /api/campos': async (u, _, id) => { exigeConfig(id); exige(); return svc.campos(u.searchParams.get('refresh') === '1'); },
   'GET /api/duplicados': async (_, __, id) => { exigeConfig(id); exige(); const a = await D.analisar(bitrix); return { ...a, plano: D.planejar(a) }; },
   'POST /api/preparar': async (_, __, id) => { exigeConfig(id); exige(); if ((store.config.admins || []).length && !svc.isAdmin(id.uid)) throw Object.assign(new Error('Apenas administradores.'), { status: 403 }); const r = await P.preparar(bitrix, svc); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); return r; },
+  // Assina os eventos de empresa/itens do Bitrix para a fila nascer na hora (a conferência a cada 30 s continua como reserva).
+  'POST /api/eventos/ativar': async (_, __, id) => {
+    exigeConfig(id);
+    if (!process.env.SERVER_ID || !process.env.VIBE_APP_KEY) throw nega('Servidor sem SERVER_ID/VIBE_APP_KEY.', 500);
+    if (!id.bearer) throw nega('Abra o app pelo Bitrix24 (não pelo link direto) para ativar os eventos.', 400);
+    const caminho = '/events' + (EVENT_TOKEN ? `?token=${EVENT_TOKEN}` : '');
+    const out = [];
+    for (const ev of ['ONCRMCOMPANYADD', 'ONCRMCOMPANYUPDATE', 'ONCRMDYNAMICITEMADD', 'ONCRMDYNAMICITEMUPDATE']) {
+      const r = await request(`https://vibecode.bitrix24.com/v1/infra/servers/${process.env.SERVER_ID}/event-subscriptions`, { method: 'POST', headers: { 'X-Api-Key': process.env.VIBE_APP_KEY, Authorization: id.bearer, 'Content-Type': 'application/json' }, body: JSON.stringify({ event: ev, appPath: caminho }) });
+      out.push({ evento: ev, ok: r.ok, erro: r.ok ? undefined : (r.json?.error?.message || `HTTP ${r.status}`) });
+    }
+    store.log('config', `Eventos do Bitrix: ${out.map(o => `${o.evento}=${o.ok ? 'ok' : o.erro}`).join('; ')}`);
+    return { eventos: out };
+  },
   'POST /api/sincronizar': async (_, b, id) => { exigeConfig(id); exige(); return b.empresa ? svc.sincronizarEmpresa(+b.empresa, { forcar: !!b.forcar }) : svc.sincronizarTodas(); },
   'POST /api/job': async (_, b, id) => { exigeConfig(id); exige(); return svc.jobDiario({ forcar: !!b.forcar }); },
   'POST /api/varrer': async (_, __, id) => { exigeConfig(id); exige(); return svc.varrer(); },

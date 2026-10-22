@@ -460,3 +460,13 @@ test('visita não realizada no mês: card vira "Não realizada", a data não mud
   assert.equal(prox[0].ufCrm_data, '2026-06-19', 'próxima = programada (20/05) + 30 dias (classe A), no futuro');
   assert.equal((await svc2.encerrarNaoRealizadas()).marcadas, 0, 'idempotente');
 });
+
+test('empresa que já tem Última e Próxima Visita: a fila do Vendedor nasce na data da Próxima Visita', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_PROXIMA: '2026-06-15' });          // última = 20/04, próxima = 15/06
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  assert.equal(vend.ufCrm_data, '2026-06-15', 'usa a Próxima Visita do cadastro, não última + intervalo (20/05)');
+  const sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
+  assert.equal(sup.ufCrm_data, '2026-06-19', 'outros cargos seguem a regra de intervalo');
+  assert.equal(Object.keys(w.items[1032]).length, 0, 'nenhum registro de visita é criado');
+});

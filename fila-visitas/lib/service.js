@@ -295,13 +295,15 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         if (motivo.length) { res.pendencias.push(`${seg} · ${cargo}: ${motivo.join(' e ')}`); continue; }
         const chave = R.chaveFila(id, seg, cargo);
         const calc = R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
+        // Empresa que já tem Última e Próxima Visita: o card do Vendedor NASCE na data da Próxima Visita (sem partir de uma visita nova).
+        const dataNova = (cargo === 'Vendedor' && s.ultima && s.proxima) ? s.proxima : calc;
         const existente = abertos.get(chave);
         if (!existente) {
           const idx = store.chave(chave);
           if (idx) { // índice local aponta para card que já não está aberto: libera a chave
             store.setChave(chave, null);
           }
-          res.criados.push(await criarCard({ empresa: emp, seg, cargo, classe: s.classe, responsavel: resp, data: calc }));
+          res.criados.push(await criarCard({ empresa: emp, seg, cargo, classe: s.classe, responsavel: resp, data: dataNova }));
           continue;
         }
         store.setChave(chave, existente.id);
