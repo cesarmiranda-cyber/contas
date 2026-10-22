@@ -241,7 +241,7 @@ async function carrega() {
   m.innerHTML = '<div class="vazio">Carregando…</div>';
   try {
     if (aba === 'minhas') { dados = await api('/api/visitas?escopo=auto'); lista(); }
-    else if (aba === 'hist') hist(await api('/api/historico'));
+    else if (aba === 'hist') { const h = await api('/api/historico'); try { dados = await api('/api/visitas?escopo=auto'); } catch { dados = { visitas: [] }; } hist(h); }
     else if (aba === 'dash') await dashboard();
     else cfg(await api('/api/config'));
   } catch (e) { m.innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }
@@ -436,6 +436,7 @@ function hist(d) {
   const quems = [...new Set(todos.map(x => x.autorNome))].sort(), segs = [...new Set(todos.map(x => x.segmento))].filter(Boolean).sort();
   const barras = (lista, chave) => { const max = lista[0]?.[1] || 1; return lista.slice(0, 8).map(([k, v]) => `<button class="bar ${HF[chave] === k ? 'on' : ''}" data-hf="${chave}" data-v="${esc(k)}"><span class="bl">${esc(k)}</span><span class="bt"><i style="width:${Math.max(6, v / max * 100)}%"></i></span><b>${v}</b></button>`).join('') || '<div class="hint">Sem dados no período.</div>'; };
   const opt = (arr, cur) => arr.map(x => `<option value="${esc(x)}" ${cur === x ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  const abre = x => (dados && dados.visitas || []).some(v => v.id === x.card);
   const link = (x) => d.base ? `<div class="links" style="justify-content:flex-start;margin-top:4px">${x.empresaId ? `<a href="${d.base}/crm/company/details/${x.empresaId}/" target="_top">Abrir empresa</a>` : ''}<a href="${d.base}/crm/type/1036/details/${x.card}/" target="_top">Abrir card</a></div>` : '';
   $('#main').innerHTML = `
     <div class="filters hf"><select id="hm"><option value="">Todos os meses</option>${meses.map(m => `<option value="${m}" ${HF.mes === m ? 'selected' : ''}>${esc(mesNome(m))}</option>`).join('')}</select>
@@ -451,7 +452,9 @@ function hist(d) {
     <div class="two"><div class="panel"><h2>Por vendedor</h2>${barras(porAutor, 'quem')}</div><div class="panel"><h2>Por motivo</h2>${barras(porMotivo, 'motivo')}</div></div>
     ${porSeg.length > 1 ? `<div class="panel" style="margin-top:12px"><h2>Por segmento</h2>${barras(porSeg, 'seg')}</div>` : ''}
     <h2>Histórico <em>${h.length}</em></h2>
-    <div class="tw"><table><tr><th>Quando</th><th>Empresa</th><th>De → Para</th><th>Motivo</th><th>Quem</th></tr>${h.map(x => `<tr><td>${new Date(x.at).toLocaleString('pt-BR')}</td><td><b>${esc(x.empresa)}</b><div class="hint">${esc(x.segmento)} · ${esc(x.cargo)}</div>${link(x)}</td><td>${fmt(x.anterior)} → <b>${fmt(x.nova)}</b><div class="hint">${dias(x) > 0 ? '+' : ''}${dias(x)} dia(s)</div></td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td></tr>`).join('') || '<tr><td colspan=5 class="hint">Nenhuma reprogramação neste filtro.</td></tr>'}</table></div>`;
+    <div class="tw"><table><tr><th>Quando</th><th>Empresa</th><th>De → Para</th><th>Motivo</th><th>Quem</th><th>Ações</th></tr>${h.map(x => `<tr><td>${new Date(x.at).toLocaleString('pt-BR')}</td><td><b>${esc(x.empresa)}</b><div class="hint">${esc(x.segmento)} · ${esc(x.cargo)}</div>${link(x)}</td><td>${fmt(x.anterior)} → <b>${fmt(x.nova)}</b><div class="hint">${dias(x) > 0 ? '+' : ''}${dias(x)} dia(s)</div></td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td><td style="white-space:nowrap">${abre(x) ? `<button class="btn sm pri" data-reg="${x.card}">Registrar visita</button> <button class="btn sm" data-rep="${x.card}">Reprogramar</button>` : '<span class="hint">Visita já realizada</span>'}</td></tr>`).join('') || '<tr><td colspan=6 class="hint">Nenhuma reprogramação neste filtro.</td></tr>'}</table></div>`;
+  document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
+  document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reprogramar(+b.dataset.rep));
   $('#hm').onchange = e => { HF.mes = e.target.value; hist(d); };
   $('#hq').onchange = e => { HF.quem = e.target.value; hist(d); };
   $('#hs').onchange = e => { HF.seg = e.target.value; hist(d); };
@@ -714,7 +717,8 @@ function paginaFila() {
     { h: 'Responsável', txt: r => r.respNome }, { h: 'Programada', txt: r => (r.data || '').split('-').reverse().join('/'), ord: r => r.data || '' },
     { h: 'Situação', txt: r => SIT[r.situacao], html: r => pill(r.situacao), ord: r => SO[r.situacao] },
     { h: 'Prazo', txt: r => r.situacao === 'finalizado' ? '' : r.dias < 0 ? `${-r.dias} dia(s) de atraso` : r.dias === 0 ? 'Hoje' : `em ${r.dias} dia(s)`, ord: r => r.dias ?? 9e9 },
-    { h: 'Card', txt: () => 'Abrir', html: r => lk(urlC(r.id), 'Abrir card') }], 'fila-de-visitas')}`;
+    { h: 'Card', txt: () => 'Abrir', html: r => lk(urlC(r.id), 'Abrir card') },
+    { h: 'Ações', txt: () => '', html: r => r.situacao === 'finalizado' ? '<span class="hint">Realizada</span>' : `<button class="mini" data-reg="${r.id}">Registrar visita</button> <button class="mini" data-rep="${r.id}">Reprogramar</button>` }], 'fila-de-visitas')}`;
 }
 function paginaReg() {
   const F = dashFiltra(), v = F.visitas;
@@ -780,6 +784,9 @@ function dashDesenha() {
   const dq = $('#dq'); if (dq) dq.oninput = () => { DB.tab.q = dq.value; DB.tab.pg = 0; const p = dq.selectionStart; dashDesenha(); const n = $('#dq'); n.focus(); n.setSelectionRange(p, p); };
   const dx = $('#dx'); if (dx) dx.onclick = () => DB.exportar();
   document.querySelectorAll('[data-pn]').forEach(b => b.onclick = () => { DB.tab.pg += +b.dataset.pn; dashDesenha(); });
+  dados = { visitas: DB.dados.cards.filter(c => c.situacao !== 'finalizado') };
+  document.querySelectorAll('.pbi [data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
+  document.querySelectorAll('.pbi [data-rep]').forEach(b => b.onclick = () => reprogramar(+b.dataset.rep));
   window.scrollTo(0, scrollY);
 }
 
