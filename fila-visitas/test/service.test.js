@@ -377,3 +377,42 @@ test('etapa final com outro nome (Encerrado) e card aberto com visita registrada
   assert.equal(r.finalizados, 1); assert.equal(vend.stageId, w.stages.finalizado);
   assert.equal((await svc.reconciliarVisitas()).finalizados, 0, 'idempotente');
 });
+
+test('varredura e registro de visita ao mesmo tempo não criam o próximo card duas vezes', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await Promise.all([svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } }), svc.sincronizarEmpresa(1), svc.sincronizarEmpresa(1, { forcar: true })]);
+  const abertosVend = cards(w).filter(c => c.title.endsWith('| Vendedor') && c.stageId !== w.stages.finalizado);
+  assert.equal(abertosVend.length, 1);
+});
+
+test('cards duplicados criados pelo app são removidos, mantendo um por empresa+segmento+cargo', async () => {
+  const { w, svc, store } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const { id: _omit, ...campos } = vend;
+  const dup = (await w.call('crm.item.add', { entityTypeId: 1036, fields: campos })).result.item;
+  store.setCard(+dup.id, { ...store.card(vend.id) });             // duplicata criada pelo próprio app
+  assert.equal(cards(w).filter(c => c.title.endsWith('| Vendedor')).length, 2);
+  const r = await svc.sincronizarEmpresa(1);
+  assert.equal(r.removidos, 1);
+  assert.equal(cards(w).filter(c => c.title.endsWith('| Vendedor')).length, 1);
+});
+
+test('etapa final é "Encerrado"; cards em "Finalizado" (sucesso do Bitrix) não contam como abertos e migram para Encerrado', async () => {
+  const { w, svc } = setup();
+  const done = w.stageList.find(s => s.STATUS_ID === 'DT1036_1:DONE'); done.NAME = 'Finalizado'; done.SEMANTICS = 'S';
+  w.stageList.push({ STATUS_ID: 'DT1036_1:UC_ENC', NAME: 'Encerrado' }, { STATUS_ID: 'DT1036_1:FAIL', NAME: 'Removido', SEMANTICS: 'F' });
+  const d = await svc.campos(true);
+  assert.equal(d.map.etapas.finalizado, 'DT1036_1:UC_ENC');
+  assert.deepEqual(d.map.etapas.concluidas.sort(), ['DT1036_1:DONE', 'DT1036_1:UC_ENC']);
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const r = await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  assert.equal(vend.stageId, 'DT1036_1:UC_ENC', 'visita registrada move o card para Encerrado');
+  const antigo = cards(w).find(c => c.title.endsWith('| Supervisor')); antigo.stageId = 'DT1036_1:DONE';  // finalizado antes, na etapa de sucesso
+  assert.ok(!(await svc.listarVisitas({ uid: 30 })).visitas.some(v => v.id === antigo.id), 'não aparece como aberto');
+  const m = await svc.migrarFinalizadas();
+  assert.equal(m.movidos, 1); assert.equal(antigo.stageId, 'DT1036_1:UC_ENC');
+});

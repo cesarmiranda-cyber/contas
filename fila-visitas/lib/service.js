@@ -144,14 +144,14 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const { map } = await campos();
     const it = (await bitrix.call('crm.item.get', { entityTypeId: F.ETYPE.fila, id })).result?.item;
     if (!it) return null;
-    return { ...(await dadosCard(it)), aberto: it.stageId !== map.etapas.finalizado };
+    return { ...(await dadosCard(it)), aberto: !map.etapas.fechadas.includes(it.stageId) };
   }
   async function cardsAbertos() {
     const { map } = await campos();
     const out = [];
     let start = 0;
     for (;;) {
-      const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { '!stageId': map.etapas.finalizado }, select: ['*', 'uf*'], start });
+      const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { stageId: map.etapas.abertas }, select: ['*', 'uf*'], start });
       out.push(...(r.result?.items || []));
       if (r.next === undefined || r.next === null) break;
       start = r.next;
@@ -195,7 +195,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (data && data !== card.data) {
       f[map.fila.data || 'closedate'] = data;
       const st = map.etapas[R.etapaPara(data, hoje())];
-      if (st && card.stageId !== map.etapas.finalizado) f.stageId = st;
+      if (st && !map.etapas.fechadas.includes(card.stageId)) f.stageId = st;
     }
     if (classe && classe !== card.classe && map.fila.classe) f[map.fila.classe] = F.encode(meta, map.fila.classe, classe);
     if (!Object.keys(f).length) return false;
@@ -209,7 +209,17 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- sincronizar empresa (cria/atualiza os cards, sem duplicar) ----------
-  async function sincronizarEmpresa(id, { forcar = false } = {}) {
+  // Operações na mesma empresa nunca rodam ao mesmo tempo (varredura x registro de visita), senão nascem cards em duplicidade.
+  const travas = new Map();
+  function comTrava(chave, fn) {
+    const anterior = travas.get(chave) || Promise.resolve();
+    const atual = anterior.catch(() => {}).then(fn);
+    travas.set(chave, atual);
+    atual.catch(() => {}).finally(() => { if (travas.get(chave) === atual) travas.delete(chave); });
+    return atual;
+  }
+  const sincronizarEmpresa = (id, op) => comTrava(`empresa:${id}`, () => sincronizarEmpresaSemTrava(id, op));
+  async function sincronizarEmpresaSemTrava(id, { forcar = false } = {}) {
     const cfg = store.config;
     const emp = await lerEmpresa(id);
     if (!emp) return { empresa: id, erro: 'Empresa não encontrada' };
@@ -218,9 +228,20 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const snapAnt = store.snapEmpresa(id) || {};
     const snapNovo = {};
     const abertos = new Map();
+    const grupos = new Map();
     for (const it of await cardsAbertosDaEmpresa(id)) {
       const c = await dadosCard(it);
-      abertos.set(R.chaveFila(id, c.segmento, c.cargo), { ...c, stageId: it.stageId });
+      const k = R.chaveFila(id, c.segmento, c.cargo);
+      (grupos.get(k) || grupos.set(k, []).get(k)).push({ ...c, stageId: it.stageId });
+    }
+    for (const [k, lista] of grupos) {
+      lista.sort((a, b) => (store.chave(k) === b.id) - (store.chave(k) === a.id) || a.id - b.id); // fica o indexado, senão o mais antigo
+      abertos.set(k, lista[0]);
+      for (const extra of lista.slice(1)) {
+        if (!store.card(extra.id)) continue;      // só remove duplicatas criadas pelo próprio app
+        try { await bitrix.call('crm.item.delete', { entityTypeId: F.ETYPE.fila, id: extra.id }); store.log('card-duplicado', `Card ${extra.id} removido: duplicava o card ${lista[0].id} (${extra.titulo})`, { card: extra.id }); res.removidos = (res.removidos || 0) + 1; }
+        catch (e) { store.log('aviso', `Duplicata ${extra.id} não removida: ${e.message}`); }
+      }
     }
     for (const seg of R.SEGMENTOS) {
       const s = emp.segs[seg];
@@ -264,7 +285,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   async function cardsAbertosDaEmpresa(id) {
     const { map } = await campos();
-    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { companyId: id, '!stageId': map.etapas.finalizado }, select: ['*', 'uf*'] });
+    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { companyId: id, stageId: map.etapas.abertas }, select: ['*', 'uf*'] });
     return r.result?.items || [];
   }
   async function gravarProxima(emp, seg) {
@@ -366,7 +387,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   // ---------- registrar visita ----------
   // Depois de uma visita (registrada pelo app ou direto no Bitrix): finaliza o card, cria o próximo e atualiza o cadastro
   // da empresa (Última e Próxima Visita do segmento) — desde que o segmento tenha Vendedor e Classe preenchidos.
-  async function posVisita({ card, emp, dia, uid, visita, agora }) {
+  const posVisita = args => comTrava(`empresa:${args.card.empresaId}`, () => posVisitaSemTrava(args));
+  async function posVisitaSemTrava({ card, emp, dia, uid, visita, agora }) {
     const { map } = await campos();
     const passos = [];
     if (!map.etapas.finalizado) throw erro('Não encontrei a etapa final (Finalizado/Encerrado) do kanban da Fila. Confira as etapas em Configurações.', 500);
@@ -495,6 +517,16 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- guardas (edição direta é revertida) ----------
+  // Cards finalizados antes de a etapa final ser "Encerrado" ficaram na etapa de sucesso do Bitrix: move para a etapa final.
+  async function migrarFinalizadas() {
+    const { map } = await campos();
+    const outros = (map.etapas.concluidas || []).filter(x => x !== map.etapas.finalizado);
+    if (!map.etapas.finalizado || !outros.length) return { movidos: 0 };
+    let n = 0;
+    const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { stageId: outros }, select: ['id'] });
+    for (const it of r.result?.items || []) { await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: it.id, fields: { stageId: map.etapas.finalizado } }); store.log('card-finalizado', `Card ${it.id} movido para a etapa final`, { card: +it.id }); n++; }
+    return { movidos: n };
+  }
   // Qualquer card ainda aberto que tenha uma visita registrada (ID da Fila) deve estar finalizado.
   async function reconciliarVisitas() {
     const { map } = await campos();
@@ -595,6 +627,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     try {
       await campos();
       const guardas = { visitas: await guardarVisitas(), cards: await guardarCards(await cardsAbertos()) };
+      if (!store.job('migradoEncerrado')) { guardas.migradas = (await migrarFinalizadas()).movidos; store.setJob('migradoEncerrado', new Date().toISOString()); }
       if (!store.job('reconciliado') || Date.now() - Date.parse(store.job('reconciliado')) > 3600e3) { guardas.reconciliados = (await reconciliarVisitas()).finalizados; store.setJob('reconciliado', new Date().toISOString()); }
       // primeira varredura depois de ativar: não processa as 11 mil empresas de uma vez, só as alteradas daqui em diante
       const emp = store.lastSweep ? await sincronizarTodas({ desde: store.lastSweep }) : [];
@@ -698,7 +731,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     // fila: abertos + finalizados no período
     const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
     const abertos = (await cardsAbertos()).filter(it => !permCards || permCards.has(+it.id));
-    const fin = (await listar(F.ETYPE.fila, { stageId: map.etapas.finalizado, '>updatedTime': R.brIso(desde) }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id));
+    const fin = (await listar(F.ETYPE.fila, { stageId: map.etapas.concluidas, '>updatedTime': R.brIso(desde) }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id));
     const nomes = new Map();
     const nome = async id => { if (!nomes.has(id)) nomes.set(id, await nomeUsuario(id)); return nomes.get(id); };
     const tipos = new Map(), emps = new Map();
@@ -778,6 +811,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };
