@@ -327,3 +327,14 @@ test('permissões do Bitrix prevalecem: o que o Bitrix nega ao usuário some da 
   store.setConfig({ respeitarBitrix: false });
   assert.equal((await svc.listarVisitas({ uid: 30, bearer: 'sessao' })).visitas.length, 5, 'desligando a opção, vale só o app');
 });
+
+test('dashboard: cada linha traz o vendedor (inclusive de cards antigos, sem índice local)', async () => {
+  const { w, svc, store } = setup();
+  await svc.sincronizarEmpresa(1);
+  for (const c of cards(w)) store.setCard(c.id, { ...(store.card(c.id) || {}), equipe: undefined }); // simula card criado antes do índice
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const r = await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok' } });
+  const d = await svc.dashboardDados({ uid: 30 });
+  assert.ok(d.cards.length && d.cards.every(c => c.vendedor === 'Vera Vendedora'));
+  assert.equal(d.visitas[0].vendedor, 'Vera Vendedora');
+});

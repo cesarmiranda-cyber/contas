@@ -134,7 +134,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET') {
       const root = path.join(__dirname, 'public');
       const f = path.join(root, u.pathname === '/' ? 'index.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
-      if (f.startsWith(root) && fs.existsSync(f) && fs.statSync(f).isFile()) { res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' }); return fs.createReadStream(f).pipe(res); }
+      if (f.startsWith(root) && fs.existsSync(f) && fs.statSync(f).isFile()) { res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' }); return fs.createReadStream(f).pipe(res); }
     }
     send(res, 404, { error: 'não encontrado' });
   } catch (e) {

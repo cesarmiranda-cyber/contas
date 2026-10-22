@@ -643,12 +643,13 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const nomes = new Map();
     const nome = async id => { if (!nomes.has(id)) nomes.set(id, await nomeUsuario(id)); return nomes.get(id); };
     const tipos = new Map(), emps = new Map();
-    const tipoDe = async id => { if (!id) return ''; if (!tipos.has(id)) { let e = emps.get(id); if (e === undefined) { e = await lerEmpresa(id).catch(() => null); emps.set(id, e); } tipos.set(id, await tipoDaEmpresa(e)); } return tipos.get(id); };
+    const empDe = async id => { if (!id) return null; let e = emps.get(id); if (e === undefined) { e = await lerEmpresa(id).catch(() => null); emps.set(id, e); } return e; };
+    const tipoDe = async id => { if (!id) return ''; if (!tipos.has(id)) tipos.set(id, await tipoDaEmpresa(await empDe(id))); return tipos.get(id); };
     const cards = [];
     for (const [lista, finalizado] of [[abertos, false], [fin, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
       if (!visivelPor(d.responsavel, reg.equipe)) continue;
-      const vendId = (reg.equipe || {}).vendedor;
+      const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
       cards.push({ vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
         data: d.data, situacao: finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
