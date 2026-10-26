@@ -968,7 +968,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     // 4) ordenação e página
     const nomesResp = new Map(); for (const id of respIds) nomesResp.set(id, await nomeDe(id));
     const chaves = {
-      data: (a, b) => (RANK[a.situacao] - RANK[b.situacao]) || (a.c.data || '9').localeCompare(b.c.data || '9'),
+      data: (a, b) => (RANK[a.situacao] - RANK[b.situacao]) || (a.c.data || '9').localeCompare(b.c.data || '9') || a.c.empresa.localeCompare(b.c.empresa) || a.c.segmento.localeCompare(b.c.segmento),
       prazo: (a, b) => (a.c.data || '9').localeCompare(b.c.data || '9'),
       empresa: (a, b) => a.c.empresa.localeCompare(b.c.empresa), segmento: (a, b) => a.c.segmento.localeCompare(b.c.segmento), cargo: (a, b) => a.c.cargo.localeCompare(b.c.cargo),
       classe: (a, b) => String(a.c.classe).localeCompare(String(b.c.classe)), responsavel: (a, b) => String(nomesResp.get(+a.c.responsavel)).localeCompare(String(nomesResp.get(+b.c.responsavel))),
