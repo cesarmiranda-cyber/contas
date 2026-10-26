@@ -271,7 +271,7 @@ const VP = (() => { try { return { view: 'cards', ord: 'data', dir: 1, ...JSON.p
 const salvaVP = () => { try { localStorage.setItem('fv.vp', JSON.stringify({ view: VP.view, ord: VP.ord, dir: VP.dir })); } catch {} };
 try { Object.assign(F, JSON.parse(localStorage.getItem('fv.f') || '{}')); } catch {}
 const salvaF = () => { try { localStorage.setItem('fv.f', JSON.stringify({ seg: F.seg, tipo: F.tipo, classe: F.classe })); } catch {} };
-const VQ = { page: 1, size: (() => { try { return +localStorage.getItem('fv.size') || 20; } catch { return 20; } })() };
+const VQ = { page: 1, size: 20 };
 const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VQ.size, q: F.q || '', status: foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, ramo: F.ramo, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
 let reqVisitas = 0;
 async function carregaVisitas() {
@@ -347,7 +347,7 @@ function lista() {
   });
   document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); refaz(); });
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { VQ.page = +b.dataset.p; refaz(false); window.scrollTo({ top: 0, behavior: 'smooth' }); });
-  $('#psz') && ($('#psz').onchange = e => { VQ.size = +e.target.value; try { localStorage.setItem('fv.size', VQ.size); } catch {} refaz(); });
+  $('#psz') && ($('#psz').onchange = e => { VQ.size = +e.target.value; refaz(); });
   if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', ramo: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: '', de: '', ate: '' }); salvaF(); refaz(); };
   $('#vcsv').onclick = async () => {
     const todas = (await api('/api/visitas?' + consultaVisitas({ page: 1, size: 5000 }))).visitas;
