@@ -20,9 +20,9 @@ const svc = createService({ bitrix, store, acesso });
 const EVENT_TOKEN = process.env.EVENT_TOKEN || '';
 
 const send = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
-const readBody = req => new Promise((ok, no) => {
+const readBody = (req, limite = 1e6) => new Promise((ok, no) => {
   let b = '';
-  req.on('data', c => { b += c; if (b.length > 1e6) { no(new Error('payload grande')); req.destroy(); } });
+  req.on('data', c => { b += c; if (b.length > limite) { no(Object.assign(new Error('Arquivo grande demais: o total dos anexos não pode passar de 25 MB.'), { status: 413 })); req.destroy(); } });
   req.on('end', () => {
     try { ok(b ? ((req.headers['content-type'] || '').includes('json') ? JSON.parse(b) : Object.fromEntries(new URLSearchParams(b))) : {}); } catch (e) { no(e); }
   });
@@ -143,7 +143,7 @@ const server = http.createServer(async (req, res) => {
     let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar)$/);
     if (m && req.method === 'POST') {
       exige();
-      const id = await quem(req, u), b = await readBody(req);
+      const id = await quem(req, u), b = await readBody(req, m[2] === 'registrar' ? 36e6 : 1e6);
       if (!(await svc.podeVerCard(id.bearer, +m[1]))) throw nega('Você não tem permissão no Bitrix24 para este registro.');
       const uid = id.verificado ? id.uid : +(b.uid || id.uid) || null;
       return send(res, 200, m[2] === 'registrar' ? await svc.registrarVisita(+m[1], { ...b, uid }) : await svc.reprogramar(+m[1], { ...b, uid }));

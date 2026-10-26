@@ -384,7 +384,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- formulário de registro: todos os campos do SPA 1032 ----------
-  const TIPOS = { string: 'texto', char: 'texto', integer: 'numero', double: 'numero', money: 'numero', date: 'data', datetime: 'datahora', boolean: 'sim_nao', enumeration: 'lista', employee: 'usuario', url: 'texto', address: 'texto' };
+  const TIPOS = { file: 'arquivo', string: 'texto', char: 'texto', integer: 'numero', double: 'numero', money: 'numero', date: 'data', datetime: 'datahora', boolean: 'sim_nao', enumeration: 'lista', employee: 'usuario', url: 'texto', address: 'texto' };
   async function camposVisita(cardId) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
@@ -475,6 +475,18 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return { proximo, novaData, passos };
   }
 
+  // Anexos vindos da tela: [{ nome, base64 }] -> formato de arquivo do Bitrix ({ fileData: [nome, base64] }). Limites: 10 MB por arquivo.
+  const MAX_ANEXO = 10 * 1024 * 1024;
+  function arquivosParaBitrix(val, titulo) {
+    const lista = (Array.isArray(val) ? val : [val]).filter(a => a && a.base64);
+    return lista.map(a => {
+      const nome = String(a.nome || 'anexo').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120) || 'anexo';
+      const b64 = String(a.base64).replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) throw erro(`O arquivo "${nome}" (${titulo}) não está num formato válido.`, 422);
+      if (b64.length * 0.75 > MAX_ANEXO) throw erro(`O arquivo "${nome}" passa de 10 MB. Anexe um arquivo menor.`, 413);
+      return { fileData: [nome, b64] };
+    });
+  }
   async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, campos: extra = {} }) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
@@ -487,7 +499,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (dhKey && dados[dhKey] && !dataHora) dataHora = dados[dhKey];
     if (resultado && map.visita.resultado && !dados[map.visita.resultado]) dados[map.visita.resultado] = resultado;
     if (acompanhamento && map.visita.acompanhamento && !dados[map.visita.acompanhamento]) dados[map.visita.acompanhamento] = acompanhamento;
-    const vazio = x => x === undefined || x === null || String(x).trim() === '' || (Array.isArray(x) && !x.length);
+    const vazio = x => x === undefined || x === null || (Array.isArray(x) ? !x.length : String(typeof x === 'object' ? (x.base64 || '') : x).trim() === '');
     const faltam = form.campos.filter(c => c.obrigatorio && !c.travado && c.key !== dhKey && vazio(dados[c.key])).map(c => c.titulo);
     if (!map.visita.resultado && String(resultado || '').trim().length < 3 && !form.campos.some(c => c.obrigatorio)) faltam.push('Resultado / observações');
     if (faltam.length) throw erro(`Preencha: ${faltam.join(', ')}.`, 422);
@@ -505,6 +517,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     for (const [k, val] of Object.entries(dados)) {
       const c = permitidos.get(k);
       if (!c || vazio(val)) continue;
+      if (c.tipo === 'arquivo') { const arq = arquivosParaBitrix(val, c.titulo); if (arq.length) f[k] = c.multiplo ? arq : arq[0]; continue; }
       f[k] = c.tipo === 'sim_nao' ? (val === true || val === 'Y' || val === 'true' ? 'Y' : 'N') : c.tipo === 'numero' ? Number(val) : val;
     }
     for (const c of form.campos) if (c.travado && !vazio(c.valor)) f[c.key] = c.valor; // campos automáticos (ex.: Alçada)
@@ -522,6 +535,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const pos = await posVisita({ card, emp, dia, uid, visita: v, agora });
     passos.push(...pos.passos);
     const proximo = pos.proximo, novaData = pos.novaData;
+    const nAnexos = Object.entries(f).filter(([k]) => permitidos.get(k)?.tipo === 'arquivo').reduce((a, [, x]) => a + (Array.isArray(x) ? x.length : 1), 0);
+    if (nAnexos) passos.push(`${nAnexos} anexo(s) salvo(s) no registro`);
     store.log('visita', `Visita ${v.id} registrada por ${uid} no card ${card.id} (antecipada: ${ant ? 'sim' : 'não'}): ${passos.join(', ')}`, { card: card.id, visita: +v.id });
     return { visita: +v.id, antecipada: ant, proximoCard: proximo, proximaData: novaData, passos };
   }

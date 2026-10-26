@@ -527,3 +527,30 @@ test('segmento do cadastro da empresa (Setor): filtro na lista paginada e nome n
   const d = await svc.dashboardDados({ uid: 30 });
   assert.ok(d.cards.every(c => c.ramo === 'Atrasada' || c.ramo === 'Dia da Visita'));
 });
+
+test('anexo no registro da visita: campo de arquivo aparece no formulário e o arquivo é salvo no SPA', async () => {
+  const { w, svc } = setup();
+  w.extraFields = { 1032: { ufCrm_anexo: { title: 'Anexo', type: 'file', isMultiple: true } } };
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const f = await svc.camposVisita(vend.id);
+  const anx = f.campos.find(c => c.key === 'ufCrm_anexo');
+  assert.equal(anx.tipo, 'arquivo'); assert.equal(anx.multiplo, true);
+  const r = await svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok', ufCrm_anexo: [{ nome: 'relatorio:visita.pdf', base64: 'data:application/pdf;base64,JVBERi0xLjQK' }, { nome: 'foto.png', base64: 'iVBORw0KGgo=' }] } });
+  const salvo = w.items[1032][r.visita].ufCrm_anexo;
+  assert.equal(salvo.length, 2);
+  assert.deepEqual(salvo[0], { fileData: ['relatorio_visita.pdf', 'JVBERi0xLjQK'] }, 'nome higienizado e prefixo data: removido');
+  assert.ok(r.passos.some(p => /2 anexo\(s\)/.test(p)));
+});
+
+test('anexo inválido ou maior que 10 MB é recusado antes de criar a visita', async () => {
+  const { w, svc } = setup();
+  w.extraFields = { 1032: { ufCrm_anexo: { title: 'Anexo', type: 'file' } } };
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await assert.rejects(svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok', ufCrm_anexo: [{ nome: 'x.pdf', base64: '%%%não-é-base64%%%' }] } }), /formato válido/);
+  const grande = 'A'.repeat(Math.ceil(11 * 1024 * 1024 / 0.75));
+  await assert.rejects(svc.registrarVisita(vend.id, { uid: 10, campos: { ufCrm_res: 'Ok', ufCrm_anexo: [{ nome: 'grande.bin', base64: grande }] } }), /passa de 10 MB/);
+  assert.equal(Object.keys(w.items[1032]).length, 0, 'nenhum registro foi criado');
+  assert.equal(vend.stageId !== w.stages.finalizado, true, 'card continua aberto');
+});

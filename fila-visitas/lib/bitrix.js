@@ -19,7 +19,7 @@ function createBitrix(webhook) {
     if (!root) throw new Error('Webhook do Bitrix24 não configurado');
     const body = new URLSearchParams(flatten(params, '', []));
     const r = await request(`${root}/${method}.json`, {
-      method: 'POST',
+      method: 'POST', timeout: 120000,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
     });

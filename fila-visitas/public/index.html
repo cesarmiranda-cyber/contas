@@ -204,6 +204,9 @@ body.wide main{padding-top:12px}
 .pg-b{display:flex;gap:4px;flex-wrap:wrap}.pg-b button{min-width:36px;height:36px;border:1px solid var(--line);background:var(--sf);border-radius:8px;cursor:pointer;font-weight:600;color:var(--ink2);padding:0 10px}.pg-b button:hover:not(:disabled){border-color:var(--brand);color:var(--brand)}.pg-b button.on{background:var(--brand);border-color:var(--brand);color:#fff}.pg-b button:disabled{opacity:.4;cursor:default}
 #main.carregando{opacity:.55;pointer-events:none;transition:opacity .15s}
 .tag.emp{background:#ede9fe;border-color:transparent;color:#6d28d9}
+
+.drop{display:flex;align-items:center;justify-content:center;gap:8px;border:2px dashed var(--line);border-radius:12px;padding:16px;cursor:pointer;font-weight:600;color:var(--ink2);background:var(--sf2);transition:.15s}.drop:hover{border-color:var(--brand);color:var(--brand);background:var(--brandbg)}.drop input{display:none}.drop small{font-weight:400;color:var(--mut)}
+.anx-l{display:grid;gap:6px;margin-top:8px}.anx-i{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);background:var(--sf);border-radius:8px;padding:7px 10px;font-size:13px}.anx-i small{color:var(--mut);margin-left:6px}.anx-i button{border:0;background:none;cursor:pointer;color:var(--red);font-size:15px;padding:2px 6px}
 </style>
 </head>
 <body>
@@ -381,10 +384,36 @@ const GRUPOS = [
   ['Conversa com o cliente', /fato|dado|interess|sentiment|valor|perfil|necessid|dor|problema/i],
   ['Equipamentos', /motor|popula|regime|equipament|frota|embarca|gerador|hora/i],
   ['Oportunidades e próximos passos', /oportunid|mapeament|acompanh|pr[oó]xim|retorno|proposta|negoci/i],
+  ['Anexos', /anexo|arquivo|documento|foto|imagem/i],
 ];
 const LONGO = /fato|interess|sentiment|valor|mapeament|observ|resultado|descri|conclus|motivo|acompanh|necessid|problema|coment/i;
 const grupoDe = c => (GRUPOS.find(([, re]) => re.test(c.titulo)) || ['Outras informações'])[0];
 const legivel = c => c.tipo === 'sim_nao' ? (c.valor === 'Y' ? 'Sim' : c.valor === 'N' ? 'Não' : '') : c.tipo === 'lista' ? [].concat(c.valor || []).map(v => (c.itens.find(i => i.id === String(v)) || {}).nome || '').filter(Boolean).join(', ') : String(c.valor || '');
+const ANEXOS = {};                       // chave do campo -> [{ nome, base64, tamanho }]
+const MAX_ARQ = 10 * 1024 * 1024, MAX_TOTAL = 25 * 1024 * 1024;
+const kb = n => n > 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+function desenhaAnexos(el) {
+  const k = el.dataset.anx, lista = ANEXOS[k] || [];
+  el.querySelector('.anx-l').innerHTML = lista.map((a, i) => `<div class="anx-i"><span>📄 ${esc(a.nome)} <small>${kb(a.tamanho)}</small></span><button type="button" data-rm="${i}" title="Remover">✕</button></div>`).join('');
+  el.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { lista.splice(+b.dataset.rm, 1); desenhaAnexos(el); });
+}
+function ligaAnexos() {
+  document.querySelectorAll('#sheet [data-anx]').forEach(el => {
+    const k = el.dataset.anx, mult = el.dataset.mult === '1'; ANEXOS[k] = [];
+    el.querySelector('input[type=file]').onchange = async e => {
+      const er = $('#er'); er.classList.remove('on');
+      for (const f of [...e.target.files]) {
+        const total = Object.values(ANEXOS).flat().reduce((a, x) => a + x.tamanho, 0);
+        if (f.size > MAX_ARQ) { er.textContent = `"${f.name}" passa de 10 MB. Anexe um arquivo menor.`; er.classList.add('on'); continue; }
+        if (total + f.size > MAX_TOTAL) { er.textContent = 'O total dos anexos não pode passar de 25 MB.'; er.classList.add('on'); continue; }
+        const base64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = no; r.readAsDataURL(f); });
+        if (!mult) ANEXOS[k] = [];
+        ANEXOS[k].push({ nome: f.name, base64, tamanho: f.size });
+      }
+      e.target.value = ''; desenhaAnexos(el);
+    };
+  });
+}
 function campoHTML(c) {
   const id = 'f_' + c.key, req = c.obrigatorio ? ' <i>*</i>' : '';
   let ctl;
@@ -397,11 +426,13 @@ function campoHTML(c) {
     ? `<div class="checks" id="${id}">${c.itens.map(i => `<label><input type="checkbox" value="${esc(i.id)}"> ${esc(i.nome)}</label>`).join('')}</div>`
     : (c.itens.length <= 4 ? `<div class="radios" id="${id}">${c.itens.map(i => `<label><input type="radio" name="${id}" value="${esc(i.id)}" ${String(c.valor) === i.id ? 'checked' : ''}> ${esc(i.nome)}</label>`).join('')}</div>`
       : `<select id="${id}"><option value="">Selecione…</option>${c.itens.map(i => `<option value="${esc(i.id)}" ${String(c.valor) === i.id ? 'selected' : ''}>${esc(i.nome)}</option>`).join('')}</select>`);
+  else if (c.tipo === 'arquivo') ctl = `<div class="anx" id="${id}" data-anx="${esc(c.key)}" data-mult="${c.multiplo ? 1 : 0}"><label class="drop"><input type="file" ${c.multiplo ? 'multiple' : ''}><span>📎 ${c.multiplo ? 'Anexar arquivos' : 'Anexar arquivo'} <small>(até 10 MB cada)</small></span></label><div class="anx-l"></div></div>`;
   else if (c.tipo === 'usuario') ctl = `<select id="${id}"><option value="">Selecione…</option>${users.map(x => `<option value="${x.id}" ${String(c.valor) === String(x.id) ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select>`;
-  const largo = (c.tipo === 'texto' && c.destaque) || /mapeament|observ|resultado|acompanh/i.test(c.titulo) || (c.tipo === 'lista' && (c.multiplo || c.itens.length <= 4));
+  const largo = c.tipo === 'arquivo' || (c.tipo === 'texto' && c.destaque) || /mapeament|observ|resultado|acompanh/i.test(c.titulo) || (c.tipo === 'lista' && (c.multiplo || c.itens.length <= 4));
   return `<div class="fld ${largo ? 'wide' : ''}"><label for="${id}">${esc(c.titulo)}${req}</label>${ctl}</div>`;
 }
 function lerCampo(c) {
+  if (c.tipo === 'arquivo') return ANEXOS[c.key] || [];
   if (c.travado) return undefined;
   const el = document.getElementById('f_' + c.key);
   if (!el) return undefined;
@@ -413,6 +444,7 @@ function lerCampo(c) {
   return el.value;
 }
 async function registrar(id) {
+  for (const k of Object.keys(ANEXOS)) delete ANEXOS[k];
   modal('<div class="sh-b"><div class="vazio">Carregando formulário…</div></div>');
   let form;
   try { form = await api(`/api/cards/${id}/form`); } catch (e) { modal(`<div class="sh-b"><div class="err on">${esc(e.message)}</div></div><div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button></div>`); return; }
@@ -431,15 +463,17 @@ async function registrar(id) {
       ${form.resultadoKey ? '' : `<div class="sec"><h4>Resultado</h4><div class="fld wide"><label>Resultado / observações <i>*</i></label><textarea id="f_resultado" rows="4" placeholder="O que foi tratado com o cliente?"></textarea></div></div>`}
       <div class="err" id="er"></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri" id="ok">Salvar visita</button></div>`);
+  ligaAnexos();
   document.querySelectorAll('#sheet textarea').forEach(t => { const ajusta = () => { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, 220) + 'px'; }; t.addEventListener('input', ajusta); ajusta(); });
   $('#ok').onclick = async () => {
     $('#ok').disabled = true; $('#er').classList.remove('on');
+    const temAnexo = Object.values(ANEXOS).some(l => l.length); if (temAnexo) $('#ok').textContent = 'Enviando anexos…';
     const campos = {};
     for (const f of form.campos) { const v = lerCampo(f); if (v !== undefined) campos[f.key] = v; }
     try {
       const r = await api(`/api/cards/${id}/registrar`, { method: 'POST', body: { campos, resultado: document.getElementById('f_resultado')?.value || '', dataHora: form.dataHoraKey ? campos[form.dataHoraKey] : undefined } });
       modal(`<div class="sh-b"><div class="ok">Visita registrada${r.antecipada ? ' (antecipada)' : ''}.${r.proximaData ? ` Próxima visita: ${fmt(r.proximaData)}.` : ''}</div></div><div class="sh-f"><button class="btn pri" onclick="fecha();carrega()">Fechar</button></div>`);
-    } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; $('#er').scrollIntoView({ block: 'nearest' }); }
+    } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; $('#ok').textContent = 'Salvar visita'; $('#er').scrollIntoView({ block: 'nearest' }); }
   };
 }
 function reagendarVisita(id) {
