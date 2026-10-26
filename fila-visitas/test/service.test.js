@@ -599,3 +599,14 @@ test('reconciliação de cadastros: empresa com Vendedor e Classe sem card (edi�
   assert.ok(cards(w).some(c => c.title.startsWith('Acme') && c.title.endsWith('| Vendedor')));
   assert.equal((await svc.reconciliarCadastros()).candidatas, 0, 'idempotente: quem já tem card não volta');
 });
+
+test('lista: Responsável vem do campo da empresa (cargo) e o colaborador do campo enxerga o card', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
+  sup.assignedById = 99;                                           // responsável do Bitrix diferente do campo da empresa
+  const r = await svc.listarVisitasPag({ uid: 10, escopo: 'auto', status: 'todas', page: 1 });
+  const v = r.visitas.find(x => x.id === sup.id);
+  assert.ok(v, 'quem está no campo da empresa vê a visita');
+  assert.equal(v.responsavel, 10, 'responsável = Supervisor Responsável do cadastro');
+});

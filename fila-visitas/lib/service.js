@@ -177,6 +177,17 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   // ---------- cache curto (deixa as telas rápidas); qualquer escrita limpa ----------
   const memoria = new Map();
   const memo = async (chave, ttl, fn) => { const c = memoria.get(chave); if (c && Date.now() - c.em < ttl) return c.v; const v = await fn(); memoria.set(chave, { em: Date.now(), v }); return v; };
+  // Mostra o último resultado na hora e atualiza em segundo plano quando passou do prazo (a tela não espera o Bitrix).
+  const atualizando = new Set();
+  const memoSWR = async (chave, ttl, fn) => {
+    const c = memoria.get(chave);
+    if (!c) return memo(chave, ttl, fn);
+    if (Date.now() - c.em >= ttl && !atualizando.has(chave)) {
+      atualizando.add(chave);
+      fn().then(v => { if (memoria.get(chave) === c) memoria.set(chave, { em: Date.now(), v }); }).catch(() => {}).finally(() => atualizando.delete(chave));
+    }
+    return c.v;
+  };
   const invalida = () => memoria.clear();
   const empresaCurta = id => memo(`emp:${id}`, 120e3, () => lerEmpresa(id).catch(() => null));
 
@@ -188,17 +199,32 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (!it) return null;
     return { ...(await dadosCard(it)), aberto: !map.etapas.fechadas.includes(it.stageId) };
   }
-  async function cardsAbertos() {
-    const { map } = await campos();
-    const out = [];
-    let start = 0;
+  // Lista todos os itens de um filtro: busca a primeira página, e as demais em paralelo (o Bitrix devolve 50 por vez).
+  async function listarItens(params) {
+    const r0 = await bitrix.call('crm.item.list', { ...params, start: 0 });
+    const out = [...(r0.result?.items || [])];
+    if (r0.next === undefined || r0.next === null) return out;
+    const total = +r0.total || 0;
+    if (total > out.length) {
+      const inicios = []; for (let s = +r0.next; s < total; s += 50) inicios.push(s);
+      const paginas = new Array(inicios.length);
+      let i = 0;
+      await Promise.all(Array.from({ length: 5 }, async () => { for (;;) { const k = i++; if (k >= inicios.length) return; paginas[k] = (await bitrix.call('crm.item.list', { ...params, start: inicios[k] })).result?.items || []; } }));
+      for (const p of paginas) out.push(...p);
+      return out;
+    }
+    let start = r0.next;                                   // sem total confiável: segue sequencial
     for (;;) {
-      const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { stageId: map.etapas.abertas }, select: ['*', 'uf*'], start });
+      const r = await bitrix.call('crm.item.list', { ...params, start });
       out.push(...(r.result?.items || []));
       if (r.next === undefined || r.next === null) break;
       start = r.next;
     }
     return out;
+  }
+  async function cardsAbertos() {
+    const { map } = await campos();
+    return listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: map.etapas.abertas }, select: ['*', 'uf*'] });
   }
   const dadosCard = async (it) => {
     const { map, meta } = await campos();
@@ -770,6 +796,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       let job = null;
       if (R.hourBR(clock()) >= store.config.horaJob) job = await jobDiario();
       store.setLastSweep(inicio);
+      try { const { map } = await campos(); await memo('cards-abertos', 0, () => cardsAbertos()); await memo('cards-fechados', 0, () => listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: [...(map.etapas.concluidas || []), map.etapas.naoRealizada].filter(Boolean), '>updatedTime': R.brIso(new Date(Date.now() - 120 * 864e5)) }, select: ['*', 'uf*'] })); } catch { /* o próximo ciclo tenta de novo */ }
       const resumo = emp.filter(e => (e.criados && e.criados.length) || (e.atualizados && e.atualizados.length) || e.erro).map(e => ({ empresa: e.empresa, criados: (e.criados || []).length, atualizados: (e.atualizados || []).length, pendencias: (e.pendencias || []).slice(0, 4), erro: e.erro }));
       return { guardas, empresas: emp.length, job, resumo };
     } finally { rodando = false; }
@@ -870,36 +897,32 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const permitidos = await permitidosBitrix(bearer, F.ETYPE.fila);
     const todos = escopo === 'todas' || (escopo === 'auto' && await enxergaTudo(uid));
     const time = escopo === 'auto' && !todos ? await memo(`equipe:${uid}`, 60e3, () => equipeDe(uid)) : new Set([+uid]);
-    const abertosL = await memo('cards-abertos', 15e3, () => cardsAbertos());
-    const fechadosL = await memo('cards-fechados', 60e3, async () => {
+    const abertosL = await memoSWR('cards-abertos', 15e3, () => cardsAbertos());
+    const fechadosL = await memoSWR('cards-fechados', 60e3, () => {
       const desde = R.brIso(new Date(Date.now() - 120 * 864e5));
       const etapas = [...(map.etapas.concluidas || []), map.etapas.naoRealizada].filter(Boolean);
-      const out = []; let start = 0;
-      for (;;) {
-        const r = await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.fila, filter: { stageId: etapas, '>updatedTime': desde }, select: ['*', 'uf*'], start });
-        out.push(...(r.result?.items || []));
-        if (r.next === undefined || r.next === null) break;
-        start = r.next;
-      }
-      return out;
+      return listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: etapas, '>updatedTime': desde }, select: ['*', 'uf*'] });
     });
     const h = hoje();
     // 1) linhas leves + visibilidade
     const leves = [];
+    // índice de equipe (campos da empresa) por card: o que vale é quem está no cadastro da empresa, não o responsável do Bitrix
+    const semEquipe = [...new Set([...abertosL, ...fechadosL].filter(it => !(store.card(it.id) || {}).equipe && it.companyId).map(it => +it.companyId))];
+    if (semEquipe.length) await Promise.all(semEquipe.slice(0, 40).map(id => empresaCurta(id)));
     for (const [lista, fechado] of [[abertosL, false], [fechadosL, true]]) for (const it of lista) {
       if (permitidos && !permitidos.has(+it.id)) continue;
       const c = await dadosCard(it), reg = store.card(it.id) || {};
+      let eq = reg.equipe;
+      if (!eq) { const e = await empresaCurta(c.empresaId); eq = e ? equipeIds(e.segs?.[c.segmento]) : null; }
+      const doCampo = eq && eq[String(c.cargo || '').toLowerCase()];
+      if (doCampo) c.responsavel = +doCampo;
       const propria = +c.responsavel === +uid;
       if (!todos && !propria) {
         if (escopo === 'minhas') continue;
-        if (escopo === 'auto' && !time.has(+c.responsavel)) {
-          let eq = reg.equipe;
-          if (!eq) { const e = await empresaCurta(c.empresaId); eq = equipeIds(e?.segs?.[c.segmento]); }
-          if (!Object.values(eq || {}).map(Number).includes(+uid)) continue;
-        }
+        if (escopo === 'auto' && !time.has(+c.responsavel) && !Object.values(eq || {}).map(Number).includes(+uid)) continue;
       }
       const situacao = fechado ? (it.stageId === map.etapas.naoRealizada ? 'naorealizada' : 'finalizado') : R.etapaPara(c.data, h);
-      leves.push({ it, c, reg, fechado, situacao, vendId: (reg.equipe || {}).vendedor || null });
+      leves.push({ it, c, reg, fechado, situacao, vendId: (eq || {}).vendedor || null });
     }
     // 2) contadores e opções (sobre tudo o que o usuário pode ver)
     const counts = { abertas: 0, atrasada: 0, dia: 0, aguardando: 0, finalizado: 0, naorealizada: 0 };
