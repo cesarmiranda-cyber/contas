@@ -620,6 +620,38 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     }
     return { marcadas };
   }
+  // Rede de segurança: acha empresas com Vendedor preenchido que ainda não têm card aberto no segmento (edição perdida, carga em massa)
+  // e gera a fila delas. Não depende da data de alteração do cadastro. Reprocessa cada empresa no máximo a cada 6 h.
+  async function reconciliarCadastros({ limite = 60 } = {}) {
+    const { map } = await campos();
+    const doSeg = {};                                  // segmento -> Set(id de empresa com Vendedor)
+    for (const seg of R.SEGMENTOS) {
+      const set = (doSeg[seg] = new Set());
+      const m = map.empresa[seg] || {};
+      for (const key of [m.vendedor, ...(((map.alt || {})[seg] || {}).vendedor || [])].filter(Boolean)) {
+        let start = 0;
+        for (;;) {
+          const r = await bitrix.call('crm.company.list', { filter: { ['!' + key]: '' }, select: ['ID'], start });
+          for (const c of r.result || []) set.add(+c.ID);
+          if (r.next === undefined || r.next === null) break;
+          start = r.next;
+        }
+      }
+    }
+    const comCard = new Set();                         // "empresa|segmento" com card aberto
+    for (const it of await cardsAbertos()) { const c = await dadosCard(it); comCard.add(`${c.empresaId}|${R.norm(c.segmento)}`); }
+    const agora = Date.now(), vistos = store.job('recheck') || {};
+    const faltam = new Set();
+    for (const seg of R.SEGMENTOS) for (const id of doSeg[seg]) if (!comCard.has(`${id}|${R.norm(seg)}`) && agora - Date.parse(vistos[id] || 0) > 6 * 3600e3) faltam.add(id);
+    const res = { candidatas: faltam.size, processadas: 0, criados: 0 };
+    for (const id of [...faltam].slice(0, limite)) {
+      try { const r = await sincronizarEmpresa(id); res.criados += (r.criados || []).length; } catch (e) { store.log('erro', `Reconciliação da empresa ${id}: ${e.message}`); }
+      vistos[id] = new Date().toISOString(); res.processadas++;
+    }
+    store.setJob('recheck', vistos);
+    if (res.criados) store.log('reconciliacao', `Reconciliação de cadastros: ${res.criados} card(s) criado(s) em ${res.processadas} empresa(s)`);
+    return res;
+  }
   // Cards finalizados antes de a etapa final ser "Encerrado" ficaram na etapa de sucesso do Bitrix: move para a etapa final.
   async function migrarFinalizadas() {
     const { map } = await campos();
@@ -730,6 +762,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     try {
       await campos();
       const guardas = { visitas: await guardarVisitas(), cards: await guardarCards(await cardsAbertos()) };
+      if (!store.job('cadastros') || Date.now() - Date.parse(store.job('cadastros')) > 3600e3) { guardas.cadastros = await reconciliarCadastros(); store.setJob('cadastros', new Date().toISOString()); }
       if (!store.job('migradoEncerrado')) { guardas.migradas = (await migrarFinalizadas()).movidos; store.setJob('migradoEncerrado', new Date().toISOString()); }
       if (!store.job('reconciliado') || Date.now() - Date.parse(store.job('reconciliado')) > 3600e3) { guardas.reconciliados = (await reconciliarVisitas()).finalizados; store.setJob('reconciliado', new Date().toISOString()); }
       // primeira varredura depois de ativar: não processa as 11 mil empresas de uma vez, só as alteradas daqui em diante
@@ -1047,6 +1080,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

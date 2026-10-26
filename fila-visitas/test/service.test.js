@@ -588,3 +588,14 @@ test('primeira visita criada com a regra antiga (data futura, sem Última Visita
   await svc.sincronizarEmpresa(1);
   assert.equal(vend.ufCrm_data, '2026-05-28', 'data escolhida pelo vendedor é respeitada');
 });
+
+test('reconciliação de cadastros: empresa com Vendedor e Classe sem card (edição perdida) ganha a fila sem depender da data de alteração', async () => {
+  const { w, svc } = setup();                                      // empresa 1 nunca foi sincronizada
+  w.empresa(2, 'Beta Ltda', { UF_CRM_PEÇ_CLASSE: '2', UF_CRM_PEÇ_VENDEDOR: '10', UF_CRM_PEÇ_ULTIMA: '2026-04-01' });
+  assert.equal(cards(w).length, 0);
+  const r = await svc.reconciliarCadastros();
+  assert.equal(r.candidatas, 2); assert.equal(r.processadas, 2); assert.ok(r.criados >= 6);
+  assert.ok(cards(w).some(c => c.title.startsWith('Beta') && c.title.endsWith('| Vendedor')));
+  assert.ok(cards(w).some(c => c.title.startsWith('Acme') && c.title.endsWith('| Vendedor')));
+  assert.equal((await svc.reconciliarCadastros()).candidatas, 0, 'idempotente: quem já tem card não volta');
+});

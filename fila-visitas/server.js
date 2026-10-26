@@ -274,6 +274,15 @@ server.listen(PORT, () => {
       }
     } catch (e) { console.error('prox:', e.message); }
   }, 2000);
+  if (bitrix.enabled && process.env.DIAG_FILTRO) setTimeout(async () => {
+    try {
+      const k = process.env.DIAG_FILTRO;
+      for (const [nome, filtro] of [['!vazio', { ['!' + k]: '' }], ['>0', { ['>' + k]: 0 }], ['!=false', { ['!=' + k]: false }], ['!null', { ['!' + k]: false }]]) {
+        try { const r = await bitrix.call('crm.company.list', { filter: filtro, select: ['ID'] }); console.log('filtro', nome, 'total=', r.total, 'pagina=', (r.result || []).length); }
+        catch (e) { console.log('filtro', nome, 'ERRO', e.message); }
+      }
+    } catch (e) { console.error('filtro:', e.message); }
+  }, 2000);
   if (bitrix.enabled && process.env.PREPARAR) setTimeout(() => P.preparar(bitrix, svc).then(r => { console.log('preparar', JSON.stringify(r)); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); }).catch(e => console.error('preparar:', e.message)), 2000);
   if (bitrix.enabled && process.env.APAGAR_CAMPOS) setTimeout(() => D.apagar(bitrix, process.env.APAGAR_CAMPOS.split(',').map(Number).filter(Boolean), DATA_DIR).then(r => { console.log('campos-apagados', JSON.stringify(r)); store.log('config', `Campos duplicados apagados: ${(r.feitos || []).join('; ')}`); }).catch(e => console.error('campos-apagados:', e.message)), 3000);
   if (bitrix.enabled && process.env.ANALISE_DUPLICADOS) setTimeout(() => D.analisar(bitrix).then(a => { const p = D.planejar(a); console.log('duplicados', JSON.stringify({ empresas: a.empresas, apagar: p.apagar.map(c => `${c.id}:${c.campo}:${c.rotulo}`), manter: p.manter.map(c => `${c.id}:${c.campo}:${c.rotulo}:${c.comValor}`), conflitos: p.conflitos.map(g => g.campos.map(c => `${c.campo}=${c.comValor}`)) })); }).catch(e => console.error('duplicados:', e.message)), 3000);

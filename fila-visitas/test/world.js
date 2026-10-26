@@ -13,6 +13,7 @@ function createWorld() {
   w.stages = { aguardando: 'DT1036_1:NEW', dia: 'DT1036_1:DIA', atrasada: 'DT1036_1:LATE', finalizado: 'DT1036_1:DONE' };
   const match = (it, filter = {}) => Object.entries(filter).every(([k, v]) => {
     if (Array.isArray(v)) return k.startsWith('!') ? !v.includes(it[k.slice(1)]) : v.includes(it[k]);
+    if (k.startsWith('!') && v === '') return !!it[k.slice(1)] && it[k.slice(1)] !== '0';
     if (k.startsWith('!')) return it[k.slice(1)] !== v;
     if (k.startsWith('>')) return String(it[k.slice(1)] || '') > String(v);
     return String(it[k]) === String(v);
