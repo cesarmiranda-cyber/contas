@@ -40,7 +40,7 @@ h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:9
 .item:last-child{border-bottom:0}.item:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cy)}
 .item:before{width:6px}.item.atrasada{background:color-mix(in srgb,var(--red) 9%,var(--sf))}.item.dia{background:color-mix(in srgb,#f5a623 16%,var(--sf))}
 .item.atrasada:before{background:var(--red)}.item.dia:before{background:#f5a623}
-.lin{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#e8eef6;color:#1e3a5f}.lin-motores{background:#dbeafe;color:#1e40af}.lin-pecas{background:#dcfce7;color:#166534}.lin-servicos{background:#fef3c7;color:#92400e}.lin-novosnegocios{background:#f3e8ff;color:#6b21a8}tr[hidden]{display:none}tr.gh{cursor:pointer}tr.gh td{padding:12px 14px;font-size:14px}tr.gh .chev{display:inline-block;width:16px;color:var(--brand)}tr.gh .gm{margin-left:12px;display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}tr.gc td:first-child{padding-left:30px}tr.rep td{border-top-color:transparent}tr.rep .hint{padding-left:6px}
+.lin{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#e8eef6;color:#1e3a5f}.lin-motores{background:#dbeafe;color:#1e40af}.lin-pecas{background:#dcfce7;color:#166534}.lin-servicos{background:#fef3c7;color:#92400e}.lin-novosnegocios{background:#f3e8ff;color:#6b21a8}tr[hidden]{display:none}tr.gh{cursor:pointer}tr.gh td{padding:10px 8px}tr.gh .chev{display:inline-block;width:22px;font-size:16px;color:var(--brand)}tr.gh{background:#fff;border-top:2px solid var(--line)}tr.gh.t-atrasada{background:#fdeeee}tr.gh.t-dia{background:#fdf1dd}tr.gh .gm{margin-left:12px;display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}tr.gc td:first-child{padding-left:30px}tr.rep td{border-top-color:transparent}tr.rep .hint{padding-left:6px}
 .emp{font-weight:700;font-size:15px;line-height:1.25}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.tag{font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--sf2);border:1px solid var(--line);color:var(--ink2)}.tag.seg{background:var(--brandbg);border-color:transparent;color:var(--brand)}
 .due b{display:block;font-size:14px}.due span{display:inline-block;margin-top:2px;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--brandbg);color:var(--brand)}
@@ -342,6 +342,7 @@ function lista() {
     if (e.target.closest('a')) return;
     const k = tr.dataset.gt, abrir = !GA.has(k); abrir ? GA.add(k) : GA.delete(k);
     tr.querySelector('.chev').textContent = abrir ? '▾' : '▸';
+    const bt = tr.querySelector('[data-tg]'); if (bt) bt.textContent = abrir ? 'Recolher' : 'Ver visitas';
     document.querySelectorAll('tr.gc').forEach(r => { if (r.dataset.gc === k) r.hidden = !abrir; });
   });
   document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); refaz(); });
@@ -377,9 +378,11 @@ function tabelaVisitas(v, verEquipe) {
     const linhas = [...new Set(g.map(x => x.segmento))];
     const nAtr = g.filter(x => x.situacao === 'atrasada').length, nHoje = g.filter(x => x.situacao === 'dia').length;
     const resumo = [nAtr && `${nAtr} atrasada(s)`, nHoje && `${nHoje} para hoje`].filter(Boolean).join(' · ');
-    return `<tr class="gh t-${pior}" data-gt="${k}"><td colspan="${cab.length + 1}"><span class="chev">${aberto ? '▾' : '▸'}</span> <b>${c0.urlEmpresa ? `<a href="${esc(c0.urlEmpresa)}" target="_top">${esc(c0.empresa)}</a>` : esc(c0.empresa)}</b>
-      <span class="hint">${esc(c0.segmentoEmpresa || '')}${c0.tipoEmpresa ? ' · ' + esc(c0.tipoEmpresa) : ''}</span>
-      <span class="gm">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join(' ')} <span class="tag">${g.length} visitas</span>${resumo ? ` <span class="tag warn">${resumo}</span>` : ''}${datas.length ? ` <span class="hint">próxima: ${fmt(datas[0])}</span>` : ''}</span></td></tr>${g.map(x => linhaTab(x, k)).join('')}`;
+    const resp = [...new Set(g.map(x => x.responsavelNome).filter(Boolean))];
+    const classes = [...new Set(g.map(x => x.classe).filter(Boolean))];
+    const ult = g.map(x => x.ultima).filter(Boolean).sort().pop();
+    const pill = nAtr ? [pl.atrasada, `${nAtr} atrasada(s)`] : nHoje ? [pl.dia, `${nHoje} para hoje`] : [pl[pior], `${g.length} visitas`];
+    return `<tr class="gh t-${pior}" data-gt="${k}"><td><span class="chev">${aberto ? '▾' : '▸'}</span><b>${c0.urlEmpresa ? `<a href="${esc(c0.urlEmpresa)}" target="_top">${esc(c0.empresa)}</a>` : esc(c0.empresa)}</b>${c0.tipoEmpresa ? `<div class="hint" style="padding-left:22px">${esc(c0.tipoEmpresa)}</div>` : ''}</td><td>${esc(c0.segmentoEmpresa || '—')}</td><td>${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join(' ')}</td><td><span class="tag">${g.length} visitas</span></td><td>${esc(classes.join(', '))}</td>${verEquipe ? `<td>${resp.length > 1 ? `${esc(resp[0])} <span class="hint">+${resp.length - 1}</span>` : esc(resp[0] || '')}</td>` : ''}<td>${ult ? fmt(ult) : '—'}</td><td>${datas.length ? fmt(datas[0]) : '—'}</td><td><span class="pl2" style="background:${pill[0][0]};color:${pill[0][1]}">${pill[1]}</span></td><td style="white-space:nowrap"><button class="btn sm" data-tg="${k}">${aberto ? 'Recolher' : 'Ver visitas'}</button></td></tr>${g.map(x => linhaTab(x, k)).join('')}`;
   }).join('');
   return `<div class="tw tbv"><table><tr>${cab.map(([k, t]) => `<th data-oc="${k}" style="cursor:pointer">${t}${VP.ord === k ? (VP.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th></th></tr>${corpo}</table></div>`;
 }
