@@ -40,7 +40,7 @@ h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:9
 .item:last-child{border-bottom:0}.item:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cy)}
 .item:before{width:6px}.item.atrasada{background:color-mix(in srgb,var(--red) 9%,var(--sf))}.item.dia{background:color-mix(in srgb,#f5a623 16%,var(--sf))}
 .item.atrasada:before{background:var(--red)}.item.dia:before{background:#f5a623}
-.lin{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#e8eef6;color:#1e3a5f}.lin-motores{background:#dbeafe;color:#1e40af}.lin-pecas{background:#dcfce7;color:#166534}.lin-servicos{background:#fef3c7;color:#92400e}.lin-novosnegocios{background:#f3e8ff;color:#6b21a8}tr.rep td{border-top-color:transparent}tr.rep .hint{padding-left:6px}
+.lin{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#e8eef6;color:#1e3a5f}.lin-motores{background:#dbeafe;color:#1e40af}.lin-pecas{background:#dcfce7;color:#166534}.lin-servicos{background:#fef3c7;color:#92400e}.lin-novosnegocios{background:#f3e8ff;color:#6b21a8}tr[hidden]{display:none}tr.gh{cursor:pointer}tr.gh td{padding:12px 14px;font-size:14px}tr.gh .chev{display:inline-block;width:16px;color:var(--brand)}tr.gh .gm{margin-left:12px;display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}tr.gc td:first-child{padding-left:30px}tr.rep td{border-top-color:transparent}tr.rep .hint{padding-left:6px}
 .emp{font-weight:700;font-size:15px;line-height:1.25}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.tag{font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--sf2);border:1px solid var(--line);color:var(--ink2)}.tag.seg{background:var(--brandbg);border-color:transparent;color:var(--brand)}
 .due b{display:block;font-size:14px}.due span{display:inline-block;margin-top:2px;font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--brandbg);color:var(--brand)}
@@ -338,6 +338,12 @@ function lista() {
   $('#fc').onchange = e => { F.classe = e.target.value; salvaF(); refaz(); };
   $('#fo').onchange = e => { VP.ord = e.target.value; VP.dir = 1; salvaVP(); refaz(); };
   document.querySelectorAll('[data-vw]').forEach(b => b.onclick = () => { VP.view = b.dataset.vw; salvaVP(); lista(); });
+  document.querySelectorAll('tr.gh').forEach(tr => tr.onclick = e => {
+    if (e.target.closest('a')) return;
+    const k = tr.dataset.gt, abrir = !GA.has(k); abrir ? GA.add(k) : GA.delete(k);
+    tr.querySelector('.chev').textContent = abrir ? '▾' : '▸';
+    document.querySelectorAll('tr.gc').forEach(r => { if (r.dataset.gc === k) r.hidden = !abrir; });
+  });
   document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); refaz(); });
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { VQ.page = +b.dataset.p; refaz(false); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('#psz') && ($('#psz').onchange = e => { VQ.size = +e.target.value; try { localStorage.setItem('fv.size', VQ.size); } catch {} refaz(); });
@@ -351,14 +357,31 @@ function lista() {
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
 }
+const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
 function tabelaVisitas(v, verEquipe) {
   const cab = [['empresa', 'Empresa'], ['segmentoEmpresa', 'Segmento da empresa'], ['segmento', 'Linha'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : []), ['ultima', 'Última visita'], ['data', 'Programada'], ['prazo', 'Prazo']];
   const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
-  return `<div class="tw tbv"><table><tr>${cab.map(([k, t]) => `<th data-oc="${k}" style="cursor:pointer">${t}${VP.ord === k ? (VP.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th></th></tr>${v.map((c, i) => {
+  const linhaTab = (c, filha) => {
     const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-    const rep = i > 0 && v[i - 1].empresaId === c.empresaId && c.empresaId;      // mesma empresa da linha de cima: não repete o nome
-    return `<tr class="t-${c.situacao}${rep ? ' rep' : ''}"><td>${rep ? `<span class="hint">↳ mesma empresa</span>` : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${rep ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`; }).join('')}</table></div>`;
+    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`;
+  };
+  const grupos = [];                                                  // linhas seguidas da mesma empresa viram um grupo recolhível
+  for (const c of v) { const g = grupos[grupos.length - 1]; if (g && c.empresaId && g[0].empresaId === c.empresaId) g.push(c); else grupos.push([c]); }
+  const ordem = ['atrasada', 'dia', 'aguardando', 'naorealizada', 'finalizado'];
+  const corpo = grupos.map(g => {
+    if (g.length === 1) return linhaTab(g[0], null);
+    const k = `${g[0].empresaId}-${g[0].id}`, aberto = GA.has(k), c0 = g[0];
+    const pior = g.map(x => x.situacao).sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b))[0];
+    const datas = g.map(x => x.data).filter(Boolean).sort();
+    const linhas = [...new Set(g.map(x => x.segmento))];
+    const nAtr = g.filter(x => x.situacao === 'atrasada').length, nHoje = g.filter(x => x.situacao === 'dia').length;
+    const resumo = [nAtr && `${nAtr} atrasada(s)`, nHoje && `${nHoje} para hoje`].filter(Boolean).join(' · ');
+    return `<tr class="gh t-${pior}" data-gt="${k}"><td colspan="${cab.length + 1}"><span class="chev">${aberto ? '▾' : '▸'}</span> <b>${c0.urlEmpresa ? `<a href="${esc(c0.urlEmpresa)}" target="_top">${esc(c0.empresa)}</a>` : esc(c0.empresa)}</b>
+      <span class="hint">${esc(c0.segmentoEmpresa || '')}${c0.tipoEmpresa ? ' · ' + esc(c0.tipoEmpresa) : ''}</span>
+      <span class="gm">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join(' ')} <span class="tag">${g.length} visitas</span>${resumo ? ` <span class="tag warn">${resumo}</span>` : ''}${datas.length ? ` <span class="hint">próxima: ${fmt(datas[0])}</span>` : ''}</span></td></tr>${g.map(x => linhaTab(x, k)).join('')}`;
+  }).join('');
+  return `<div class="tw tbv"><table><tr>${cab.map(([k, t]) => `<th data-oc="${k}" style="cursor:pointer">${t}${VP.ord === k ? (VP.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th></th></tr>${corpo}</table></div>`;
 }
 const ini = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 function linha(c) {
