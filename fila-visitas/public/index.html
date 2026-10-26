@@ -678,14 +678,16 @@ const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', ramo: '', resp: '
 const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const SELNOME = { seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
+let dashTent = 0;
 async function dashboard() {
-  const d = await api('/api/dashboard');
-  if (d.carregando) {
-    $('#main').innerHTML = '<div class="vazio">Preparando o dashboard… isso leva alguns segundos na primeira vez.</div>';
-    setTimeout(() => { if (aba === 'dash') dashboard().catch(e => { $('#main').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }); }, 3000);
-    return;
+  const espera = msg => { $('#main').innerHTML = `<div class="vazio">${msg}</div>`; setTimeout(() => { if (aba === 'dash') dashboard().catch(e => { $('#main').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }); }, 3000); };
+  let d;
+  try { d = await api('/api/dashboard'); } catch (e) {                  // o gateway cortou a espera: o servidor segue calculando, tenta de novo
+    if (/gateway|demorou|timeout|504/i.test(e.message) && ++dashTent < 20) return espera('Preparando o dashboard… isso leva alguns segundos na primeira vez.');
+    throw e;
   }
-  DB.dados = d; dashDesenha();
+  if (d.carregando && ++dashTent < 40) return espera('Preparando o dashboard… isso leva alguns segundos na primeira vez.');
+  dashTent = 0; DB.dados = d; dashDesenha();
 }
 function mesesLista(n, hoje) {
   const [y, m] = hoje.split('-').map(Number), out = [];

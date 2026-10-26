@@ -1011,7 +1011,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (c0) { if (Date.now() - c0.em >= 60e3) disparar().catch(() => {}); return c0.dados; }
     const pronto = disparar();
     pronto.catch(() => {});
-    const r = await Promise.race([pronto, new Promise(ok => setTimeout(() => ok(null), p.espera ?? 20e3))]);
+    const r = await Promise.race([pronto, new Promise(ok => setTimeout(() => ok(null), p.espera ?? 6e3))]);
     return r || { carregando: true };
   }
   async function dashboardCalcula({ uid, meses = 13, bearer = null }) {
