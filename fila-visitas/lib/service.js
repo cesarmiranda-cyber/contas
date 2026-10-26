@@ -302,7 +302,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         if (!R.CLASSES.includes(s.classe)) motivo.push('classe não selecionada');
         if (motivo.length) { res.pendencias.push(`${seg} · ${cargo}: ${motivo.join(' e ')}`); continue; }
         const chave = R.chaveFila(id, seg, cargo);
-        const calc = R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
+        // Empresa nunca visitada (sem Última Visita): a primeira visita do Vendedor já entra na fila para HOJE.
+        // Com Última Visita: Última + intervalo da classe. Cargos acima do Vendedor sempre seguem o intervalo.
+        const primeira = cargo === 'Vendedor' && !s.ultima;
+        const calc = primeira ? hoje() : R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
         // Empresa que já tem Última e Próxima Visita: o card do Vendedor NASCE na data da Próxima Visita (sem partir de uma visita nova).
         const dataNova = (cargo === 'Vendedor' && s.ultima && s.proxima) ? s.proxima : calc;
         const existente = abertos.get(chave);
@@ -316,6 +319,9 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         }
         store.setChave(chave, existente.id);
         { const reg = store.card(existente.id) || {}, eq = equipeIds(s); if (JSON.stringify(reg.equipe) !== JSON.stringify(eq) || reg.ramo !== (emp.ramo || '')) store.setCard(existente.id, { ...reg, empresaId: id, empresa: emp.nome, seg, cargo, equipe: eq, ramo: emp.ramo || '' }); }
+        if (primeira && existente.data && existente.data > hoje() && existente.stageId !== undefined && !store.historico.some(x => x.card === existente.id && !x.tipo)) {
+          if (await atualizarCard(existente, { data: hoje() }, 'primeira visita da empresa vai para hoje')) { res.atualizados.push(existente.id); continue; }
+        }
         const ant = snapAnt[k] || {};
         const mudouData = forcar || ant.classe !== s.classe || ant.ultima !== s.ultima;
         const mudouResp = forcar || ant.resp !== resp || existente.responsavel !== resp;

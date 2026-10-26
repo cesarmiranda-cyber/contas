@@ -24,6 +24,9 @@ if os.environ.get("SYNC_RECENTES"): env["SYNC_RECENTES"] = os.environ["SYNC_RECE
 if os.environ.get("DIAG_EMPRESA"): env["DIAG_EMPRESA"] = os.environ["DIAG_EMPRESA"]
 env["SERVER_ID"] = os.environ["SERVER_ID"]
 if os.environ.get("DIAG_CAMPO"): env["DIAG_CAMPO"] = os.environ["DIAG_CAMPO"]
+if os.environ.get("DIAG_EMP_RAW"): env["DIAG_EMP_RAW"] = os.environ["DIAG_EMP_RAW"]
+if os.environ.get("DIAG_VEND"): env["DIAG_VEND"] = os.environ["DIAG_VEND"]
+if os.environ.get("DIAG_PROX"): env["DIAG_PROX"] = os.environ["DIAG_PROX"]
 if os.environ.get("EVENT_TOKEN"): env["EVENT_TOKEN"] = os.environ["EVENT_TOKEN"]
 print(json.dumps({
   "source": {"content": base64.b64encode(open(out + "/fila-app.tgz","rb").read()).decode()},

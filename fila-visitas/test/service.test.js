@@ -566,3 +566,25 @@ test('campo "Anexo" de texto é escondido quando existe um campo de arquivo de v
   assert.ok(!f.campos.some(c => c.key === 'ufCrm_anexo_txt'), 'com campo de arquivo, o de texto some');
   assert.equal(f.campos.find(c => c.key === 'ufCrm_anexos').tipo, 'arquivo');
 });
+
+test('empresa nunca visitada (sem Última Visita): a primeira visita do Vendedor entra na fila para hoje; cargos acima seguem o intervalo', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_ULTIMA: '' });                      // hoje = 10/05/2026, classe A
+  const r = await svc.sincronizarEmpresa(1);
+  assert.equal(r.criados.length, 5);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor')), sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
+  assert.equal(vend.ufCrm_data, '2026-05-10'); assert.equal(vend.stageId, w.stages.dia);
+  assert.equal(sup.ufCrm_data, '2026-07-09', 'supervisor: hoje + 60 dias (classe A)');
+});
+
+test('primeira visita criada com a regra antiga (data futura, sem Última Visita, nunca alterada) é puxada para hoje; se já foi alterada pelo vendedor, fica como está', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_ULTIMA: '' });
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  vend.ufCrm_data = '2026-08-08'; vend.stageId = w.stages.aguardando;        // como nasceria antes: hoje + intervalo
+  await svc.sincronizarEmpresa(1);
+  assert.equal(vend.ufCrm_data, '2026-05-10');
+  vend.ufCrm_data = '2026-05-25';                                             // vendedor alterou a data pelo app
+  await svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: 'Cliente pediu' });
+  await svc.sincronizarEmpresa(1);
+  assert.equal(vend.ufCrm_data, '2026-05-28', 'data escolhida pelo vendedor é respeitada');
+});

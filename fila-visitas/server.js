@@ -228,6 +228,52 @@ server.listen(PORT, () => {
       console.log('diag-campo', k, JSON.stringify(g[k] || Object.entries(g).filter(([x, d]) => /anexo/i.test(JSON.stringify(d))).map(([x, d]) => [x, d])));
     } catch (e) { console.error('diag-campo:', e.message); }
   }, 2000);
+  if (bitrix.enabled && process.env.DIAG_EMP_RAW) setTimeout(async () => {
+    try {
+      const id = +process.env.DIAG_EMP_RAW, { map, meta } = await svc.campos(true);
+      const r = (await bitrix.call('crm.company.get', { id })).result || {};
+      const out = {};
+      for (const seg of Object.keys(map.empresa)) {
+        out[seg] = {};
+        for (const [campo, k] of Object.entries(map.empresa[seg])) for (const key of [k, ...(((map.alt || {})[seg] || {})[campo] || [])]) out[seg][`${campo}:${key}`] = r[key] === undefined ? '(sem)' : JSON.stringify(r[key]) + (meta[key]?.itens?.length ? ' => ' + JSON.stringify(meta[key].itens.map(i => i.id + '=' + i.value)) : '');
+      }
+      console.log('raw-empresa', id, JSON.stringify(out));
+      console.log('raw-lida', JSON.stringify(await svc.sincronizarEmpresa(id)));
+      const c = (await bitrix.call('crm.item.list', { entityTypeId: 1036, filter: { companyId: id }, select: ['id', 'title', 'stageId', 'closedate'] })).result?.items || [];
+      console.log('raw-cards', JSON.stringify(c.map(i => [i.id, i.title, i.stageId, i.closedate])));
+    } catch (e) { console.error('raw-empresa:', e.message); }
+  }, 2000);
+  if (bitrix.enabled && process.env.DIAG_VEND) setTimeout(async () => {
+    try {
+      const { map } = await svc.campos(true);
+      const [nome, ...resto] = process.env.DIAG_VEND.split(' ');
+      const us = (await bitrix.call('user.get', { filter: { NAME: nome, LAST_NAME: resto.join(' ') } })).result || [];
+      console.log('vend-usuarios', JSON.stringify(us.map(u => [u.ID, u.NAME, u.LAST_NAME])));
+      for (const u of us.slice(0, 2)) {
+        const achadas = new Set();
+        for (const seg of Object.keys(map.empresa)) {
+          const k = map.empresa[seg].vendedor, alt = ((map.alt || {})[seg] || {}).vendedor || [];
+          for (const key of [k, ...alt]) { const r = (await bitrix.call('crm.company.list', { filter: { [key]: u.ID }, select: ['ID', 'TITLE', 'DATE_MODIFY'] })).result || []; r.forEach(c => achadas.add(`${c.ID}|${c.TITLE}|${c.DATE_MODIFY}`)); }
+        }
+        console.log('vend-empresas', u.ID, JSON.stringify([...achadas].slice(0, 40)));
+      }
+    } catch (e) { console.error('vend:', e.message); }
+  }, 2000);
+  if (bitrix.enabled && process.env.DIAG_PROX) setTimeout(async () => {
+    try {
+      const { map } = await svc.campos(true);
+      const [mot, pec] = process.env.DIAG_PROX.split(',');
+      const a = (await bitrix.call('crm.company.list', { filter: { [map.empresa['Motores'].proxima]: mot }, select: ['ID', 'TITLE', 'DATE_MODIFY'] })).result || [];
+      const b = (await bitrix.call('crm.company.list', { filter: { [map.empresa['Peças'].proxima]: pec }, select: ['ID', 'TITLE', 'DATE_MODIFY'] })).result || [];
+      const ids = a.map(x => x.ID).filter(x => b.some(y => y.ID === x));
+      console.log('prox-empresas', JSON.stringify({ motores: a.map(x => x.ID + ':' + x.TITLE), pecas: b.map(x => x.ID + ':' + x.TITLE), ambas: ids }));
+      for (const id of ids.slice(0, 3)) {
+        const c = (await bitrix.call('crm.item.list', { entityTypeId: 1036, filter: { companyId: +id }, select: ['id', 'title', 'stageId', 'createdTime'] })).result?.items || [];
+        console.log('prox-cards', id, JSON.stringify(c.map(i => [i.id, i.title.split(' | ').slice(1).join('|'), i.stageId, i.createdTime])));
+        console.log('prox-sync', id, JSON.stringify(await svc.sincronizarEmpresa(+id)));
+      }
+    } catch (e) { console.error('prox:', e.message); }
+  }, 2000);
   if (bitrix.enabled && process.env.PREPARAR) setTimeout(() => P.preparar(bitrix, svc).then(r => { console.log('preparar', JSON.stringify(r)); store.log('config', `Preparar Bitrix: ${[...r.feito, ...r.erros].join('; ') || 'nada a fazer'}`); }).catch(e => console.error('preparar:', e.message)), 2000);
   if (bitrix.enabled && process.env.APAGAR_CAMPOS) setTimeout(() => D.apagar(bitrix, process.env.APAGAR_CAMPOS.split(',').map(Number).filter(Boolean), DATA_DIR).then(r => { console.log('campos-apagados', JSON.stringify(r)); store.log('config', `Campos duplicados apagados: ${(r.feitos || []).join('; ')}`); }).catch(e => console.error('campos-apagados:', e.message)), 3000);
   if (bitrix.enabled && process.env.ANALISE_DUPLICADOS) setTimeout(() => D.analisar(bitrix).then(a => { const p = D.planejar(a); console.log('duplicados', JSON.stringify({ empresas: a.empresas, apagar: p.apagar.map(c => `${c.id}:${c.campo}:${c.rotulo}`), manter: p.manter.map(c => `${c.id}:${c.campo}:${c.rotulo}:${c.comValor}`), conflitos: p.conflitos.map(g => g.campos.map(c => `${c.campo}=${c.comValor}`)) })); }).catch(e => console.error('duplicados:', e.message)), 3000);
