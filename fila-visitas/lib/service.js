@@ -132,6 +132,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const cfg = store.config.tipoPorRamo || {};
     return ramos.map(r => ({ ...r, tipo: cfg[r.id] !== undefined ? cfg[r.id] : sugestaoTipo(r.nome) }));
   }
+  const nomeRamo = async id => (id ? ((await listaRamos()).find(r => r.id === id) || {}).nome || '' : '');
   async function tipoDaEmpresa(emp) {
     if (!emp) return '';
     if (emp.tipo) return emp.tipo;
@@ -223,7 +224,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     f[map.fila.data || 'closedate'] = data;
     const r = (await bitrix.call('crm.item.add', { entityTypeId: F.ETYPE.fila, fields: f })).result?.item;
     store.setChave(chave, +r.id);
-    store.setCard(+r.id, { empresaId: empresa.id, empresa: empresa.nome, seg, cargo, classe, chave, equipe: equipeIds(empresa.segs[seg]) });
+    store.setCard(+r.id, { empresaId: empresa.id, empresa: empresa.nome, seg, cargo, classe, chave, equipe: equipeIds(empresa.segs[seg]), ramo: empresa.ramo || '' });
     store.setSnapCard(+r.id, { data, resp: responsavel });
     if (store.config.tarefaAtiva) await criarTarefaCard(+r.id, { empresa: empresa.nome, seg, cargo, responsavel, data });
     store.log('card-criado', `Card ${r.id} criado: ${f.title} · ${R.fmtBR(data)} · resp ${responsavel}`, { card: +r.id });
@@ -314,7 +315,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
           continue;
         }
         store.setChave(chave, existente.id);
-        { const reg = store.card(existente.id) || {}, eq = equipeIds(s); if (JSON.stringify(reg.equipe) !== JSON.stringify(eq)) store.setCard(existente.id, { ...reg, empresaId: id, empresa: emp.nome, seg, cargo, equipe: eq }); }
+        { const reg = store.card(existente.id) || {}, eq = equipeIds(s); if (JSON.stringify(reg.equipe) !== JSON.stringify(eq) || reg.ramo !== (emp.ramo || '')) store.setCard(existente.id, { ...reg, empresaId: id, empresa: emp.nome, seg, cargo, equipe: eq, ramo: emp.ramo || '' }); }
         const ant = snapAnt[k] || {};
         const mudouData = forcar || ant.classe !== s.classe || ant.ultima !== s.ultima;
         const mudouResp = forcar || ant.resp !== resp || existente.responsavel !== resp;
@@ -807,7 +808,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   // Filtra/ordena/pagina com os dados baratos do card e do índice local; só as linhas da página buscam empresa e nomes.
   const RANK = { atrasada: 0, dia: 1, aguardando: 2, finalizado: 3, naorealizada: 4 };
   async function listarVisitasPag(p) {
-    const { uid, bearer = null, escopo = 'auto', q = '', status = 'abertas', per = '', de = '', ate = '', seg = '', tipo = '', classe = '', resp = '', vend = '', ord = 'data', dir = 1 } = p;
+    const { uid, bearer = null, escopo = 'auto', q = '', status = 'abertas', per = '', de = '', ate = '', seg = '', tipo = '', classe = '', resp = '', vend = '', ramo = '', ord = 'data', dir = 1 } = p;
     const size = Math.max(1, Math.min(+p.size || 20, 5000));
     const { map } = await campos();
     const permitidos = await permitidosBitrix(bearer, F.ETYPE.fila);
@@ -851,6 +852,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const vendIds = [...new Set(leves.map(l => l.vendId).filter(Boolean))], respIds = [...new Set(leves.map(l => +l.c.responsavel).filter(Boolean))];
     const opcoes = {
       segmentos: [...new Set(leves.map(l => l.c.segmento).filter(Boolean))].sort(),
+      ramos: (await listaRamos()).map(r => ({ id: r.id, nome: r.nome })).sort((a, b) => a.nome.localeCompare(b.nome)),
       vendedores: (await Promise.all(vendIds.map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
       responsaveis: (await Promise.all(respIds.map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
     };
@@ -871,6 +873,11 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (vend) {
       const out = [];
       for (const l of sel) { let vid = l.vendId; if (!vid) { const e = await empresaCurta(l.c.empresaId); vid = (e?.segs?.[l.c.segmento] || {}).vendedor; } if (String(vid) === String(vend)) out.push(l); }
+      sel = out;
+    }
+    if (ramo) {
+      const out = [];
+      for (const l of sel) { let r = l.reg.ramo; if (r === undefined) { const e = await empresaCurta(l.c.empresaId); r = e?.ramo || ''; } if (String(r) === String(ramo)) out.push(l); }
       sel = out;
     }
     if (tipo) {
@@ -899,9 +906,9 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const sg = emp?.segs?.[c.segmento] || {};
       const equipe = {};
       for (const k of ['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor']) if (sg[k]) equipe[k] = await nomeDe(sg[k]);
-      if (emp && JSON.stringify(reg.equipe) !== JSON.stringify(equipeIds(sg))) store.setCard(it.id, { ...reg, empresaId: c.empresaId, empresa: emp.nome, seg: c.segmento, cargo: c.cargo, equipe: equipeIds(sg) });
+      if (emp && (JSON.stringify(reg.equipe) !== JSON.stringify(equipeIds(sg)) || reg.ramo !== (emp.ramo || ''))) store.setCard(it.id, { ...reg, empresaId: c.empresaId, empresa: emp.nome, seg: c.segmento, cargo: c.cargo, equipe: equipeIds(sg), ramo: emp.ramo || '' });
       const tipoEmp = await memo(`tipo:${c.empresaId}`, 300e3, () => tipoDaEmpresa(emp));
-      visitas.push({ ...c, tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
+      visitas.push({ ...c, segmentoEmpresa: await nomeRamo(emp?.ramo), tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
         encerradoEm: l.fechado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null, dias: !l.fechado && c.data ? R.dayDiff(h, c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, h) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
         altMin: R.addDays(h, 1), altMax: R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || h.slice(0, 7)),
@@ -947,7 +954,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const d = await dadosCard(it), reg = store.card(it.id) || {};
       if (!visivelPor(d.responsavel, reg.equipe)) continue;
       const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
-      cards.push({ vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
+      cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
         data: d.data, situacao: naoRealizada ? 'naorealizada' : finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
     // registros de visita
@@ -964,7 +971,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const progr = fila?.data || null;
       const dia = q ? R.todayBR(new Date(q)) : null;
       const antTxt = v.antecipada ? String(F.decode(meta, v.antecipada, it[v.antecipada])).toLowerCase() : '';
-      visitas.push({ vendedor: await nome(+it.assignedById), id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
+      visitas.push({ ramo: await nomeRamo((await empDe(+it.companyId || 0))?.ramo), vendedor: await nome(+it.assignedById), id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
         antecipada: antTxt ? /^(sim|y|true|1)/.test(antTxt) : null, programada: progr, desvio: progr && dia ? R.dayDiff(progr, dia) : null, cargo: fila?.cargo || '' });
     }
     const faltam = [...new Set(visitas.map(x => x.empresaId).filter(Boolean))];
@@ -975,7 +982,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     }
     visitas.forEach(x => { x.empresa = nomeEmp.get(x.empresaId) || ''; });
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
-    const reprog = store.historico.filter(x => !x.tipo && (todos || [x.autor, x.responsavel].some(r => r && (+r === +uid || (time && time.has(+r)))))).map(x => ({ vendedor: x.autorNome, card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
+    const reprog = store.historico.filter(x => !x.tipo && (todos || [x.autor, x.responsavel].some(r => r && (+r === +uid || (time && time.has(+r)))))).map(x => ({ ramo: '', vendedor: x.autorNome, card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
+    for (const x of reprog) if (x.empresaId) x.ramo = await nomeRamo((await empDe(x.empresaId))?.ramo);
     const dados = { base, hoje: h, geradoEm: new Date().toISOString(), visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog };
     cacheDash.set(chave, { em: Date.now(), dados });
     return dados;

@@ -512,3 +512,18 @@ test('lista paginada no servidor: total, páginas, contadores, filtros e ordena�
   assert.equal(enc.total, 1); assert.equal(enc.visitas[0].situacao, 'finalizado');
   assert.equal((await svc.listarVisitasPag({ uid: 777, page: 1 })).total, 0, 'quem não pode ver nada recebe lista vazia');
 });
+
+test('segmento do cadastro da empresa (Setor): filtro na lista paginada e nome na linha', async () => {
+  const { w, svc } = setup({ INDUSTRY: 'DT1036_1:LATE' });                 // o mock devolve as etapas como lista de setores
+  w.empresa(2, 'Outra Ltda', { UF_CRM_MOT_CLASSE: '1', UF_CRM_MOT_VENDEDOR: '10', UF_CRM_MOT_ULTIMA: '2026-04-20', INDUSTRY: 'DT1036_1:DIA' });
+  await svc.sincronizarEmpresa(1); await svc.sincronizarEmpresa(2);
+  const todas = await svc.listarVisitasPag({ uid: 30, page: 1, size: 50 });
+  assert.ok(todas.opcoes.ramos.some(r => r.id === 'DT1036_1:LATE'));
+  const so1 = await svc.listarVisitasPag({ uid: 30, page: 1, size: 50, ramo: 'DT1036_1:LATE' });
+  assert.ok(so1.total >= 1 && so1.visitas.every(v => v.empresa === 'Acme Marítima' && v.segmentoEmpresa === 'Atrasada'));
+  const so2 = await svc.listarVisitasPag({ uid: 30, page: 1, size: 50, ramo: 'DT1036_1:DIA' });
+  assert.deepEqual([...new Set(so2.visitas.map(v => v.empresa))], ['Outra Ltda']);
+  assert.equal((await svc.listarVisitasPag({ uid: 30, page: 1, size: 50, ramo: 'NAO_EXISTE' })).total, 0);
+  const d = await svc.dashboardDados({ uid: 30 });
+  assert.ok(d.cards.every(c => c.ramo === 'Atrasada' || c.ramo === 'Dia da Visita'));
+});

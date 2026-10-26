@@ -203,6 +203,7 @@ body.wide main{padding-top:12px}
 .pager{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:18px 0 6px}.pg-i{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut)}.pg-i select{width:auto;padding:6px 10px}
 .pg-b{display:flex;gap:4px;flex-wrap:wrap}.pg-b button{min-width:36px;height:36px;border:1px solid var(--line);background:var(--sf);border-radius:8px;cursor:pointer;font-weight:600;color:var(--ink2);padding:0 10px}.pg-b button:hover:not(:disabled){border-color:var(--brand);color:var(--brand)}.pg-b button.on{background:var(--brand);border-color:var(--brand);color:#fff}.pg-b button:disabled{opacity:.4;cursor:default}
 #main.carregando{opacity:.55;pointer-events:none;transition:opacity .15s}
+.tag.emp{background:#ede9fe;border-color:transparent;color:#6d28d9}
 </style>
 </head>
 <body>
@@ -221,7 +222,7 @@ const fmt = iso => iso ? iso.split('-').reverse().join('/') : '—';
 let uid = null, eu = {}, aba = 'minhas', dados = null, users = [], foco = 'abertas';
 const VD = { per: '', de: '', ate: '' };   // filtro de data: '' | hoje | semana | mes | custom
 try { uid = +localStorage.getItem('fv.uid') || null; } catch {}
-const F = { seg: '', tipo: '', classe: '', resp: '', vend: '' };
+const F = { seg: '', ramo: '', tipo: '', classe: '', resp: '', vend: '' };
 
 async function api(path, opt = {}) {
   const sep = path.includes('?') ? '&' : '?';
@@ -267,7 +268,7 @@ const salvaVP = () => { try { localStorage.setItem('fv.vp', JSON.stringify({ vie
 try { Object.assign(F, JSON.parse(localStorage.getItem('fv.f') || '{}')); } catch {}
 const salvaF = () => { try { localStorage.setItem('fv.f', JSON.stringify({ seg: F.seg, tipo: F.tipo, classe: F.classe })); } catch {} };
 const VQ = { page: 1, size: (() => { try { return +localStorage.getItem('fv.size') || 20; } catch { return 20; } })() };
-const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VQ.size, q: F.q || '', status: foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
+const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VQ.size, q: F.q || '', status: foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, ramo: F.ramo, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
 let reqVisitas = 0;
 async function carregaVisitas() {
   const n = ++reqVisitas;
@@ -288,7 +289,7 @@ function lista() {
   }).join('');
   const de = (dados.pagina - 1) * dados.tamanho + 1, ate = Math.min(dados.total, dados.pagina * dados.tamanho);
   const janela = (() => { const a = Math.max(1, dados.pagina - 2), b = Math.min(dados.paginas, a + 4); return Array.from({ length: b - a + 1 }, (_, i) => a + i); })();
-  const filtrado = F.seg || F.tipo || F.classe || F.resp || F.vend || foco !== 'abertas' || VD.per || F.q;
+  const filtrado = F.seg || F.ramo || F.tipo || F.classe || F.resp || F.vend || foco !== 'abertas' || VD.per || F.q;
   $('#main').innerHTML = `
     <div class="stats s5">
       <button class="stat ${foco === 'abertas' ? 'on' : ''}" data-f="abertas"><i>◷</i><div><b>${c.abertas}</b><span>Em aberto</span></div></button>
@@ -305,7 +306,8 @@ function lista() {
       ${VD.per === 'custom' ? `<input id="fde" type="date" value="${VD.de}" title="De"><input id="fate" type="date" value="${VD.ate}" title="Até">` : ''}
       ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(op.responsaveis.map(x => [x.id, x.nome]), F.resp)}</select>` : ''}
       <select id="fv"><option value="">Todos os vendedores</option>${opt(op.vendedores.map(x => [x.id, x.nome]), F.vend)}</select>
-      <select id="fs"><option value="">Todos os segmentos</option>${opt(op.segmentos.map(s => [s, s]), F.seg)}</select>
+      <select id="fra" title="Segmento do cadastro da empresa"><option value="">Segmento da empresa: todos</option>${opt(op.ramos.map(x => [x.id, x.nome]), F.ramo)}</select>
+      <select id="fs" title="Linha de negócio"><option value="">Todas as linhas (Motores, Peças…)</option>${opt(op.segmentos.map(s => [s, s]), F.seg)}</select>
       <select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
     </div>
@@ -326,6 +328,7 @@ function lista() {
   if ($('#fate')) $('#fate').onchange = e => { VD.ate = e.target.value; refaz(); };
   if ($('#fr')) $('#fr').onchange = e => { F.resp = e.target.value; refaz(); };
   $('#fv').onchange = e => { F.vend = e.target.value; refaz(); };
+  $('#fra').onchange = e => { F.ramo = e.target.value; refaz(); };
   $('#fs').onchange = e => { F.seg = e.target.value; salvaF(); refaz(); };
   $('#ft').onchange = e => { F.tipo = e.target.value; salvaF(); refaz(); };
   $('#fc').onchange = e => { F.classe = e.target.value; salvaF(); refaz(); };
@@ -334,7 +337,7 @@ function lista() {
   document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); refaz(); });
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { VQ.page = +b.dataset.p; refaz(false); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('#psz') && ($('#psz').onchange = e => { VQ.size = +e.target.value; try { localStorage.setItem('fv.size', VQ.size); } catch {} refaz(); });
-  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: '', de: '', ate: '' }); salvaF(); refaz(); };
+  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', ramo: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: '', de: '', ate: '' }); salvaF(); refaz(); };
   $('#vcsv').onclick = async () => {
     const todas = (await api('/api/visitas?' + consultaVisitas({ page: 1, size: 5000 }))).visitas;
     const q2 = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
@@ -345,11 +348,11 @@ function lista() {
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
 }
 function tabelaVisitas(v, verEquipe) {
-  const cab = [['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : []), ['ultima', 'Última visita'], ['data', 'Programada'], ['prazo', 'Prazo']];
+  const cab = [['empresa', 'Empresa'], ['segmentoEmpresa', 'Segmento da empresa'], ['segmento', 'Linha'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : []), ['ultima', 'Última visita'], ['data', 'Programada'], ['prazo', 'Prazo']];
   const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
   return `<div class="tw tbv"><table><tr>${cab.map(([k, t]) => `<th data-oc="${k}" style="cursor:pointer">${t}${VP.ord === k ? (VP.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}<th></th></tr>${v.map(c => {
     const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-    return `<tr class="t-${c.situacao}"><td><b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}</td><td>${esc(c.segmento)}</td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`; }).join('')}</table></div>`;
+    return `<tr class="t-${c.situacao}"><td><b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}</td><td>${esc(c.segmentoEmpresa || '—')}</td><td>${esc(c.segmento)}</td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`; }).join('')}</table></div>`;
 }
 const ini = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 function linha(c) {
@@ -359,7 +362,7 @@ function linha(c) {
   return `<div class="item ${c.situacao}">
     <div class="main">
       <div class="emp">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</div>
-      <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
+      <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.segmentoEmpresa ? `<span class="tag emp" title="Segmento da empresa">${esc(c.segmentoEmpresa)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
       <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null && c.diasDesdeUltima !== undefined ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${dados.visao !== 'minhas' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
       ${eq ? `<div class="pessoas">${eq}</div>` : ''}
     </div>
@@ -608,7 +611,7 @@ async function cfg(d) {
 const PBI = ['#6366f1', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'];
 const COR = { atrasada: '#ef4444', dia: '#f59e0b', aguardando: '#10b981', finalizado: '#64748b' , naorealizada: '#94a3b8' };
 const SIT = { atrasada: 'Atrasada', dia: 'Hoje', aguardando: 'No prazo', finalizado: 'Finalizada', naorealizada: 'Não realizada' };
-const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', resp: '', tipo: '', classe: '', emp: '', vend: '' }, sel: {}, tab: { col: null, dir: 1, q: '', pg: 0 } };
+const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', ramo: '', resp: '', tipo: '', classe: '', emp: '', vend: '' }, sel: {}, tab: { col: null, dir: 1, q: '', pg: 0 } };
 const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const SELNOME = { seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
@@ -640,15 +643,16 @@ function dashFiltra(ex = []) {
   const d = DB.dados, f = DB.f, s = DB.sel, meses = mesesLista(f.meses, d.hoje), ini = meses[0] + '-01';
   const u = k => s[k] !== undefined && !ex.includes(k);
   const eq = (nome) => !f.emp || String(nome || '').toLowerCase().includes(f.emp.toLowerCase());
-  const okC = c => eq(c.empresa) && (!f.vend || c.vendedor === f.vend) && (!f.seg || c.segmento === f.seg) && (!f.resp || String(c.resp) === f.resp) && (!f.tipo || (c.tipo || '').toLowerCase() === f.tipo) && (!f.classe || c.classe === f.classe)
+  const okR = r => !f.ramo || r.ramo === f.ramo;
+  const okC = c => eq(c.empresa) && okR(c) && (!f.vend || c.vendedor === f.vend) && (!f.seg || c.segmento === f.seg) && (!f.resp || String(c.resp) === f.resp) && (!f.tipo || (c.tipo || '').toLowerCase() === f.tipo) && (!f.classe || c.classe === f.classe)
     && (!u('seg') || c.segmento === s.seg) && (!u('cargo') || c.cargo === s.cargo) && (!u('situacao') || c.situacao === s.situacao) && (!u('resp') || String(c.resp) === s.resp) && (!u('classe') || c.classe === s.classe)
     && (!u('semana') || (c.situacao !== 'atrasada' && c.situacao !== 'finalizado' && c.dias != null && Math.floor(c.dias / 7) === +s.semana))
     && (!u('aging') || (c.situacao === 'atrasada' && -c.dias >= AGING[+s.aging][1] && -c.dias <= AGING[+s.aging][2]));
   const cards = d.cards.filter(okC);
-  const visitas = d.visitas.filter(v => eq(v.empresa) && (!f.vend || v.vendedor === f.vend) && (!f.seg || v.segmento === f.seg) && (!f.resp || String(v.resp) === f.resp) && v.dia && v.dia >= ini
+  const visitas = d.visitas.filter(v => eq(v.empresa) && okR(v) && (!f.vend || v.vendedor === f.vend) && (!f.seg || v.segmento === f.seg) && (!f.resp || String(v.resp) === f.resp) && v.dia && v.dia >= ini
     && (!u('seg') || v.segmento === s.seg) && (!u('cargo') || v.cargo === s.cargo) && (!u('resp') || String(v.resp) === s.resp) && (!u('mes') || v.dia.slice(0, 7) === s.mes)
     && (!u('ant') || String(!!v.antecipada) === s.ant) && (!u('prazo') || (s.prazo === 'fora' ? v.desvio > 0 : (v.desvio === null || v.desvio <= 0))));
-  const reprog = d.reprog.filter(r => eq(r.empresa) && (!f.vend || r.vendedor === f.vend) && (!f.seg || r.segmento === f.seg) && r.at.slice(0, 10) >= ini
+  const reprog = d.reprog.filter(r => eq(r.empresa) && okR(r) && (!f.vend || r.vendedor === f.vend) && (!f.seg || r.segmento === f.seg) && r.at.slice(0, 10) >= ini
     && (!u('seg') || r.segmento === s.seg) && (!u('mes') || r.at.slice(0, 7) === s.mes) && (!u('motivo') || r.motivo === s.motivo) && (!u('quem') || r.quem === s.quem));
   return { meses, cards, visitas, reprog, abertos: cards.filter(c => c.situacao !== 'finalizado' && c.situacao !== 'naorealizada') };
 }
@@ -759,7 +763,7 @@ function paginaFila() {
      ${vz('Fila por tipo de empresa', rosca(contar(aoutros(['tipo']), c => c.tipo).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] }))))}
      ${vz('Fila por responsável (todas)', hbar(contar(aoutros(['resp']), c => c.respNome).slice(0, 8).map(([n, v]) => [n, v, PBI[1], String((DB.dados.cards.find(c => c.respNome === n) || {}).resp)]), { keys: ['resp'] }))}</div>
    ${detalhe(dets, [
-    { h: 'Empresa', txt: r => r.empresa, html: r => lk(urlE(r.empresaId), r.empresa) }, { h: 'Segmento', txt: r => r.segmento }, { h: 'Cargo', txt: r => r.cargo }, { h: 'Classe', txt: r => r.classe },
+    { h: 'Empresa', txt: r => r.empresa, html: r => lk(urlE(r.empresaId), r.empresa) }, { h: 'Segmento da empresa', txt: r => r.ramo || '' }, { h: 'Linha', txt: r => r.segmento }, { h: 'Cargo', txt: r => r.cargo }, { h: 'Classe', txt: r => r.classe },
     { h: 'Responsável', txt: r => r.respNome }, { h: 'Programada', txt: r => (r.data || '').split('-').reverse().join('/'), ord: r => r.data || '' },
     { h: 'Situação', txt: r => SIT[r.situacao], html: r => pill(r.situacao), ord: r => SO[r.situacao] },
     { h: 'Prazo', txt: r => r.situacao === 'finalizado' || r.situacao === 'naorealizada' ? '' : r.dias < 0 ? `${-r.dias} dia(s) de atraso` : r.dias === 0 ? 'Hoje' : `em ${r.dias} dia(s)`, ord: r => r.dias ?? 9e9 },
@@ -807,6 +811,7 @@ function dashDesenha() {
   const resps = [...new Map([...d.cards.map(c => [String(c.resp), c.respNome]), ...d.visitas.map(v => [String(v.resp), v.respNome])]).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const temTipo = d.cards.some(c => c.tipo);
   const vends = [...new Set([...d.cards.map(c => c.vendedor), ...d.visitas.map(v => v.vendedor), ...d.reprog.map(r => r.vendedor)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const ramos = [...new Set([...d.cards.map(c => c.ramo), ...d.visitas.map(v => v.ramo), ...d.reprog.map(r => r.ramo)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const empresas = [...new Set([...d.cards.map(c => c.empresa), ...d.visitas.map(v => v.empresa)].filter(Boolean))].sort((a, b) => a.localeCompare(b)).slice(0, 800);
   const pagina = { fila: paginaFila, reg: paginaReg, rep: paginaRep }[DB.pag]();
   const chips = Object.entries(DB.sel).map(([k, v]) => `<span class="chip" data-rm="${k}">${esc(SELNOME[k] || k)}: <b>${esc(selTxt(k, v))}</b> ✕</span>`).join('');
@@ -814,15 +819,15 @@ function dashDesenha() {
   const scrollY = window.scrollY;
   $('#main').innerHTML = `<div class="pbi">
     <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${new Date(d.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · <a href="#" id="s_r2">atualizar</a></span></div>
-      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend)}${sel('s_s', 'Segmento', [['', 'Todos'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
+      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend)}${sel('s_ra', 'Segmento da empresa', [['', 'Todos'], ...ramos.map(x => [x, x])], f.ramo)}${sel('s_s', 'Linha', [['', 'Todas'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
     <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Visitas alteradas']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
     ${chips ? `<div class="chips-bar"><span>Filtros aplicados:</span>${chips}</div>` : '<div class="chips-bar dica">Dica: clique em qualquer barra, fatia, coluna ou indicador para filtrar a página e ver os registros abaixo.</div>'}
     <div class="pbi-cv">${pagina}</div>
 </div>`;
   const lig = (id, k, num) => { const e = $('#' + id); if (e) e.onchange = () => { f[k] = num ? +e.value : e.value; DB.tab.pg = 0; dashDesenha(); }; };
-  lig('s_m', 'meses', true); lig('s_v', 'vend'); lig('s_s', 'seg'); lig('s_r', 'resp'); lig('s_t', 'tipo'); lig('s_c', 'classe');
+  lig('s_m', 'meses', true); lig('s_v', 'vend'); lig('s_ra', 'ramo'); lig('s_s', 'seg'); lig('s_r', 'resp'); lig('s_t', 'tipo'); lig('s_c', 'classe');
   const se = $('#s_e'); if (se) se.oninput = () => { f.emp = se.value; DB.tab.pg = 0; const p = se.selectionStart; dashDesenha(); const n = $('#s_e'); n.focus(); n.setSelectionRange(p, p); };
-  $('#s_x').onclick = () => { Object.assign(f, { meses: 6, seg: '', resp: '', tipo: '', classe: '', emp: '', vend: '' }); DB.sel = {}; DB.tab = { col: null, dir: 1, q: '', pg: 0 }; dashDesenha(); };
+  $('#s_x').onclick = () => { Object.assign(f, { meses: 6, seg: '', ramo: '', resp: '', tipo: '', classe: '', emp: '', vend: '' }); DB.sel = {}; DB.tab = { col: null, dir: 1, q: '', pg: 0 }; dashDesenha(); };
   $('#s_r2').onclick = async e => { e.preventDefault(); await dashboard(); };
   document.querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { DB.pag = b.dataset.pg; DB.sel = {}; DB.tab = { col: null, dir: 1, q: '', pg: 0 }; dashDesenha(); });
   document.querySelectorAll('[data-rm]').forEach(c => c.onclick = () => { delete DB.sel[c.dataset.rm]; DB.tab.pg = 0; dashDesenha(); });
