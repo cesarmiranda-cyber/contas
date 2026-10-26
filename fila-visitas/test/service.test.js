@@ -554,3 +554,15 @@ test('anexo inválido ou maior que 10 MB é recusado antes de criar a visita', a
   assert.equal(Object.keys(w.items[1032]).length, 0, 'nenhum registro foi criado');
   assert.equal(vend.stageId !== w.stages.finalizado, true, 'card continua aberto');
 });
+
+test('campo "Anexo" de texto é escondido quando existe um campo de arquivo de verdade', async () => {
+  const { w, svc } = setup();
+  w.extraFields = { 1032: { ufCrm_anexo_txt: { title: 'Anexo', type: 'string' } } };
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  assert.ok((await svc.camposVisita(vend.id)).campos.some(c => c.key === 'ufCrm_anexo_txt'), 'sem campo de arquivo, o de texto aparece');
+  w.extraFields[1032].ufCrm_anexos = { title: 'Anexos', type: 'file', isMultiple: true };
+  const f = await svc.camposVisita(vend.id);
+  assert.ok(!f.campos.some(c => c.key === 'ufCrm_anexo_txt'), 'com campo de arquivo, o de texto some');
+  assert.equal(f.campos.find(c => c.key === 'ufCrm_anexos').tipo, 'arquivo');
+});

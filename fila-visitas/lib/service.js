@@ -417,6 +417,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const travados = new Set([v.segmento, v.filaId, v.antecipada, ...alcadaKeys].filter(Boolean));
     const lista = [];
     const ocultos = new Set(Duplicados.agrupar(defs, Object.values(map.visita)).flatMap(g => g.outros)); // duplicados: mostra só o campo padrão
+    const temArquivo = Object.values(defs).some(x => x.type === 'file');
+    if (temArquivo) for (const [k, d] of Object.entries(defs)) if (d.type !== 'file' && /^(anexos?|arquivos?)$/.test(R.norm(d.title || ''))) ocultos.add(k); // campo de texto não guarda arquivo
     for (const [k, d] of Object.entries(defs)) {
       if (!k.startsWith('ufCrm') || ocultos.has(k)) continue;
       const tipo = TIPOS[d.type];

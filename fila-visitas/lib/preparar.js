@@ -37,6 +37,11 @@ async function preparar(bitrix, svc) {
   if (!d.map.fila.data) await criar(eFila, 'Fila', 'DATA_PROGRAMADA', 'date', 'Data programada');
   if (!d.map.visita.resultado) await criar(eVis, 'Registro', 'RESULTADO', 'string', 'Resultado / observações', { settings: { ROWS: 5 } });
   if (!d.map.visita.acompanhamento) await criar(eVis, 'Registro', 'ACOMPANHAMENTO', 'string', 'Acompanhamento');
+  // Anexo do registro: o campo "Anexo" existente é de TEXTO e não guarda arquivo. Cria um campo de ARQUIVO (múltiplo).
+  try {
+    const defs = (await bitrix.call('crm.item.fields', { entityTypeId: vis })).result?.fields || {};
+    if (!Object.values(defs).some(x => x.type === 'file')) await criar(eVis, 'Registro', 'ANEXOS', 'file', 'Anexos', { multiple: 'Y' });
+  } catch (e) { erros.push(`Registro · Anexos: ${e.message}`); }
   const depois = await svc.campos(true);
   return { feito, erros, faltando: depois.faltando };
 }
