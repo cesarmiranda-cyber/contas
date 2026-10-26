@@ -998,10 +998,24 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   // Dados em nível de linha para o dashboard (a tela agrega e filtra). Respeita a visibilidade de quem consulta.
   const cacheDash = new Map();
-  async function dashboardDados({ uid, meses = 13, bearer = null }) {
-    const chave = `${uid}|${bearer ? bearer.slice(-12) : ''}`;
+  // O dashboard é pesado (todas as empresas e visitas do período): devolve o último cálculo na hora, recalcula em segundo plano
+  // e, se ainda não houver nada calculado, espera um pouco e responde "carregando" para a tela tentar de novo.
+  const construindo = new Map();
+  async function dashboardDados(p) {
+    const chave = `${p.uid}|${p.bearer ? p.bearer.slice(-12) : ''}`;
     const c0 = cacheDash.get(chave);
-    if (c0 && Date.now() - c0.em < 60e3) return c0.dados;
+    const disparar = () => {
+      if (!construindo.has(chave)) construindo.set(chave, dashboardCalcula(p).catch(e => { store.log('erro', `Dashboard: ${e.message}`); throw e; }).finally(() => construindo.delete(chave)));
+      return construindo.get(chave);
+    };
+    if (c0) { if (Date.now() - c0.em >= 60e3) disparar().catch(() => {}); return c0.dados; }
+    const pronto = disparar();
+    pronto.catch(() => {});
+    const r = await Promise.race([pronto, new Promise(ok => setTimeout(() => ok(null), p.espera ?? 20e3))]);
+    return r || { carregando: true };
+  }
+  async function dashboardCalcula({ uid, meses = 13, bearer = null }) {
+    const chave = `${uid}|${bearer ? bearer.slice(-12) : ''}`;
     const { map, meta } = await campos();
     const todos = await enxergaTudo(uid);
     const time = todos ? null : await equipeDe(uid);
@@ -1028,6 +1042,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const tipos = new Map(), emps = new Map();
     const empDe = async id => { if (!id) return null; let e = emps.get(id); if (e === undefined) { e = await lerEmpresa(id).catch(() => null); emps.set(id, e); } return e; };
     const tipoDe = async id => { if (!id) return ''; if (!tipos.has(id)) tipos.set(id, await tipoDaEmpresa(await empDe(id))); return tipos.get(id); };
+    const pre = [...new Set([...abertos, ...fin, ...naoReal].map(it => +it.companyId).filter(Boolean))];
+    { let i = 0; await Promise.all(Array.from({ length: 8 }, async () => { while (i < pre.length) await empDe(pre[i++]); })); }
     const cards = [];
     for (const [lista, finalizado, naoRealizada] of [[abertos, false, false], [fin, true, false], [naoReal, false, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};

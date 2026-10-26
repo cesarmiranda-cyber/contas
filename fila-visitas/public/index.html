@@ -232,7 +232,7 @@ async function api(path, opt = {}) {
   const sep = path.includes('?') ? '&' : '?';
   const r = await fetch(path + (uid ? `${sep}uid=${uid}` : ''), { ...opt, headers: { 'Content-Type': 'application/json' }, body: opt.body ? JSON.stringify({ uid, ...opt.body }) : undefined });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || `Erro ${r.status}`);
+  if (!r.ok) throw new Error(typeof j.error === 'string' ? j.error : (j.error && (j.error.message || j.error.code)) || `Erro ${r.status}${r.status === 504 ? ' (o servidor demorou a responder)' : ''}`);
   return j;
 }
 async function init() {
@@ -678,7 +678,15 @@ const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', ramo: '', resp: '
 const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const SELNOME = { seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
-async function dashboard() { DB.dados = await api('/api/dashboard'); dashDesenha(); }
+async function dashboard() {
+  const d = await api('/api/dashboard');
+  if (d.carregando) {
+    $('#main').innerHTML = '<div class="vazio">Preparando o dashboard… isso leva alguns segundos na primeira vez.</div>';
+    setTimeout(() => { if (aba === 'dash') dashboard().catch(e => { $('#main').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }); }, 3000);
+    return;
+  }
+  DB.dados = d; dashDesenha();
+}
 function mesesLista(n, hoje) {
   const [y, m] = hoje.split('-').map(Number), out = [];
   for (let i = n - 1; i >= 0; i--) { const d = new Date(y, m - 1 - i, 1); out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`); }
