@@ -784,6 +784,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   let rodando = false;
   // Deixa as listas prontas na memória (a primeira abertura da tela não espera o Bitrix). Roda a cada varredura e ao iniciar.
   async function aquecer() {
+    if (!baseDash || Date.now() - baseEm > 300e3) baseDashboard().catch(() => {});
     try { const { map } = await campos(); await memo('cards-abertos', 0, () => cardsAbertos()); await memo('cards-fechados', 0, () => listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: [...(map.etapas.concluidas || []), map.etapas.naoRealizada].filter(Boolean), '>updatedTime': R.brIso(new Date(Date.now() - 120 * 864e5)) }, select: ['*', 'uf*'] })); } catch { /* o próximo ciclo tenta de novo */ }
   }
   async function varrer() {
@@ -1004,45 +1005,47 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   // Dados em nível de linha para o dashboard (a tela agrega e filtra). Respeita a visibilidade de quem consulta.
   const cacheDash = new Map();
-  // O dashboard é pesado (todas as empresas e visitas do período): devolve o último cálculo na hora, recalcula em segundo plano
-  // e, se ainda não houver nada calculado, espera um pouco e responde "carregando" para a tela tentar de novo.
-  const construindo = new Map();
+  // O dashboard é pesado: o cálculo (igual para todos) roda uma vez em segundo plano e fica em memória; cada pessoa só recebe
+  // o recorte dela (equipe + permissões do Bitrix). A tela nunca espera o cálculo: se ainda não houver nada, responde "carregando".
+  let baseDash = null, baseEm = 0, baseTrab = null;
+  function baseDashboard() {
+    if (baseTrab) return baseTrab;
+    baseTrab = dashboardBase().then(d => { baseDash = d; baseEm = Date.now(); return d; })
+      .catch(e => { store.log('erro', `Dashboard: ${e.message}`); throw e; }).finally(() => { baseTrab = null; });
+    return baseTrab;
+  }
   async function dashboardDados(p) {
     const chave = `${p.uid}|${p.bearer ? p.bearer.slice(-12) : ''}`;
     const c0 = cacheDash.get(chave);
-    const disparar = () => {
-      if (!construindo.has(chave)) construindo.set(chave, dashboardCalcula(p).catch(e => { store.log('erro', `Dashboard: ${e.message}`); throw e; }).finally(() => construindo.delete(chave)));
-      return construindo.get(chave);
-    };
-    if (c0) { if (Date.now() - c0.em >= 60e3) disparar().catch(() => {}); return c0.dados; }
-    const pronto = disparar();
-    pronto.catch(() => {});
-    const r = await Promise.race([pronto, new Promise(ok => setTimeout(() => ok(null), p.espera ?? 6e3))]);
+    if (baseDash && Date.now() - baseEm > 120e3) baseDashboard().catch(() => {});
+    if (c0 && c0.base === baseDash) return c0.dados;
+    const trabalho = (async () => {
+      const b = baseDash || await baseDashboard();
+      const uid = p.uid, bearer = p.bearer || null;
+      const todos = await enxergaTudo(uid);
+      const time = todos ? null : await equipeDe(uid);
+      const visivelPor = (resp, eq) => todos || +resp === +uid || (time && time.has(+resp)) || Object.values(eq || {}).map(Number).includes(+uid);
+      const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
+      const cards = b.cards.filter(c => (!permCards || permCards.has(+c.id)) && visivelPor(c.resp, c._eq)).map(({ _eq, ...c }) => c);
+      const visitas = b.visitas.filter(x => (!permVis || permVis.has(+x.id)) && (todos || visivelPor(x.resp, null)));
+      const reprog = b.reprog.filter(x => todos || [x._a, x._r].some(r => r && (+r === +uid || (time && time.has(+r))))).map(({ _a, _r, ...x }) => x);
+      const dados = { base: b.base, hoje: b.hoje, geradoEm: b.geradoEm, visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog };
+      cacheDash.set(chave, { base: b, dados });
+      return dados;
+    })();
+    trabalho.catch(() => {});
+    if (c0) return c0.dados;                                   // há uma versão anterior: serve já e atualiza em segundo plano
+    const r = await Promise.race([trabalho, new Promise(ok => setTimeout(() => ok(null), p.espera ?? 2500))]);
     return r || { carregando: true };
   }
-  async function dashboardCalcula({ uid, meses = 13, bearer = null }) {
-    const chave = `${uid}|${bearer ? bearer.slice(-12) : ''}`;
+  async function dashboardBase(meses = 13) {
     const { map, meta } = await campos();
-    const todos = await enxergaTudo(uid);
-    const time = todos ? null : await equipeDe(uid);
-    const visivelPor = (resp, eq) => todos || +resp === +uid || (time && time.has(+resp)) || Object.values(eq || {}).map(Number).includes(+uid);
     const desde = new Date(Date.now() - meses * 30.5 * 864e5).toISOString();
     const h = hoje();
-    const listar = async (etype, filter, select) => {
-      const out = []; let start = 0;
-      for (;;) {
-        const r = await bitrix.call('crm.item.list', { entityTypeId: etype, filter, select, start });
-        out.push(...(r.result?.items || []));
-        if (r.next === undefined || r.next === null) break;
-        start = r.next;
-      }
-      return out;
-    };
     // fila: abertos + finalizados no período
-    const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
-    const abertos = (await cardsAbertos()).filter(it => !permCards || permCards.has(+it.id));
-    const fin = (await listar(F.ETYPE.fila, { stageId: map.etapas.concluidas, '>updatedTime': R.brIso(desde) }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id));
-    const naoReal = map.etapas.naoRealizada ? (await listar(F.ETYPE.fila, { stageId: [map.etapas.naoRealizada], '>updatedTime': R.brIso(desde) }, ['*', 'uf*'])).filter(it => !permCards || permCards.has(+it.id)) : [];
+    const abertos = await memoSWR('cards-abertos', 15e3, () => cardsAbertos());
+    const fin = await listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: map.etapas.concluidas, '>updatedTime': R.brIso(desde) }, select: ['*', 'uf*'] });
+    const naoReal = map.etapas.naoRealizada ? await listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: [map.etapas.naoRealizada], '>updatedTime': R.brIso(desde) }, select: ['*', 'uf*'] }) : [];
     const nomes = new Map();
     const nome = async id => { if (!nomes.has(id)) nomes.set(id, await nomeUsuario(id)); return nomes.get(id); };
     const tipos = new Map(), emps = new Map();
@@ -1053,20 +1056,17 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const cards = [];
     for (const [lista, finalizado, naoRealizada] of [[abertos, false, false], [fin, true, false], [naoReal, false, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
-      if (!visivelPor(d.responsavel, reg.equipe)) continue;
       const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
-      cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel),
+      cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel), _eq: reg.equipe || null,
         data: d.data, situacao: naoRealizada ? 'naorealizada' : finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
     // registros de visita
     const v = map.visita, campoDH = v.dataHora || 'begindate';
     const sel = ['id', 'createdTime', 'assignedById', 'companyId', campoDH, ...[v.segmento, v.antecipada, v.filaId].filter(Boolean), ...Object.keys(meta).filter(k => /^ufCrm9_/.test(k) && /al[cç]ada/i.test(k))];
-    const regs = await listar(F.ETYPE.visita, { '>createdTime': R.brIso(desde) }, ['*', 'uf*']);
+    const regs = await listarItens({ entityTypeId: F.ETYPE.visita, filter: { '>createdTime': R.brIso(desde) }, select: ['*', 'uf*'] });
     const porId = new Map(cards.map(c => [String(c.id), c]));
     const visitas = [];
     for (const it of regs) {
-      if (permVis && !permVis.has(+it.id)) continue;
-      if (!visivelPor(it.assignedById, null) && !(todos)) continue;
       const q = it[campoDH] || it.createdTime;
       const fila = v.filaId ? porId.get(String(it[v.filaId])) : null;
       const progr = fila?.data || null;
@@ -1083,12 +1083,11 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     }
     visitas.forEach(x => { x.empresa = nomeEmp.get(x.empresaId) || ''; });
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
-    const reprog = store.historico.filter(x => !x.tipo && (todos || [x.autor, x.responsavel].some(r => r && (+r === +uid || (time && time.has(+r)))))).map(x => ({ ramo: '', vendedor: x.autorNome, card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
+    const reprog = store.historico.filter(x => !x.tipo).map(x => ({ _a: x.autor, _r: x.responsavel, ramo: '', vendedor: x.autorNome, card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
     for (const x of reprog) if (x.empresaId) x.ramo = await nomeRamo((await empDe(x.empresaId))?.ramo);
-    const dados = { base, hoje: h, geradoEm: new Date().toISOString(), visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog };
-    cacheDash.set(chave, { em: Date.now(), dados });
-    return dados;
+    return { base, hoje: h, geradoEm: new Date().toISOString(), cards, visitas, reprog };
   }
+
 
   // Histórico de reprogramações respeita a mesma regra de visibilidade das visitas.
   async function historicoVisivel(uid, bearer = null) {
