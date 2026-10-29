@@ -1010,8 +1010,9 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   let baseDash = null, baseEm = 0, baseTrab = null;
   function baseDashboard() {
     if (baseTrab) return baseTrab;
-    baseTrab = dashboardBase().then(d => { baseDash = d; baseEm = Date.now(); return d; })
-      .catch(e => { store.log('erro', `Dashboard: ${e.message}`); throw e; }).finally(() => { baseTrab = null; });
+    const t0 = Date.now();
+    baseTrab = dashboardBase().then(d => { baseDash = d; baseEm = Date.now(); console.log(`dashboard-base ${Date.now() - t0}ms cards=${d.cards.length} visitas=${d.visitas.length}`); return d; })
+      .catch(e => { console.error(`dashboard-base erro: ${e.message}`); store.log('erro', `Dashboard: ${e.message}`); throw e; }).finally(() => { baseTrab = null; });
     return baseTrab;
   }
   async function dashboardDados(p) {
