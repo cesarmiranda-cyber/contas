@@ -184,11 +184,14 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (!c) return memo(chave, ttl, fn);
     if (Date.now() - c.em >= ttl && !atualizando.has(chave)) {
       atualizando.add(chave);
-      fn().then(v => { if (memoria.get(chave) === c) memoria.set(chave, { em: Date.now(), v }); }).catch(() => {}).finally(() => atualizando.delete(chave));
+      fn().then(v => { if (memoria.has(chave)) memoria.set(chave, { em: Date.now(), v }); }).catch(() => {}).finally(() => atualizando.delete(chave));
     }
     return c.v;
   };
-  const invalida = () => memoria.clear();
+  // Só os cards mudam quando se escreve na fila: nomes, empresas e equipe continuam em cache (a tela não refaz tudo a cada alteração).
+  // Alterações da varredura só deixam a lista "velha" (a tela segue mostrando e atualiza em segundo plano); ações do usuário descartam.
+  const envelhece = () => { for (const [k, v] of memoria) if (k.startsWith('cards-')) memoria.set(k, { ...v, em: 0 }); };
+  const invalida = () => { for (const k of [...memoria.keys()]) if (k.startsWith('cards-')) memoria.delete(k); };
   const empresaCurta = id => memo(`emp:${id}`, 120e3, () => lerEmpresa(id).catch(() => null));
 
   // ---------- cards da fila ----------
@@ -287,9 +290,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     atual.catch(() => {}).finally(() => { if (travas.get(chave) === atual) travas.delete(chave); });
     return atual;
   }
-  const sincronizarEmpresa = (id, op) => comTrava(`empresa:${id}`, () => sincronizarEmpresaSemTrava(id, op));
+  const sincronizarEmpresa = (id, op) => comTrava(`empresa:${id}`, async () => { const r = await sincronizarEmpresaSemTrava(id, op); if ((r.criados || []).length || (r.atualizados || []).length) envelhece(); return r; });
   async function sincronizarEmpresaSemTrava(id, { forcar = false } = {}) {
-    invalida();
     const cfg = store.config;
     const emp = await lerEmpresa(id);
     if (!emp) return { empresa: id, erro: 'Empresa não encontrada' };
