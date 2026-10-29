@@ -782,6 +782,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
 
   // ---------- varredura periódica (alternativa aos eventos; idempotente) ----------
   let rodando = false;
+  // Deixa as listas prontas na memória (a primeira abertura da tela não espera o Bitrix). Roda a cada varredura e ao iniciar.
+  async function aquecer() {
+    try { const { map } = await campos(); await memo('cards-abertos', 0, () => cardsAbertos()); await memo('cards-fechados', 0, () => listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: [...(map.etapas.concluidas || []), map.etapas.naoRealizada].filter(Boolean), '>updatedTime': R.brIso(new Date(Date.now() - 120 * 864e5)) }, select: ['*', 'uf*'] })); } catch { /* o próximo ciclo tenta de novo */ }
+  }
   async function varrer() {
     if (!store.config.ativo) return { pausado: true };
     if (rodando) return { pulado: true };
@@ -798,7 +802,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       let job = null;
       if (R.hourBR(clock()) >= store.config.horaJob) job = await jobDiario();
       store.setLastSweep(inicio);
-      try { const { map } = await campos(); await memo('cards-abertos', 0, () => cardsAbertos()); await memo('cards-fechados', 0, () => listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: [...(map.etapas.concluidas || []), map.etapas.naoRealizada].filter(Boolean), '>updatedTime': R.brIso(new Date(Date.now() - 120 * 864e5)) }, select: ['*', 'uf*'] })); } catch { /* o próximo ciclo tenta de novo */ }
+      await aquecer();
       const resumo = emp.filter(e => (e.criados && e.criados.length) || (e.atualizados && e.atualizados.length) || e.erro).map(e => ({ empresa: e.empresa, criados: (e.criados || []).length, atualizados: (e.atualizados || []).length, pendencias: (e.pendencias || []).slice(0, 4), erro: e.erro }));
       return { guardas, empresas: emp.length, job, resumo };
     } finally { rodando = false; }
@@ -1121,6 +1125,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, aquecer, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

@@ -162,6 +162,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Registro de Visitas DLC em :${PORT} · Bitrix ${bitrix.enabled ? 'configurado' : 'SEM WEBHOOK (defina BITRIX_WEBHOOK)'}`);
+  if (bitrix.enabled) setTimeout(() => svc.aquecer().catch(() => {}), 1000);   // servidor recém-iniciado: já deixa a fila em memória
   const tick = () => bitrix.enabled && svc.varrer().then(r => r && !r.pulado && !r.pausado && console.log('varredura', JSON.stringify(r))).catch(e => { store.log('erro', `varredura: ${e.message}`); console.error('varredura:', e.message); });
   if (process.env.ATIVAR === '1' && !store.config.ativo) { store.setConfig({ ativo: true }); store.log('config', 'App ativado'); console.log('app ativado'); }
   if (bitrix.enabled && process.env.SYNC_EMPRESA) setTimeout(() => svc.sincronizarEmpresa(+process.env.SYNC_EMPRESA, { forcar: true }).then(r => console.log('sync-empresa', JSON.stringify(r))).catch(e => console.error('sync-empresa:', e.message)), 6000);

@@ -234,8 +234,8 @@ async function api(path, opt = {}) {
   let r, j;
   for (let t = 0; ; t++) {                              // leituras repetem sozinhas se a rede ou o gateway falhar (502/503/504)
     try { r = await fetch(url, { ...opt, headers: { 'Content-Type': 'application/json' }, body: opt.body ? JSON.stringify({ uid, ...opt.body }) : undefined }); }
-    catch (e) { if (leitura && t < 2) { await new Promise(ok => setTimeout(ok, 1200 * (t + 1))); continue; } throw new Error('Sem conexão com o servidor. Tente novamente.'); }
-    if (leitura && [502, 503, 504].includes(r.status) && t < 2 && !/\/api\/dashboard/.test(path)) { await new Promise(ok => setTimeout(ok, 1200 * (t + 1))); continue; }
+    catch (e) { if (leitura && t < 6) { if (t === 1) { const m = $('#main'); if (m && /Carregando/.test(m.textContent)) m.innerHTML = '<div class="vazio">Iniciando o servidor… aguarde alguns segundos.</div>'; } await new Promise(ok => setTimeout(ok, 2500)); continue; } throw new Error('Sem conexão com o servidor. Tente novamente.'); }
+    if (leitura && [502, 503, 504].includes(r.status) && t < 6 && !/\/api\/dashboard/.test(path)) { await new Promise(ok => setTimeout(ok, 2500)); continue; }
     break;
   }
   j = await r.json().catch(() => ({}));
