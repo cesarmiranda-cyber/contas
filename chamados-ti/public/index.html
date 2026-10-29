@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal de Chamados de TI</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--bg:#f5f7f8;--card:#fff;--ink:#1f2933;--mute:#6b7785;--line:#dfe3e6;--brand:#2fc6f6;--brand-d:#1aa8d8;--ok:#2e9e4f;--bad:#c0392b;--warn:#b7791f;--focus:#0b6fa4}
+@media(prefers-color-scheme:dark){:root{--bg:#14181c;--card:#1d2328;--ink:#e8ecef;--mute:#9aa6b2;--line:#2d353c;--brand:#2fc6f6;--brand-d:#5fd4f8;--ok:#52c27a;--bad:#ef7d6f;--warn:#e0b04f;--focus:#7fd3f5}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line)}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+header .wrap{display:flex;align-items:center;gap:12px;padding-top:14px;padding-bottom:14px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--brand);display:grid;place-items:center;color:#fff;font-weight:700}
+h1{font-size:18px;margin:0}h1 small{display:block;font-weight:400;color:var(--mute);font-size:13px}
+nav{display:flex;gap:4px;margin:20px 0 14px}
+nav button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 16px;border-radius:8px;font:inherit;cursor:pointer}
+nav button[aria-selected=true]{background:var(--brand);border-color:var(--brand);color:#06222d;font-weight:600}
+nav button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:620px){.grid{grid-template-columns:1fr}}
+.full{grid-column:1/-1}label{display:block;font-weight:600;font-size:13px;margin-bottom:4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+textarea{min-height:130px;resize:vertical}
+.btn{background:var(--brand);color:#06222d;border:0;border-radius:8px;padding:10px 20px;font:inherit;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--brand-d)}.btn[disabled]{opacity:.6;cursor:wait}
+.msg{padding:10px 12px;border-radius:8px;margin-bottom:14px;border:1px solid}
+.msg.err{color:var(--bad);border-color:var(--bad)}.msg.ok{color:var(--ok);border-color:var(--ok)}
+.hp{position:absolute;left:-9999px}.row{display:flex;gap:10px;align-items:end}.row>div{flex:1}
+.t{border-top:1px solid var(--line);padding:14px 0}.t:first-child{border-top:0}
+.t h3{margin:0 0 4px;font-size:15px}.meta{color:var(--mute);font-size:13px;display:flex;flex-wrap:wrap;gap:6px 14px}
+.badge{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:1px 10px;font-size:12px;font-weight:600}
+.badge.S{color:var(--ok);border-color:var(--ok)}.badge.F{color:var(--bad);border-color:var(--bad)}.badge.A{color:var(--warn);border-color:var(--warn)}
+.t p{margin:6px 0 0;white-space:pre-wrap}.empty{color:var(--mute);text-align:center;padding:20px}
+.req{color:var(--bad)}
+</style>
+</head>
+<body>
+<header><div class="wrap"><div class="logo" aria-hidden="true">TI</div><h1>Portal de Chamados de TI<small>Abra e acompanhe suas solicitações</small></h1></div></header>
+<main class="wrap">
+<nav role="tablist"><button role="tab" id="tab-novo" aria-selected="true">Abrir chamado</button><button role="tab" id="tab-meus" aria-selected="false">Meus chamados</button></nav>
+
+<section id="novo" class="card" aria-labelledby="tab-novo">
+<div id="msgNovo" role="status" aria-live="polite"></div>
+<form id="form" novalidate>
+<div class="grid">
+<div><label for="nome">Seu nome <span class="req">*</span></label><input id="nome" maxlength="120" autocomplete="name" required></div>
+<div><label for="email">E-mail <span class="req">*</span></label><input id="email" type="email" maxlength="160" autocomplete="email" required></div>
+<div><label for="setor">Setor / unidade</label><input id="setor" maxlength="120"></div>
+<div><label for="prioridade">Prioridade <span class="req">*</span></label><select id="prioridade" required></select></div>
+<div class="full"><label for="categoria">Categoria <span class="req">*</span></label><select id="categoria" required></select></div>
+<div class="full"><label for="assunto">Assunto <span class="req">*</span></label><input id="assunto" maxlength="200" required placeholder="Resumo do problema"></div>
+<div class="full"><label for="descricao">Descrição <span class="req">*</span></label><textarea id="descricao" maxlength="5000" required placeholder="O que aconteceu? Desde quando? Mensagem de erro, equipamento, ramal…"></textarea></div>
+<input class="hp" id="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<div class="full"><button class="btn" id="enviar">Enviar chamado</button></div>
+</div></form>
+</section>
+
+<section id="meus" class="card" hidden aria-labelledby="tab-meus">
+<form id="busca" class="row"><div><label for="emailBusca">Seu e-mail</label><input id="emailBusca" type="email" required autocomplete="email"></div><button class="btn">Consultar</button></form>
+<div id="msgMeus" role="status" aria-live="polite" style="margin-top:14px"></div>
+<div id="lista"></div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store={get(k){try{return localStorage.getItem(k)||''}catch{return ''}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+const show=(el,t,txt)=>{el.innerHTML=txt?`<div class="msg ${t}">${esc(txt)}</div>`:''};
+const api=async(p,o)=>{const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Erro inesperado');return j};
+
+function tab(which){for(const t of['novo','meus']){$('#tab-'+t).setAttribute('aria-selected',t===which);$('#'+t).hidden=t!==which}}
+$('#tab-novo').onclick=()=>tab('novo');$('#tab-meus').onclick=()=>{tab('meus');if($('#emailBusca').value&&!$('#lista').innerHTML)$('#busca').requestSubmit()};
+
+(async()=>{
+  $('#nome').value=store.get('ti_nome');$('#email').value=store.get('ti_email');$('#setor').value=store.get('ti_setor');$('#emailBusca').value=store.get('ti_email');
+  try{const c=await api('/api/config');
+    const fill=(sel,l,ph)=>$(sel).innerHTML=`<option value="">${ph}</option>`+l.map(x=>`<option value="${esc(x.id)}">${esc(x.label)}</option>`).join('');
+    fill('#categoria',c.categories,'Selecione…');fill('#prioridade',c.priorities,'Selecione…');
+    const m=c.priorities.find(p=>p.label==='Média');if(m)$('#prioridade').value=m.id;
+  }catch(e){show($('#msgNovo'),'err',e.message)}
+})();
+
+$('#form').onsubmit=async e=>{e.preventDefault();const b=$('#enviar');b.disabled=true;show($('#msgNovo'),'','');
+  const v=id=>$('#'+id).value;
+  try{const r=await api('/api/tickets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:v('nome'),email:v('email'),setor:v('setor'),categoria:v('categoria'),prioridade:v('prioridade'),assunto:v('assunto'),descricao:v('descricao'),website:v('website')})});
+    store.set('ti_nome',v('nome'));store.set('ti_email',v('email'));store.set('ti_setor',v('setor'));$('#emailBusca').value=v('email');
+    $('#assunto').value='';$('#descricao').value='';
+    show($('#msgNovo'),'ok',`Chamado #${r.id} aberto com sucesso! A equipe de TI vai atender em breve. Acompanhe em "Meus chamados".`);window.scrollTo({top:0,behavior:'smooth'});$('#lista').innerHTML='';
+  }catch(err){show($('#msgNovo'),'err',err.message)}finally{b.disabled=false}};
+
+$('#busca').onsubmit=async e=>{e.preventDefault();show($('#msgMeus'),'','');$('#lista').innerHTML='';
+  try{const email=$('#emailBusca').value.trim();const {tickets}=await api('/api/tickets?email='+encodeURIComponent(email));store.set('ti_email',email);
+    if(!tickets.length){$('#lista').innerHTML='<div class="empty">Nenhum chamado encontrado para este e-mail.</div>';return}
+    $('#lista').innerHTML=tickets.map(t=>{const cls=t.resultado==='S'?'S':t.resultado==='F'?'F':'A';const d=t.criadoEm?new Date(t.criadoEm).toLocaleString('pt-BR'):'';
+      return `<article class="t"><h3>#${t.id} · ${esc(t.assunto)}</h3><div class="meta"><span class="badge ${cls}">${esc(t.etapa)}</span><span>${esc(t.categoria)}</span><span>Prioridade: ${esc(t.prioridade)}</span><span>Aberto em ${esc(d)}</span></div><p>${esc(t.descricao)}</p></article>`}).join('');
+  }catch(err){show($('#msgMeus'),'err',err.message)}};
+</script>
+</body>
+</html>
