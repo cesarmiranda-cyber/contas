@@ -17,6 +17,11 @@ Em aberto → Próximo do vencimento → Atrasado → Pago / Cancelado.
 - **E-mail detalhado:** do consolidado ou do extrato do parceiro, com prévia, Cc, mensagem e planilha CSV anexa. Configure o SMTP em *Configurações → E-mail (SMTP)* (Gmail/Microsoft 365 pedem senha de app); a senha fica só no servidor.
 - Fluxo de caixa (entradas × saídas) e margem por venda no painel financeiro. O app **não movimenta dinheiro**: registra pagamentos feitos no banco.
 
+## Estrutura de gestão (Receber × Pagar × Resultado)
+- **Contas a receber** (funil Contas): vendas **com comissão** a parceiro, vendas **sem comissão** (100% Manda4) e **recebimentos manuais** (sem Asaas: Pix/TED direto, comissões recebidas de terceiros). Manual tem baixa à mão (*Receber*) e nunca emite cobrança.
+- **Contas a pagar** (funil Contas a Pagar): **repasses** (nascem da venda com comissão, liberados quando o cliente paga) e **despesas** (sem parceiro/venda: aluguel, fornecedores, impostos, pessoas…). Dá para filtrar por tipo.
+- **Resultado (DRE gerencial)** em `GET /api/gestao?mes=AAAA-MM&regime=caixa|competencia`: receita bruta (por origem) − taxas Asaas − comissões = **margem da Manda4** − despesas por categoria = **resultado**; evolução de 6 meses e posição de hoje. Cálculo em `lib/gestao.js` (consolidados não contam em dobro).
+
 ## Painel financeiro
 - **Geral** (aba *Dashboard* e gaveta lateral *Painel financeiro*) e **do cliente** (aba dentro da deal): nota de saúde 0–100 com as partes à mostra, previsão de recebimento (30/60/90 dias e por mês), recebido, atraso por faixa, maiores devedores, próximas cobranças, concentração e alertas.
 - Cálculo em `lib/dashboard.js` (função pura, testada). Atrasos antigos pesam na nota e a limitam (máx. 84 com atraso > 60 dias, 69 > 90). Pagamento até 2 dias após o vencimento conta como no prazo.

@@ -185,7 +185,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 .side .sp{flex:1}.side .fold{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--mut);padding:8px 10px;border-radius:10px;font:inherit;font-size:12.5px;cursor:pointer}.side .fold:hover{color:var(--ink)}
 .side .fold svg{width:16px;height:16px;transition:.2s}
 body.fold .shell{grid-template-columns:68px minmax(0,1fr)}body.fold .side .lbl2,body.fold .side .grp,body.fold .side .brand b,body.fold .side .nav .bd{display:none}body.fold .side{padding:16px 8px}body.fold .side .brand{justify-content:center;padding:4px 0 14px}body.fold .side button.nav{justify-content:center;padding:10px}body.fold .side button.nav.on::before{left:-8px}body.fold .side .fold svg{transform:rotate(180deg)}body.fold .side .fold{justify-content:center}
-.content{min-width:0}.top .logo,.top .ttl h1+.sub{display:none}.top .ttl h1{font-size:19px}
+.content{min-width:0}.top .logo,.top .ttl h1+.sub{display:none}.top .ttl h1{font-size:19px}body[data-view=res] #bNova,body[data-view=res] #bGerar,body[data-view=res] #bImp,body[data-view=res] #bDash{display:none}
 .top .ttl .sub{display:flex!important}
 .vtabs{display:none!important}
 body[data-view=pagar] #bNova,body[data-view=pagar] #bGerar,body[data-view=pagar] #bImp,body[data-view=pagar] #bDash,body[data-view=par] #bNova,body[data-view=par] #bGerar,body[data-view=par] #bImp,body[data-view=par] #bDash,body[data-view=cfg] #bNova,body[data-view=cfg] #bGerar,body[data-view=cfg] #bImp,body[data-view=cfg] #bDash,body[data-view=subs] #bGerar,body[data-view=subs] #bImp,body[data-view=links] #bGerar,body[data-view=links] #bImp,body[data-view=dash] #bGerar,body[data-view=dash] #bImp,body[data-view=dash] #bDash{display:none}
@@ -242,7 +242,7 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <section class="card">
     <div class="toolbar">
       <div class="seg" id="tabs"></div>
-      <div class="sel"><select id="fCat" aria-label="Categoria"></select><select id="fPlano" aria-label="Plano"></select></div>
+      <div class="sel"><select id="fCat" aria-label="Categoria"></select><select id="fPlano" aria-label="Plano"></select><select id="fOrig" aria-label="Origem"><option value="">Todas as origens</option><option value="com">Com comissão a parceiro</option><option value="sem">Sem comissão (100% Manda4)</option><option value="manual">Recebimento manual (sem Asaas)</option></select></div>
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" placeholder="Buscar cliente, título ou ID…"></div>
     </div>
     <div class="fbar">
@@ -272,9 +272,9 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <div class="vtabs" data-active="pagar"></div>
   <section class="kpis" id="apKpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))"></section>
   <section class="card">
-    <div class="toolbar"><div class="seg" id="apTabs"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="apRef">Atualizar</button><button class="btn" id="apCsv">⬇ CSV</button><button class="btn pri" id="apNova">+ Nova conta a pagar</button></div></div>
+    <div class="toolbar"><div class="seg" id="apTabs"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="apRef">Atualizar</button><button class="btn" id="apCsv">⬇ CSV</button><button class="btn pri" id="apNova">+ Nova despesa / conta a pagar</button></div></div>
     <div class="fbar">
-      <div class="sel2"><select id="apPar" aria-label="Beneficiário"></select><select id="apCat" aria-label="Categoria"></select></div>
+      <div class="sel2"><select id="apTipo" aria-label="Tipo"><option value="">Repasses e despesas</option><option value="repasse">Só repasses a parceiros (vindos de vendas)</option><option value="despesa">Só despesas (sem venda/parceiro)</option></select><select id="apPar" aria-label="Beneficiário"></select><select id="apCat" aria-label="Categoria"></select></div>
       <input type="date" id="apDe" aria-label="Vence de"><span class="mut">até</span><input type="date" id="apAte" aria-label="Vence até">
       <span id="apOrigem"></span><span class="sp"></span>
       <div class="search" style="max-width:260px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="apQ" placeholder="Buscar conta, parceiro ou ID…"></div>
@@ -371,6 +371,27 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
 
   </div>
 </main>
+
+<main id="viewRes" hidden>
+  <div class="toolbar" style="padding:0 0 14px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="seg" id="rsMes" style="display:inline-flex"><button type="button" data-m="-1" aria-label="Mês anterior">‹</button><button type="button" id="rsMesLbl" disabled style="min-width:120px;opacity:1;color:var(--ink)"></button><button type="button" data-m="1" aria-label="Próximo mês">›</button></div>
+      <div class="seg" id="rsReg" style="display:inline-flex"><button type="button" data-r="caixa" class="on" title="O que realmente entrou e saiu no mês (data do pagamento)">Caixa</button><button type="button" data-r="competencia" title="O que vence no mês, pago ou não">Competência</button></div>
+      <span class="mini" id="rsHint"></span>
+    </div>
+    <button class="btn" id="rsRef">Atualizar</button>
+  </div>
+  <section class="kpis" id="rsKpis"></section>
+  <div class="cuts" style="margin-top:14px">
+    <section class="card pad"><h2 style="margin:0 0 4px;font-size:15px">Resultado do mês (DRE gerencial)</h2><p class="mini" style="margin:0 0 10px" id="rsSub"></p><div class="tw"><table class="dtbl" style="min-width:380px"><tbody id="rsDre"></tbody></table></div></section>
+    <section class="card pad"><h2 style="margin:0 0 4px;font-size:15px">Posição hoje</h2><p class="mini" style="margin:0 0 10px">Tudo que falta receber e pagar, em qualquer data.</p><div id="rsPos"></div></section>
+  </div>
+  <section class="card pad" style="margin-top:14px"><h2 style="margin:0 0 2px;font-size:15px">Evolução · 6 meses</h2><div class="leg2" style="margin:6px 0"><span><i style="background:var(--v3)"></i>Receita</span><span><i style="background:var(--vw)"></i>Comissões + despesas</span></div><div id="rsChart"></div><div class="tw" style="margin-top:8px"><table class="dtbl" style="min-width:520px"><thead id="rsSH"></thead><tbody id="rsSB"></tbody></table></div></section>
+  <div class="cuts" style="margin-top:14px">
+    <section class="card pad"><h2 style="margin:0 0 8px;font-size:15px">Receita por origem</h2><div id="rsOri"></div></section>
+    <section class="card pad"><h2 style="margin:0 0 8px;font-size:15px">Comissões por parceiro</h2><div id="rsPar"></div></section>
+  </div>
+</main>
 </div></div>
 
 <dialog id="dGerar"><form method="dialog" id="fGerar">
@@ -400,21 +421,23 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
 
 <dialog id="dNova"><form method="dialog" id="fNova">
   <h2>Nova cobrança</h2><p class="dlg-sub" id="nSub"></p>
-  <div class="seg" id="nTipo" style="display:flex"><button type="button" data-t="avulsa" class="on">Avulsa</button><button type="button" data-t="parcelada">Parcelada</button><button type="button" data-t="assinatura">Assinatura</button><button type="button" data-t="link">Link de pagamento</button></div>
+  <div class="seg" id="nTipo" style="display:flex"><button type="button" data-t="avulsa" class="on">Avulsa</button><button type="button" data-t="parcelada">Parcelada</button><button type="button" data-t="assinatura">Assinatura</button><button type="button" data-t="link">Link de pagamento</button><button type="button" data-t="manual">Recebimento manual</button></div>
   <div id="nCliWrap"><label>Cliente</label><div style="display:flex;gap:8px"><input id="nCli" placeholder="Buscar empresa ou contato do Bitrix…"><button type="button" class="btn" id="nBusca">Buscar</button></div><select id="nSel" size="4" style="display:none;margin-top:8px"></select></div>
   <div id="nNomeWrap" style="display:none"><label>Nome do link</label><input id="nNome" maxlength="255" placeholder="Ex.: Renovação Bitrix24"></div>
   <div id="nTitWrap"><label>Título / descrição da cobrança</label><input id="nTit" maxlength="255" placeholder="Ex.: Licença Bitrix24 Professional Vibe+"></div>
-  <label>Forma de pagamento</label>
+  <div id="nFormaWrap"><label>Forma de pagamento</label>
   <div class="seg" id="nForma" style="display:flex"><button type="button" data-f="UNDEFINED" class="on">Cliente escolhe</button><button type="button" data-f="BOLETO">Boleto</button><button type="button" data-f="PIX">Pix</button><button type="button" data-f="CREDIT_CARD">Cartão</button></div>
-  <p class="dlg-sub" id="nFormaHint" style="margin-top:6px"></p>
+  <p class="dlg-sub" id="nFormaHint" style="margin-top:6px"></p></div>
   <div class="r2"><div><label id="nValLbl">Valor (R$)</label><input id="nVal" type="number" step="0.01" min="0.01"></div><div id="nVencWrap"><label id="nVencLbl">Vencimento</label><input id="nVenc" type="date"></div></div>
   <div id="nParcWrap" style="display:none"><label>Nº de parcelas</label><input id="nParc" type="number" min="2" max="60" value="2"></div>
   <div id="nAssWrap" style="display:none"><div class="r2"><div><label>Ciclo</label><select id="nCiclo"><option value="MENSAL">Mensal</option><option value="SEMANAL">Semanal</option><option value="QUINZENAL">Quinzenal</option><option value="BIMESTRAL">Bimestral</option><option value="TRIMESTRAL">Trimestral</option><option value="SEMESTRAL">Semestral</option><option value="ANUAL">Anual</option></select></div><div><label>Máx. de cobranças (opcional)</label><input id="nMax" type="number" min="1"></div></div><label>Data de término (opcional)</label><input id="nFim" type="date"></div>
   <div id="nLinkWrap" style="display:none"><div class="r2"><div><label>Tipo do link</label><select id="nLTipo"><option value="DETACHED">Avulso (paga uma vez)</option><option value="INSTALLMENT">Parcelado (cliente escolhe até N)</option><option value="RECURRENT">Assinatura recorrente</option></select></div><div id="nLParcWrap" style="display:none"><label>Máx. de parcelas</label><input id="nLParc" type="number" min="2" max="21" value="12"></div><div id="nLCicloWrap" style="display:none"><label>Ciclo</label><select id="nLCiclo"><option value="MENSAL">Mensal</option><option value="SEMANAL">Semanal</option><option value="QUINZENAL">Quinzenal</option><option value="BIMESTRAL">Bimestral</option><option value="TRIMESTRAL">Trimestral</option><option value="SEMESTRAL">Semestral</option><option value="ANUAL">Anual</option></select></div></div>
     <div class="r2"><div><label>Dias para vencer (boleto)</label><input id="nLDias" type="number" min="1" max="365"></div><div><label>Link válido até (opcional)</label><input id="nLFim" type="date"></div></div><label>Descrição (opcional)</label><input id="nLDesc" maxlength="500"></div>
-  <details class="adv" id="nAdv"><summary>Desconto, split e classificação</summary>
+  <div id="nComBlk"><label>Comissão a parceiro</label>
+    <div class="seg" id="nCom" style="display:flex"><button type="button" data-c="sem" class="on">Sem comissão · 100% Manda4</button><button type="button" data-c="com">Paga comissão a parceiro</button></div>
+    <div id="nComBox" style="display:none"><div id="nSplit"></div><button type="button" class="btn sm" id="nSplitAdd" style="margin-top:8px">+ Adicionar parceiro</button><p class="mini" id="nSplitHint"></p></div></div>
+  <details class="adv" id="nAdv"><summary>Desconto e classificação</summary>
     <div id="nDescWrap"><label>Desconto por pagamento antecipado</label><div class="srow" style="grid-template-columns:1fr 1fr 1fr"><input id="nDVal" type="number" step="0.01" min="0" placeholder="Valor"><select id="nDTipo"><option value="PERCENTAGE">%</option><option value="FIXED">R$</option></select><input id="nDDias" type="number" min="0" max="30" placeholder="Até X dias antes"></div></div>
-    <label>Split de pagamento</label><div id="nSplit"></div><button type="button" class="btn sm" id="nSplitAdd" style="margin-top:8px">+ Adicionar recebedor</button><p class="mini" id="nSplitHint"></p>
     <div id="nClassWrap"><div class="r2"><div><label>Categoria</label><select id="nCat"></select></div><div id="nPlWrap"><label>Tipo de licença</label><select id="nPl"></select></div></div><label>CPF/CNPJ do pagador (se não estiver no cadastro)</label><input id="nDoc" placeholder="Somente números"></div>
   </details>
   <div class="prev" id="nPrev"></div>
@@ -519,6 +542,15 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <div class="foot"><button type="button" class="btn" id="emCancel">Cancelar</button><button class="btn pri" id="emOk">Enviar e-mail</button></div>
 </form></dialog>
 
+<dialog id="dBaixa"><form method="dialog" id="fBaixa">
+  <h2>Registrar recebimento</h2><p class="dlg-sub" id="bxSub"></p>
+  <div class="r2"><div><label>Data do recebimento</label><input id="bxData" type="date"></div><div><label>Forma</label><select id="bxForma"><option>Pix</option><option>TED</option><option>Boleto</option><option>Dinheiro</option><option>Outro</option></select></div></div>
+  <div class="r2"><div><label>Valor recebido (R$)</label><input id="bxVal" type="number" step="0.01" min="0.01"></div><div><label>Observação</label><input id="bxObs" maxlength="200" placeholder="Comprovante, banco…"></div></div>
+  <p class="dlg-sub" style="margin-top:10px">Se houver comissão a parceiro, o repasse é liberado para pagamento assim que o recebimento for registrado.</p>
+  <div class="res" id="bxRes"></div>
+  <div class="foot"><button type="button" class="btn" id="bxCancel">Cancelar</button><button class="btn pri" id="bxOk">Confirmar recebimento</button></div>
+</form></dialog>
+
 <dialog id="dEdit"><form method="dialog" id="fEdit">
   <h2>Editar lançamento</h2><p class="dlg-sub" id="eHint"></p>
   <label>Título / descrição da cobrança</label><input id="eTit" required maxlength="255">
@@ -554,7 +586,7 @@ const SCOPE=/^\d+$/.test(String(PO.ID||''))?(/DEAL_DETAIL/.test(PL)?`deal=${PO.I
 if(SCOPE)document.body.classList.add('scoped');
 const CUR_DEAL=/DEAL_DETAIL/.test(PL)?+PO.ID:0;
 let CURLIST=[];
-let S=null,filter='todos',cliSel=null,fCat='',fPlano='';
+let S=null,filter='todos',cliSel=null,fCat='',fPlano='',fOrig='';
 let dF='venc',dFrom='',dTo='',sortK='venc',sortD=1,groupMes=false;
 const ymd=d=>d.toISOString().slice(0,10);const addD=(day,n)=>{const d=new Date(day+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return ymd(d)};
 const monthRange=(day,off)=>{const [y,m]=day.split('-').map(Number);return [ymd(new Date(Date.UTC(y,m-1+off,1))),ymd(new Date(Date.UTC(y,m+off,0)))]};
@@ -615,7 +647,7 @@ function render(){
   if(!S.deals.some(isC)&&filter==='contratos')filter='todos';
   $('#tabs').innerHTML=T.map(([id,l,f])=>`<button data-t="${id}" class="${filter===id?'on':''}">${l}<em>${cnt(f)}</em></button>`).join('');
   const f=T.find(t=>t[0]===filter)[2],q=$('#q').value.trim().toLowerCase();
-  let list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id} ${d.obs||''}`.toLowerCase().includes(q)).filter(d=>!fCat||(fCat==='Sem categoria'?!d.categoria:d.categoria===fCat)).filter(d=>!fPlano||d.plano===fPlano);
+  let list=S.deals.filter(f).filter(d=>!q||`${d.cliente} ${d.titulo} ${d.id} ${d.obs||''}`.toLowerCase().includes(q)).filter(d=>!fCat||(fCat==='Sem categoria'?!d.categoria:d.categoria===fCat)).filter(d=>!fPlano||d.plano===fPlano).filter(d=>!fOrig||(fOrig==='manual'?d.manual:fOrig==='com'?!!(d.split||d.repasses):!d.manual&&!d.split&&!d.repasses&&!isC(d)));
   if(dFrom||dTo)list=list.filter(d=>{const v=d[dF];return v&&(!dFrom||v>=dFrom)&&(!dTo||v<=dTo)});
   const cmp={cliente:(a,b)=>(a.cliente||'￿').localeCompare(b.cliente||'￿','pt-BR'),valor:(a,b)=>a.valor-b.valor,venc:(a,b)=>(a.venc||'9999').localeCompare(b.venc||'9999'),etapa:(a,b)=>(STAGE_ORD[a.stageId]??9)-(STAGE_ORD[b.stageId]??9)}[sortK];
   list=[...list].sort((a,b)=>cmp(a,b)*sortD||a.id-b.id);
@@ -634,15 +666,16 @@ function render(){
     const nome=d.cliente||'Sem cliente';
     const menu=[
       d.stageId==='C90:GERAR'?`<button data-a="gerar" data-id="${d.id}">${ic(I.send,16)}Gerar cobranças agora</button>`:'',
-      !fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'&&!d.asaasId&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
+      !fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'&&!d.asaasId&&!d.manual&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
       d.repasses?`<button data-a="repasses" data-id="${d.id}">${ic(I.send,16)}Ver repasses (contas a pagar)</button>`:'',
       d.asaasId?`<button data-a="detalhe" data-id="${d.id}">${ic(I.link,16)}Ver cobrança (boleto, Pix, split)</button>`:'',
+      d.manual&&d.stageId==='C90:WON'?`<button data-a="desbaixar" data-id="${d.id}">${ic(I.x,16)}Desfazer recebimento</button>`:'',
       `<button data-a="editar" data-id="${d.id}">${ic(I.doc,16)}Editar lançamento</button>`,
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://${BX_HOST}/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
     return `<tr class="${d.id===CUR_DEAL?'cur':''}">
-      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.split?`<span class="chip3" title="${esc(d.split)}">Split: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
+      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.manual?'<span class="chip3 est">Recebimento manual</span>':''}${!d.manual&&!d.split&&!d.repasses&&!isC(d)&&d.stageId!=='C90:GERAR'?'<span class="chip3">100% Manda4</span>':''}${d.split?`<span class="chip3" title="${esc(d.split)}">Comissão: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
       <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(d.valor)}</td>
@@ -650,9 +683,10 @@ function render(){
       <td><span class="pill ${sc}">${sl}</span>${d.avisos.length?`<div class="mut" style="font-size:11.5px;margin-top:4px">avisos: ${d.avisos.map(o=>o===0?'D0':o<0?'D'+o:'D+'+o).join(' · ')}</div>`:''}</td>
       <td><div class="acts">
         ${d.link?`<a class="btn sm" href="${esc(safeUrl(d.link))}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a><button class="btn sm" data-a="copy" data-v="${esc(d.link)}" title="Copiar link de pagamento">${ic(I.doc,14)}Copiar</button>`:''}
+        ${d.manual&&!fin?`<button class="btn sm" data-a="baixar" data-id="${d.id}">${ic(I.check,14)}Receber</button>`:''}
         <button class="btn sm" data-a="editar" data-id="${d.id}">${ic(I.doc,14)}Editar</button>
         ${d.stageId==='C90:GERAR'?`<button class="btn sm" data-a="gerar" data-id="${d.id}">${ic(I.send,14)}Gerar</button>`:''}
-        ${!fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
+        ${!fin&&!d.manual&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
         <details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details>
       </div></td></tr>`};
   if(groupMes){const gs=new Map();for(const d of list){const k=(d[dF]||'').slice(0,7);(gs.get(k)||gs.set(k,[]).get(k)).push(d)}
@@ -663,7 +697,7 @@ function render(){
 }
 $('#tabs').onclick=e=>{const t=e.target.closest('button[data-t]');if(t){filter=t.dataset.t;render()}};
 $('#q').oninput=()=>S&&render();
-$('#fCat').onchange=e=>{fCat=e.target.value;render()};
+$('#fCat').onchange=e=>{fCat=e.target.value;render()};$('#fOrig').onchange=e=>{fOrig=e.target.value;render()};
 $('#fPlano').onchange=e=>{fPlano=e.target.value;render()};
 const toggle=(cur,v)=>cur===v?'':v;
 $('#cutCat').onclick=e=>{const r=e.target.closest('[data-cat]');if(r){fCat=toggle(fCat,r.dataset.cat);render()}};
@@ -711,6 +745,8 @@ $('#bCsv').onclick=()=>{const q=csvq;
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lancamentos-${S.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${CURLIST.length} lançamento(s) exportados`)};
 $('#rows').onclick=async e=>{const b=e.target.closest('[data-a]');if(!b)return;const {a,id}=b.dataset;
   if(a==='copy'){copyText(b.dataset.v);return}
+  if(a==='baixar'){b.closest('details')&&(b.closest('details').open=false);openBaixa(+id);return}
+  if(a==='desbaixar'){b.closest('details')&&(b.closest('details').open=false);if(!confirm('Desfazer este recebimento? O título volta a ficar em aberto.'))return;try{await api('POST',`/api/deals/${id}/desbaixar`,{});toast('Recebimento desfeito');load()}catch(x){toast(x.message)}return}
   if(a==='repasses'){b.closest('details')&&(b.closest('details').open=false);apOrigem=+id;showView('pagar');return}
   if(a==='detalhe'){b.closest('details')&&(b.closest('details').open=false);openDet(id);return}
   if(a==='editar'){b.closest('details')&&(b.closest('details').open=false);openEdit(id);return}
@@ -745,16 +781,17 @@ $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disable
 let CFG=null,aEnv='sandbox';
 const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
 const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
-function showView(v){document.body.dataset.view=v;$('#pgTitle').textContent=NAVT[v]||'Contas';document.querySelectorAll('#side button.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));['main','cfg','subs','links','dash','pagar','par'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
+function showView(v){document.body.dataset.view=v;if(v==='res')loadRes();$('#pgTitle').textContent=NAVT[v]||'Contas';document.querySelectorAll('#side button.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));['main','cfg','subs','links','dash','pagar','par','res'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
   if(v==='cfg'){loadSettings();location.hash='config'}else history.replaceState(null,'',location.pathname+location.search);
   if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();if(v==='dash')loadDash($('#dashHost'),{});if(v==='pagar'||v==='par')loadPagar();window.scrollTo(0,0)}
-const VTABS=[['main','Lançamentos'],['dash','Dashboard'],['pagar','Contas a pagar'],['par','Parceiros'],['subs','Assinaturas'],['links','Links de pagamento']];
-const NAVI={main:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',dash:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',pagar:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>',par:'<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',subs:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',links:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',cfg:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
+const VTABS=[['main','Contas a receber'],['dash','Visão geral'],['res','Resultado (DRE)'],['pagar','Contas a pagar'],['par','Parceiros e fornecedores'],['subs','Assinaturas'],['links','Links de pagamento']];
+const NAVI={res:'<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',main:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',dash:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',pagar:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>',par:'<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',subs:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',links:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',cfg:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
 const NAVT={cfg:'Configurações'};VTABS.forEach(([k,l])=>NAVT[k]=l);
 (function(){const it=(k,l)=>`<button class="nav" data-v="${k}" title="${l}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${NAVI[k]}</svg><span class="lbl2">${l}</span><span class="bd" id="bd_${k}"></span></button>`;
   $('#side').innerHTML=`<div class="brand"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div><b>Contas<small>Receber e Pagar</small></b></div>
-  <div class="grp">Receber</div>${it('main','Lançamentos')}${it('dash','Dashboard')}${it('subs','Assinaturas')}${it('links','Links de pagamento')}
-  <div class="grp">Pagar</div>${it('pagar','Contas a pagar')}${it('par','Parceiros')}
+  <div class="grp">Gestão</div>${it('dash','Visão geral')}${it('res','Resultado (DRE)')}
+  <div class="grp">Receber</div>${it('main','Contas a receber')}${it('subs','Assinaturas')}${it('links','Links de pagamento')}
+  <div class="grp">Pagar</div>${it('pagar','Contas a pagar')}${it('par','Parceiros e fornecedores')}
   <div class="grp">Sistema</div>${it('cfg','Configurações')}<div class="sp"></div>
   <button class="fold" id="sideFold" title="Recolher menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span class="lbl2">Recolher menu</span></button>`;
   try{if(localStorage.getItem('sideFold')==='1')document.body.classList.add('fold')}catch{}
@@ -817,32 +854,41 @@ const cbox=(label,val,openUrl)=>val?`<div class="dsec"><h3>${label}</h3><div cla
 document.addEventListener('click',e=>{const b=e.target.closest('[data-copy]');if(b)copyText(b.dataset.copy)});
 
 // ---- Nova cobrança ----
+const dbx=$('#dBaixa');let bxId=0;
+function openBaixa(id){const d=S.deals.find(x=>x.id==id);if(!d)return;bxId=id;$('#bxRes').className='res';$('#bxSub').textContent=`${d.cliente||'—'} · ${d.titulo}`;$('#bxData').value=S.hoje;$('#bxData').max=S.hoje;$('#bxVal').value=d.valor;$('#bxObs').value='';dbx.showModal()}
+$('#bxCancel').onclick=()=>dbx.close();
+$('#fBaixa').onsubmit=async e=>{e.preventDefault();const b=$('#bxOk'),res=$('#bxRes');res.className='res';b.disabled=true;
+  try{await api('POST',`/api/deals/${bxId}/baixar`,{data:$('#bxData').value,valor:$('#bxVal').value,forma:$('#bxForma').value,obs:$('#bxObs').value});dbx.close();toast('Recebimento registrado');load();if(!$('#viewPagar').hidden)loadPagar()}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=false};
 const dn=$('#dNova');let N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};
 const FORMA_HINT={UNDEFINED:'O cliente escolhe boleto, Pix ou cartão na página do link.',BOLETO:'Gera boleto com PDF e linha digitável.',PIX:'Gera QR Code e Pix copia e cola.',CREDIT_CARD:'O cliente informa o cartão na página segura do Asaas — o app não guarda dados de cartão.'};
 function nSetTipo(t){N.tipo=t;document.querySelectorAll('#nTipo button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  const man=t==='manual';$('#nFormaWrap').style.display=man?'none':'';$('#nParc').min=man?1:2;if(man&&+$('#nParc').value<1)$('#nParc').value=1;
   const link=t==='link';$('#nCliWrap').style.display=link?'none':'';$('#nTitWrap').style.display=link?'none':'';$('#nNomeWrap').style.display=link?'':'none';$('#nVencWrap').style.display=link?'none':'';
-  $('#nParcWrap').style.display=t==='parcelada'?'':'none';$('#nAssWrap').style.display=t==='assinatura'?'':'none';$('#nLinkWrap').style.display=link?'':'none';
-  $('#nDescWrap').style.display=link?'none':'';$('#nClassWrap').style.display=link?'none':'';
-  $('#nValLbl').textContent={avulsa:'Valor (R$)',parcelada:'Valor total (R$)',assinatura:'Valor por cobrança (R$)',link:'Valor (R$, opcional)'}[t];
-  $('#nVencLbl').textContent={avulsa:'Vencimento',parcelada:'1º vencimento',assinatura:'1º vencimento'}[t]||'';
-  $('#nSub').textContent={avulsa:'Uma cobrança. Cria o card no funil Contas e emite no Asaas.',parcelada:'Parcelamento do Asaas (boleto, Pix ou cartão em N vezes): um card por parcela.',assinatura:'Cobrança recorrente automática. Cada mês vira um card no funil.',link:'Link reutilizável para enviar ao cliente (WhatsApp, e-mail). Não cria card até alguém pagar.'}[t];
+  $('#nParcWrap').style.display=t==='parcelada'||man?'':'none';$('#nAssWrap').style.display=t==='assinatura'?'':'none';$('#nLinkWrap').style.display=link?'':'none';
+  $('#nDescWrap').style.display=link||man?'none':'';$('#nClassWrap').style.display=link?'none':'';
+  $('#nValLbl').textContent={avulsa:'Valor (R$)',parcelada:'Valor total (R$)',assinatura:'Valor por cobrança (R$)',link:'Valor (R$, opcional)',manual:'Valor total (R$)'}[t];
+  $('#nVencLbl').textContent={avulsa:'Vencimento',parcelada:'1º vencimento',assinatura:'1º vencimento',manual:'1º vencimento'}[t]||'';
+  $('#nSub').textContent={avulsa:'Uma cobrança. Cria o card no funil Contas e emite no Asaas.',parcelada:'Parcelamento do Asaas (boleto, Pix ou cartão em N vezes): um card por parcela.',assinatura:'Cobrança recorrente automática. Cada mês vira um card no funil.',link:'Link reutilizável para enviar ao cliente (WhatsApp, e-mail). Não cria card até alguém pagar.',manual:'Receita SEM cobrança no Asaas (Pix/TED direto, comissão recebida de terceiros etc.). Cria o título a receber; você registra o recebimento quando entrar.'}[t];
   nPrev()}
 function nSetForma(f){N.forma=f;document.querySelectorAll('#nForma button').forEach(b=>b.classList.toggle('on',b.dataset.f===f));$('#nFormaHint').textContent=FORMA_HINT[f];nPrev()}
 function nPrev(){const v=+$('#nVal').value,n=+$('#nParc').value||2;let t='';
-  if(v>0){if(N.tipo==='parcelada')t=`${n}x de ≈ ${brl(v/n)} (total ${brl(v)})`;else if(N.tipo==='assinatura')t=`${brl(v)} a cada ${$('#nCiclo').selectedOptions[0].text.toLowerCase()}`+($('#nMax').value?` · ${$('#nMax').value} cobranças`:'');else if(N.tipo==='avulsa')t=`1 cobrança de ${brl(v)}`;
+  if(v>0){if(N.tipo==='parcelada')t=`${n}x de ≈ ${brl(v/n)} (total ${brl(v)})`;else if(N.tipo==='assinatura')t=`${brl(v)} a cada ${$('#nCiclo').selectedOptions[0].text.toLowerCase()}`+($('#nMax').value?` · ${$('#nMax').value} cobranças`:'');else if(N.tipo==='avulsa')t=`1 cobrança de ${brl(v)}`;else if(N.tipo==='manual')t=n>1?`${n} títulos de ≈ ${brl(v/n)} (total ${brl(v)})`:`1 título de ${brl(v)}`;
     const dv=+$('#nDVal').value;if(dv>0&&N.tipo!=='link')t+=` · desconto ${$('#nDTipo').value==='PERCENTAGE'?dv+'%':brl(dv)} se pagar até ${+$('#nDDias').value||0} dia(s) antes`}
   $('#nPrev').textContent=t}
 const sOpts=()=>N.carteiras.map(w=>`<option value="${esc(w.nome)}">${esc(w.nome)}${w.walletId?' ⚡':''}</option>`).join('');
 function nSplitAdd(){if(!N.carteiras.length){$('#nSplitHint').textContent='Nenhum parceiro cadastrado. Cadastre na aba Parceiros.';return}
-  $('#nSplitHint').textContent='⚡ = recebe direto pelo Asaas (split automático). Os demais viram conta a pagar quando o cliente paga.';const r=document.createElement('div');r.className='srow';r.innerHTML=`<select>${sOpts()}</select><input type="number" step="0.01" min="0.01" placeholder="Valor"><select><option value="%">%</option><option value="R$">R$</option></select><button type="button" class="btn sm" title="Remover">✕</button>`;
-  r.querySelector('button').onclick=()=>r.remove();$('#nSplit').appendChild(r)}
+  $('#nSplitHint').textContent=N.tipo==='manual'?'A comissão vira uma conta a pagar ao parceiro (em Contas a pagar) assim que você registrar o recebimento.':'⚡ = recebe direto pelo Asaas (split automático). Os demais viram conta a pagar quando o cliente paga.';const r=document.createElement('div');r.className='srow';r.innerHTML=`<select>${sOpts()}</select><input type="number" step="0.01" min="0.01" placeholder="Valor"><select><option value="%">%</option><option value="R$">R$</option></select><button type="button" class="btn sm" title="Remover">✕</button>`;
+  r.querySelector('button').onclick=()=>{r.remove();if(!document.querySelector('#nSplit .srow'))nSetCom('sem')};
+  const fill=()=>{const w=N.carteiras.find(x=>x.nome===r.children[0].value);if(!w)return;if(w.perc){r.children[1].value=w.perc;r.children[2].value='%'}else if(w.fixo){r.children[1].value=w.fixo;r.children[2].value='R$'}};r.children[0].onchange=fill;fill();$('#nSplit').appendChild(r)}
 const nSplitText=()=>[...document.querySelectorAll('#nSplit .srow')].map(r=>{const [a,b,c]=[r.children[0].value,r.children[1].value,r.children[2].value];return b?`${a}=${c==='%'?b+'%':'R$ '+String(b).replace('.',',')}`:''}).filter(Boolean).join('; ');
-async function openNova(tipo,prefill){N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};$('#fNova').reset();$('#nSplit').innerHTML='';$('#nSplitHint').textContent='';$('#nRes').className='res';$('#nOut').innerHTML='';$('#nSel').style.display='none';$('#nOk').style.display='';$('#nOk').disabled=false;
-  try{const ps=await api('GET','/api/parceiros'),lg=await api('GET','/api/carteiras');N.carteiras=[...ps.filter(x=>!x.inativo).map(x=>({nome:x.nome,walletId:x.wallet})),...lg.filter(w=>!ps.some(x=>x.nome.toLowerCase()===w.nome.toLowerCase()))]}catch{}
+function nSetCom(c){document.querySelectorAll('#nCom button').forEach(b=>b.classList.toggle('on',b.dataset.c===c));$('#nComBox').style.display=c==='com'?'':'none';if(c==='com'&&!document.querySelector('#nSplit .srow'))nSplitAdd();if(c==='sem')$('#nSplit').innerHTML=''}
+async function openNova(tipo,prefill){N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};nSetCom('sem');$('#fNova').reset();$('#nSplit').innerHTML='';$('#nSplitHint').textContent='';$('#nRes').className='res';$('#nOut').innerHTML='';$('#nSel').style.display='none';$('#nOk').style.display='';$('#nOk').disabled=false;
+  try{const ps=await api('GET','/api/parceiros'),lg=await api('GET','/api/carteiras');N.carteiras=[...ps.filter(x=>!x.inativo).map(x=>({nome:x.nome,walletId:x.wallet,perc:x.perc,fixo:x.fixo})),...lg.filter(w=>!ps.some(x=>x.nome.toLowerCase()===w.nome.toLowerCase()))]}catch{}
   fillSel($('#nCat'),S.listas.categorias,'','Sem categoria');fillSel($('#nPl'),S.listas.planos,'','Sem tipo de licença');plWrap($('#nCat'),$('#nPlWrap'));
   if(S.escopo&&(S.escopo.companyId||S.escopo.contactId)){N.cli=S.escopo.companyId?{tipo:'company',id:S.escopo.companyId,nome:S.escopo.nome}:{tipo:'contact',id:S.escopo.contactId,nome:S.escopo.nome};$('#nCli').value=S.escopo.nome;$('#nCli').readOnly=true;$('#nBusca').style.display='none'}
   else{$('#nCli').readOnly=false;$('#nBusca').style.display=''}
   $('#nVenc').value=addD(S.hoje,7);nSetForma('UNDEFINED');nSetTipo(tipo||'avulsa');dn.showModal()}
+$('#nCom').onclick=e=>{const b=e.target.closest('button[data-c]');if(b)nSetCom(b.dataset.c)};
 $('#nTipo').onclick=e=>{const b=e.target.closest('button[data-t]');if(b)nSetTipo(b.dataset.t)};
 $('#nForma').onclick=e=>{const b=e.target.closest('button[data-f]');if(b)nSetForma(b.dataset.f)};
 ['nVal','nParc','nCiclo','nMax','nDVal','nDTipo','nDDias'].forEach(i=>$('#'+i).addEventListener('input',nPrev));
@@ -861,12 +907,12 @@ $('#fNova').onsubmit=async e=>{e.preventDefault();const t=N.tipo,res=$('#nRes');
   else{if(!N.cli){res.className='res bad';res.textContent='Busque e selecione o cliente.';return}
     Object.assign(body,{titulo:$('#nTit').value,venc:$('#nVenc').value,[N.cli.tipo==='company'?'companyId':'contactId']:N.cli.id,doc:$('#nDoc').value||undefined,categoria:$('#nCat').value,plano:$('#nCat').value===S.listas.licenca?$('#nPl').value:''});
     if(+$('#nDVal').value>0)body.desconto={valor:+$('#nDVal').value,tipo:$('#nDTipo').value,dias:+$('#nDDias').value||0};
-    if(t==='parcelada')body.parcelas=$('#nParc').value;
+    if(t==='parcelada'||t==='manual')body.parcelas=$('#nParc').value;
     if(t==='assinatura'){body.ciclo=$('#nCiclo').value;body.maxCobrancas=$('#nMax').value||undefined;body.fim=$('#nFim').value||undefined}}
-  if(S.asaas.env==='production'&&!confirm('Você está em PRODUÇÃO: isto cria uma cobrança REAL no Asaas e o cliente pode ser notificado. Continuar?'))return;
+  if(t!=='manual'&&S.asaas.env==='production'&&!confirm('Você está em PRODUÇÃO: isto cria uma cobrança REAL no Asaas e o cliente pode ser notificado. Continuar?'))return;
   const b=$('#nOk');b.disabled=true;
   try{const r=await api('POST','/api/cobrar',body);res.className='res ok';
-    res.textContent={avulsa:'Cobrança criada e card gravado no funil.',parcelada:`Parcelamento criado: ${r.parcelas} cards no funil.`,assinatura:'Assinatura criada. Novas cobranças viram cards automaticamente.',link:'Link de pagamento criado.'}[t];
+    res.textContent={avulsa:'Cobrança criada e card gravado no funil.',parcelada:`Parcelamento criado: ${r.parcelas} cards no funil.`,assinatura:'Assinatura criada. Novas cobranças viram cards automaticamente.',link:'Link de pagamento criado.',manual:`Recebimento criado: ${r.parcelas} título(s) no contas a receber.`}[t];
     $('#nOut').innerHTML=cbox(t==='link'?'Link de pagamento':'Link da cobrança',r.link,true)+cbox('Boleto (PDF)',r.boleto,true)+cbox('Linha digitável',r.linha)+cbox('Pix copia e cola',r.pix);
     $('#nOk').style.display='none';load();if(t==='link')loadLinks()}
   catch(x){res.className='res bad';res.textContent=x.message;b.disabled=false}};
@@ -1042,6 +1088,37 @@ function closeDrawer(){$('#drawer').classList.remove('open');$('#drawer').setAtt
 $('#bDash').onclick=openDrawer;$('#drClose').onclick=closeDrawer;$('#dim').onclick=closeDrawer;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
 
+
+// ================= resultado (DRE) =================
+let RS=null,rsMes='',rsReg='caixa';
+const rsAdd=(m,n)=>{const [y,mo]=m.split('-').map(Number),t=y*12+mo-1+n;return `${Math.floor(t/12)}-${String(t%12+1).padStart(2,'0')}`};
+const rsLbl=m=>{const [y,mo]=m.split('-');return ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+mo-1]+' '+y};
+async function loadRes(){if(!rsMes)rsMes=(S&&S.hoje||new Date().toISOString().slice(0,10)).slice(0,7);
+  try{RS=await api('GET',`/api/gestao?mes=${rsMes}&regime=${rsReg}`)}catch(x){toast(x.message);return}renderRes()}
+function renderRes(){const g=RS,d=g.dre,cx=d.regime==='caixa',pc=(v)=>v===null||v===undefined?'':v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+  $('#rsMesLbl').textContent=rsLbl(g.mes);document.querySelectorAll('#rsReg button').forEach(b=>b.classList.toggle('on',b.dataset.r===d.regime));
+  $('#rsHint').textContent=cx?'Caixa: só o que foi recebido/pago neste mês.':'Competência: tudo que vence neste mês, pago ou não.';
+  const kp=(cls,icn,l,v,sb)=>`<div class="card kpi"><div class="ico ${cls}">${ic(icn,20)}</div><div><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${sb}</div></div></div>`;
+  $('#rsKpis').style.cssText='grid-template-columns:repeat(auto-fit,minmax(200px,1fr))';
+  $('#rsKpis').innerHTML=kp('c-blue',I.check,'Receita bruta',brl(d.receitaBruta),cx?'recebido no mês':'a receber no mês')+kp('c-green',I.list,'Margem da Manda4',brl(d.margem),d.margemPct===null?'sem receita':pc(d.margemPct)+' da receita')+kp('c-amber',I.clock,'Despesas',brl(d.despesas),'sem parceiro/venda')+kp(d.resultado<0?'c-red':'c-green',d.resultado<0?I.alert:I.check,'Resultado',`<span style="color:${d.resultado<0?'var(--red)':'inherit'}">${brl(d.resultado)}</span>`,d.resultadoPct===null?'—':pc(d.resultadoPct)+' da receita');
+  $('#rsSub').textContent=`${rsLbl(g.mes)} · regime de ${cx?'caixa':'competência'}`+(!cx?` · ainda a receber ${brl(d.aReceber)} · ainda a pagar ${brl(d.aPagar)}`:'');
+  const row=(l,v,o={})=>`<tr style="${o.b?'font-weight:700;background:var(--surface2)':''}"><td style="text-align:left;padding-left:${o.i?28:10}px;${o.m?'color:var(--mut)':''}">${l}</td><td class="num">${o.neg&&v?'− ':''}${brl(v)}</td><td class="num mut">${d.receitaBruta&&v?pc(v/d.receitaBruta*100):''}</td></tr>`;
+  $('#rsDre').innerHTML=row('Receita bruta',d.receitaBruta,{b:1})+d.receitaPorOrigem.map(o=>row(esc(o.nome)+` <small>(${o.qtd})</small>`,o.valor,{i:1,m:1})).join('')
+   +row('(−) Taxas de cobrança (Asaas)',d.taxas,{neg:1})+row('(−) Comissões e repasses a parceiros',d.comissoes,{neg:1})+row('= Margem da Manda4',d.margem,{b:1})
+   +row('(−) Despesas operacionais',d.despesas,{neg:1})+d.despesasPorCategoria.map(o=>row(esc(o.nome)+` <small>(${o.qtd})</small>`,o.valor,{i:1,m:1})).join('')+row('= Resultado do período',d.resultado,{b:1});
+  const p=g.posicao;
+  $('#rsPos').innerHTML=[['A receber',p.aReceber,p.receberAtrasado?`${brl(p.receberAtrasado)} em atraso`:'em dia','var(--v3)'],['A pagar',p.aPagar,p.pagarAtrasado?`${brl(p.pagarAtrasado)} em atraso`:'em dia','var(--vw)'],['Repasses aguardando recebimento',p.repassesAguardando,'dependem de clientes pagarem','var(--mut)']].map(([l,v,s2,c])=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)"><div><i class="sw" style="background:${c}"></i> <b>${l}</b><div class="mini">${s2}</div></div><b>${brl(v)}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding:12px 0 0"><b>Saldo projetado</b><b style="color:${p.saldoProjetado<0?'var(--red)':'var(--green)'}">${brl(p.saldoProjetado)}</b></div><p class="mini">A receber − a pagar (sem contar o caixa que você já tem).</p>`;
+  // gráfico: barras agrupadas (receita × saídas) — a tabela abaixo é o equivalente em texto
+  const sr=g.serie,mx=Math.max(1,...sr.flatMap(x=>[x.receita,x.comissoes+x.despesas])),W=640,H=190,bw=22,gap=(W-40)/sr.length;
+  $('#rsChart').innerHTML=`<svg viewBox="0 0 ${W} ${H+24}" style="width:100%;max-height:260px" role="img" aria-label="Receita e saídas por mês"><line x1="30" x2="${W}" y1="${H}" y2="${H}" stroke="var(--line)"/>`+sr.map((x,i)=>{const cx0=30+gap*i+gap/2,h1=x.receita/mx*(H-14),h2=(x.comissoes+x.despesas)/mx*(H-14);return `<g><title>${x.label}: receita ${brl(x.receita)} · saídas ${brl(x.comissoes+x.despesas)} · resultado ${brl(x.resultado)}</title><rect x="${cx0-bw-1}" y="${H-h1}" width="${bw}" height="${h1}" rx="3" fill="var(--v3)"/><rect x="${cx0+1}" y="${H-h2}" width="${bw}" height="${h2}" rx="3" fill="var(--vw)"/><text x="${cx0}" y="${H+16}" text-anchor="middle" font-size="11" fill="var(--mut)">${x.label}</text></g>`}).join('')+'</svg>';
+  $('#rsSH').innerHTML='<tr><th></th>'+sr.map(x=>`<th class="num">${x.label}</th>`).join('')+'</tr>';
+  $('#rsSB').innerHTML=[['Receita',x=>x.receita],['Comissões',x=>x.comissoes],['Despesas',x=>x.despesas],['Resultado',x=>x.resultado]].map(([l,f],i)=>`<tr style="${i===3?'font-weight:700':''}"><td style="text-align:left">${l}</td>`+sr.map(x=>`<td class="num" style="${i===3&&f(x)<0?'color:var(--red)':''}">${brl(f(x))}</td>`).join('')+'</tr>').join('');
+  const bar=(items,tot)=>items.length?items.map(o=>`<div style="display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin-bottom:10px"><b style="text-align:left">${esc(o.nome)} <small class="mut">(${o.qtd})</small></b><b>${brl(o.valor)}</b><div style="grid-column:1/-1;height:6px;border-radius:4px;background:var(--graybg)"><i style="display:block;height:100%;width:${tot?o.valor/tot*100:0}%;border-radius:4px;background:var(--v3)"></i></div></div>`).join(''):'<div class="mut">Nada neste período.</div>';
+  $('#rsOri').innerHTML=bar(d.receitaPorOrigem,d.receitaBruta);$('#rsPar').innerHTML=bar(d.comissaoPorParceiro,d.comissoes);
+}
+$('#rsMes').onclick=e=>{const b=e.target.closest('button[data-m]');if(b){rsMes=rsAdd(rsMes,+b.dataset.m);loadRes()}};
+$('#rsReg').onclick=e=>{const b=e.target.closest('button[data-r]');if(b){rsReg=b.dataset.r;loadRes()}};$('#rsRef').onclick=loadRes;
+
 // ================= contas a pagar e parceiros =================
 let AP={contas:[],resumo:{},parceiros:[],consts:{},hoje:'',pronto:false},apTab='abertas',apOrigem=0;const apSel=new Set();
 const AP_ST={aguardando:['Aguardando recebimento','c-slate'],aberto:['A pagar','c-blue'],proximo:['Vence em breve','c-amber'],atrasado:['Atrasado','c-red'],pago:['Pago','c-green'],cancelado:['Cancelado','c-gray']};
@@ -1057,7 +1134,7 @@ function relVenc(c){if(c.estado==='pago')return c.pagoEm?`<small class="okc">pag
   return d<0?`<small class="late">${-d} dia${-d>1?'s':''} em atraso</small>`:d===0?'<small class="soon">vence hoje</small>':d<=7?`<small class="soon">em ${d} dia${d>1?'s':''}</small>`:`<small class="mut">em ${d} dias</small>`}
 function apFiltered(){const q=$('#apQ').value.trim().toLowerCase(),par=$('#apPar').value,cat=$('#apCat').value,de=$('#apDe').value,ate=$('#apAte').value;
   const tabs={consolidado:c=>c.estado==='consolidado',abertas:c=>ABERTAS.includes(c.estado),aguardando:c=>c.estado==='aguardando',proximo:c=>c.estado==='proximo',atrasado:c=>c.estado==='atrasado',pago:c=>c.estado==='pago',cancelado:c=>c.estado==='cancelado',todas:()=>true};
-  return AP.contas.filter(c=>apTab==='consolidado'||!c.lote).filter(tabs[apTab]).filter(c=>!apOrigem||c.origem===apOrigem).filter(c=>!par||(par==='__livre'?!c.parceiroId:String(c.parceiroId)===par)).filter(c=>!cat||c.categoria===cat)
+  return AP.contas.filter(c=>apTab==='consolidado'||!c.lote).filter(tabs[apTab]).filter(c=>!apOrigem||c.origem===apOrigem).filter(c=>{const t=$('#apTipo').value;return !t||(t==='repasse'?c.origem>0:!c.origem)}).filter(c=>!par||(par==='__livre'?!c.parceiroId:String(c.parceiroId)===par)).filter(c=>!cat||c.categoria===cat)
     .filter(c=>!de||(c.venc&&c.venc>=de)).filter(c=>!ate||(c.venc&&c.venc<=ate)).filter(c=>!q||`${c.beneficiario} ${c.titulo} ${c.id} ${c.regra}`.toLowerCase().includes(q))
     .sort((a,b)=>(a.venc||'9999').localeCompare(b.venc||'9999')||a.id-b.id)}
 function renderPagar(){const r=AP.resumo||{};{const bd=$('#bd_pagar');if(bd)bd.textContent=r.atrasado&&r.atrasado.qtd?r.atrasado.qtd:''}
@@ -1082,12 +1159,12 @@ function renderPagar(){const r=AP.resumo||{};{const bd=$('#bd_pagar');if(bd)bd.t
       c.estado==='pago'?`<button data-ap="desfazer" data-id="${c.id}">${ic(I.x,16)}Desfazer pagamento</button>`:'',!fin&&!c.lote&&!eCons?`<button class="dng" data-ap="cancelar" data-id="${c.id}">${ic(I.x,16)}Cancelar conta</button>`:''].join('');
     return `<tr class="${sel?'picked':''}"><td class="ck">${tick}</td><td class="due"><b>${c.venc?dbr(c.venc):'—'}</b>${relVenc(c)}</td>
       <td><div class="cli"><div class="av ${AVC[c.id%5]}">${esc(initials(c.beneficiario||'?'))}</div><div><b>${esc(c.beneficiario||'Sem beneficiário')}</b><small>#${c.id} · ${esc(c.titulo)}</small>
-      <div>${c.regra?`<span class="chip3">${esc(c.regra)}</span>`:''}${c.origem?`<span class="chip3">Origem #${c.origem}</span>`:''}${c.parcela?`<span class="chip3">${esc(c.parcela)}</span>`:''}${auto?'<span class="chip3 auto">⚡ Split automático</span>':''}${eCons?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.id}">Consolidado · ${c.itens.length} título${c.itens.length>1?'s':''} · ver quais</button>`:''}${c.lote?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.lote}">No consolidado #${c.lote}</button>`:''}${eCons&&c.enviadoEm?`<span class="chip3 auto" title="${esc(c.enviadoPara||'')}">✉ enviado ${dbr(c.enviadoEm.slice(0,10))}</span>`:''}${c.splitSt?`<span class="chip3">Split: ${esc(SPLIT_ST[c.splitSt]||c.splitSt)}</span>`:''}</div></div></div></td>
+      <div>${eCons?'':c.origem?'<span class="chip3 auto">Repasse de venda</span>':'<span class="chip3">Despesa</span>'}${c.regra?`<span class="chip3">${esc(c.regra)}</span>`:''}${c.origem?`<span class="chip3">Origem #${c.origem}</span>`:''}${c.parcela?`<span class="chip3">${esc(c.parcela)}</span>`:''}${auto?'<span class="chip3 auto">⚡ Split automático</span>':''}${eCons?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.id}">Consolidado · ${c.itens.length} título${c.itens.length>1?'s':''} · ver quais</button>`:''}${c.lote?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.lote}">No consolidado #${c.lote}</button>`:''}${eCons&&c.enviadoEm?`<span class="chip3 auto" title="${esc(c.enviadoPara||'')}">✉ enviado ${dbr(c.enviadoEm.slice(0,10))}</span>`:''}${c.splitSt?`<span class="chip3">Split: ${esc(SPLIT_ST[c.splitSt]||c.splitSt)}</span>`:''}</div></div></div></td>
       <td>${c.categoria?`<span class="tag">${esc(c.categoria)}</span>`:'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(c.valor)}${c.estado==='pago'&&c.valorPago&&c.valorPago!==c.valor?`<div class="mini">pago ${brl(c.valorPago)}</div>`:''}</td>
       <td>${apPill(c.estado)}${c.forma&&c.estado==='pago'?`<div class="mini" style="margin-top:4px">${esc(c.forma)}${c.comprovante?' · '+esc(c.comprovante):''}</div>`:''}</td>
       <td><div class="acts">${open&&!c.lote?`<button class="btn sm" data-ap="pagar" data-id="${c.id}">${ic(I.check,14)}Pagar</button>`:''}<details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details></div></td></tr>`}).join('');renderSel(list)}
-['apQ','apDe','apAte'].forEach(i=>$('#'+i).addEventListener('input',()=>renderPagar()));['apPar','apCat'].forEach(i=>$('#'+i).addEventListener('change',()=>renderPagar()));
+['apQ','apDe','apAte'].forEach(i=>$('#'+i).addEventListener('input',()=>renderPagar()));['apTipo','apPar','apCat'].forEach(i=>$('#'+i).addEventListener('change',()=>renderPagar()));
 $('#apTabs').onclick=e=>{const b=e.target.closest('button[data-t]');if(b){apTab=b.dataset.t;renderPagar()}};
 $('#apRef').onclick=loadPagar;
 $('#apCsv').onclick=()=>{const q=csvq,list=apFiltered();

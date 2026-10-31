@@ -10,6 +10,7 @@ const { createSecrets } = require('./lib/secrets');
 const { createSettingsApi } = require('./lib/settingsApi');
 const { createMailer } = require('./lib/mailer');
 const R = require('./lib/rules');
+const G = require('./lib/gestao');
 
 // .env opcional (a plataforma de deploy já injeta as variáveis no processo).
 try {
@@ -81,6 +82,14 @@ const routes = {
     const q = u.searchParams;
     return svc.painel({ deal: q.get('deal'), company: q.get('company'), contact: q.get('contact') });   // { escopo, dashes: { 3, 6, 12 } }
   },
+  // Resultado gerencial (DRE): ?mes=AAAA-MM&regime=caixa|competencia
+  'GET /api/gestao': async (u) => {
+    if (!bitrix.enabled) { const e = new Error('Bitrix24 não configurado'); e.status = 503; throw e; }
+    const hoje = R.todayBR(), mes = /^\d{4}-(0[1-9]|1[0-2])$/.test(u.searchParams.get('mes') || '') ? u.searchParams.get('mes') : hoje.slice(0, 7);
+    const regime = u.searchParams.get('regime') === 'competencia' ? 'competencia' : 'caixa';
+    const [deals, contas] = await Promise.all([svc.dealsCached(30000), svc.pagar.contasCached(30000).catch(() => [])]);
+    return { hoje, mes, regime, dre: G.dre(deals, contas, { mes, regime }), serie: G.serie(deals, contas, { mes, regime, meses: 6 }), posicao: G.posicao(deals, contas, hoje) };
+  },
   'PUT /api/config': async (_, body) => {
     const p = {};
     if (typeof body.autoCreate === 'boolean') p.autoCreate = body.autoCreate;
@@ -132,6 +141,8 @@ const dealRoutes = {
   detalhe: async c => svc.detalhe(c),
   receber: async (c, body) => svc.receberDinheiro(c, body),
   estornar: async (c, body) => svc.estornar(c, body),
+  baixar: async (c, body) => svc.baixaManual(c, body),
+  desbaixar: async c => svc.desfazerBaixa(c),
   editar: async (c, body) => svc.editar(c, body),
   categoria: async (c, body) => { await svc.classify(c, String(body.categoria || ''), String(body.plano || '')); return { ok: true }; },
   doc: async (c, body) => { await svc.setDoc(c.id, body.doc); return { ok: true }; },
@@ -146,7 +157,7 @@ const server = http.createServer(async (req, res) => {
     const key = `${req.method} ${u.pathname}`;
     if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
-    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar|editar|detalhe|receber|estornar)$/);
+    const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar|editar|detalhe|receber|estornar|baixar|desbaixar)$/);
     if (m && req.method === 'POST') {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });
