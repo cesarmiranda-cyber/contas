@@ -172,6 +172,27 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 .r2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 .prev{margin-top:12px;padding:10px 12px;background:var(--brandbg);color:var(--brand);border-radius:11px;font-weight:600;font-size:13px}.prev:empty{display:none}
 .toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;z-index:99;max-width:92%;transition:.25s;font-weight:550;box-shadow:0 14px 30px -10px rgba(0,0,0,.5)}.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ===== layout com menu lateral ===== */
+.shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px;padding:16px 12px;background:var(--surface);border-right:1px solid var(--line);overflow-y:auto}
+.side .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 16px}.side .brand b{font-size:15.5px;letter-spacing:-.01em;line-height:1.15}.side .brand small{display:block;color:var(--mut);font-weight:500;font-size:11.5px}
+.side .grp{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);padding:14px 10px 5px}
+.side button.nav{display:flex;align-items:center;gap:11px;width:100%;border:0;background:transparent;color:var(--ink2);padding:9px 10px;border-radius:11px;font:inherit;font-weight:600;cursor:pointer;text-align:left;position:relative}
+.side button.nav svg{width:18px;height:18px;flex:none}.side button.nav:hover{background:var(--surface2);color:var(--ink)}
+.side button.nav.on{background:var(--brandbg);color:var(--brand)}.side button.nav.on::before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--brand)}
+.side .nav .bd{margin-left:auto;font-size:11px;font-weight:700;background:var(--redbg);color:var(--red);padding:1px 7px;border-radius:99px}.side .nav .bd:empty{display:none}
+.side .sp{flex:1}.side .fold{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--mut);padding:8px 10px;border-radius:10px;font:inherit;font-size:12.5px;cursor:pointer}.side .fold:hover{color:var(--ink)}
+.side .fold svg{width:16px;height:16px;transition:.2s}
+body.fold .shell{grid-template-columns:68px minmax(0,1fr)}body.fold .side .lbl2,body.fold .side .grp,body.fold .side .brand b,body.fold .side .nav .bd{display:none}body.fold .side{padding:16px 8px}body.fold .side .brand{justify-content:center;padding:4px 0 14px}body.fold .side button.nav{justify-content:center;padding:10px}body.fold .side button.nav.on::before{left:-8px}body.fold .side .fold svg{transform:rotate(180deg)}body.fold .side .fold{justify-content:center}
+.content{min-width:0}.top .logo,.top .ttl h1+.sub{display:none}.top .ttl h1{font-size:19px}
+.top .ttl .sub{display:flex!important}
+.vtabs{display:none!important}
+body[data-view=pagar] #bNova,body[data-view=pagar] #bGerar,body[data-view=pagar] #bImp,body[data-view=pagar] #bDash,body[data-view=par] #bNova,body[data-view=par] #bGerar,body[data-view=par] #bImp,body[data-view=par] #bDash,body[data-view=cfg] #bNova,body[data-view=cfg] #bGerar,body[data-view=cfg] #bImp,body[data-view=cfg] #bDash,body[data-view=subs] #bGerar,body[data-view=subs] #bImp,body[data-view=links] #bGerar,body[data-view=links] #bImp,body[data-view=dash] #bGerar,body[data-view=dash] #bImp,body[data-view=dash] #bDash{display:none}
+#bCfg{display:none}
+body.scoped .shell{display:block}body.scoped .side{display:none}
+@media(max-width:900px){.shell{grid-template-columns:68px minmax(0,1fr)}.side .lbl2,.side .grp,.side .brand b,.side .nav .bd,.side .fold{display:none}.side{padding:16px 8px}.side .brand{justify-content:center;padding:4px 0 14px}.side button.nav{justify-content:center;padding:10px}.side button.nav.on::before{left:-8px}}
+@media(max-width:560px){.shell{grid-template-columns:54px minmax(0,1fr)}.side{padding:12px 5px}.side button.nav{padding:9px 6px}}
 @media(max-width:980px){.cuts{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){
   main{padding:14px}.bar{padding:10px 14px}.kpis{gap:10px}.kpi{padding:13px;flex-direction:column;gap:8px}.hero .big{font-size:28px}
@@ -185,10 +206,13 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 }
 </style>
 </head>
-<body>
+<body data-view="main">
+<div class="shell">
+<aside class="side" id="side" aria-label="Menu principal"></aside>
+<div class="content">
 <div class="top"><div class="bar">
   <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div>
-  <div class="ttl"><h1>Contas a Receber</h1><div class="sub" id="sub"><span class="dot off"></span>carregando…</div></div>
+  <div class="ttl"><h1 id="pgTitle">Lançamentos</h1><div class="sub" id="sub"><span class="dot off"></span>carregando…</div></div>
   <div class="tools">
     <span class="env bad" id="env"></span>
     <button class="btn pri" id="bNova"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nova cobrança</span></button>
@@ -347,6 +371,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 
   </div>
 </main>
+</div></div>
 
 <dialog id="dGerar"><form method="dialog" id="fGerar">
   <h2>Gerar parcelas</h2><p class="hint">Cria uma deal por cobrança no funil Contas.</p>
@@ -720,10 +745,21 @@ $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disable
 let CFG=null,aEnv='sandbox';
 const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
 const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
-function showView(v){['main','cfg','subs','links','dash','pagar','par'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
+function showView(v){document.body.dataset.view=v;$('#pgTitle').textContent=NAVT[v]||'Contas';document.querySelectorAll('#side button.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));['main','cfg','subs','links','dash','pagar','par'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
   if(v==='cfg'){loadSettings();location.hash='config'}else history.replaceState(null,'',location.pathname+location.search);
   if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();if(v==='dash')loadDash($('#dashHost'),{});if(v==='pagar'||v==='par')loadPagar();window.scrollTo(0,0)}
 const VTABS=[['main','Lançamentos'],['dash','Dashboard'],['pagar','Contas a pagar'],['par','Parceiros'],['subs','Assinaturas'],['links','Links de pagamento']];
+const NAVI={main:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',dash:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',pagar:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>',par:'<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',subs:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',links:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',cfg:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
+const NAVT={cfg:'Configurações'};VTABS.forEach(([k,l])=>NAVT[k]=l);
+(function(){const it=(k,l)=>`<button class="nav" data-v="${k}" title="${l}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${NAVI[k]}</svg><span class="lbl2">${l}</span><span class="bd" id="bd_${k}"></span></button>`;
+  $('#side').innerHTML=`<div class="brand"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div><b>Contas<small>Receber e Pagar</small></b></div>
+  <div class="grp">Receber</div>${it('main','Lançamentos')}${it('dash','Dashboard')}${it('subs','Assinaturas')}${it('links','Links de pagamento')}
+  <div class="grp">Pagar</div>${it('pagar','Contas a pagar')}${it('par','Parceiros')}
+  <div class="grp">Sistema</div>${it('cfg','Configurações')}<div class="sp"></div>
+  <button class="fold" id="sideFold" title="Recolher menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span class="lbl2">Recolher menu</span></button>`;
+  try{if(localStorage.getItem('sideFold')==='1')document.body.classList.add('fold')}catch{}
+  $('#side').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='sideFold'){const f=document.body.classList.toggle('fold');try{localStorage.setItem('sideFold',f?'1':'0')}catch{}return}if(b.dataset.v)showView(b.dataset.v)}})();
+document.querySelector('#side button[data-v=main]').classList.add('on');
 document.querySelectorAll('.vtabs').forEach(v=>{v.innerHTML=VTABS.map(([k,l])=>`<button data-v="${k}" class="${v.dataset.active===k?'on':''}">${l}</button>`).join('')});
 document.addEventListener('click',e=>{const b=e.target.closest('.vtabs button[data-v]');if(b)showView(b.dataset.v)});
 $('#bCfg').onclick=()=>showView('cfg');$('#cBack').onclick=()=>showView('main');$('#bannerBtn').onclick=()=>showView('cfg');
@@ -1024,7 +1060,7 @@ function apFiltered(){const q=$('#apQ').value.trim().toLowerCase(),par=$('#apPar
   return AP.contas.filter(c=>apTab==='consolidado'||!c.lote).filter(tabs[apTab]).filter(c=>!apOrigem||c.origem===apOrigem).filter(c=>!par||(par==='__livre'?!c.parceiroId:String(c.parceiroId)===par)).filter(c=>!cat||c.categoria===cat)
     .filter(c=>!de||(c.venc&&c.venc>=de)).filter(c=>!ate||(c.venc&&c.venc<=ate)).filter(c=>!q||`${c.beneficiario} ${c.titulo} ${c.id} ${c.regra}`.toLowerCase().includes(q))
     .sort((a,b)=>(a.venc||'9999').localeCompare(b.venc||'9999')||a.id-b.id)}
-function renderPagar(){const r=AP.resumo||{};
+function renderPagar(){const r=AP.resumo||{};{const bd=$('#bd_pagar');if(bd)bd.textContent=r.atrasado&&r.atrasado.qtd?r.atrasado.qtd:''}
   const kp=(cls,icn,l,v,sb)=>`<div class="card kpi"><div class="ico ${cls}">${ic(icn,20)}</div><div><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${sb}</div></div></div>`;
   $('#apKpis').innerHTML=AP.pronto?kp('c-blue',I.clock,'A pagar',brl(r.aPagar?.valor),`${r.aPagar?.qtd||0} conta(s)`)+kp('c-amber',I.alert,'Vence em 7 dias',brl(r.venceEm7),'a pagar na semana')+kp('c-red',I.alert,'Atrasado',brl(r.atrasado?.valor),`${r.atrasado?.qtd||0} conta(s)`)+kp('c-gray',I.list,'Aguardando recebimento',brl(r.aguardando?.valor),`${r.aguardando?.qtd||0} repasse(s) ligados a cobranças`)+kp('c-green',I.check,'Pago no mês',brl(r.pagoMes),`${r.pago?.qtd||0} pago(s) no total`):`<div class="card pad" style="grid-column:1/-1"><b>Preparando o módulo…</b><div class="mini">O funil “Contas a Pagar” é criado no Bitrix na próxima sincronização. Clique em <b>Sincronizar</b> no topo.</div></div>`;
   const cnt=f=>AP.contas.filter(c=>f.cons||!c.lote).filter(f).length,T=[['abertas','Abertas',c=>ABERTAS.includes(c.estado)],['aguardando','Aguardando recebimento',c=>c.estado==='aguardando'],['proximo','Vencem em breve',c=>c.estado==='proximo'],['atrasado','Atrasadas',c=>c.estado==='atrasado'],['pago','Pagas',c=>c.estado==='pago'],['consolidado','Em consolidado',Object.assign(c=>c.estado==='consolidado',{cons:true})],['cancelado','Canceladas',c=>c.estado==='cancelado'],['todas','Todas',()=>true]];
