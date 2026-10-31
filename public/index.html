@@ -538,8 +538,12 @@ const mesLabel=k=>k?`${MESES[+k.slice(5,7)-1]}/${k.slice(0,4)}`:'Sem data';
 const STAGE_ORD={'C90:GERAR':0,'C90:PREPARATION':1,'C90:PREPAYMENT_INVOIC':2,'C90:NEW':3,'C90:CONTRATADO':4,'C90:WON':5,'C90:LOSE':6};
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),4200)}
-async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
-async function load(){try{S=await api('GET','/api/state'+(SCOPE?'?'+SCOPE:''));$('#banner').style.display='none';render();if(SCOPE&&typeof loadDash==='function')loadDash($('#scopedDash'),{})}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message);if(/não configurado/i.test(e.message)){$('#bannerTxt').textContent='Falta conectar o Bitrix24. Abra as Configurações e informe o webhook.';$('#banner').style.display='flex'}}}
+const safeUrl=u=>/^https?:\/\//i.test(String(u||'').trim())?String(u).trim():'#';
+// CSV: protege contra fórmulas do Excel (= + @ e - que não seja número) em textos vindos do Bitrix/usuários.
+const csvq=v=>{let t=String(v??'');if(/^[=+@\t\r]/.test(t)||/^-(?!\d[\d.,]*$)/.test(t))t="'"+t;return `"${t.replace(/"/g,'""')}"`};
+let BX_HOST='manda4.bitrix24.com.br';
+async function api(m,u,b){let r;try{r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined})}catch{throw new Error('Sem conexão com o servidor. Verifique a internet e tente de novo.')}const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||`Erro ${r.status} do servidor${r.status>=502?' (indisponível, tente em instantes)':''}`);return j}
+async function load(){try{S=await api('GET','/api/state'+(SCOPE?'?'+SCOPE:''));$('#banner').style.display='none';if(S.bitrixHost)BX_HOST=S.bitrixHost;render();if(SCOPE&&typeof loadDash==='function')loadDash($('#scopedDash'),{})}catch(e){$('#sub').innerHTML='<span class="dot err"></span>Erro: '+esc(e.message);if(/não configurado/i.test(e.message)){$('#bannerTxt').textContent='Falta conectar o Bitrix24. Abra as Configurações e informe o webhook.';$('#banner').style.display='flex'}}}
 const fmtDoc=d=>{d=String(d||'').replace(/\D/g,'');return d.length===11?d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4'):d.length===14?d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):d};
 const initials=n=>(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase();
 function dueText(d){
@@ -610,7 +614,7 @@ function render(){
       d.asaasId?`<button data-a="detalhe" data-id="${d.id}">${ic(I.link,16)}Ver cobrança (boleto, Pix, split)</button>`:'',
       `<button data-a="editar" data-id="${d.id}">${ic(I.doc,16)}Editar lançamento</button>`,
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
-      `<a href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
+      `<a href="https://${BX_HOST}/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
     return `<tr class="${d.id===CUR_DEAL?'cur':''}">
       <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.split?`<span class="chip3" title="${esc(d.split)}">Split: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
@@ -620,7 +624,7 @@ function render(){
       <td class="due"><b>${dv}</b>${ds}</td>
       <td><span class="pill ${sc}">${sl}</span>${d.avisos.length?`<div class="mut" style="font-size:11.5px;margin-top:4px">avisos: ${d.avisos.map(o=>o===0?'D0':o<0?'D'+o:'D+'+o).join(' · ')}</div>`:''}</td>
       <td><div class="acts">
-        ${d.link?`<a class="btn sm" href="${esc(d.link)}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a><button class="btn sm" data-a="copy" data-v="${esc(d.link)}" title="Copiar link de pagamento">${ic(I.doc,14)}Copiar</button>`:''}
+        ${d.link?`<a class="btn sm" href="${esc(safeUrl(d.link))}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a><button class="btn sm" data-a="copy" data-v="${esc(d.link)}" title="Copiar link de pagamento">${ic(I.doc,14)}Copiar</button>`:''}
         <button class="btn sm" data-a="editar" data-id="${d.id}">${ic(I.doc,14)}Editar</button>
         ${d.stageId==='C90:GERAR'?`<button class="btn sm" data-a="gerar" data-id="${d.id}">${ic(I.send,14)}Gerar</button>`:''}
         ${!fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
@@ -675,7 +679,7 @@ document.querySelector('.fbar').onclick=e=>{const b=e.target.closest('.chip2[dat
   b.classList.add('on')};
 $('#gMes').onchange=e=>{groupMes=e.target.checked;render()};
 document.querySelector('thead').onclick=e=>{const th=e.target.closest('th.s');if(!th)return;if(sortK===th.dataset.k)sortD*=-1;else{sortK=th.dataset.k;sortD=1}render()};
-$('#bCsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+$('#bCsv').onclick=()=>{const q=csvq;
   const head=['ID','Cliente','Título','Categoria','Tipo de licença','Parcela','Forma','Valor','Vencimento','Pago em','Criado em','Situação','Status Asaas','CPF/CNPJ','Observações'];
   const rows=CURLIST.map(d=>[d.id,d.cliente,d.titulo,d.categoria,d.plano,d.parcela,FORMA[d.forma]||'',String(d.valor).replace('.',','),dbr(d.venc),dbr(d.pagoEm),dbr(d.criado),(STAGE[d.stageId]||[d.etapa])[0],d.statusAsaas,d.doc,d.obs].map(q).join(';'));
   const blob=new Blob(['\ufeff'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});
@@ -730,7 +734,7 @@ $('#aEnv').onclick=e=>{const b=e.target.closest('button[data-e]');if(b)setEnv(b.
 $('#aShow').onclick=()=>{const i=$('#aKey');i.type=i.type==='password'?'text':'password';$('#aShow').textContent=i.type==='password'?'mostrar':'ocultar'};
 async function loadSettings(){
   try{CFG=await api('GET','/api/settings')}catch(x){toast(x.message);return}
-  const a=CFG.asaas,b=CFG.bitrix,k=CFG.config;
+  const a=CFG.asaas,b=CFG.bitrix,k=CFG.config;if(b.host)BX_HOST=b.host;
   $('#aStatus').innerHTML=a.configured?stat(true,`Conectado · ${a.env==='production'?'Produção':'Sandbox'}`,`Chave ${esc(a.hint)} · salva ${a.source==='painel'?'pelo painel':'nas variáveis do servidor'}`):stat(false,'Não configurado','Cole a chave de API abaixo para ativar a emissão e a conciliação.');
   setEnv(a.configured?a.env:'sandbox');$('#aKey').value='';$('#aConf').checked=false;
   $('#aDel').style.display=a.source==='painel'?'':'none';$('#aRes').className='res';
@@ -773,7 +777,7 @@ const CICLO_PT={WEEKLY:'Semanal',BIWEEKLY:'Quinzenal',MONTHLY:'Mensal',BIMONTHLY
 const FORMA_PT={BOLETO:'Boleto',PIX:'Pix',CREDIT_CARD:'Cartão',UNDEFINED:'Cliente escolhe'};
 const ASAAS_ST={PENDING:['Aguardando','c-blue'],OVERDUE:['Vencida','c-red'],RECEIVED:['Recebida','c-green'],CONFIRMED:['Confirmada','c-green'],RECEIVED_IN_CASH:['Recebida em dinheiro','c-green'],REFUNDED:['Estornada','c-gray'],REFUND_REQUESTED:['Estorno solicitado','c-amber'],DELETED:['Cancelada','c-gray'],ACTIVE:['Ativa','c-green'],INACTIVE:['Inativa','c-gray'],EXPIRED:['Encerrada','c-gray']};
 const stPill=st=>{const [l,c]=ASAAS_ST[st]||[st,'c-gray'];return `<span class="pill ${c}">${esc(l)}</span>`};
-const cbox=(label,val,openUrl)=>val?`<div class="dsec"><h3>${label}</h3><div class="copybox"><code>${esc(val)}</code><button type="button" class="btn sm" data-copy="${esc(val)}">Copiar</button>${openUrl?`<a class="btn sm" href="${esc(val)}" target="_blank" rel="noopener">Abrir</a>`:''}</div></div>`:'';
+const cbox=(label,val,openUrl)=>val?`<div class="dsec"><h3>${label}</h3><div class="copybox"><code>${esc(val)}</code><button type="button" class="btn sm" data-copy="${esc(val)}">Copiar</button>${openUrl?`<a class="btn sm" href="${esc(safeUrl(val))}" target="_blank" rel="noopener">Abrir</a>`:''}</div></div>`:'';
 document.addEventListener('click',e=>{const b=e.target.closest('[data-copy]');if(b)copyText(b.dataset.copy)});
 
 // ---- Nova cobrança ----
@@ -859,7 +863,7 @@ $('#dtClose').onclick=()=>dd.close();
 let subStatus='ACTIVE',SUBS=[],subId=null;
 async function loadSubs(){$('#subRows').innerHTML='<tr><td colspan="7"><div class="skel" style="width:60%"></div></td></tr>';try{SUBS=await api('GET','/api/assinaturas?status='+subStatus)}catch(x){toast(x.message);SUBS=[]}renderSubs()}
 function renderSubs(){$('#subEmpty').style.display=SUBS.length?'none':'block';
-  $('#subRows').innerHTML=SUBS.map(a=>`<tr><td><b>${esc(a.cliente||'—')}</b><div class="mini">${esc(a.descricao)}</div></td><td class="val">${brl(a.valor)}</td><td>${esc(CICLO_PT[a.ciclo]||a.ciclo)}</td><td>${dbr(a.proximoVenc)}</td><td>${esc(FORMA_PT[a.forma]||a.forma)}</td><td>${stPill(a.status)}</td><td><div class="acts"><button class="btn sm" data-sa="editar" data-id="${esc(a.id)}">Editar</button>${a.status==='ACTIVE'?`<button class="btn sm" data-sa="cancelar" data-id="${esc(a.id)}">Cancelar</button>`:''}${a.dealId?`<a class="btn sm" href="https://manda4.bitrix24.com.br/crm/deal/details/${a.dealId}/" target="_blank" rel="noopener">Bitrix</a>`:''}</div></td></tr>`).join('')}
+  $('#subRows').innerHTML=SUBS.map(a=>`<tr><td><b>${esc(a.cliente||'—')}</b><div class="mini">${esc(a.descricao)}</div></td><td class="val">${brl(a.valor)}</td><td>${esc(CICLO_PT[a.ciclo]||a.ciclo)}</td><td>${dbr(a.proximoVenc)}</td><td>${esc(FORMA_PT[a.forma]||a.forma)}</td><td>${stPill(a.status)}</td><td><div class="acts"><button class="btn sm" data-sa="editar" data-id="${esc(a.id)}">Editar</button>${a.status==='ACTIVE'?`<button class="btn sm" data-sa="cancelar" data-id="${esc(a.id)}">Cancelar</button>`:''}${a.dealId?`<a class="btn sm" href="https://${BX_HOST}/crm/deal/details/${a.dealId}/" target="_blank" rel="noopener">Bitrix</a>`:''}</div></td></tr>`).join('')}
 $('#subSeg').onclick=e=>{const b=e.target.closest('button[data-s]');if(!b)return;subStatus=b.dataset.s;document.querySelectorAll('#subSeg button').forEach(x=>x.classList.toggle('on',x===b));loadSubs()};
 $('#subRef').onclick=loadSubs;
 const dsb=$('#dSub');
@@ -876,7 +880,7 @@ let LINKS=[];
 const LTIPO={DETACHED:'Avulso',INSTALLMENT:'Parcelado',RECURRENT:'Recorrente'};
 async function loadLinks(){try{LINKS=await api('GET','/api/links')}catch(x){toast(x.message);LINKS=[]}
   $('#linkEmpty').style.display=LINKS.length?'none':'block';
-  $('#linkRows').innerHTML=LINKS.map(l=>`<tr><td><b>${esc(l.nome)}</b></td><td>${esc(LTIPO[l.tipo]||l.tipo)}</td><td class="val">${l.valor?brl(l.valor):'<span class="mut">Cliente informa</span>'}</td><td>${esc(FORMA_PT[l.forma]||l.forma)}</td><td>${l.criado?new Date(l.criado).toLocaleDateString('pt-BR'):''}</td><td><div class="acts"><button class="btn sm" data-copy="${esc(l.url)}">Copiar link</button><a class="btn sm" href="${esc(l.url)}" target="_blank" rel="noopener">Abrir</a><button class="btn sm" data-lk="${esc(l.id)}" style="color:var(--red)">Remover</button></div></td></tr>`).join('')}
+  $('#linkRows').innerHTML=LINKS.map(l=>`<tr><td><b>${esc(l.nome)}</b></td><td>${esc(LTIPO[l.tipo]||l.tipo)}</td><td class="val">${l.valor?brl(l.valor):'<span class="mut">Cliente informa</span>'}</td><td>${esc(FORMA_PT[l.forma]||l.forma)}</td><td>${l.criado?new Date(l.criado).toLocaleDateString('pt-BR'):''}</td><td><div class="acts"><button class="btn sm" data-copy="${esc(l.url)}">Copiar link</button><a class="btn sm" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">Abrir</a><button class="btn sm" data-lk="${esc(l.id)}" style="color:var(--red)">Remover</button></div></td></tr>`).join('')}
 $('#linkRows').onclick=async e=>{const b=e.target.closest('button[data-lk]');if(!b)return;if(!confirm('Remover este link de pagamento? Quem tiver o link não conseguirá mais pagar por ele.'))return;b.disabled=true;try{await api('DELETE','/api/links/'+encodeURIComponent(b.dataset.lk));toast('Link removido');loadLinks()}catch(x){toast(x.message);b.disabled=false}};
 
 // ---- carteiras (split) em Configurações ----
@@ -1038,7 +1042,7 @@ function renderPagar(){const r=AP.resumo||{};
     const tick=pagavel(c)?`<input type="checkbox" data-sel="${c.id}" ${sel?'checked':''} aria-label="Selecionar título ${c.id}">`:'';
     const consMenu=eCons?`<button data-ap="ver" data-id="${c.id}">${ic(I.list,16)}Ver títulos do consolidado</button><button data-ap="mail" data-id="${c.id}">${ic(I.send,16)}Enviar detalhado por e-mail</button>`:'';
     const menu=[consMenu,!fin&&c.estado==='aguardando'&&!auto?`<button data-ap="pagar" data-id="${c.id}">${ic(I.check,16)}Pagar antes do recebimento</button>`:'',!fin&&!c.lote&&!eCons?`<button data-ap="editar" data-id="${c.id}">${ic(I.doc,16)}Editar</button>`:'',c.pix?`<button data-ap="copy" data-v="${esc(c.pix)}">${ic(I.link,16)}Copiar chave Pix</button>`:'',c.linha?`<button data-ap="copy" data-v="${esc(c.linha)}">${ic(I.link,16)}Copiar linha digitável</button>`:'',
-      c.origem?`<a href="https://manda4.bitrix24.com.br/crm/deal/details/${c.origem}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir cobrança de origem</a>`:'',`<a href="https://manda4.bitrix24.com.br/crm/deal/details/${c.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
+      c.origem?`<a href="https://${BX_HOST}/crm/deal/details/${c.origem}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir cobrança de origem</a>`:'',`<a href="https://${BX_HOST}/crm/deal/details/${c.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       c.estado==='pago'?`<button data-ap="desfazer" data-id="${c.id}">${ic(I.x,16)}Desfazer pagamento</button>`:'',!fin&&!c.lote&&!eCons?`<button class="dng" data-ap="cancelar" data-id="${c.id}">${ic(I.x,16)}Cancelar conta</button>`:''].join('');
     return `<tr class="${sel?'picked':''}"><td class="ck">${tick}</td><td class="due"><b>${c.venc?dbr(c.venc):'—'}</b>${relVenc(c)}</td>
       <td><div class="cli"><div class="av ${AVC[c.id%5]}">${esc(initials(c.beneficiario||'?'))}</div><div><b>${esc(c.beneficiario||'Sem beneficiário')}</b><small>#${c.id} · ${esc(c.titulo)}</small>
@@ -1050,7 +1054,7 @@ function renderPagar(){const r=AP.resumo||{};
 ['apQ','apDe','apAte'].forEach(i=>$('#'+i).addEventListener('input',()=>renderPagar()));['apPar','apCat'].forEach(i=>$('#'+i).addEventListener('change',()=>renderPagar()));
 $('#apTabs').onclick=e=>{const b=e.target.closest('button[data-t]');if(b){apTab=b.dataset.t;renderPagar()}};
 $('#apRef').onclick=loadPagar;
-$('#apCsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`,list=apFiltered();
+$('#apCsv').onclick=()=>{const q=csvq,list=apFiltered();
   const head=['ID','Beneficiário','Descrição','Categoria','Vencimento','Valor','Situação','Pago em','Valor pago','Forma','Origem (cobrança)','Regra','Comprovante'];
   const rows=list.map(c=>[c.id,c.beneficiario,c.titulo,c.categoria,dbr(c.venc),String(c.valor).replace('.',','),(AP_ST[c.estado]||[c.estado])[0],dbr(c.pagoEm),c.valorPago?String(c.valorPago).replace('.',','):'',c.forma,c.origem||'',c.regra,c.comprovante].map(q).join(';'));
   const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`contas-a-pagar-${AP.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${list.length} conta(s) exportadas`)};
@@ -1100,7 +1104,7 @@ $('#cdMail').onclick=()=>{dcd.close();openMailCons(CDET.consolidado.id)};
 $('#cdUndo').onclick=async()=>{if(!confirm('Desfazer a consolidação? Os títulos voltam a ficar em aberto individualmente.'))return;try{await api('POST',`/api/pagar/consolidados/${CDET.consolidado.id}/desfazer`,{});dcd.close();toast('Consolidação desfeita');loadPagar()}catch(x){$('#cdRes').className='res bad';$('#cdRes').textContent=x.message}};
 $('#cdRows').onclick=async e=>{const b=e.target.closest('[data-rm]');if(!b)return;if(!confirm('Tirar este título do consolidado? O total é recalculado.'))return;b.disabled=true;
   try{const r=await api('POST',`/api/pagar/consolidados/${CDET.consolidado.id}/remover`,{tituloId:+b.dataset.rm});await loadPagar();if(r.cancelado){dcd.close();toast('Último título removido: consolidado cancelado')}else{toast('Título removido');CDET=await api('GET','/api/pagar/consolidados/'+CDET.consolidado.id);renderCdet()}}catch(x){$('#cdRes').className='res bad';$('#cdRes').textContent=x.message;b.disabled=false}};
-$('#cdCsv').onclick=()=>{const d=CDET,c=d.consolidado,q=v=>`"${String(v??'').replace(/"/g,'""')}"`;const head=['Título','Cliente','Cobrança de origem','Regra','Vencimento original','Valor'];
+$('#cdCsv').onclick=()=>{const d=CDET,c=d.consolidado,q=csvq;const head=['Título','Cliente','Cobrança de origem','Regra','Vencimento original','Valor'];
   const rows=d.itens.map(i=>[i.titulo,i.cliente,i.cobranca||'',i.regra,dbr(i.venc),String(i.valor).replace('.',',')].map(q).join(';'));rows.push(['TOTAL','','','','',String(c.valor).replace('.',',')].map(q).join(';'));
   const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`consolidado-${c.id}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
 
@@ -1186,7 +1190,7 @@ async function openExtrato(id){try{EXT=await api('GET',`/api/parceiros/${id}/ext
   dex.showModal()}
 $('#exClose').onclick=()=>dex.close();
 $('#exCopy').onclick=()=>{const p=EXT&&EXT.parceiro;if(p&&p.pix)copyText(p.pix);else toast('Parceiro sem chave Pix cadastrada')};
-$('#exCsv').onclick=()=>{if(!EXT)return;const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;const head=['Vencimento','Descrição','Regra','Situação','Pago em','Valor'];
+$('#exCsv').onclick=()=>{if(!EXT)return;const q=csvq;const head=['Vencimento','Descrição','Regra','Situação','Pago em','Valor'];
   const rows=EXT.itens.map(c=>[dbr(c.venc),c.titulo,c.regra,(AP_ST[c.estado]||[c.estado])[0],dbr(c.pagoEm),String(c.estado==='pago'?(c.valorPago||c.valor):c.valor).replace('.',',')].map(q).join(';'));
   const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`extrato-${EXT.parceiro.nome.replace(/[^\w]+/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
 [dcn,dpg,dpr,dex,dcs,dcd,dml].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));

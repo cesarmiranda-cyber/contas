@@ -31,15 +31,34 @@ const svc = createService({ bitrix, asaas, store, mailer });
 const settings = createSettingsApi({ secrets, asaas, bitrix, store, svc, mailer });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
+const bad = (code, msg) => { const e = new Error(msg); e.status = code; return e; };
+// O app é embutido em iframe do Bitrix24; qualquer outro site não pode emoldurá-lo (clickjacking).
+const SEC = {
+  'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy': "frame-ancestors 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
+};
 const send = (res, code, obj) => {
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.writeHead(code, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(obj));
 };
 const readBody = req => new Promise((ok, no) => {
-  let b = '';
-  req.on('data', c => { b += c; if (b.length > 1e6) { no(new Error('payload grande')); req.destroy(); } });
-  req.on('end', () => { try { ok(b ? JSON.parse(b) : {}); } catch (e) { no(e); } });
+  if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return no(bad(415, 'Content-Type deve ser application/json.'));
+  const chunks = []; let n = 0, dead = false;
+  req.on('data', c => { n += c.length; if (n > 1e6) { dead = true; chunks.length = 0; no(bad(413, 'Corpo da requisição grande demais.')); req.resume(); } else if (!dead) chunks.push(c); });
+  req.on('end', () => {
+    if (dead) return;
+    const t = Buffer.concat(chunks).toString('utf8');
+    let v; try { v = t.trim() ? JSON.parse(t) : {}; } catch { return no(bad(400, 'JSON inválido.')); }
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return no(bad(400, 'O corpo deve ser um objeto JSON.'));
+    ok(v);
+  });
+  req.on('error', () => no(bad(400, 'Requisição interrompida.')));
 });
+// Bloqueia requisições de outro site (CSRF) e DNS rebinding: sem Origin = chamada direta/ferramenta.
+const sameOrigin = req => {
+  const o = req.headers.origin; if (!o) return true;
+  try { return new URL(o).host === req.headers.host; } catch { return false; }
+};
 
 const routes = {
   ...settings.routes,
@@ -51,7 +70,7 @@ const routes = {
     return {
       config: store.config, asaas: { enabled: asaas.enabled, env: asaas.env }, escopo,
       kpis, deals, lastSync: store.lastSync, lastQuick: store.lastQuick, logs: escopo ? store.logs.filter(l => l.deal && deals.some(d => d.id === l.deal)).slice(0, 50) : store.logs.slice(0, 50),
-      hoje: R.todayBR(),
+      hoje: R.todayBR(), bitrixHost: (() => { try { return new URL(bitrix.base).host; } catch { return ''; } })(),
       listas: { categorias: Object.values((await svc.loadEnums()).categoria), planos: Object.values((await svc.loadEnums()).plano), licenca: R.CATEGORIA_LICENCA },
     };
   },
@@ -120,8 +139,10 @@ const dealRoutes = {
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const server = http.createServer(async (req, res) => {
-  const u = new URL(req.url, 'http://x');
+  let u;
+  try { u = new URL(req.url.replace(/^\/{2,}/, '/'), 'http://x'); } catch { return send(res, 400, { error: 'URL inválida.' }); }
   try {
+    if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOrigin(req)) throw bad(403, 'Origem não permitida.');
     const key = `${req.method} ${u.pathname}`;
     if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
@@ -168,18 +189,23 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET') {
       const f = path.join(__dirname, 'public', u.pathname === '/' ? 'index.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
-      if (f.startsWith(path.join(__dirname, 'public')) && fs.existsSync(f) && fs.statSync(f).isFile()) {
-        res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
-        return fs.createReadStream(f).pipe(res);
+      if (f.startsWith(path.join(__dirname, 'public') + path.sep) && fs.existsSync(f) && fs.statSync(f).isFile()) {
+        res.writeHead(200, { ...SEC, 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+        return fs.createReadStream(f).on('error', () => res.destroy()).pipe(res);
       }
     }
     send(res, 404, { error: 'não encontrado' });
   } catch (e) {
-    store.log('erro', `${req.method} ${u.pathname}: ${e.message}`);
-    send(res, e.status && e.status < 500 ? e.status : 500, { error: e.message });
+    const code = e.status && e.status < 500 ? e.status : 500;
+    if (code >= 500) store.log('erro', `${req.method} ${u.pathname}: ${String(e.message).replace(/[\r\n]+/g, ' ').slice(0, 300)}`);
+    send(res, code, { error: code >= 500 ? String(e.message).slice(0, 300) : e.message });
   }
 });
 
+server.requestTimeout = 60000; server.headersTimeout = 15000;
+// Um erro inesperado não pode derrubar o sync e a régua: registra e segue.
+process.on('uncaughtException', e => console.error('uncaughtException', e));
+process.on('unhandledRejection', e => console.error('unhandledRejection', e));
 server.listen(PORT, () => {
   console.log(`Contas a Receber em :${PORT} · Asaas ${asaas.enabled ? asaas.env : 'DESLIGADO (configure em Configurações)'} · sync a cada ${SYNC_MIN} min`);
   setTimeout(() => svc.sync().then(r => console.log('sync inicial', JSON.stringify(r))).catch(e => console.error(e)), 5000);

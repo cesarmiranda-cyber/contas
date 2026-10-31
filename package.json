@@ -4,6 +4,6 @@
   "description": "Contas a receber (funil Bitrix24 + Asaas) com régua de cobrança automática",
   "private": true,
   "main": "server.js",
-  "scripts": { "start": "node server.js", "test": "node --test" },
+  "scripts": { "start": "node server.js", "test": "ALLOW_LOCAL_SMTP=1 node --test" },
   "engines": { "node": ">=20" }
 }
