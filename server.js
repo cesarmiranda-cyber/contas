@@ -8,6 +8,7 @@ const { createStore } = require('./lib/store');
 const { createService } = require('./lib/service');
 const { createSecrets } = require('./lib/secrets');
 const { createSettingsApi } = require('./lib/settingsApi');
+const { createMailer } = require('./lib/mailer');
 const R = require('./lib/rules');
 
 // .env opcional (a plataforma de deploy já injeta as variáveis no processo).
@@ -25,8 +26,9 @@ const store = createStore(DATA_DIR);
 const secrets = createSecrets(DATA_DIR);
 const bitrix = createBitrix('');
 const asaas = createAsaas({});
-const svc = createService({ bitrix, asaas, store });
-const settings = createSettingsApi({ secrets, asaas, bitrix, store, svc });
+const mailer = createMailer({ secrets });
+const svc = createService({ bitrix, asaas, store, mailer });
+const settings = createSettingsApi({ secrets, asaas, bitrix, store, svc, mailer });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
 const send = (res, code, obj) => {
@@ -82,6 +84,7 @@ const routes = {
     return { pronto: !!store.ap, contas: lista, resumo: svc.pagar.resumoContas(lista), parceiros: svc.pagar.parceirosComResumo(ps, lista), consts: svc.pagar.consts, hoje: R.todayBR() };
   },
   'POST /api/pagar/contas': async (_, b) => svc.pagar.criarConta(b),
+  'POST /api/pagar/consolidar': async (_, b) => svc.pagar.consolidar(b),
   'GET /api/parceiros': async () => svc.pagar.parceirosComResumo(await svc.pagar.parceiros(true), await svc.pagar.contasCached(0)),
   'POST /api/parceiros': async (_, b) => svc.pagar.salvarParceiro(b),
   'POST /api/carteiras': async (_, b) => {
@@ -135,6 +138,21 @@ const server = http.createServer(async (req, res) => {
       if (acao === 'pagar' && req.method === 'POST') return send(res, 200, await P.pagarConta(id, await readBody(req)));
       if (acao === 'cancelar' && req.method === 'POST') return send(res, 200, await P.cancelarConta(id, await readBody(req)));
       if (acao === 'desfazer' && req.method === 'POST') return send(res, 200, await P.desfazerPagamento(id));
+    }
+    const mc = u.pathname.match(/^\/api\/pagar\/consolidados\/(\d+)(?:\/(desfazer|remover|email))?$/);
+    if (mc) {
+      const [, id, acao] = mc, P = svc.pagar;
+      if (!acao && req.method === 'GET') return send(res, 200, await P.detalheConsolidado(id));
+      const b = req.method === 'POST' ? await readBody(req) : {};
+      if (acao === 'desfazer' && req.method === 'POST') return send(res, 200, await P.desfazerConsolidacao(id));
+      if (acao === 'remover' && req.method === 'POST') return send(res, 200, await P.removerDoConsolidado(id, b.tituloId));
+      if (acao === 'email' && req.method === 'POST') return send(res, 200, await P.emailConsolidado(id, { para: b.para, cc: b.cc, mensagem: String(b.mensagem || '').slice(0, 2000), anexo: b.anexo !== false, preview: !!b.preview }));
+    }
+    const me = u.pathname.match(/^\/api\/parceiros\/(\d+)\/extrato\/email$/);
+    if (me && req.method === 'POST') {
+      const b = await readBody(req), dia = v => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : undefined);
+      const ok = ['aguardando', 'consolidado', 'aberto', 'proximo', 'atrasado', 'pago'];
+      return send(res, 200, await svc.pagar.emailExtrato(me[1], { para: b.para, cc: b.cc, de: dia(b.de), ate: dia(b.ate), estados: Array.isArray(b.estados) ? b.estados.filter(x => ok.includes(x)) : undefined, mensagem: String(b.mensagem || '').slice(0, 2000), anexo: b.anexo !== false, preview: !!b.preview }));
     }
     const mq = u.pathname.match(/^\/api\/parceiros\/(\d+)(\/extrato)?$/);
     if (mq) {

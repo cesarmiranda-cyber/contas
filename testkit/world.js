@@ -118,8 +118,10 @@ function world(initial = []) {
     async updatePayment(id, b) { updates.push([id, b]); Object.assign(pays[id], b); return pays[id]; },
   };
   const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
-  const svc = createService({ bitrix, asaas, store });
-  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets, calls, companies, categories, statuses, dealFields, companyFields, installments, receipts, refunds, links, deletedLinks, subUpdates, subCancelled, created, opts };
+  const emails = [];
+  const mailer = { ok: true, configured() { return this.ok; }, async send(m) { if (!this.ok) throw new Error('não configurado'); emails.push(m); return { ok: true, para: [].concat(m.to).flatMap(x => String(x).split(/[;,]/)).map(x => x.trim()).filter(Boolean), cc: m.cc ? [].concat(m.cc).flatMap(x => String(x).split(/[;,]/)).map(x => x.trim()).filter(Boolean) : [] }; } };
+  const svc = createService({ bitrix, asaas, store, mailer });
+  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets, calls, emails, mailer, companies, categories, statuses, dealFields, companyFields, installments, receipts, refunds, links, deletedLinks, subUpdates, subCancelled, created, opts };
 }
 
 module.exports = { userfields, FORMA_ID, TIPO_ID, today, in10, world, R };

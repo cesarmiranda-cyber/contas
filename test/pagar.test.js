@@ -15,9 +15,9 @@ test('prepara o funil "Contas a Pagar" (etapas do plano), campos de contas e de 
   const r = await w.svc.pagar.ensure();
   assert.equal(w.categories.filter(c => c.NAME === 'Contas a Pagar').length, 1);
   const ap = w.store.ap;
-  assert.deepEqual(Object.keys(ap.stages).sort(), ['aguardando', 'cancelled', 'late', 'open', 'paid', 'soon']);
+  assert.deepEqual(Object.keys(ap.stages).sort(), ['aguardando', 'cancelled', 'consolidado', 'late', 'open', 'paid', 'soon']);
   const ent = w.statuses['DEAL_STAGE_' + ap.categoryId];
-  assert.deepEqual(ent.map(s => s.NAME).sort(), ['A pagar', 'Aguardando recebimento', 'Atrasado', 'Cancelado', 'Pago', 'Próximo do Vencimento']);   // etapas padrão extras foram removidas
+  assert.deepEqual(ent.map(s => s.NAME).sort(), ['A pagar', 'Aguardando recebimento', 'Atrasado', 'Cancelado', 'Em consolidado', 'Pago', 'Próximo do Vencimento']);   // etapas padrão extras foram removidas
   assert.ok(ent.every(s => !/EXECUTING|FINAL_INVOICE|APOLOGY/.test(s.STATUS_ID)));
   assert.ok(w.dealFields.some(f => f.FIELD_NAME === 'UF_CRM_CP_ORIGEM') && w.companyFields.some(f => f.FIELD_NAME === 'UF_CRM_PAR_WALLET'));
   assert.ok(r.campos.length >= 20);

@@ -165,6 +165,9 @@ body.scoped #bDash{display:none}
 dialog{border:1px solid var(--line);border-radius:20px;background:var(--surface);color:var(--ink);padding:0;max-width:540px;width:calc(100% - 28px);box-shadow:0 30px 80px -20px rgba(0,0,0,.5)}
 dialog::backdrop{background:rgba(10,14,28,.55);backdrop-filter:blur(3px)}
 dialog form{padding:22px}dialog h2{margin:0 0 4px;font-size:18px;letter-spacing:-.01em}dialog .hint{color:var(--mut);font-size:12.5px;margin:0 0 6px}
+.picked td{background:var(--bluebg)}.ck{width:34px;padding-right:0}.ck input,td.ck input{width:17px;height:17px;accent-color:var(--brand);vertical-align:middle}
+.selbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;margin:0 0 10px;border:1px solid var(--brand);background:var(--bluebg);border-radius:12px;font-size:13.5px}.selbar[hidden]{display:none}.selbar .warn{color:var(--red);font-weight:600}
+.btn.dng{color:var(--red)}.chip3.cons{background:var(--bluebg);color:var(--blue);cursor:pointer;border:0}
 label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px 0 5px}label.chk{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;font-weight:500;color:var(--ink);padding:11px 12px;border:1px solid var(--line);border-radius:12px;margin:8px 0}label.chk input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--brand);flex:none}
 .r2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 .prev{margin-top:12px;padding:10px 12px;background:var(--brandbg);color:var(--brand);border-radius:11px;font-weight:600;font-size:13px}.prev:empty{display:none}
@@ -253,7 +256,8 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
       <div class="search" style="max-width:260px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="apQ" placeholder="Buscar conta, parceiro ou ID…"></div>
     </div>
     <div class="sum" id="apSum"></div>
-    <div class="tw"><table><thead><tr><th>Vencimento</th><th>Beneficiário</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody id="apRows"></tbody></table></div>
+    <div class="selbar" id="apSel" hidden></div>
+    <div class="tw"><table><thead><tr><th class="ck"><input type="checkbox" id="apAll" aria-label="Selecionar todos os títulos pagáveis da lista"></th><th>Vencimento</th><th>Beneficiário</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody id="apRows"></tbody></table></div>
     <div class="empty" id="apEmpty" style="display:none"><b>Nenhuma conta a pagar aqui</b>Crie uma em “Nova conta a pagar”, ou use o campo <b>CR · Split</b> numa cobrança para gerar repasses a parceiros automaticamente.</div>
   </section>
 </main>
@@ -314,6 +318,18 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
       <div class="r2" style="margin-top:12px"><div><label>Nome do recebedor</label><input id="wNome" maxlength="60" placeholder="Ex.: Parceiro A"></div><div><label>walletId do Asaas</label><input id="wId" placeholder="00000000-0000-0000-0000-000000000000"></div></div>
       <div class="row"><button class="btn pri" id="wAdd">Cadastrar recebedor</button></div>
       <div class="res" id="wRes"></div>
+    </section>
+
+    <section class="card pad" id="secEmail">
+      <h2>E-mail (SMTP)</h2><p class="hint">Usado para enviar demonstrativos e extratos aos parceiros e fornecedores. A senha fica só no servidor do app e nunca volta para esta tela.</p>
+      <div class="st" id="mStatus"></div>
+      <div class="r2"><div><label>Servidor SMTP</label><input id="mHost" placeholder="smtp.gmail.com" autocomplete="off"></div><div><label>Porta</label><input id="mPort" type="number" placeholder="587"></div></div>
+      <div class="r2"><div><label>Segurança</label><select id="mSec"><option value="starttls">STARTTLS (587)</option><option value="ssl">SSL/TLS (465)</option></select></div><div><label>Usuário</label><input id="mUser" autocomplete="off" placeholder="login do SMTP"></div></div>
+      <div class="r2"><div><label>Senha</label><input id="mPass" type="password" autocomplete="new-password" placeholder=""></div><div><label>E-mail do remetente (De)</label><input id="mFrom" type="email" placeholder="financeiro@suaempresa.com.br"></div></div>
+      <div class="r2"><div><label>Nome do remetente</label><input id="mFromName" maxlength="100" placeholder="Financeiro Manda4"></div><div><label>Nome da empresa nos e-mails</label><input id="mEmpresa" maxlength="80" placeholder="Manda4"></div></div>
+      <p class="hint" style="margin-top:8px">Gmail e Microsoft 365 exigem uma <b>senha de app</b> (não a senha normal da conta).</p>
+      <div class="row"><button class="btn" id="mTest">Testar conexão</button><button class="btn pri" id="mSave">Salvar</button><button class="btn" id="mSend">Enviar e-mail de teste</button><button class="btn ghost" id="mDel" style="display:none">Remover configuração</button></div>
+      <div class="res" id="mRes"></div>
     </section>
 
     <section class="card pad">
@@ -441,7 +457,41 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <h2 id="exTit">Extrato</h2><p class="dlg-sub" id="exSub"></p>
   <div class="kv" id="exTot" style="grid-template-columns:repeat(4,1fr)"></div>
   <div class="tw" style="max-height:340px;overflow:auto"><table class="dtbl" style="min-width:520px"><thead><tr><th>Vencimento</th><th>Descrição</th><th>Situação</th><th>Valor</th></tr></thead><tbody id="exRows"></tbody></table></div>
-  <div class="foot"><button type="button" class="btn" id="exCsv">⬇ Exportar CSV</button><button type="button" class="btn" id="exCopy">Copiar chave Pix</button><button type="button" class="btn pri" id="exClose">Fechar</button></div>
+  <div class="foot"><button type="button" class="btn" id="exCsv">⬇ Exportar CSV</button><button type="button" class="btn" id="exCopy">Copiar chave Pix</button><button type="button" class="btn" id="exMail">✉ Enviar por e-mail</button><button type="button" class="btn pri" id="exClose">Fechar</button></div>
+</form></dialog>
+
+<dialog id="dCons" style="max-width:680px"><form method="dialog" id="fCons" style="padding:22px">
+  <h2>Gerar título consolidado</h2><p class="dlg-sub" id="csSub"></p>
+  <div class="tw" style="max-height:230px;overflow:auto"><table class="dtbl" style="min-width:480px"><thead><tr><th class="ck"></th><th>Título</th><th>Venc. original</th><th>Valor</th></tr></thead><tbody id="csRows"></tbody></table></div>
+  <div class="kv" style="grid-template-columns:repeat(2,1fr);margin-top:12px"><div><small>Títulos incluídos</small><b id="csQtd"></b></div><div><small>Total a pagar</small><b id="csTot"></b></div></div>
+  <div class="r2"><div><label>Vencimento do pagamento</label><input id="csVenc" type="date"></div><div><label>Forma de pagamento</label><select id="csForma"></select></div></div>
+  <label>Chave Pix / observações</label><input id="csPix" maxlength="140" placeholder="Chave Pix (se vazia, usa a do parceiro)"><textarea id="csObs" placeholder="Observação (opcional)" style="margin-top:8px"></textarea>
+  <p class="pnote">Os títulos escolhidos saem das contas abertas (etapa “Em consolidado”) e passam a ser pagos de uma vez. Dá para desfazer enquanto não estiver pago.</p>
+  <div class="res" id="csRes"></div>
+  <div class="foot"><button type="button" class="btn" id="csCancel">Cancelar</button><button class="btn pri" id="csOk">Gerar consolidado</button></div>
+</form></dialog>
+
+<dialog id="dCdet" style="max-width:820px"><form method="dialog" style="padding:22px">
+  <h2 id="cdTit">Título consolidado</h2><p class="dlg-sub" id="cdSub"></p>
+  <div class="kv" id="cdKv" style="grid-template-columns:repeat(4,1fr)"></div>
+  <div class="tw" style="max-height:340px;overflow:auto;margin-top:12px"><table class="dtbl" style="min-width:640px"><thead><tr><th>Título</th><th>Cliente / cobrança de origem</th><th>Regra (base)</th><th>Venc. orig.</th><th>Valor</th><th></th></tr></thead><tbody id="cdRows"></tbody></table></div>
+  <div class="mini" id="cdNote" style="margin-top:8px"></div>
+  <div class="res" id="cdRes"></div>
+  <div class="foot" style="flex-wrap:wrap"><button type="button" class="btn dng" id="cdUndo">Desfazer consolidação</button><span class="sp" style="flex:1"></span><button type="button" class="btn" id="cdCsv">⬇ CSV</button><button type="button" class="btn" id="cdMail">✉ Enviar por e-mail</button><button type="button" class="btn pri" id="cdPay">Registrar pagamento</button><button type="button" class="btn" id="cdClose">Fechar</button></div>
+</form></dialog>
+
+<dialog id="dMail" style="max-width:760px"><form method="dialog" id="fMail" style="padding:22px">
+  <h2 id="emTit">Enviar por e-mail</h2><p class="dlg-sub" id="emSub"></p>
+  <div class="note" id="emNoSmtp" style="display:none">O envio de e-mail ainda não foi configurado. Você já pode ver a prévia; para enviar, configure em <b>Configurações → E-mail (SMTP)</b>.</div>
+  <div class="r2"><div><label>Para</label><input id="emPara" placeholder="email@parceiro.com"></div><div><label>Cc (opcional, separe por vírgula)</label><input id="emCc"></div></div>
+  <div id="emFiltro" class="r2" style="display:none"><div><label>Vencimento de</label><input id="emDe" type="date"></div><div><label>até</label><input id="emAte" type="date"></div>
+    <div style="grid-column:1/-1"><label>Situações incluídas</label><div class="seg" id="emEst" style="display:flex;flex-wrap:wrap"></div></div></div>
+  <label>Mensagem (opcional)</label><textarea id="emMsg" maxlength="2000" placeholder="Ex.: Segue o detalhamento dos repasses do mês."></textarea>
+  <label class="chk"><input type="checkbox" id="emAnexo" checked><span><b>Anexar planilha CSV</b><br><span class="mut">Um arquivo com todos os títulos, para abrir no Excel.</span></span></label>
+  <label>Prévia do e-mail <span class="mini" id="emAssunto"></span></label>
+  <iframe id="emPrev" sandbox="" title="Prévia do e-mail" style="width:100%;height:300px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>
+  <div class="res" id="emRes"></div>
+  <div class="foot"><button type="button" class="btn" id="emCancel">Cancelar</button><button class="btn pri" id="emOk">Enviar e-mail</button></div>
 </form></dialog>
 
 <dialog id="dEdit"><form method="dialog" id="fEdit">
@@ -686,10 +736,20 @@ async function loadSettings(){
   $('#aDel').style.display=a.source==='painel'?'':'none';$('#aRes').className='res';
   $('#bStatus').innerHTML=b.configured?stat(true,esc(b.host||'Bitrix24'),`Webhook ${esc(b.hint)} · ${b.source==='painel'?'salvo pelo painel':'nas variáveis do servidor'}`):stat(false,'Não configurado','Informe o webhook de entrada do Bitrix24.');
   $('#bHook').value='';$('#bRes').className='res';
-  loadWallets();
+  loadWallets();loadEmail();
   $('#cAuto').checked=k.autoCreate;$('#cImp').checked=k.importAuto;$('#cRegua').checked=k.reguaAtiva;$('#cOff').value=k.reguaOffsets.join(', ');$('#cProx').value=k.diasProximo;$('#cAlerta').value=k.alertaAtrasoDias;$('#cMulta').value=k.multaPct;$('#cJuros').value=k.jurosMensalPct;$('#cImpDias').value=k.importDias;
 }
 const busy=async(btn,fn)=>{btn.disabled=true;try{await fn()}finally{btn.disabled=false}};
+// ---- e-mail (SMTP) ----
+function loadEmail(){const m=CFG.email||{};$('#mStatus').innerHTML=m.configured?stat(true,`Configurado · ${esc(m.host)}:${m.port}`,`Remetente ${esc(m.from)}${m.hasPass?' · senha salva no servidor':''}`):stat(false,'Não configurado','Preencha os dados do seu provedor de e-mail e clique em Salvar.');
+  $('#mHost').value=m.host||'';$('#mPort').value=m.port||'';$('#mSec').value=m.secure==='ssl'?'ssl':'starttls';$('#mUser').value=m.user||'';$('#mPass').value='';$('#mPass').placeholder=m.hasPass?'•••••••• (deixe vazio para manter)':'';$('#mFrom').value=m.from||'';$('#mFromName').value=m.fromName||'';$('#mEmpresa').value=m.empresaNome||'';$('#mDel').style.display=m.configured?'':'none';$('#mRes').className='res'}
+const mBody=()=>({host:$('#mHost').value,port:$('#mPort').value,secure:$('#mSec').value,user:$('#mUser').value,pass:$('#mPass').value,from:$('#mFrom').value,fromName:$('#mFromName').value,empresaNome:$('#mEmpresa').value});
+$('#mSec').onchange=()=>{if(!$('#mPort').value||['465','587'].includes($('#mPort').value))$('#mPort').value=$('#mSec').value==='ssl'?465:587};
+$('#mTest').onclick=e=>busy(e.currentTarget,async()=>{try{await api('POST','/api/settings/email/test',mBody());res($('#mRes'),true,'Conexão com o servidor de e-mail OK.')}catch(x){res($('#mRes'),false,x.message)}});
+$('#mSave').onclick=e=>busy(e.currentTarget,async()=>{try{await api('PUT','/api/settings/email',mBody());toast('E-mail configurado');await loadSettings();res($('#mRes'),true,'Configuração salva. A conexão foi testada com sucesso.')}catch(x){res($('#mRes'),false,x.message)}});
+$('#mSend').onclick=e=>busy(e.currentTarget,async()=>{const para=prompt('Enviar e-mail de teste para qual endereço?');if(!para)return;try{const r=await api('POST','/api/settings/email/enviar-teste',{para});res($('#mRes'),true,`E-mail de teste enviado para ${(r.para||[]).join(', ')}.`)}catch(x){res($('#mRes'),false,x.message)}});
+$('#mDel').onclick=e=>busy(e.currentTarget,async()=>{if(!confirm('Remover a configuração de e-mail? Os envios deixam de funcionar até configurar de novo.'))return;try{await api('DELETE','/api/settings/email');await loadSettings()}catch(x){res($('#mRes'),false,x.message)}});
+
 $('#aTest').onclick=e=>busy(e.currentTarget,async()=>{try{const r=await api('POST','/api/settings/asaas/test',{apiKey:$('#aKey').value,env:aEnv});res($('#aRes'),true,`Conexão OK${r.nome?` · ${r.nome}`:''} · saldo ${brl(r.saldo)} (${r.env==='production'?'produção':'sandbox'})`)}catch(x){res($('#aRes'),false,x.message)}});
 $('#aSave').onclick=e=>busy(e.currentTarget,async()=>{try{
   if(!$('#aKey').value.trim()&&!CFG.asaas.configured){res($('#aRes'),false,'Informe a chave de API.');return}
@@ -943,25 +1003,27 @@ $('#bDash').onclick=openDrawer;$('#drClose').onclick=closeDrawer;$('#dim').oncli
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
 
 // ================= contas a pagar e parceiros =================
-let AP={contas:[],resumo:{},parceiros:[],consts:{},hoje:'',pronto:false},apTab='abertas',apOrigem=0;
+let AP={contas:[],resumo:{},parceiros:[],consts:{},hoje:'',pronto:false},apTab='abertas',apOrigem=0;const apSel=new Set();
 const AP_ST={aguardando:['Aguardando recebimento','c-slate'],aberto:['A pagar','c-blue'],proximo:['Vence em breve','c-amber'],atrasado:['Atrasado','c-red'],pago:['Pago','c-green'],cancelado:['Cancelado','c-gray']};
 const apPill=e=>{const [l,c]=AP_ST[e]||[e,'c-gray'];return `<span class="pill ${c}">${l}</span>`};
 const SPLIT_ST={PENDING:'aguardando crédito',AWAITING_CREDIT:'aguardando crédito',DONE:'creditado',CANCELLED:'cancelado',REFUNDED:'estornado'};
 const ABERTAS=['aberto','proximo','atrasado'];
+const benKey=c=>c.parceiroId?'p'+c.parceiroId:'n'+String(c.beneficiario||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+const pagavel=c=>ABERTAS.includes(c.estado)&&c.forma!=='Split Asaas'&&!c.lote&&!(c.itens&&c.itens.length);
 async function loadPagar(){try{AP=await api('GET','/api/pagar')}catch(x){toast(x.message);return}renderPagar();renderPar()}
 function relVenc(c){if(c.estado==='pago')return c.pagoEm?`<small class="okc">pago em ${dbr(c.pagoEm)}</small>`:'';if(c.estado==='cancelado')return '';
   if(c.estado==='aguardando')return '<small class="mut">estimado · depende do recebimento</small>';
   if(!c.venc)return '';const d=Math.round((Date.parse(c.venc)-Date.parse(AP.hoje))/864e5);
   return d<0?`<small class="late">${-d} dia${-d>1?'s':''} em atraso</small>`:d===0?'<small class="soon">vence hoje</small>':d<=7?`<small class="soon">em ${d} dia${d>1?'s':''}</small>`:`<small class="mut">em ${d} dias</small>`}
 function apFiltered(){const q=$('#apQ').value.trim().toLowerCase(),par=$('#apPar').value,cat=$('#apCat').value,de=$('#apDe').value,ate=$('#apAte').value;
-  const tabs={abertas:c=>ABERTAS.includes(c.estado),aguardando:c=>c.estado==='aguardando',proximo:c=>c.estado==='proximo',atrasado:c=>c.estado==='atrasado',pago:c=>c.estado==='pago',cancelado:c=>c.estado==='cancelado',todas:()=>true};
-  return AP.contas.filter(tabs[apTab]).filter(c=>!apOrigem||c.origem===apOrigem).filter(c=>!par||(par==='__livre'?!c.parceiroId:String(c.parceiroId)===par)).filter(c=>!cat||c.categoria===cat)
+  const tabs={consolidado:c=>c.estado==='consolidado',abertas:c=>ABERTAS.includes(c.estado),aguardando:c=>c.estado==='aguardando',proximo:c=>c.estado==='proximo',atrasado:c=>c.estado==='atrasado',pago:c=>c.estado==='pago',cancelado:c=>c.estado==='cancelado',todas:()=>true};
+  return AP.contas.filter(c=>apTab==='consolidado'||!c.lote).filter(tabs[apTab]).filter(c=>!apOrigem||c.origem===apOrigem).filter(c=>!par||(par==='__livre'?!c.parceiroId:String(c.parceiroId)===par)).filter(c=>!cat||c.categoria===cat)
     .filter(c=>!de||(c.venc&&c.venc>=de)).filter(c=>!ate||(c.venc&&c.venc<=ate)).filter(c=>!q||`${c.beneficiario} ${c.titulo} ${c.id} ${c.regra}`.toLowerCase().includes(q))
     .sort((a,b)=>(a.venc||'9999').localeCompare(b.venc||'9999')||a.id-b.id)}
 function renderPagar(){const r=AP.resumo||{};
   const kp=(cls,icn,l,v,sb)=>`<div class="card kpi"><div class="ico ${cls}">${ic(icn,20)}</div><div><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${sb}</div></div></div>`;
   $('#apKpis').innerHTML=AP.pronto?kp('c-blue',I.clock,'A pagar',brl(r.aPagar?.valor),`${r.aPagar?.qtd||0} conta(s)`)+kp('c-amber',I.alert,'Vence em 7 dias',brl(r.venceEm7),'a pagar na semana')+kp('c-red',I.alert,'Atrasado',brl(r.atrasado?.valor),`${r.atrasado?.qtd||0} conta(s)`)+kp('c-gray',I.list,'Aguardando recebimento',brl(r.aguardando?.valor),`${r.aguardando?.qtd||0} repasse(s) ligados a cobranças`)+kp('c-green',I.check,'Pago no mês',brl(r.pagoMes),`${r.pago?.qtd||0} pago(s) no total`):`<div class="card pad" style="grid-column:1/-1"><b>Preparando o módulo…</b><div class="mini">O funil “Contas a Pagar” é criado no Bitrix na próxima sincronização. Clique em <b>Sincronizar</b> no topo.</div></div>`;
-  const cnt=f=>AP.contas.filter(f).length,T=[['abertas','Abertas',c=>ABERTAS.includes(c.estado)],['aguardando','Aguardando recebimento',c=>c.estado==='aguardando'],['proximo','Vencem em breve',c=>c.estado==='proximo'],['atrasado','Atrasadas',c=>c.estado==='atrasado'],['pago','Pagas',c=>c.estado==='pago'],['cancelado','Canceladas',c=>c.estado==='cancelado'],['todas','Todas',()=>true]];
+  const cnt=f=>AP.contas.filter(c=>f.cons||!c.lote).filter(f).length,T=[['abertas','Abertas',c=>ABERTAS.includes(c.estado)],['aguardando','Aguardando recebimento',c=>c.estado==='aguardando'],['proximo','Vencem em breve',c=>c.estado==='proximo'],['atrasado','Atrasadas',c=>c.estado==='atrasado'],['pago','Pagas',c=>c.estado==='pago'],['consolidado','Em consolidado',Object.assign(c=>c.estado==='consolidado',{cons:true})],['cancelado','Canceladas',c=>c.estado==='cancelado'],['todas','Todas',()=>true]];
   $('#apTabs').innerHTML=T.map(([id,l,f])=>`<button data-t="${id}" class="${apTab===id?'on':''}">${l}<em>${cnt(f)}</em></button>`).join('');
   const keep=[$('#apPar').value,$('#apCat').value];
   $('#apPar').innerHTML='<option value="">Todos os beneficiários</option>'+(AP.parceiros||[]).filter(p=>!p.inativo).map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')+'<option value="__livre">Sem parceiro cadastrado</option>';
@@ -972,16 +1034,19 @@ function renderPagar(){const r=AP.resumo||{};
   $('#apSum').innerHTML=`<span><b>${list.length}</b> conta${list.length===1?'':'s'}</span><span>Total <b>${brl(list.filter(c=>c.estado!=='cancelado').reduce((a,c)=>a+(c.estado==='pago'?(c.valorPago||c.valor):c.valor),0))}</b></span>`+[['Aguardando','var(--mut)',c=>c.estado==='aguardando'],['A pagar','var(--v1)',c=>ABERTAS.includes(c.estado)&&c.estado!=='atrasado'],['Atrasado','var(--vc)',c=>c.estado==='atrasado'],['Pago','var(--v3)',c=>c.estado==='pago']].filter(([,,f])=>list.some(f)).map(([n,col,f])=>`<span class="i"><i class="sw" style="background:${col}"></i>${n} <b style="font-size:13px">${brl(sum(f))}</b> <span class="mut">(${list.filter(f).length})</span></span>`).join('');
   $('#apEmpty').style.display=list.length?'none':'block';
   $('#apRows').innerHTML=list.map(c=>{const open=ABERTAS.includes(c.estado),fin=c.estado==='pago'||c.estado==='cancelado',auto=c.forma==='Split Asaas';
-    const menu=[!fin&&c.estado==='aguardando'&&!auto?`<button data-ap="pagar" data-id="${c.id}">${ic(I.check,16)}Pagar antes do recebimento</button>`:'',!fin?`<button data-ap="editar" data-id="${c.id}">${ic(I.doc,16)}Editar</button>`:'',c.pix?`<button data-ap="copy" data-v="${esc(c.pix)}">${ic(I.link,16)}Copiar chave Pix</button>`:'',c.linha?`<button data-ap="copy" data-v="${esc(c.linha)}">${ic(I.link,16)}Copiar linha digitável</button>`:'',
+    const eCons=c.itens&&c.itens.length,sel=apSel.has(c.id);
+    const tick=pagavel(c)?`<input type="checkbox" data-sel="${c.id}" ${sel?'checked':''} aria-label="Selecionar título ${c.id}">`:'';
+    const consMenu=eCons?`<button data-ap="ver" data-id="${c.id}">${ic(I.list,16)}Ver títulos do consolidado</button><button data-ap="mail" data-id="${c.id}">${ic(I.send,16)}Enviar detalhado por e-mail</button>`:'';
+    const menu=[consMenu,!fin&&c.estado==='aguardando'&&!auto?`<button data-ap="pagar" data-id="${c.id}">${ic(I.check,16)}Pagar antes do recebimento</button>`:'',!fin&&!c.lote&&!eCons?`<button data-ap="editar" data-id="${c.id}">${ic(I.doc,16)}Editar</button>`:'',c.pix?`<button data-ap="copy" data-v="${esc(c.pix)}">${ic(I.link,16)}Copiar chave Pix</button>`:'',c.linha?`<button data-ap="copy" data-v="${esc(c.linha)}">${ic(I.link,16)}Copiar linha digitável</button>`:'',
       c.origem?`<a href="https://manda4.bitrix24.com.br/crm/deal/details/${c.origem}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir cobrança de origem</a>`:'',`<a href="https://manda4.bitrix24.com.br/crm/deal/details/${c.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
-      c.estado==='pago'?`<button data-ap="desfazer" data-id="${c.id}">${ic(I.x,16)}Desfazer pagamento</button>`:'',!fin?`<button class="dng" data-ap="cancelar" data-id="${c.id}">${ic(I.x,16)}Cancelar conta</button>`:''].join('');
-    return `<tr><td class="due"><b>${c.venc?dbr(c.venc):'—'}</b>${relVenc(c)}</td>
+      c.estado==='pago'?`<button data-ap="desfazer" data-id="${c.id}">${ic(I.x,16)}Desfazer pagamento</button>`:'',!fin&&!c.lote&&!eCons?`<button class="dng" data-ap="cancelar" data-id="${c.id}">${ic(I.x,16)}Cancelar conta</button>`:''].join('');
+    return `<tr class="${sel?'picked':''}"><td class="ck">${tick}</td><td class="due"><b>${c.venc?dbr(c.venc):'—'}</b>${relVenc(c)}</td>
       <td><div class="cli"><div class="av ${AVC[c.id%5]}">${esc(initials(c.beneficiario||'?'))}</div><div><b>${esc(c.beneficiario||'Sem beneficiário')}</b><small>#${c.id} · ${esc(c.titulo)}</small>
-      <div>${c.regra?`<span class="chip3">${esc(c.regra)}</span>`:''}${c.origem?`<span class="chip3">Origem #${c.origem}</span>`:''}${c.parcela?`<span class="chip3">${esc(c.parcela)}</span>`:''}${auto?'<span class="chip3 auto">⚡ Split automático</span>':''}${c.splitSt?`<span class="chip3">Split: ${esc(SPLIT_ST[c.splitSt]||c.splitSt)}</span>`:''}</div></div></div></td>
+      <div>${c.regra?`<span class="chip3">${esc(c.regra)}</span>`:''}${c.origem?`<span class="chip3">Origem #${c.origem}</span>`:''}${c.parcela?`<span class="chip3">${esc(c.parcela)}</span>`:''}${auto?'<span class="chip3 auto">⚡ Split automático</span>':''}${eCons?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.id}">Consolidado · ${c.itens.length} título${c.itens.length>1?'s':''} · ver quais</button>`:''}${c.lote?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.lote}">No consolidado #${c.lote}</button>`:''}${eCons&&c.enviadoEm?`<span class="chip3 auto" title="${esc(c.enviadoPara||'')}">✉ enviado ${dbr(c.enviadoEm.slice(0,10))}</span>`:''}${c.splitSt?`<span class="chip3">Split: ${esc(SPLIT_ST[c.splitSt]||c.splitSt)}</span>`:''}</div></div></div></td>
       <td>${c.categoria?`<span class="tag">${esc(c.categoria)}</span>`:'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(c.valor)}${c.estado==='pago'&&c.valorPago&&c.valorPago!==c.valor?`<div class="mini">pago ${brl(c.valorPago)}</div>`:''}</td>
       <td>${apPill(c.estado)}${c.forma&&c.estado==='pago'?`<div class="mini" style="margin-top:4px">${esc(c.forma)}${c.comprovante?' · '+esc(c.comprovante):''}</div>`:''}</td>
-      <td><div class="acts">${open?`<button class="btn sm" data-ap="pagar" data-id="${c.id}">${ic(I.check,14)}Pagar</button>`:''}<details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details></div></td></tr>`}).join('')}
+      <td><div class="acts">${open&&!c.lote?`<button class="btn sm" data-ap="pagar" data-id="${c.id}">${ic(I.check,14)}Pagar</button>`:''}<details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details></div></td></tr>`}).join('');renderSel(list)}
 ['apQ','apDe','apAte'].forEach(i=>$('#'+i).addEventListener('input',()=>renderPagar()));['apPar','apCat'].forEach(i=>$('#'+i).addEventListener('change',()=>renderPagar()));
 $('#apTabs').onclick=e=>{const b=e.target.closest('button[data-t]');if(b){apTab=b.dataset.t;renderPagar()}};
 $('#apRef').onclick=loadPagar;
@@ -991,10 +1056,73 @@ $('#apCsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`,list
   const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`contas-a-pagar-${AP.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${list.length} conta(s) exportadas`)};
 $('#apOrigem').onclick=e=>{if(e.target.closest('[data-ap="limpar-origem"]')){apOrigem=0;renderPagar()}};
 $('#apRows').onclick=async e=>{const b=e.target.closest('[data-ap]');if(!b)return;const a=b.dataset.ap,id=+b.dataset.id;b.closest('details')&&(b.closest('details').open=false);
-  if(a==='copy'){copyText(b.dataset.v);return}if(a==='pagar'){openPagar(id);return}if(a==='editar'){openConta(id);return}
+  if(a==='copy'){copyText(b.dataset.v);return}if(a==='ver'){openCdet(id);return}if(a==='mail'){openMailCons(id);return}if(a==='pagar'){openPagar(id);return}if(a==='editar'){openConta(id);return}
   try{if(a==='cancelar'){const m=prompt('Motivo do cancelamento (opcional):');if(m===null)return;await api('POST',`/api/pagar/contas/${id}/cancelar`,{motivo:m});toast('Conta cancelada')}
     if(a==='desfazer'){if(!confirm('Desfazer este pagamento? A conta volta a ficar em aberto.'))return;await api('POST',`/api/pagar/contas/${id}/desfazer`,{});toast('Pagamento desfeito')}
     loadPagar()}catch(x){toast(x.message)}};
+
+// ---- seleção e consolidação ----
+function renderSel(list){const ids=[...apSel].filter(i=>AP.contas.some(c=>c.id===i&&pagavel(c)));ids.length!==apSel.size&&(apSel.clear(),ids.forEach(i=>apSel.add(i)));
+  const el=$('#apSel'),itens=ids.map(i=>AP.contas.find(c=>c.id===i)),pg=list.filter(pagavel);
+  $('#apAll').checked=!!pg.length&&pg.every(c=>apSel.has(c.id));$('#apAll').indeterminate=!$('#apAll').checked&&pg.some(c=>apSel.has(c.id));$('#apAll').disabled=!pg.length;
+  if(!itens.length){el.hidden=true;return}el.hidden=false;
+  const mix=new Set(itens.map(benKey)).size>1,tot=itens.reduce((a,c)=>a+c.valor,0);
+  el.innerHTML=`<b>${itens.length} título${itens.length>1?'s':''} selecionado${itens.length>1?'s':''}</b><span>Total <b>${brl(tot)}</b></span>${mix?'<span class="warn">Escolha títulos de um único beneficiário.</span>':`<span class="mut">${esc(itens[0].beneficiario||'')}</span>`}<span class="sp" style="flex:1"></span><button class="btn" data-sel-a="limpar">Limpar</button><button class="btn pri" data-sel-a="gerar" ${mix||itens.length<2?'disabled':''} title="${itens.length<2?'Selecione pelo menos 2 títulos':''}">Gerar título consolidado</button>`}
+$('#apRows').addEventListener('change',e=>{const k=e.target.closest('input[data-sel]');if(!k)return;const id=+k.dataset.sel;k.checked?apSel.add(id):apSel.delete(id);renderPagar()});
+$('#apAll').onchange=e=>{const pg=apFiltered().filter(pagavel);pg.forEach(c=>e.target.checked?apSel.add(c.id):apSel.delete(c.id));renderPagar()};
+$('#apSel').onclick=e=>{const b=e.target.closest('[data-sel-a]');if(!b)return;if(b.dataset.selA==='limpar'){apSel.clear();renderPagar()}else openCons()};
+const dcs=$('#dCons');let csIds=new Set();
+function openCons(){const itens=[...apSel].map(i=>AP.contas.find(c=>c.id===i)).filter(Boolean);if(itens.length<2)return;csIds=new Set(itens.map(c=>c.id));const p=(AP.parceiros||[]).find(x=>x.id===itens[0].parceiroId);
+  $('#csSub').textContent=`${itens[0].beneficiario||'—'}${p&&p.tipo==='SUPPLIER'?' (fornecedor)':''}`;
+  $('#csRows').innerHTML=itens.map(c=>`<tr><td class="ck"><input type="checkbox" data-cs="${c.id}" checked></td><td style="text-align:left;white-space:normal">${esc(c.titulo)}<div class="mini">#${c.id}${c.origem?' · cobrança #'+c.origem:''}${c.regra?' · '+esc(c.regra):''}</div></td><td>${dbr(c.venc)}</td><td><b>${brl(c.valor)}</b></td></tr>`).join('');
+  const primeiro=itens.map(c=>c.venc).filter(Boolean).sort()[0]||AP.hoje;$('#csVenc').min=AP.hoje;$('#csVenc').value=primeiro>AP.hoje?primeiro:AP.hoje;
+  $('#csForma').innerHTML='<option value="">A definir</option>'+(AP.consts.AP_FORMAS||[]).filter(f=>f!=='Split Asaas').map(f=>`<option>${f}</option>`).join('');
+  $('#csPix').value=(p&&p.pix)||itens.find(c=>c.pix)?.pix||'';$('#csObs').value='';$('#csRes').className='res';csTotais();dcs.showModal()}
+function csTotais(){const its=[...csIds].map(i=>AP.contas.find(c=>c.id===i));$('#csQtd').textContent=its.length;$('#csTot').textContent=brl(its.reduce((a,c)=>a+c.valor,0));$('#csOk').disabled=its.length<2}
+$('#csRows').onchange=e=>{const k=e.target.closest('input[data-cs]');if(!k)return;k.checked?csIds.add(+k.dataset.cs):csIds.delete(+k.dataset.cs);csTotais()};
+$('#csCancel').onclick=()=>dcs.close();
+$('#fCons').onsubmit=async e=>{e.preventDefault();const b=$('#csOk'),res=$('#csRes');res.className='res';b.disabled=true;
+  try{const r=await api('POST','/api/pagar/consolidar',{ids:[...csIds],venc:$('#csVenc').value,forma:$('#csForma').value,pix:$('#csPix').value,obs:$('#csObs').value});
+    dcs.close();apSel.clear();toast('Título consolidado gerado');await loadPagar();const id=r.id||r.consolidado?.id;if(id)openCdet(id)}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=csIds.size<2};
+
+// ---- detalhe do consolidado ----
+const dcd=$('#dCdet');let CDET=null;
+async function openCdet(id){try{CDET=await api('GET','/api/pagar/consolidados/'+id)}catch(x){toast(x.message);return}renderCdet();dcd.showModal()}
+function renderCdet(){const d=CDET,c=d.consolidado,aberto=ABERTAS.includes(c.estado);$('#cdRes').className='res';
+  $('#cdTit').textContent=`Consolidado #${c.id}`;$('#cdSub').textContent=`${c.beneficiario||'—'} · ${d.itens.length} título${d.itens.length>1?'s':''}`;
+  $('#cdKv').innerHTML=[['Total',brl(c.valor)],['Vencimento',dbr(c.venc)],['Situação',apPill(c.estado)],['Forma',esc(c.forma||'A definir')]].map(([l,v])=>`<div><small>${l}</small><b>${v}</b></div>`).join('');
+  $('#cdRows').innerHTML=d.itens.map(i=>`<tr><td style="text-align:left;white-space:normal">${esc(i.titulo)}<div class="mini">#${i.id}</div></td><td style="text-align:left;white-space:normal">${esc(i.cliente||'—')}${i.cobranca?`<div class="mini">cobrança #${i.cobranca}${i.cobrancaTitulo?' · '+esc(i.cobrancaTitulo):''}</div>`:''}</td><td style="text-align:left;white-space:normal">${esc(i.regra||'—')}</td><td>${dbr(i.venc)}</td><td><b>${brl(i.valor)}</b>${i.valorPago&&i.valorPago!==i.valor?`<div class="mini">pago ${brl(i.valorPago)}</div>`:''}</td><td>${aberto&&d.itens.length>1?`<button type="button" class="btn sm" data-rm="${i.id}" title="Tirar do consolidado">Remover</button>`:''}</td></tr>`).join('');
+  $('#cdNote').textContent=(d.faltando?`${d.faltando} título(s) não foram encontrados. `:'')+(c.enviadoEm?`Último e-mail: ${dbr(c.enviadoEm.slice(0,10))} para ${c.enviadoPara||'—'}.`:'Nenhum e-mail enviado ainda.');
+  $('#cdUndo').style.display=aberto?'':'none';$('#cdPay').style.display=aberto?'':'none';$('#cdMail').disabled=false}
+$('#cdClose').onclick=()=>dcd.close();
+$('#cdPay').onclick=()=>{dcd.close();openPagar(CDET.consolidado.id)};
+$('#cdMail').onclick=()=>{dcd.close();openMailCons(CDET.consolidado.id)};
+$('#cdUndo').onclick=async()=>{if(!confirm('Desfazer a consolidação? Os títulos voltam a ficar em aberto individualmente.'))return;try{await api('POST',`/api/pagar/consolidados/${CDET.consolidado.id}/desfazer`,{});dcd.close();toast('Consolidação desfeita');loadPagar()}catch(x){$('#cdRes').className='res bad';$('#cdRes').textContent=x.message}};
+$('#cdRows').onclick=async e=>{const b=e.target.closest('[data-rm]');if(!b)return;if(!confirm('Tirar este título do consolidado? O total é recalculado.'))return;b.disabled=true;
+  try{const r=await api('POST',`/api/pagar/consolidados/${CDET.consolidado.id}/remover`,{tituloId:+b.dataset.rm});await loadPagar();if(r.cancelado){dcd.close();toast('Último título removido: consolidado cancelado')}else{toast('Título removido');CDET=await api('GET','/api/pagar/consolidados/'+CDET.consolidado.id);renderCdet()}}catch(x){$('#cdRes').className='res bad';$('#cdRes').textContent=x.message;b.disabled=false}};
+$('#cdCsv').onclick=()=>{const d=CDET,c=d.consolidado,q=v=>`"${String(v??'').replace(/"/g,'""')}"`;const head=['Título','Cliente','Cobrança de origem','Regra','Vencimento original','Valor'];
+  const rows=d.itens.map(i=>[i.titulo,i.cliente,i.cobranca||'',i.regra,dbr(i.venc),String(i.valor).replace('.',',')].map(q).join(';'));rows.push(['TOTAL','','','','',String(c.valor).replace('.',',')].map(q).join(';'));
+  const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`consolidado-${c.id}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+
+// ---- e-mail (consolidado e extrato) ----
+const dml=$('#dMail');let MAIL=null,mailT=0;
+const EXT_EST=[['aguardando','Aguardando'],['aberto','A pagar'],['proximo','Vence em breve'],['atrasado','Atrasado'],['pago','Pago']];
+function mailBody(preview){const b={para:$('#emPara').value,cc:$('#emCc').value,mensagem:$('#emMsg').value,anexo:$('#emAnexo').checked,preview};
+  if(MAIL.tipo==='extrato'){b.de=$('#emDe').value||undefined;b.ate=$('#emAte').value||undefined;b.estados=[...document.querySelectorAll('#emEst button.on')].map(x=>x.dataset.e)}return b}
+const mailUrl=()=>MAIL.tipo==='extrato'?`/api/parceiros/${MAIL.id}/extrato/email`:`/api/pagar/consolidados/${MAIL.id}/email`;
+async function mailPrevia(){const t=++mailT;try{const r=await api('POST',mailUrl(),mailBody(true));if(t!==mailT)return;$('#emPrev').srcdoc=r.html;$('#emAssunto').textContent='· '+r.assunto;$('#emNoSmtp').style.display=r.smtp?'none':'block';$('#emOk').disabled=!r.smtp;if(!$('#emPara').value&&r.para)$('#emPara').value=r.para;$('#emRes').className='res'}
+  catch(x){if(t!==mailT)return;$('#emPrev').srcdoc='';$('#emRes').className='res bad';$('#emRes').textContent=x.message}}
+function abrirMail(m){MAIL=m;$('#emPara').value='';$('#emCc').value='';$('#emMsg').value='';$('#emAnexo').checked=true;$('#emRes').className='res';$('#emPrev').srcdoc='';
+  $('#emFiltro').style.display=m.tipo==='extrato'?'grid':'none';
+  if(m.tipo==='extrato'){$('#emDe').value='';$('#emAte').value='';$('#emEst').innerHTML=EXT_EST.map(([k,l])=>`<button type="button" data-e="${k}" class="${k!=='aguardando'?'on':''}">${l}</button>`).join('')}
+  $('#emTit').textContent=m.tipo==='extrato'?'Enviar extrato por e-mail':'Enviar demonstrativo por e-mail';$('#emSub').textContent=m.sub;dml.showModal();mailPrevia()}
+function openMailCons(id){const c=AP.contas.find(x=>x.id===id);abrirMail({tipo:'cons',id,sub:`Consolidado #${id} · ${c?c.beneficiario:''} · detalhamento de todos os títulos`})}
+$('#exMail').onclick=()=>{if(!EXT)return;dex.close();abrirMail({tipo:'extrato',id:EXT.parceiro.id,sub:`Extrato de ${EXT.parceiro.nome}`})};
+$('#emEst').onclick=e=>{const b=e.target.closest('button[data-e]');if(b){b.classList.toggle('on');mailPrevia()}};
+['emDe','emAte','emAnexo'].forEach(i=>$('#'+i).addEventListener('change',mailPrevia));let emTm;$('#emMsg').addEventListener('input',()=>{clearTimeout(emTm);emTm=setTimeout(mailPrevia,600)});
+$('#emCancel').onclick=()=>dml.close();
+$('#fMail').onsubmit=async e=>{e.preventDefault();const b=$('#emOk'),res=$('#emRes');res.className='res';b.disabled=true;
+  try{const r=await api('POST',mailUrl(),mailBody(false));dml.close();toast(`E-mail enviado para ${(r.para||[]).join?r.para.join(', '):r.para}`);loadPagar()}catch(x){res.className='res bad';res.textContent=x.message;b.disabled=false}};
 
 // ---- nova / editar conta ----
 const dcn=$('#dConta');let cnId=null;
@@ -1061,7 +1189,7 @@ $('#exCopy').onclick=()=>{const p=EXT&&EXT.parceiro;if(p&&p.pix)copyText(p.pix);
 $('#exCsv').onclick=()=>{if(!EXT)return;const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;const head=['Vencimento','Descrição','Regra','Situação','Pago em','Valor'];
   const rows=EXT.itens.map(c=>[dbr(c.venc),c.titulo,c.regra,(AP_ST[c.estado]||[c.estado])[0],dbr(c.pagoEm),String(c.estado==='pago'?(c.valorPago||c.valor):c.valor).replace('.',',')].map(q).join(';'));
   const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`extrato-${EXT.parceiro.nome.replace(/[^\w]+/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
-[dcn,dpg,dpr,dex].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+[dcn,dpg,dpr,dex,dcs,dcd,dml].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 load();setInterval(load,60000);
 </script>
 </body>
