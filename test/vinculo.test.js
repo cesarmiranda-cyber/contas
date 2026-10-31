@@ -45,3 +45,16 @@ test('agrupa pelo título "Parcela N de M. …" quando não há marca do Asaas (
   assert.deepEqual([g(1).parcelaN, g(1).parcelaTotal], [4, 12]);
   assert.equal(R.parseParcelaTitulo('Parcela 13 de 12. x'), null);
 });
+
+test('agrupamento de parcelas manuais: lote do recebimento manual, "Título — n/N" e recorrência', async () => {
+  const w = world([]); w.asaas.enabled = true; await w.svc.ensureFields();
+  const r1 = await w.svc.cobrar.nova({ tipo: 'manual', titulo: 'Implantação', valor: 3000, venc: today, parcelas: 3, companyId: '5' });
+  const r2 = await w.svc.cobrar.nova({ tipo: 'manual', titulo: 'Suporte mensal', valor: 500, venc: today, companyId: '5', recorrencia: { freq: 'mensal', qtd: 4 } });
+  const ld = await w.svc.loadDeals();
+  const g1 = r1.ids.map(id => ld.find(d => d.id === id).grupo), g2 = ld.filter(d => d.recor).map(d => d.recor.split(':')[0]);
+  assert.equal(new Set(g1).size, 1); assert.match(g1[0], /^m_/); assert.equal(g1.length, 3);
+  assert.equal(new Set(g2).size, 1); assert.equal(g2.length, 4);
+  const deals = [1, 2, 3].map(n => deal(100 + n, { TITLE: `Plano anual — ${n}/3`, COMPANY_ID: '9', UF_CRM_CR_ASAAS_ID: '' }));
+  const w2 = world(deals); const l2 = await w2.svc.loadDeals();
+  assert.equal(new Set(l2.map(d => d.grupo)).size, 1); assert.ok(l2[0].grupo.startsWith('p_'));
+});

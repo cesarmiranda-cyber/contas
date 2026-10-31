@@ -187,6 +187,15 @@ tr.gh .car{display:inline-grid;place-items:center;width:22px;height:22px;border-
 tr.gc td{background:var(--bg);border-top:1px dashed var(--line);cursor:pointer;padding-top:8px;padding-bottom:8px}tr.gc:hover td{background:var(--brandbg)}tr.gc td:first-child{padding-left:44px}
 tr.gc .gdot{width:8px;height:8px;border-radius:50%;background:var(--line);margin:0 12px 0 4px;flex:none}
 .vchip{cursor:pointer;border:0;background:var(--amberbg);color:var(--amber);font:inherit;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:7px;display:inline-block;margin:4px 4px 0 0}.vchip:hover{filter:brightness(.95)}
+
+/* ===== cores por situação: atrasado vermelho · pago verde · vence em breve âmbar · em aberto azul ===== */
+tr.st-late>td{background:color-mix(in srgb,var(--red) 8%,var(--surface))}tr.st-paid>td{background:color-mix(in srgb,var(--green) 8%,var(--surface))}tr.st-soon>td{background:color-mix(in srgb,var(--amber) 9%,var(--surface))}tr.st-open>td{background:color-mix(in srgb,var(--blue) 5%,var(--surface))}tr.st-canc>td{background:var(--graybg);opacity:.75}
+tr.st-late>td:first-child{box-shadow:inset 4px 0 0 var(--red)}tr.st-paid>td:first-child{box-shadow:inset 4px 0 0 var(--green)}tr.st-soon>td:first-child{box-shadow:inset 4px 0 0 var(--amber)}tr.st-open>td:first-child{box-shadow:inset 4px 0 0 var(--blue)}tr.st-canc>td:first-child{box-shadow:inset 4px 0 0 var(--gray)}
+tr.gh.st-late>td,tr.gh.st-paid>td,tr.gh.st-soon>td,tr.gh.st-open>td{border-top:1px solid var(--line)}
+tr.gc.st-late>td{background:color-mix(in srgb,var(--red) 11%,var(--bg))}tr.gc.st-paid>td{background:color-mix(in srgb,var(--green) 10%,var(--bg))}tr.gc.st-soon>td{background:color-mix(in srgb,var(--amber) 12%,var(--bg))}tr.gc.st-open>td{background:color-mix(in srgb,var(--blue) 7%,var(--bg))}
+tr.st-late .due b{color:var(--red)}tr.st-paid .due small{color:var(--green)}
+#bMenu{padding:8px 10px}body.scoped #bMenu{display:none}@media(max-width:900px){#bMenu{display:none}}
+.tleg{display:flex;gap:14px;flex-wrap:wrap;padding:8px 18px;font-size:12px;color:var(--mut)}.tleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 /* ===== layout com menu lateral ===== */
 .shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
 .side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px;padding:16px 12px;background:var(--surface);border-right:1px solid var(--line);overflow-y:auto}
@@ -225,6 +234,7 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
 <aside class="side" id="side" aria-label="Menu principal"></aside>
 <div class="content">
 <div class="top"><div class="bar">
+  <button class="btn" id="bMenu" aria-label="Recolher ou expandir o menu" title="Recolher / expandir o menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
   <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div>
   <div class="ttl"><h1 id="pgTitle">Lançamentos</h1><div class="sub" id="sub"><span class="dot off"></span>carregando…</div></div>
   <div class="tools">
@@ -276,6 +286,7 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
       <button class="chip2" id="bCsv">⬇ Exportar CSV</button>
     </div>
     <div class="sum" id="sum"></div>
+    <div class="tleg"><span><i style="background:var(--red)"></i>Atrasado</span><span><i style="background:var(--amber)"></i>Vence em breve</span><span><i style="background:var(--blue)"></i>Em aberto</span><span><i style="background:var(--green)"></i>Pago</span></div>
     <div class="tw"><table>
       <thead><tr><th class="s" data-k="cliente">Cliente<span class="ar">↕</span></th><th class="hide-m">Parcela</th><th class="hide-m">Forma</th><th class="num s" data-k="valor">Valor<span class="ar">↕</span></th><th class="s" data-k="venc">Vencimento<span class="ar">↕</span></th><th class="s" data-k="etapa">Situação<span class="ar">↕</span></th><th></th></tr></thead>
       <tbody id="rows"></tbody>
@@ -710,7 +721,8 @@ function render(){
   const sg=[['Em aberto','var(--blue)',d=>d.stageId==='C90:NEW'||d.stageId==='C90:PREPAYMENT_INVOIC'],['Atrasado','var(--red)',d=>d.stageId==='C90:PREPARATION'],['Pago','var(--green)',d=>d.stageId==='C90:WON'],['Cancelado','var(--gray)',d=>d.stageId==='C90:LOSE']].filter(([,,fn])=>qtd(fn));
   $('#sum').innerHTML=`<span><b>${list.length}</b> lançamento${list.length===1?'':'s'}</span><span>Total <b>${brl(list.filter(d=>!isC(d)&&d.stageId!=='C90:LOSE').reduce((a,d)=>a+d.valor,0))}</b></span>`+sg.map(([n,c,fn])=>`<span class="i"><i class="sw" style="background:${c}"></i>${n} <b style="font-size:13px">${brl(money(fn))}</b> <span class="mut">(${qtd(fn)})</span></span>`).join('')+((dFrom||dTo)?`<span class="mut">· ${{venc:'vencimento',pagoEm:'pagamento',criado:'criação'}[dF]} ${dFrom?'de '+dbr(dFrom):''} ${dTo?'até '+dbr(dTo):''}</span>`:'');
   $('#empty').style.display=list.length?'none':'block';
-  const rowHtml=(d,child=false)=>{
+  const stCls=d=>({'C90:WON':'st-paid','C90:PREPARATION':'st-late','C90:PREPAYMENT_INVOIC':'st-soon','C90:NEW':'st-open','C90:LOSE':'st-canc'}[d.stageId]||'');
+const rowHtml=(d,child=false)=>{
     const [sl,sc]=STAGE[d.stageId]||[d.etapa,'c-gray'];
     const fin=d.stageId==='C90:WON'||d.stageId==='C90:LOSE';
     const [dv,ds]=dueText(d);
@@ -729,9 +741,9 @@ function render(){
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
     const sem=!d.cliente&&!isC(d)?`<button type="button" class="vchip" data-a="vincular" data-id="${d.id}">⚠ Sem cliente · vincular</button>`:'';
     const vend=d.venda?`<a class="chip3" href="https://${BX_HOST}/crm/deal/details/${d.venda}/" target="_blank" rel="noopener">Venda #${esc(d.venda)}</a>`:'';
-    return `<tr class="${child?'gc':''} ${d.id===CUR_DEAL?'cur':''}" ${child?`data-edit="${d.id}"`:''}>
+    return `<tr class="${child?'gc':''} ${stCls(d)} ${d.id===CUR_DEAL?'cur':''}" ${child?`data-edit="${d.id}"`:''}>
       <td class="c-cli"><div class="cli">${child?'<div class="gdot"></div>':`<div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div>`}<div><b>${child?'Parcela '+(d.parcelaN&&d.parcelaTotal?d.parcelaN+' de '+d.parcelaTotal:esc(d.parcela||d.titulo)):esc(nome)}</b><small>${child?'#'+d.id:'#'+d.id+' · '+esc(d.titulo)}</small>${sem}${vend}${d.manual?'<span class="chip3 est">Recebimento manual</span>':''}${d.recor?'<span class="chip3" title="Gerado por uma recorrência">↻ Recorrente</span>':''}${d.split?`<span class="chip3" title="${esc(d.split)}">Comissão: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria&&!child?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
-      <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
+      <td class="hide-m">${child?'':d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(d.valor)}</td>
       <td class="due"><b>${dv}</b>${ds}</td>
@@ -853,8 +865,10 @@ const NAVT={cfg:'Configurações'};VTABS.forEach(([k,l])=>NAVT[k]=l);
   <div class="grp">Pagar</div>${it('pagar','Contas a pagar')}${it('par','Parceiros e fornecedores')}
   <div class="grp">Sistema</div>${it('cfg','Configurações')}<div class="sp"></div>
   <button class="fold" id="sideFold" title="Recolher menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span class="lbl2">Recolher menu</span></button>`;
-  try{if(localStorage.getItem('sideFold')==='1')document.body.classList.add('fold')}catch{}
-  $('#side').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='sideFold'){const f=document.body.classList.toggle('fold');try{localStorage.setItem('sideFold',f?'1':'0')}catch{}return}if(b.dataset.v)showView(b.dataset.v)}})();
+  try{const v=localStorage.getItem('sideFold');if(v==='1'||(v===null&&window.innerWidth<1500))document.body.classList.add('fold')}catch{}
+  const toggleFold=()=>{const f=document.body.classList.toggle('fold');try{localStorage.setItem('sideFold',f?'1':'0')}catch{}};
+  $('#bMenu').onclick=toggleFold;
+  $('#side').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='sideFold'){toggleFold();return}if(b.dataset.v)showView(b.dataset.v)}})();
 document.querySelector('#side button[data-v=main]').classList.add('on');
 document.querySelectorAll('.vtabs').forEach(v=>{v.innerHTML=VTABS.map(([k,l])=>`<button data-v="${k}" class="${v.dataset.active===k?'on':''}">${l}</button>`).join('')});
 document.addEventListener('click',e=>{const b=e.target.closest('.vtabs button[data-v]');if(b)showView(b.dataset.v)});
@@ -929,7 +943,8 @@ function groupHtml(r,rowHtml){const it=r.items,master=r.k[0]==='o'?S.deals.find(
   const nome=first.cliente||'Sem cliente',w=n=>vivos.length?n/vivos.length*100:0;
   const sit=atras.length?`<span class="pill c-red">${atras.length} atrasada${atras.length>1?'s':''}</span>`:pagas.length===vivos.length&&vivos.length?'<span class="pill c-green">Quitado</span>':`<span class="pill c-blue">${abertas} em aberto</span>`;
   const sem=!first.cliente?`<button type="button" class="vchip" data-a="vincular-grupo" data-k="${esc(r.k)}">⚠ Sem cliente · vincular</button>`:'';
-  const head=`<tr class="gh ${open?'open':''}" data-g="${esc(r.k)}"><td class="c-cli"><div class="cli"><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span><div class="av ${AVC[first.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>${esc(baseTitle(master?master.titulo:first.titulo))}</small><span class="chip3">${kind} · ${exp&&exp>vivos.length?`${vivos.length} de ${exp} parcelas`:vivos.length+' parcelas'}</span>${sem}${first.venda?`<a class="chip3" href="https://${BX_HOST}/crm/deal/details/${first.venda}/" target="_blank" rel="noopener">Venda #${esc(first.venda)}</a>`:''}</div></div></td>
+  const gcls=atras.length?'st-late':pagas.length===vivos.length&&vivos.length?'st-paid':vivos.some(d=>d.stageId==='C90:PREPAYMENT_INVOIC')?'st-soon':'st-open';
+  const head=`<tr class="gh ${gcls} ${open?'open':''}" data-g="${esc(r.k)}"><td class="c-cli"><div class="cli"><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span><div class="av ${AVC[first.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>${esc(baseTitle(master?master.titulo:first.titulo))}</small><span class="chip3">${kind} · ${exp&&exp>vivos.length?`${vivos.length} de ${exp} parcelas`:vivos.length+' parcelas'}</span>${sem}${first.venda?`<a class="chip3" href="https://${BX_HOST}/crm/deal/details/${first.venda}/" target="_blank" rel="noopener">Venda #${esc(first.venda)}</a>`:''}</div></div></td>
     <td class="hide-m"><b>${pagas.length}</b> de ${vivos.length} pagas<div class="gbar"><i style="width:${w(pagas.length)}%;background:var(--green)"></i><i style="width:${w(abertas)}%;background:var(--blue)"></i><i style="width:${w(atras.length)}%;background:var(--red)"></i></div></td>
     <td class="hide-m"><span class="mut">—</span></td><td class="num val">${brl(tot)}</td><td class="due">${prox?`<b>${dbr(prox)}</b><small class="mut">próxima</small>`:'<span class="mut">—</span>'}</td><td>${sit}</td>
     <td><div class="acts"><button class="btn sm" data-a="toggle-grupo" data-k="${esc(r.k)}">${open?'Recolher':'Ver parcelas'}</button><details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop"><button data-a="vincular-grupo" data-k="${esc(r.k)}">${ic(I.link,16)}Vincular a cliente / venda</button></div></details></div></td></tr>`;
