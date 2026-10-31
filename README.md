@@ -27,6 +27,11 @@ Em aberto → Próximo do vencimento → Atrasado → Pago / Cancelado.
 - A regra fica no app (`lib/recorrencia.js`); cada ocorrência é um título comum no Bitrix, marcado em `CP_RECOR`/`CR_RECOR`. O app mantém **12 meses à frente** e completa a cada sincronização, sem duplicar.
 - Tela **Recorrências**: pausar/retomar, editar valor/descrição (vale para as futuras não pagas) e encerrar (opcionalmente cancelando as futuras). Cobranças pelo Asaas seguem em *Assinaturas*.
 
+## Parcelas agrupadas e vínculo com cliente/venda
+- Parcelamentos, assinaturas e recorrências aparecem em **uma linha** (cliente, “2 de 6 pagas”, barra de status, total e próxima data). Clique para abrir as parcelas; clique numa parcela para editar. O botão **Parcelas agrupadas** liga/desliga.
+- O agrupamento usa `CR_GRUPO` (parcelamento/assinatura de origem no Asaas), preenchido nas novas cobranças e, uma vez, nas já importadas (*Mais ações → Organizar parcelas do Asaas* refaz sob demanda).
+- **Vincular a cliente / venda**: em qualquer cobrança (ou grupo inteiro) escolha a empresa/contato do Bitrix e, opcionalmente, o negócio de venda (`CR_VENDA`). “Lembrar” grava o cliente do Asaas para as próximas importações.
+
 ## Painel financeiro
 - **Geral** (aba *Dashboard* e gaveta lateral *Painel financeiro*) e **do cliente** (aba dentro da deal): nota de saúde 0–100 com as partes à mostra, previsão de recebimento (30/60/90 dias e por mês), recebido, atraso por faixa, maiores devedores, próximas cobranças, concentração e alertas.
 - Cálculo em `lib/dashboard.js` (função pura, testada). Atrasos antigos pesam na nota e a limitam (máx. 84 com atraso > 60 dias, 69 > 90). Pagamento até 2 dias após o vencimento conta como no prazo.

@@ -134,6 +134,15 @@ const routes = {
     return store.addWallet({ nome, walletId });
   },
   'POST /api/importar': async (_, body) => svc.importar({ dias: body.dias, dryRun: !!body.dryRun }),
+  'POST /api/vincular': async (_, b) => svc.vincular({ ids: b.ids, companyId: b.companyId, contactId: b.contactId, vendaId: b.vendaId, lembrar: b.lembrar !== false }),
+  'POST /api/organizar': async () => svc.organizarParcelas(),
+  // Negócios (cards) de outros funis, para ligar a cobrança à venda que a originou.
+  'GET /api/negocios': async (u) => {
+    const q = String(u.searchParams.get('q') || '').trim().slice(0, 80);
+    if (q.length < 2) return [];
+    const r = await bitrix.call('crm.deal.list', { filter: { '%TITLE': q, '!CATEGORY_ID': R.CATEGORY_ID }, select: ['ID', 'TITLE', 'COMPANY_ID', 'CATEGORY_ID', 'OPPORTUNITY', 'STAGE_ID'], order: { ID: 'DESC' } });
+    return (r.result || []).slice(0, 15).map(d => ({ id: +d.ID, titulo: d.TITLE, valor: Number(d.OPPORTUNITY) || 0 }));
+  },
   'GET /api/clientes': async (u) => svc.findCustomers(u.searchParams.get('q') || ''),
 };
 const dealRoutes = {

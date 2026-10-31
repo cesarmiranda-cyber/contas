@@ -173,6 +173,20 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 .prev{margin-top:12px;padding:10px 12px;background:var(--brandbg);color:var(--brand);border-radius:11px;font-weight:600;font-size:13px}.prev:empty{display:none}
 .toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;z-index:99;max-width:92%;transition:.25s;font-weight:550;box-shadow:0 14px 30px -10px rgba(0,0,0,.5)}.toast.show{opacity:1;transform:translate(-50%,0)}
 
+
+/* ===== ambiente mais limpo: análise recolhida, filtros sob demanda, parcelas agrupadas ===== */
+details.analise{margin:14px 0}details.analise>summary{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;font-weight:650;list-style:none}details.analise>summary::-webkit-details-marker{display:none}details.analise[open]>summary{border-bottom:1px solid var(--line)}details.analise>.hero,details.analise>.cuts{padding:14px;margin:0}
+details.menu.topm summary{width:auto;height:auto;padding:8px 13px;border-radius:11px;font-weight:550;color:var(--ink);display:inline-flex}details.menu.topm summary:hover{border-color:var(--brand);color:var(--brand)}details.menu.topm .pop{min-width:240px}
+.pop .mi{display:flex;gap:9px;align-items:center;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:9px 10px;border-radius:8px;font:inherit;cursor:pointer}.pop .mi:hover{background:var(--surface2)}.pop .mi svg{width:16px;height:16px;flex:none}
+body[data-view=pagar] #topMais,body[data-view=par] #topMais,body[data-view=cfg] #topMais,body[data-view=rec] #topMais,body[data-view=res] #topMais,body[data-view=dash] #topMais{display:none}
+.btn.on{background:var(--brandbg);border-color:var(--brand);color:var(--brand)}.cnt{font-style:normal;background:var(--brand);color:#fff;border-radius:99px;padding:0 7px;font-size:11px;margin-left:2px}.cnt:empty{display:none}
+#fpanel{border-top:1px solid var(--line);background:var(--surface2)}#fpanel[hidden]{display:none}
+tr.gh td{background:var(--surface2);cursor:pointer;border-top:1px solid var(--line)}tr.gh:hover td{background:var(--brandbg)}
+tr.gh .car{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:7px;color:var(--mut);transition:.15s;flex:none}tr.gh.open .car{transform:rotate(90deg);color:var(--brand)}
+.gbar{display:flex;height:6px;border-radius:4px;overflow:hidden;background:var(--graybg);min-width:90px;margin-top:5px}.gbar i{display:block;height:100%}
+tr.gc td{background:var(--bg);border-top:1px dashed var(--line);cursor:pointer;padding-top:8px;padding-bottom:8px}tr.gc:hover td{background:var(--brandbg)}tr.gc td:first-child{padding-left:44px}
+tr.gc .gdot{width:8px;height:8px;border-radius:50%;background:var(--line);margin:0 12px 0 4px;flex:none}
+.vchip{cursor:pointer;border:0;background:var(--amberbg);color:var(--amber);font:inherit;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:7px;display:inline-block;margin:4px 4px 0 0}.vchip:hover{filter:brightness(.95)}
 /* ===== layout com menu lateral ===== */
 .shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
 .side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px;padding:16px 12px;background:var(--surface);border-right:1px solid var(--line);overflow-y:auto}
@@ -216,11 +230,14 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <div class="tools">
     <span class="env bad" id="env"></span>
     <button class="btn pri" id="bNova"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Nova cobrança</span></button>
-    <button class="btn" id="bDash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="lbl">Painel financeiro</span></button>
-    <button class="btn" id="bGerar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Gerar parcelas</span></button>
-    <button class="btn" id="bImp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span class="lbl">Importar do Asaas</span></button>
-    <button class="btn" id="bCfg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Configurações</span></button>
     <button class="btn" id="bSync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg><span class="lbl">Sincronizar</span></button>
+    <details class="menu topm" id="topMais"><summary>Mais ações ▾</summary><div class="pop">
+    <button class="mi" id="bDash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="lbl">Painel financeiro</span></button>
+    <button class="mi" id="bGerar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">Gerar parcelas</span></button>
+    <button class="mi" id="bImp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg><span class="lbl">Importar do Asaas</span></button>
+    <button class="mi" id="bOrg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h12M3 18h6"/></svg><span class="lbl">Organizar parcelas do Asaas</span></button>
+    </div></details>
+    <button class="btn" id="bCfg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Configurações</span></button>
   </div>
 </div></div>
 
@@ -229,23 +246,28 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <div class="vtabs" data-active="main"></div>
   <div id="cliCard" class="card cli-card" style="display:none"></div>
   <section id="scopedDash"></section>
+  <section class="kpis" id="kpis"></section>
+  <details class="card analise"><summary><span>Análise por categoria, licença e faixa de atraso</span><span class="mut">ver detalhes</span></summary>
   <section class="hero">
     <div class="card pad" id="hero"><div class="skel" style="width:40%"></div><div class="skel" style="width:60%;height:34px;margin-top:14px"></div></div>
     <div class="card pad" id="agingCard"><div class="eyebrow">Atraso por faixa</div><div class="agebars" id="aging"></div></div>
   </section>
-  <section class="kpis" id="kpis"></section>
   <section class="cuts">
     <div class="card pad"><div class="eyebrow" style="display:flex;justify-content:space-between">Por categoria <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">clique para filtrar</span></div><div id="cutCat" style="margin-top:8px"></div></div>
     <div class="card pad"><div class="eyebrow" style="display:flex;justify-content:space-between">Licenças por tipo <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">clique para filtrar</span></div><div id="cutPlano" style="margin-top:8px"></div></div>
   </section>
+  </details>
 
   <section class="card">
     <div class="toolbar">
       <div class="seg" id="tabs"></div>
-      <div class="sel"><select id="fCat" aria-label="Categoria"></select><select id="fPlano" aria-label="Plano"></select><select id="fOrig" aria-label="Origem"><option value="">Todas as origens</option><option value="com">Com comissão a parceiro</option><option value="sem">Sem comissão (100% Manda4)</option><option value="manual">Recebimento manual (sem Asaas)</option></select></div>
       <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" placeholder="Buscar cliente, título ou ID…"></div>
+      <button class="btn" id="bFiltros" aria-expanded="false">Filtros<em id="fCount" class="cnt"></em></button>
+      <button class="btn on" id="bGrp" title="Mostra parcelamentos e assinaturas em uma única linha">Parcelas agrupadas</button>
     </div>
-    <div class="fbar">
+    <div class="fbar" id="fpanel" hidden>
+      <div class="sel" style="flex-wrap:wrap"><select id="fCat" aria-label="Categoria"></select><select id="fPlano" aria-label="Plano"></select><select id="fOrig" aria-label="Origem"><option value="">Todas as origens</option><option value="com">Com comissão a parceiro</option><option value="sem">Sem comissão (100% Manda4)</option><option value="manual">Recebimento manual (sem Asaas)</option></select></div>
+
       <select id="dField" aria-label="Campo de data"><option value="venc">Vencimento</option><option value="pagoEm">Pago em</option><option value="criado">Criado em</option></select>
       <input type="date" id="dFrom" aria-label="De"><span class="mut">até</span><input type="date" id="dTo" aria-label="Até">
       <button class="chip2" data-p="hoje">Hoje</button><button class="chip2" data-p="semana">Esta semana</button><button class="chip2" data-p="mes">Este mês</button><button class="chip2" data-p="passado">Mês passado</button><button class="chip2" data-p="prox30">Próx. 30 dias</button><button class="chip2" data-p="limpar">Limpar</button>
@@ -557,6 +579,21 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <div class="foot"><button type="button" class="btn" id="reCancel">Cancelar</button><button class="btn pri" id="reOk">Salvar</button></div>
 </form></dialog>
 
+<dialog id="dVinc" style="max-width:600px"><form method="dialog" id="fVinc">
+  <h2>Vincular ao cliente do Bitrix</h2><p class="dlg-sub" id="vcSub"></p>
+  <div class="note" id="vcAtual" style="display:block;color:var(--ink2);background:var(--graybg)"></div>
+  <label>Cliente (empresa ou contato)</label>
+  <div style="display:flex;gap:8px"><input id="vcBusca" placeholder="Buscar pelo nome no Bitrix…"><button type="button" class="btn" id="vcBuscaBt">Buscar</button></div>
+  <select id="vcSel" size="4" style="display:none;margin-top:8px"></select>
+  <details class="adv" style="margin-top:12px"><summary>Também ligar ao negócio (card) de venda</summary>
+    <div style="display:flex;gap:8px"><input id="vcVBusca" placeholder="Buscar negócio de venda pelo título…"><button type="button" class="btn" id="vcVBuscaBt">Buscar</button></div>
+    <select id="vcVSel" size="4" style="display:none;margin-top:8px"></select><p class="pnote" id="vcVNote"></p></details>
+  <label class="chk" id="vcTodasW"><input type="checkbox" id="vcTodas" checked><span><b>Aplicar a todas as parcelas</b><br><span class="mut" id="vcTodasT"></span></span></label>
+  <label class="chk"><input type="checkbox" id="vcLembrar" checked><span><b>Lembrar para as próximas importações</b><br><span class="mut">Cobranças futuras desse mesmo cliente do Asaas já entram no cliente certo.</span></span></label>
+  <div class="res" id="vcRes"></div>
+  <div class="foot"><button type="button" class="btn" id="vcCancel">Cancelar</button><button class="btn pri" id="vcOk" disabled>Vincular</button></div>
+</form></dialog>
+
 <dialog id="dBaixa"><form method="dialog" id="fBaixa">
   <h2>Registrar recebimento</h2><p class="dlg-sub" id="bxSub"></p>
   <div class="r2"><div><label>Data do recebimento</label><input id="bxData" type="date"></div><div><label>Forma</label><select id="bxForma"><option>Pix</option><option>TED</option><option>Boleto</option><option>Dinheiro</option><option>Outro</option></select></div></div>
@@ -601,7 +638,7 @@ const SCOPE=/^\d+$/.test(String(PO.ID||''))?(/DEAL_DETAIL/.test(PL)?`deal=${PO.I
 if(SCOPE)document.body.classList.add('scoped');
 const CUR_DEAL=/DEAL_DETAIL/.test(PL)?+PO.ID:0;
 let CURLIST=[];
-let S=null,filter='todos',cliSel=null,fCat='',fPlano='',fOrig='';
+let S=null,filter='todos',cliSel=null,fCat='',fPlano='',fOrig='';let grpOn=true;const openGrp=new Set();
 let dF='venc',dFrom='',dTo='',sortK='venc',sortD=1,groupMes=false;
 const ymd=d=>d.toISOString().slice(0,10);const addD=(day,n)=>{const d=new Date(day+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return ymd(d)};
 const monthRange=(day,off)=>{const [y,m]=day.split('-').map(Number);return [ymd(new Date(Date.UTC(y,m-1+off,1))),ymd(new Date(Date.UTC(y,m+off,0)))]};
@@ -673,7 +710,7 @@ function render(){
   const sg=[['Em aberto','var(--blue)',d=>d.stageId==='C90:NEW'||d.stageId==='C90:PREPAYMENT_INVOIC'],['Atrasado','var(--red)',d=>d.stageId==='C90:PREPARATION'],['Pago','var(--green)',d=>d.stageId==='C90:WON'],['Cancelado','var(--gray)',d=>d.stageId==='C90:LOSE']].filter(([,,fn])=>qtd(fn));
   $('#sum').innerHTML=`<span><b>${list.length}</b> lançamento${list.length===1?'':'s'}</span><span>Total <b>${brl(list.filter(d=>!isC(d)&&d.stageId!=='C90:LOSE').reduce((a,d)=>a+d.valor,0))}</b></span>`+sg.map(([n,c,fn])=>`<span class="i"><i class="sw" style="background:${c}"></i>${n} <b style="font-size:13px">${brl(money(fn))}</b> <span class="mut">(${qtd(fn)})</span></span>`).join('')+((dFrom||dTo)?`<span class="mut">· ${{venc:'vencimento',pagoEm:'pagamento',criado:'criação'}[dF]} ${dFrom?'de '+dbr(dFrom):''} ${dTo?'até '+dbr(dTo):''}</span>`:'');
   $('#empty').style.display=list.length?'none':'block';
-  const rowHtml=d=>{
+  const rowHtml=(d,child=false)=>{
     const [sl,sc]=STAGE[d.stageId]||[d.etapa,'c-gray'];
     const fin=d.stageId==='C90:WON'||d.stageId==='C90:LOSE';
     const [dv,ds]=dueText(d);
@@ -686,27 +723,31 @@ function render(){
       d.asaasId?`<button data-a="detalhe" data-id="${d.id}">${ic(I.link,16)}Ver cobrança (boleto, Pix, split)</button>`:'',
       d.manual&&d.stageId==='C90:WON'?`<button data-a="desbaixar" data-id="${d.id}">${ic(I.x,16)}Desfazer recebimento</button>`:'',
       `<button data-a="editar" data-id="${d.id}">${ic(I.doc,16)}Editar lançamento</button>`,
+      !isC(d)?`<button data-a="vincular" data-id="${d.id}">${ic(I.link,16)}Vincular a cliente / venda</button>`:'',
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://${BX_HOST}/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
-    return `<tr class="${d.id===CUR_DEAL?'cur':''}">
-      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.manual?'<span class="chip3 est">Recebimento manual</span>':''}${d.recor?'<span class="chip3" title="Gerado por uma recorrência">↻ Recorrente</span>':''}${!d.manual&&!d.split&&!d.repasses&&!isC(d)&&d.stageId!=='C90:GERAR'?'<span class="chip3">100% Manda4</span>':''}${d.split?`<span class="chip3" title="${esc(d.split)}">Comissão: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
+    const sem=!d.cliente&&!isC(d)?`<button type="button" class="vchip" data-a="vincular" data-id="${d.id}">⚠ Sem cliente · vincular</button>`:'';
+    const vend=d.venda?`<a class="chip3" href="https://${BX_HOST}/crm/deal/details/${d.venda}/" target="_blank" rel="noopener">Venda #${esc(d.venda)}</a>`:'';
+    return `<tr class="${child?'gc':''} ${d.id===CUR_DEAL?'cur':''}" ${child?`data-edit="${d.id}"`:''}>
+      <td class="c-cli"><div class="cli">${child?'<div class="gdot"></div>':`<div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div>`}<div><b>${child?'Parcela '+esc(d.parcela||d.titulo):esc(nome)}</b><small>${child?'#'+d.id:'#'+d.id+' · '+esc(d.titulo)}</small>${sem}${vend}${d.manual?'<span class="chip3 est">Recebimento manual</span>':''}${d.recor?'<span class="chip3" title="Gerado por uma recorrência">↻ Recorrente</span>':''}${d.split?`<span class="chip3" title="${esc(d.split)}">Comissão: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria&&!child?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
       <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(d.valor)}</td>
       <td class="due"><b>${dv}</b>${ds}</td>
       <td><span class="pill ${sc}">${sl}</span>${d.avisos.length?`<div class="mut" style="font-size:11.5px;margin-top:4px">avisos: ${d.avisos.map(o=>o===0?'D0':o<0?'D'+o:'D+'+o).join(' · ')}</div>`:''}</td>
       <td><div class="acts">
-        ${d.link?`<a class="btn sm" href="${esc(safeUrl(d.link))}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a><button class="btn sm" data-a="copy" data-v="${esc(d.link)}" title="Copiar link de pagamento">${ic(I.doc,14)}Copiar</button>`:''}
-        ${d.manual&&!fin?`<button class="btn sm" data-a="baixar" data-id="${d.id}">${ic(I.check,14)}Receber</button>`:''}
-        <button class="btn sm" data-a="editar" data-id="${d.id}">${ic(I.doc,14)}Editar</button>
+        ${d.link?`<a class="btn sm" href="${esc(safeUrl(d.link))}" target="_blank" rel="noopener">${ic(I.link,14)}Fatura</a>${child?'':`<button class="btn sm" data-a="copy" data-v="${esc(d.link)}" title="Copiar link de pagamento">${ic(I.doc,14)}Copiar</button>`}`:''}
+        ${child?'':''}${d.manual&&!fin?`<button class="btn sm" data-a="baixar" data-id="${d.id}">${ic(I.check,14)}Receber</button>`:''}
+        ${child?'':`<button class="btn sm" data-a="editar" data-id="${d.id}">${ic(I.doc,14)}Editar</button>`}
         ${d.stageId==='C90:GERAR'?`<button class="btn sm" data-a="gerar" data-id="${d.id}">${ic(I.send,14)}Gerar</button>`:''}
-        ${!fin&&!d.manual&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
+        ${!child&&!fin&&!d.manual&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'?`<button class="btn sm" data-a="remind" data-id="${d.id}">${ic(I.bell,14)}Cobrar</button>`:''}
         <details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details>
       </div></td></tr>`};
   if(groupMes){const gs=new Map();for(const d of list){const k=(d[dF]||'').slice(0,7);(gs.get(k)||gs.set(k,[]).get(k)).push(d)}
     $('#rows').innerHTML=[...gs].map(([k,ds])=>`<tr class="grp"><td colspan="7">${mesLabel(k)}<span>${ds.length} lançamento(s) · ${brl(ds.filter(d=>!isC(d)).reduce((a,d)=>a+d.valor,0))}</span></td></tr>`+ds.map(rowHtml).join('')).join('')}
-  else $('#rows').innerHTML=list.map(rowHtml).join('');
+  else $('#rows').innerHTML=buildRows(list).map(r=>r.t==='g'?groupHtml(r,rowHtml):rowHtml(r.d)).join('');
+  { const n=[fCat,fPlano,fOrig,dFrom,dTo].filter(Boolean).length;$('#fCount').textContent=n||'';$('#bGrp').classList.toggle('on',grpOn) }
   $('#logn').textContent=S.logs.length?`${S.logs.length} registros`:'';
   $('#log').innerHTML=S.logs.map(l=>`<div><time>${new Date(l.at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</time><span class="lt">${esc(l.type)}</span><span>${esc(l.msg)}</span></div>`).join('')||'<div class="mut">Sem atividade ainda.</div>';
 }
@@ -759,6 +800,9 @@ $('#bCsv').onclick=()=>{const q=csvq;
   const blob=new Blob(['\ufeff'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lancamentos-${S.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${CURLIST.length} lançamento(s) exportados`)};
 $('#rows').onclick=async e=>{const b=e.target.closest('[data-a]');if(!b)return;const {a,id}=b.dataset;
+  if(a==='toggle-grupo'){const k=b.dataset.k;openGrp.has(k)?openGrp.delete(k):openGrp.add(k);render();return}
+  if(a==='vincular'){b.closest('details')&&(b.closest('details').open=false);const d=S.deals.find(x=>x.id==id);if(d)openVinc([d.id],d.cliente,1);return}
+  if(a==='vincular-grupo'){b.closest('details')&&(b.closest('details').open=false);const k=b.dataset.k,its=S.deals.filter(x=>gKey(x)===k),mst=k[0]==='o'?S.deals.find(x=>x.id==k.slice(1)):null;openVinc([...its.map(x=>x.id),...(mst?[mst.id]:[])],(mst||its[0]||{}).cliente,its.length);return}
   if(a==='copy'){copyText(b.dataset.v);return}
   if(a==='baixar'){b.closest('details')&&(b.closest('details').open=false);openBaixa(+id);return}
   if(a==='desbaixar'){b.closest('details')&&(b.closest('details').open=false);if(!confirm('Desfazer este recebimento? O título volta a ficar em aberto.'))return;try{await api('POST',`/api/deals/${id}/desbaixar`,{});toast('Recebimento desfeito');load()}catch(x){toast(x.message)}return}
@@ -869,6 +913,49 @@ const cbox=(label,val,openUrl)=>val?`<div class="dsec"><h3>${label}</h3><div cla
 document.addEventListener('click',e=>{const b=e.target.closest('[data-copy]');if(b)copyText(b.dataset.copy)});
 
 // ---- Nova cobrança ----
+// ---- parcelas agrupadas: um parcelamento/assinatura vira uma linha; clique abre as parcelas; clique na parcela edita ----
+const gKey=d=>isC(d)?null:d.origem?'o'+d.origem:d.recor?'r'+String(d.recor).split(':')[0]:d.grupo||null;
+function buildRows(list){if(!grpOn||groupMes)return list.map(d=>({t:'d',d}));
+  const g=new Map();list.forEach(d=>{const k=gKey(d);if(k)(g.get(k)||g.set(k,[]).get(k)).push(d)});
+  const seen=new Set(),rows=[];
+  for(const d of list){const k=gKey(d);if(!k||g.get(k).length<2){rows.push({t:'d',d});continue}if(seen.has(k))continue;seen.add(k);rows.push({t:'g',k,items:[...g.get(k)].sort((a,b)=>String(a.venc||'').localeCompare(String(b.venc||''))||a.id-b.id)})}
+  return rows}
+const baseTitle=t=>String(t||'').replace(/\s*[—-]\s*(\d+\/\d+|mensal \d{4}-\d{2})\s*$/,'');
+function groupHtml(r,rowHtml){const it=r.items,master=r.k[0]==='o'?S.deals.find(x=>x.id==r.k.slice(1)):null,first=master||it[0],open=openGrp.has(r.k);
+  const vivos=it.filter(d=>d.stageId!=='C90:LOSE'),pagas=vivos.filter(d=>d.stageId==='C90:WON'),atras=vivos.filter(d=>d.stageId==='C90:PREPARATION'),abertas=vivos.length-pagas.length-atras.length;
+  const tot=vivos.reduce((a,d)=>a+d.valor,0),prox=vivos.filter(d=>d.stageId!=='C90:WON').map(d=>d.venc).filter(Boolean).sort()[0];
+  const kind={i:'Parcelamento',s:'Assinatura',r:'Recorrência',m:'Parcelado',o:master?({PARCELADO:'Parcelamento',RECORRENTE:'Recorrente mensal',UNICA:'Contrato'}[master.tipo]||'Contrato'):'Contrato'}[r.k[0]]||'Grupo';
+  const nome=first.cliente||'Sem cliente',w=n=>vivos.length?n/vivos.length*100:0;
+  const sit=atras.length?`<span class="pill c-red">${atras.length} atrasada${atras.length>1?'s':''}</span>`:pagas.length===vivos.length&&vivos.length?'<span class="pill c-green">Quitado</span>':`<span class="pill c-blue">${abertas} em aberto</span>`;
+  const sem=!first.cliente?`<button type="button" class="vchip" data-a="vincular-grupo" data-k="${esc(r.k)}">⚠ Sem cliente · vincular</button>`:'';
+  const head=`<tr class="gh ${open?'open':''}" data-g="${esc(r.k)}"><td class="c-cli"><div class="cli"><span class="car"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span><div class="av ${AVC[first.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>${esc(baseTitle(master?master.titulo:first.titulo))}</small><span class="chip3">${kind} · ${vivos.length} parcelas</span>${sem}${first.venda?`<a class="chip3" href="https://${BX_HOST}/crm/deal/details/${first.venda}/" target="_blank" rel="noopener">Venda #${esc(first.venda)}</a>`:''}</div></div></td>
+    <td class="hide-m"><b>${pagas.length}</b> de ${vivos.length} pagas<div class="gbar"><i style="width:${w(pagas.length)}%;background:var(--green)"></i><i style="width:${w(abertas)}%;background:var(--blue)"></i><i style="width:${w(atras.length)}%;background:var(--red)"></i></div></td>
+    <td class="hide-m"><span class="mut">—</span></td><td class="num val">${brl(tot)}</td><td class="due">${prox?`<b>${dbr(prox)}</b><small class="mut">próxima</small>`:'<span class="mut">—</span>'}</td><td>${sit}</td>
+    <td><div class="acts"><button class="btn sm" data-a="toggle-grupo" data-k="${esc(r.k)}">${open?'Recolher':'Ver parcelas'}</button><details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop"><button data-a="vincular-grupo" data-k="${esc(r.k)}">${ic(I.link,16)}Vincular a cliente / venda</button></div></details></div></td></tr>`;
+  return head+(open?it.map(d=>rowHtml(d,true)).join(''):'')}
+$('#bGrp').onclick=()=>{grpOn=!grpOn;render()};
+$('#bFiltros').onclick=()=>{const p=$('#fpanel');p.hidden=!p.hidden;$('#bFiltros').setAttribute('aria-expanded',String(!p.hidden))};
+$('#rows').addEventListener('click',e=>{
+  if(e.target.closest('button,a,details,input,select'))return;
+  const gh=e.target.closest('tr.gh');if(gh){const k=gh.dataset.g;openGrp.has(k)?openGrp.delete(k):openGrp.add(k);render();return}
+  const gc=e.target.closest('tr.gc');if(gc)openEdit(gc.dataset.edit)});
+// vincular cliente / venda
+const dvc=$('#dVinc');let vcIds=[],vcCli=null,vcVenda=undefined;
+function openVinc(ids,nome,grupoQtd){vcIds=ids;vcCli=null;vcVenda=undefined;$('#vcRes').className='res';$('#vcOk').disabled=true;$('#vcSel').style.display='none';$('#vcVSel').style.display='none';$('#vcBusca').value='';$('#vcVBusca').value='';$('#vcVNote').textContent='';
+  $('#vcSub').textContent=grupoQtd>1?`${grupoQtd} parcelas`:`Cobrança #${ids[0]}`;$('#vcAtual').textContent=nome?`Cliente atual: ${nome}`:'Esta cobrança ainda não está ligada a nenhum cliente do Bitrix.';
+  $('#vcTodasW').style.display=grupoQtd>1?'':'none';$('#vcTodasT').textContent=grupoQtd>1?`Todas as ${grupoQtd} parcelas passam para o mesmo cliente.`:'';dvc.showModal()}
+$('#vcCancel').onclick=()=>dvc.close();
+async function vcBuscar(){const q=$('#vcBusca').value.trim();if(q.length<2)return;try{const r=await api('GET','/api/clientes?q='+encodeURIComponent(q));const sl=$('#vcSel');sl.innerHTML=r.map(c=>`<option value='${esc(JSON.stringify(c))}'>${c.tipo==='company'?'🏢':'👤'} ${esc(c.nome)} (#${c.id})${c.doc?' · '+esc(fmtDoc(c.doc)):''}</option>`).join('')||'<option disabled>Nenhum cliente encontrado</option>';sl.style.display='block'}catch(x){toast(x.message)}}
+$('#vcBuscaBt').onclick=vcBuscar;$('#vcBusca').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();vcBuscar()}});
+$('#vcSel').onchange=e=>{try{vcCli=JSON.parse(e.target.value);$('#vcOk').disabled=false}catch{}};
+async function vcVBuscar(){const q=$('#vcVBusca').value.trim();if(q.length<2)return;try{const r=await api('GET','/api/negocios?q='+encodeURIComponent(q));const sl=$('#vcVSel');sl.innerHTML=r.map(d=>`<option value="${d.id}">#${d.id} · ${esc(d.titulo)}${d.valor?' · '+brl(d.valor):''}</option>`).join('')||'<option disabled>Nenhum negócio encontrado</option>';sl.style.display='block'}catch(x){toast(x.message)}}
+$('#vcVBuscaBt').onclick=vcVBuscar;$('#vcVSel').onchange=e=>{vcVenda=e.target.value;$('#vcVNote').textContent=`Negócio #${vcVenda} será ligado a esta cobrança.`;$('#vcOk').disabled=false};
+$('#fVinc').onsubmit=async e=>{e.preventDefault();const b=$('#vcOk'),res=$('#vcRes');res.className='res';b.disabled=true;
+  const ids=$('#vcTodasW').style.display==='none'||$('#vcTodas').checked?vcIds:vcIds.slice(0,1);
+  try{const r=await api('POST','/api/vincular',{ids,...(vcCli?{[vcCli.tipo==='company'?'companyId':'contactId']:vcCli.id}:{}),...(vcVenda!==undefined?{vendaId:vcVenda}:{}),lembrar:$('#vcLembrar').checked});dvc.close();toast(`${r.vinculadas} cobrança(s) vinculada(s)${r.cliente?' a '+r.cliente:''}`);load()}catch(x){res.className='res bad';res.textContent=x.message;b.disabled=false}};
+dvc.addEventListener('click',e=>{if(e.target===dvc)dvc.close()});
+$('#bOrg').onclick=async e=>{$('#topMais').open=false;const b=e.currentTarget;b.disabled=true;try{const r=await api('POST','/api/organizar',{});toast(r.atualizadas?`${r.atualizadas} cobrança(s) ligada(s) ao parcelamento/assinatura de origem`:'Tudo já estava organizado');load()}catch(x){toast(x.message)}b.disabled=false};
+
 const dbx=$('#dBaixa');let bxId=0;
 function openBaixa(id){const d=S.deals.find(x=>x.id==id);if(!d)return;bxId=id;$('#bxRes').className='res';$('#bxSub').textContent=`${d.cliente||'—'} · ${d.titulo}`;$('#bxData').value=S.hoje;$('#bxData').max=S.hoje;$('#bxVal').value=d.valor;$('#bxObs').value='';dbx.showModal()}
 $('#bxCancel').onclick=()=>dbx.close();
