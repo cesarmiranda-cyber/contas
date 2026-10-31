@@ -32,3 +32,16 @@ test('organizar parcelas: marca cada cobrança com o parcelamento/assinatura de 
   assert.equal((await w.svc.organizarParcelas()).atualizadas, 0);                 // idempotente
   const ld = await w.svc.loadDeals(); assert.equal(ld.find(d => d.id === 11).grupo, 'i_ins_A');
 });
+
+test('agrupa pelo título "Parcela N de M. …" quando não há marca do Asaas (Asaas desligado); clientes e contratos diferentes não se misturam', async () => {
+  const mk = (id, n, comp, rest = 'Renovação Bitrix24 Professional', tot = 12) => deal(id, { TITLE: `Parcela ${n} de ${tot}. ${rest}`, COMPANY_ID: comp, UF_CRM_CR_ASAAS_ID: '' });
+  const deals = [mk(1, 4, '5'), mk(2, 5, '5'), mk(3, 6, '5'), mk(4, 4, '6'), mk(5, 5, '5', 'Outro serviço'), deal(6, { TITLE: 'Licença avulsa', COMPANY_ID: '5' })];
+  const w = world(deals); w.asaas.enabled = false;
+  const ld = await w.svc.loadDeals(); const g = id => ld.find(d => d.id === id);
+  assert.equal(g(1).grupo, g(2).grupo); assert.equal(g(2).grupo, g(3).grupo);
+  assert.notEqual(g(1).grupo, g(4).grupo);                 // outro cliente
+  assert.notEqual(g(1).grupo, g(5).grupo);                 // outro serviço
+  assert.equal(g(6).grupo, '');
+  assert.deepEqual([g(1).parcelaN, g(1).parcelaTotal], [4, 12]);
+  assert.equal(R.parseParcelaTitulo('Parcela 13 de 12. x'), null);
+});
