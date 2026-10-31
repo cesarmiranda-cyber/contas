@@ -19,17 +19,41 @@ function world(initial = []) {
   const companies = {};
   const comments = [];
   const calls = [];
-  let nextId = 500, nextCo = 50;
+  let nextId = 500, nextCo = 50, nextFieldId = 1000, nextStatus = 9000;
+  // Campos personalizados criados em tempo de execução (listas ganham ids como no Bitrix)
+  const dealFields = userfields(), companyFields = [];
+  const addField = (arr, f) => {
+    const x = { ID: String(nextFieldId++), FIELD_NAME: 'UF_CRM_' + f.FIELD_NAME, USER_TYPE_ID: f.USER_TYPE_ID, SETTINGS: f.SETTINGS || {} };
+    if (f.LIST) x.LIST = f.LIST.map(i => ({ ID: String(nextFieldId++), VALUE: i.VALUE }));
+    arr.push(x); return x;
+  };
+  // Funis: o 90 (Contas) já existe; categorias novas nascem com as etapas padrão do Bitrix
+  const categories = [{ ID: '90', NAME: 'Contas' }];
+  const statuses = { DEAL_STAGE_90: [{ ID: '1', STATUS_ID: 'GERAR' }, { ID: '2', STATUS_ID: 'CONTRATADO' }] };
+  const DEFAULT_STAGES = [['NEW', 'Novo', 10], ['PREPARATION', 'Preparação', 20], ['PREPAYMENT_INVOICE', 'Fatura de pré-pagamento', 30], ['EXECUTING', 'Em execução', 40], ['FINAL_INVOICE', 'Fatura final', 50], ['WON', 'Negócio fechado', 60], ['LOSE', 'Negócio perdido', 70], ['APOLOGY', 'Analisar falha', 80]];
+  const catOf = d => String(d.CATEGORY_ID ?? 90);
   const bitrix = {
     async call(m, p) {
       calls.push(m);
       switch (m) {
-        case 'crm.deal.userfield.list': return { result: userfields() };
-        case 'crm.status.list': return { result: [{ STATUS_ID: 'GERAR' }, { STATUS_ID: 'CONTRATADO' }] };
+        case 'crm.deal.userfield.list': return { result: dealFields };
+        case 'crm.deal.userfield.add': return { result: addField(dealFields, p.fields).ID };
+        case 'crm.company.userfield.list': return { result: companyFields };
+        case 'crm.company.userfield.add': return { result: addField(companyFields, p.fields).ID };
+        case 'crm.dealcategory.list': return { result: categories };
+        case 'crm.dealcategory.add': { const id = String(93 + categories.length); categories.push({ ID: id, NAME: p.fields.NAME }); statuses['DEAL_STAGE_' + id] = DEFAULT_STAGES.map(([k, n, so]) => ({ ID: String(nextStatus++), STATUS_ID: `C${id}:${k}`, NAME: n, SORT: so })); return { result: id }; }
+        case 'crm.status.list': return { result: statuses[p.filter?.ENTITY_ID] || [] };
+        case 'crm.status.add': { const e = p.fields.ENTITY_ID, id = e.split('_').pop(); (statuses[e] ||= []).push({ ID: String(nextStatus++), STATUS_ID: `C${id}:${p.fields.STATUS_ID}`, NAME: p.fields.NAME, SORT: p.fields.SORT }); return { result: true }; }
+        case 'crm.status.update': { for (const l of Object.values(statuses)) { const x = l.find(y => y.ID == p.id); if (x) Object.assign(x, p.fields); } return { result: true }; }
+        case 'crm.status.delete': { for (const k of Object.keys(statuses)) statuses[k] = statuses[k].filter(y => y.ID != p.id); return { result: true }; }
         case 'crm.company.get': return { result: companies[p.id] || { TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'fin@acme.com' }] } };
-        case 'crm.company.list': return { result: (p.filter?.ID || []).map(id => ({ ID: String(id), TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'fin@acme.com' }] })) };
+        case 'crm.company.list': {
+          if (p.filter?.COMPANY_TYPE) return { result: Object.values(companies).filter(c => p.filter.COMPANY_TYPE.includes(c.COMPANY_TYPE)) };
+          return { result: (p.filter?.ID || []).map(id => ({ ID: String(id), TITLE: 'ACME Ltda', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'fin@acme.com' }] })) };
+        }
         case 'crm.deal.get': return { result: deals.find(d => d.ID == p.id) || {} };
-        case 'crm.company.add': { const id = String(nextCo++); companies[id] = { ID: id, TITLE: p.fields.TITLE, EMAIL: p.fields.EMAIL || [] }; return { result: id }; }
+        case 'crm.company.add': { const id = String(nextCo++); companies[id] = { ID: id, TITLE: p.fields.TITLE, EMAIL: (p.fields.EMAIL || []).map((e, i) => ({ ID: 'm' + id + i, ...e })), PHONE: (p.fields.PHONE || []).map((e, i) => ({ ID: 'p' + id + i, ...e })), ...Object.fromEntries(Object.entries(p.fields).filter(([k]) => k !== 'EMAIL' && k !== 'PHONE')) }; return { result: id }; }
+        case 'crm.company.update': { const c = companies[p.id] || (companies[p.id] = { ID: String(p.id), TITLE: 'Empresa ' + p.id }); for (const [k, v] of Object.entries(p.fields)) { if (k === 'EMAIL' || k === 'PHONE') c[k] = v.map((x, i) => ({ ID: x.ID || 'n' + i, VALUE: x.VALUE, VALUE_TYPE: x.VALUE_TYPE })); else c[k] = v; } return { result: true }; }
         case 'crm.requisite.list': return { result: [] };
         case 'crm.duplicate.findbycomm': return { result: {} };
         case 'crm.deal.add': { const d = { ID: String(nextId++), ...p.fields }; deals.push(d); return { result: d.ID }; }
@@ -39,7 +63,11 @@ function world(initial = []) {
         default: return { result: true };
       }
     },
-    async listAll() { return deals; },
+    async listAll(method, p) {
+      if (method === 'crm.company.list') return (await bitrix.call(method, p)).result;
+      const cat = p?.filter?.CATEGORY_ID;
+      return cat === undefined ? deals : deals.filter(d => catOf(d) === String(cat));
+    },
   };
   const pays = {}, subs = {}, customers = { cus_x: { id: 'cus_x', name: 'Cliente Direto SA', cpfCnpj: '11222333000181', email: 'x@y.com' } };
   let np = 1;
@@ -91,7 +119,7 @@ function world(initial = []) {
   };
   const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
   const svc = createService({ bitrix, asaas, store });
-  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets, calls, installments, receipts, refunds, links, deletedLinks, subUpdates, subCancelled, created, opts };
+  return { deals, comments, pays, subs, asaas, svc, store, customers, cancelled, updates, gets, calls, companies, categories, statuses, dealFields, companyFields, installments, receipts, refunds, links, deletedLinks, subUpdates, subCancelled, created, opts };
 }
 
 module.exports = { userfields, FORMA_ID, TIPO_ID, today, in10, world, R };

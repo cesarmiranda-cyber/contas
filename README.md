@@ -9,6 +9,12 @@ Em aberto → Próximo do vencimento → Atrasado → Pago / Cancelado.
 - **Gerar parcelas**: cria N deals (parcelado, à vista ou recorrente mensal) no funil.
 - Campos criados na deal: `UF_CRM_CR_*` (não usa os campos `ASAAS_*`/`M4A_*` do app já instalado).
 
+## Contas a pagar, parceiros e repasses
+- **Parceiros/fornecedores** são empresas do Bitrix (tipo Parceiro/Fornecedor) com campos próprios (`UF_CRM_PAR_*`): walletId do Asaas, regra padrão (% ou R$), base (bruto/líquido), prazo de repasse, chave Pix e dados bancários.
+- **Contas a pagar** vivem no funil **Contas a Pagar** (criado pelo app): Aguardando recebimento → A pagar → Vence em breve → Atrasado → Pago/Cancelado (`UF_CRM_CP_*`).
+- **Ligação com o contas a receber:** o campo `CR · Split` de uma cobrança (ex.: `Parceiro A=30%; Parceiro B=R$ 50,00`) gera um título por parceiro, preso ao recebimento. Parceiro com walletId = split automático no Asaas (título só de registro; fecha quando o split é concluído); sem walletId = repasse manual (liberado quando o cliente paga, vence em recebimento + prazo). Cancelamento/estorno da cobrança cancela os repasses abertos.
+- Fluxo de caixa (entradas × saídas) e margem por venda no painel financeiro. O app **não movimenta dinheiro**: registra pagamentos feitos no banco.
+
 ## Painel financeiro
 - **Geral** (aba *Dashboard* e gaveta lateral *Painel financeiro*) e **do cliente** (aba dentro da deal): nota de saúde 0–100 com as partes à mostra, previsão de recebimento (30/60/90 dias e por mês), recebido, atraso por faixa, maiores devedores, próximas cobranças, concentração e alertas.
 - Cálculo em `lib/dashboard.js` (função pura, testada). Atrasos antigos pesam na nota e a limitam (máx. 84 com atraso > 60 dias, 69 > 90). Pagamento até 2 dias após o vencimento conta como no prazo.

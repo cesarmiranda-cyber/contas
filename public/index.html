@@ -148,6 +148,15 @@ body.scoped #bDash{display:none}
 @media(max-width:980px){.dg-top,.dg-two{grid-template-columns:1fr}.dg-tiles{grid-template-columns:1fr 1fr}.hero-n{font-size:48px}}
 @media(max-width:640px){.mt{grid-template-columns:1fr}.mt .d{grid-column:1}.dg-tiles{grid-template-columns:1fr}}
 .dwrap.compact .dg-top,.dwrap.compact .dg-two{grid-template-columns:1fr}.dwrap.compact .dg-tiles{grid-template-columns:1fr 1fr}
+:root{--v4:#eda100}@media(prefers-color-scheme:dark){:root{--v4:#c98500}}
+.c-slate{background:color-mix(in srgb,var(--mut) 16%,transparent);color:var(--ink2)}
+.chip3{font-size:11.5px;background:var(--graybg);color:var(--ink2);padding:2px 8px;border-radius:7px;font-weight:600;display:inline-block;margin:4px 4px 0 0}
+.chip3.auto{background:var(--greenbg);color:var(--green)}.chip3.est{background:var(--amberbg);color:var(--amber)}
+.sel2{display:flex;gap:8px;flex-wrap:wrap}.sel2 select{width:auto;min-width:150px;padding:8px 12px}
+.pfield{display:flex;flex-direction:column}.pnote{font-size:12px;color:var(--mut);margin-top:4px}
+.filtchip{display:inline-flex;gap:6px;align-items:center;background:var(--brandbg);color:var(--brand);border-radius:99px;padding:4px 6px 4px 11px;font-size:12.5px;font-weight:600}.filtchip button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 4px}
+.flux-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}.flux-strip div{background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:9px 11px}.flux-strip small{display:block;color:var(--mut);font-size:11.5px}.flux-strip b{font-size:15px}
+@media(max-width:640px){.flux-strip{grid-template-columns:1fr}}
 .empty{padding:56px 20px;text-align:center;color:var(--mut)}.empty svg{width:44px;height:44px;opacity:.5;margin-bottom:8px}.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
 .skel{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--graybg),var(--surface2),var(--graybg));background-size:200% 100%;animation:sk 1.2s infinite}@keyframes sk{to{background-position:-200% 0}}
 .logc{margin-top:16px}.logc summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between}.logc summary::-webkit-details-marker{display:none}
@@ -232,6 +241,30 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="vtabs" data-active="dash"></div>
   <div id="dashHost"></div>
 </main>
+<main id="viewPagar" hidden>
+  <div class="vtabs" data-active="pagar"></div>
+  <section class="kpis" id="apKpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))"></section>
+  <section class="card">
+    <div class="toolbar"><div class="seg" id="apTabs"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="apRef">Atualizar</button><button class="btn" id="apCsv">⬇ CSV</button><button class="btn pri" id="apNova">+ Nova conta a pagar</button></div></div>
+    <div class="fbar">
+      <div class="sel2"><select id="apPar" aria-label="Beneficiário"></select><select id="apCat" aria-label="Categoria"></select></div>
+      <input type="date" id="apDe" aria-label="Vence de"><span class="mut">até</span><input type="date" id="apAte" aria-label="Vence até">
+      <span id="apOrigem"></span><span class="sp"></span>
+      <div class="search" style="max-width:260px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="apQ" placeholder="Buscar conta, parceiro ou ID…"></div>
+    </div>
+    <div class="sum" id="apSum"></div>
+    <div class="tw"><table><thead><tr><th>Vencimento</th><th>Beneficiário</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody id="apRows"></tbody></table></div>
+    <div class="empty" id="apEmpty" style="display:none"><b>Nenhuma conta a pagar aqui</b>Crie uma em “Nova conta a pagar”, ou use o campo <b>CR · Split</b> numa cobrança para gerar repasses a parceiros automaticamente.</div>
+  </section>
+</main>
+<main id="viewPar" hidden>
+  <div class="vtabs" data-active="par"></div>
+  <section class="card">
+    <div class="toolbar"><div class="mini">Parceiros e fornecedores são empresas do Bitrix. Quem tem <b>walletId</b> recebe direto pelo Asaas (split automático); os demais viram contas a pagar quando o cliente paga.</div><div style="display:flex;gap:8px"><button class="btn" id="parRef">Atualizar</button><button class="btn pri" id="parNovo">+ Novo parceiro</button></div></div>
+    <div class="tw"><table><thead><tr><th>Parceiro</th><th>Regra padrão</th><th>Pagamento</th><th class="num">Aguardando</th><th class="num">A pagar</th><th class="num">Pago</th><th></th></tr></thead><tbody id="parRows"></tbody></table></div>
+    <div class="empty" id="parEmpty" style="display:none"><b>Nenhum parceiro cadastrado</b>Cadastre o primeiro em “Novo parceiro”.</div>
+  </section>
+</main>
 <main id="viewSubs" hidden>
   <div class="vtabs" data-active="subs"></div>
   <section class="card">
@@ -276,7 +309,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
     </section>
 
     <section class="card pad" id="secSplit">
-      <h2>Split de pagamento</h2><p class="hint">Recebedores que podem dividir uma cobrança. Use o <b>walletId</b> da conta Asaas de cada parceiro (Asaas → Integrações → ou peça ao parceiro). No lançamento você escolhe quanto vai para cada um.</p>
+      <h2>Carteiras avulsas (split)</h2><p class="hint">Para parceiros e fornecedores use a aba <b>Parceiros</b>: o walletId do Asaas, a regra de repasse e a chave Pix ficam lá, e quem tem walletId já entra no split automaticamente. Esta lista é só para uma carteira do Asaas que <b>não</b> é um parceiro cadastrado.</p>
       <table class="wtbl"><tbody id="wRows"></tbody></table>
       <div class="r2" style="margin-top:12px"><div><label>Nome do recebedor</label><input id="wNome" maxlength="60" placeholder="Ex.: Parceiro A"></div><div><label>walletId do Asaas</label><input id="wId" placeholder="00000000-0000-0000-0000-000000000000"></div></div>
       <div class="row"><button class="btn pri" id="wAdd">Cadastrar recebedor</button></div>
@@ -363,12 +396,61 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
   <div class="foot"><button type="button" class="btn" id="sbCancel">Cancelar</button><button class="btn pri" id="sbOk">Salvar</button></div>
 </form></dialog>
 
+<dialog id="dConta"><form method="dialog" id="fConta">
+  <h2 id="cnTit">Nova conta a pagar</h2><p class="dlg-sub" id="cnSub">Cria um título no funil Contas a Pagar do Bitrix.</p>
+  <div id="cnBenWrap"><label>Beneficiário</label><select id="cnBen"></select></div>
+  <div id="cnLivreWrap" style="display:none"><label>Nome do beneficiário</label><input id="cnLivre" maxlength="200" placeholder="Ex.: João Contador"></div>
+  <label>Descrição</label><input id="cnDesc" maxlength="255" placeholder="Ex.: Aluguel do escritório">
+  <div class="r2"><div><label>Categoria</label><select id="cnCat"></select></div><div><label>Forma de pagamento</label><select id="cnForma"><option value="">A definir</option></select></div></div>
+  <div class="r2"><div><label>Valor (R$)</label><input id="cnVal" type="number" step="0.01" min="0.01"></div><div><label id="cnVencLbl">Vencimento</label><input id="cnVenc" type="date"></div></div>
+  <div id="cnRepWrap"><label>Repetir todo mês por quantos meses? <span class="mini">(1 = só esta conta)</span></label><input id="cnRep" type="number" min="1" max="60" value="1"></div>
+  <details class="adv"><summary>Dados de pagamento e observações</summary>
+    <label>Chave Pix</label><input id="cnPix" maxlength="140"><label>Linha digitável do boleto</label><input id="cnLinha" maxlength="120"><label>Observações</label><textarea id="cnObs"></textarea></details>
+  <div class="res" id="cnRes"></div>
+  <div class="foot"><button type="button" class="btn" id="cnCancel">Cancelar</button><button class="btn pri" id="cnOk">Salvar</button></div>
+</form></dialog>
+
+<dialog id="dPagar"><form method="dialog" id="fPagar">
+  <h2>Registrar pagamento</h2><p class="dlg-sub" id="pgSub"></p>
+  <div id="pgInfo"></div>
+  <div class="r2"><div><label>Data do pagamento</label><input id="pgData" type="date"></div><div><label>Forma</label><select id="pgForma"><option>Pix</option><option>Boleto</option><option>TED</option><option>Dinheiro</option></select></div></div>
+  <div class="r2"><div><label>Valor pago (R$)</label><input id="pgVal" type="number" step="0.01" min="0.01"></div><div><label>Comprovante / referência</label><input id="pgRef" maxlength="200" placeholder="ID da transação, nº do comprovante…"></div></div>
+  <p class="dlg-sub" style="margin-top:10px">O app não movimenta dinheiro: ele só registra o pagamento que você fez no banco.</p>
+  <div class="res" id="pgRes"></div>
+  <div class="foot"><button type="button" class="btn" id="pgCancel">Cancelar</button><button class="btn pri" id="pgOk">Confirmar pagamento</button></div>
+</form></dialog>
+
+<dialog id="dPar" style="max-width:600px"><form method="dialog" id="fPar">
+  <h2 id="prTit">Novo parceiro</h2><p class="dlg-sub">Fica cadastrado como empresa no Bitrix (tipo Parceiro ou Fornecedor).</p>
+  <div id="prExistWrap"><label>A empresa já existe no Bitrix?</label><div style="display:flex;gap:8px"><input id="prBusca" placeholder="Buscar empresa pelo nome…"><button type="button" class="btn" id="prBuscaBt">Buscar</button></div><select id="prSel" size="3" style="display:none;margin-top:8px"></select><p class="pnote" id="prExistNote"></p></div>
+  <div class="r2"><div><label>Nome</label><input id="prNome" maxlength="120" required></div><div><label>Tipo</label><select id="prTipo"><option value="PARTNER">Parceiro</option><option value="SUPPLIER">Fornecedor</option></select></div></div>
+  <div class="r2"><div><label>CPF/CNPJ</label><input id="prDoc" placeholder="Somente números"></div><div><label>walletId do Asaas (split automático)</label><input id="prWallet" placeholder="00000000-0000-0000-0000-000000000000"></div></div>
+  <div class="r2"><div><label>E-mail</label><input id="prEmail" type="email"></div><div><label>Telefone</label><input id="prTel"></div></div>
+  <label>Regra padrão do repasse</label>
+  <div class="r2" style="grid-template-columns:1fr 1fr 1fr 1fr"><input id="prPerc" type="number" step="0.01" min="0" max="100" placeholder="% padrão"><input id="prFixo" type="number" step="0.01" min="0" placeholder="ou R$ fixo"><select id="prBase"><option value="BRUTO">Sobre o bruto</option><option value="LIQUIDO">Sobre o líquido</option></select><input id="prPrazo" type="number" min="0" max="365" placeholder="Prazo (dias)"></div>
+  <p class="pnote">Prazo = dias depois que o cliente paga para o repasse vencer. Com walletId o Asaas divide na origem, sempre sobre o líquido.</p>
+  <div class="r2" style="margin-top:6px"><div><label>Tipo da chave Pix</label><select id="prPixTipo"><option value="">—</option><option>CPF/CNPJ</option><option>E-mail</option><option>Celular</option><option>Chave aleatória</option></select></div><div><label>Chave Pix</label><input id="prPix" maxlength="140"></div></div>
+  <label>Dados bancários</label><input id="prBanco" maxlength="300" placeholder="Banco, agência, conta e titular">
+  <label>Observações</label><textarea id="prObs"></textarea>
+  <label class="chk" id="prInatWrap" style="display:none"><input type="checkbox" id="prInat"><span><b>Parceiro inativo</b><br><span class="mut">Deixa de aparecer nas listas e não recebe novos repasses.</span></span></label>
+  <div class="res" id="prRes"></div>
+  <div class="foot"><button type="button" class="btn" id="prCancel">Cancelar</button><button class="btn pri" id="prOk">Salvar</button></div>
+</form></dialog>
+
+<dialog id="dExt" style="max-width:720px"><form method="dialog" style="padding:22px">
+  <h2 id="exTit">Extrato</h2><p class="dlg-sub" id="exSub"></p>
+  <div class="kv" id="exTot" style="grid-template-columns:repeat(4,1fr)"></div>
+  <div class="tw" style="max-height:340px;overflow:auto"><table class="dtbl" style="min-width:520px"><thead><tr><th>Vencimento</th><th>Descrição</th><th>Situação</th><th>Valor</th></tr></thead><tbody id="exRows"></tbody></table></div>
+  <div class="foot"><button type="button" class="btn" id="exCsv">⬇ Exportar CSV</button><button type="button" class="btn" id="exCopy">Copiar chave Pix</button><button type="button" class="btn pri" id="exClose">Fechar</button></div>
+</form></dialog>
+
 <dialog id="dEdit"><form method="dialog" id="fEdit">
   <h2>Editar lançamento</h2><p class="dlg-sub" id="eHint"></p>
   <label>Título / descrição da cobrança</label><input id="eTit" required maxlength="255">
   <div class="r2"><div><label>Categoria</label><select id="eCat"></select></div><div id="ePlWrap"><label>Tipo de licença</label><select id="ePl"></select></div></div>
   <div class="r2"><div><label>Valor (R$)</label><input id="eVal" type="number" step="0.01" min="0.01" required></div><div><label>Vencimento</label><input id="eVenc" type="date" required></div></div>
   <div class="r2"><div><label>Forma de pagamento</label><select id="eForma"><option value="UNDEFINED">Cliente escolhe</option><option value="BOLETO">Boleto</option><option value="PIX">Pix</option><option value="CREDIT_CARD">Cartão</option></select></div><div><label>Tipo</label><select id="eTipo"><option value="">—</option><option value="UNICA">À vista</option><option value="PARCELADO">Parcelado</option><option value="RECORRENTE">Recorrente mensal</option></select></div></div>
+  <label>Split / repasses a parceiros</label><input id="eSplit" list="parList" placeholder="Parceiro A=30%; Parceiro B=R$ 50,00"><datalist id="parList"></datalist><p class="pnote">Parceiro com walletId recebe direto pelo Asaas (só definido na emissão); os demais geram conta a pagar quando o cliente paga.</p>
   <label>CPF/CNPJ do pagador</label><input id="eDoc" placeholder="Somente números">
   <label>Observações</label><textarea id="eObs" placeholder="Anotações internas sobre este lançamento"></textarea>
   <div class="note" id="eNote"></div>
@@ -474,13 +556,14 @@ function render(){
     const menu=[
       d.stageId==='C90:GERAR'?`<button data-a="gerar" data-id="${d.id}">${ic(I.send,16)}Gerar cobranças agora</button>`:'',
       !fin&&d.stageId!=='C90:GERAR'&&d.stageId!=='C90:CONTRATADO'&&!d.asaasId&&S.asaas.enabled?`<button data-a="charge" data-id="${d.id}">${ic(I.send,16)}Emitir cobrança</button>`:'',
+      d.repasses?`<button data-a="repasses" data-id="${d.id}">${ic(I.send,16)}Ver repasses (contas a pagar)</button>`:'',
       d.asaasId?`<button data-a="detalhe" data-id="${d.id}">${ic(I.link,16)}Ver cobrança (boleto, Pix, split)</button>`:'',
       `<button data-a="editar" data-id="${d.id}">${ic(I.doc,16)}Editar lançamento</button>`,
       !fin&&!d.doc?`<button data-a="doc" data-id="${d.id}">${ic(I.doc,16)}Informar CPF/CNPJ</button>`:'',
       `<a href="https://manda4.bitrix24.com.br/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
     return `<tr class="${d.id===CUR_DEAL?'cur':''}">
-      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
+      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.split?`<span class="chip3" title="${esc(d.split)}">Split: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
       <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(d.valor)}</td>
@@ -519,7 +602,7 @@ $('#eCat').onchange=()=>plWrap($('#eCat'),$('#ePlWrap'));
 $('#eCancel').onclick=()=>de.close();
 function openEdit(id){const d=S.deals.find(x=>x.id==id);if(!d)return;edId=id;edOrig=d;
   $('#eHint').textContent=`#${d.id} · ${d.cliente||'Sem cliente'}${d.asaasId?' · cobrança '+d.asaasId:''}`;
-  $('#eTit').value=d.titulo;$('#eVal').value=d.valor;$('#eVenc').value=d.venc||'';$('#eForma').value=d.forma||'UNDEFINED';$('#eTipo').value=d.tipo||'';$('#eDoc').value=d.doc||'';$('#eObs').value=d.obs||'';
+  $('#eTit').value=d.titulo;$('#eVal').value=d.valor;$('#eVenc').value=d.venc||'';$('#eForma').value=d.forma||'UNDEFINED';$('#eTipo').value=d.tipo||'';$('#eDoc').value=d.doc||'';$('#eObs').value=d.obs||'';$('#eSplit').value=d.split||'';fetch('/api/parceiros').then(r=>r.json()).then(ps=>{$('#parList').innerHTML=ps.filter(x=>!x.inativo).map(x=>`<option value="${esc(x.nome)}="></option>`).join('')}).catch(()=>{});
   fillSel($('#eCat'),S.listas.categorias,d.categoria,'Sem categoria');fillSel($('#ePl'),S.listas.planos,d.plano,'Sem tipo de licença');plWrap($('#eCat'),$('#ePlWrap'));
   const lock=d.asaasId&&d.statusAsaas&&!['PENDING','OVERDUE','AWAITING_RISK_ANALYSIS'].includes(d.statusAsaas);
   ['eVal','eVenc','eForma'].forEach(i=>$('#'+i).disabled=!!lock);
@@ -527,7 +610,7 @@ function openEdit(id){const d=S.deals.find(x=>x.id==id);if(!d)return;edId=id;edO
   de.showModal()}
 $('#fEdit').onsubmit=async e=>{e.preventDefault();const b=$('#eOk');b.disabled=true;
   const cat=$('#eCat').value;
-  const body={titulo:$('#eTit').value,categoria:cat,plano:cat===S.listas.licenca?$('#ePl').value:'',tipo:$('#eTipo').value,obs:$('#eObs').value,doc:$('#eDoc').value};
+  const body={titulo:$('#eTit').value,categoria:cat,plano:cat===S.listas.licenca?$('#ePl').value:'',tipo:$('#eTipo').value,obs:$('#eObs').value,doc:$('#eDoc').value,split:$('#eSplit').value};
   if(!$('#eVal').disabled){body.valor=+$('#eVal').value;body.venc=$('#eVenc').value;body.forma=$('#eForma').value}
   try{const r=await api('POST',`/api/deals/${edId}/editar`,body);de.close();
     toast(!r.alterado?'Nada foi alterado':r.asaas?.enviado?.length?`Salvo no Bitrix e enviado ao Asaas (${r.asaas.enviado.join(', ')})`:r.asaas?.bloqueado?r.asaas.bloqueado:'Salvo no Bitrix');load()}
@@ -549,6 +632,7 @@ $('#bCsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`lancamentos-${S.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${CURLIST.length} lançamento(s) exportados`)};
 $('#rows').onclick=async e=>{const b=e.target.closest('[data-a]');if(!b)return;const {a,id}=b.dataset;
   if(a==='copy'){copyText(b.dataset.v);return}
+  if(a==='repasses'){b.closest('details')&&(b.closest('details').open=false);apOrigem=+id;showView('pagar');return}
   if(a==='detalhe'){b.closest('details')&&(b.closest('details').open=false);openDet(id);return}
   if(a==='editar'){b.closest('details')&&(b.closest('details').open=false);openEdit(id);return}
   try{
@@ -582,10 +666,10 @@ $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disable
 let CFG=null,aEnv='sandbox';
 const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
 const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
-function showView(v){['main','cfg','subs','links','dash'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
+function showView(v){['main','cfg','subs','links','dash','pagar','par'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
   if(v==='cfg'){loadSettings();location.hash='config'}else history.replaceState(null,'',location.pathname+location.search);
-  if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();if(v==='dash')loadDash($('#dashHost'),{});window.scrollTo(0,0)}
-const VTABS=[['main','Lançamentos'],['dash','Dashboard'],['subs','Assinaturas'],['links','Links de pagamento']];
+  if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();if(v==='dash')loadDash($('#dashHost'),{});if(v==='pagar'||v==='par')loadPagar();window.scrollTo(0,0)}
+const VTABS=[['main','Lançamentos'],['dash','Dashboard'],['pagar','Contas a pagar'],['par','Parceiros'],['subs','Assinaturas'],['links','Links de pagamento']];
 document.querySelectorAll('.vtabs').forEach(v=>{v.innerHTML=VTABS.map(([k,l])=>`<button data-v="${k}" class="${v.dataset.active===k?'on':''}">${l}</button>`).join('')});
 document.addEventListener('click',e=>{const b=e.target.closest('.vtabs button[data-v]');if(b)showView(b.dataset.v)});
 $('#bCfg').onclick=()=>showView('cfg');$('#cBack').onclick=()=>showView('main');$('#bannerBtn').onclick=()=>showView('cfg');
@@ -648,13 +732,13 @@ function nPrev(){const v=+$('#nVal').value,n=+$('#nParc').value||2;let t='';
   if(v>0){if(N.tipo==='parcelada')t=`${n}x de ≈ ${brl(v/n)} (total ${brl(v)})`;else if(N.tipo==='assinatura')t=`${brl(v)} a cada ${$('#nCiclo').selectedOptions[0].text.toLowerCase()}`+($('#nMax').value?` · ${$('#nMax').value} cobranças`:'');else if(N.tipo==='avulsa')t=`1 cobrança de ${brl(v)}`;
     const dv=+$('#nDVal').value;if(dv>0&&N.tipo!=='link')t+=` · desconto ${$('#nDTipo').value==='PERCENTAGE'?dv+'%':brl(dv)} se pagar até ${+$('#nDDias').value||0} dia(s) antes`}
   $('#nPrev').textContent=t}
-const sOpts=()=>N.carteiras.map(w=>`<option>${esc(w.nome)}</option>`).join('');
-function nSplitAdd(){if(!N.carteiras.length){$('#nSplitHint').textContent='Nenhum recebedor cadastrado. Cadastre em Configurações → Split de pagamento.';return}
-  $('#nSplitHint').textContent='';const r=document.createElement('div');r.className='srow';r.innerHTML=`<select>${sOpts()}</select><input type="number" step="0.01" min="0.01" placeholder="Valor"><select><option value="%">%</option><option value="R$">R$</option></select><button type="button" class="btn sm" title="Remover">✕</button>`;
+const sOpts=()=>N.carteiras.map(w=>`<option value="${esc(w.nome)}">${esc(w.nome)}${w.walletId?' ⚡':''}</option>`).join('');
+function nSplitAdd(){if(!N.carteiras.length){$('#nSplitHint').textContent='Nenhum parceiro cadastrado. Cadastre na aba Parceiros.';return}
+  $('#nSplitHint').textContent='⚡ = recebe direto pelo Asaas (split automático). Os demais viram conta a pagar quando o cliente paga.';const r=document.createElement('div');r.className='srow';r.innerHTML=`<select>${sOpts()}</select><input type="number" step="0.01" min="0.01" placeholder="Valor"><select><option value="%">%</option><option value="R$">R$</option></select><button type="button" class="btn sm" title="Remover">✕</button>`;
   r.querySelector('button').onclick=()=>r.remove();$('#nSplit').appendChild(r)}
 const nSplitText=()=>[...document.querySelectorAll('#nSplit .srow')].map(r=>{const [a,b,c]=[r.children[0].value,r.children[1].value,r.children[2].value];return b?`${a}=${c==='%'?b+'%':'R$ '+String(b).replace('.',',')}`:''}).filter(Boolean).join('; ');
 async function openNova(tipo,prefill){N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};$('#fNova').reset();$('#nSplit').innerHTML='';$('#nSplitHint').textContent='';$('#nRes').className='res';$('#nOut').innerHTML='';$('#nSel').style.display='none';$('#nOk').style.display='';$('#nOk').disabled=false;
-  try{N.carteiras=await api('GET','/api/carteiras')}catch{}
+  try{const ps=await api('GET','/api/parceiros'),lg=await api('GET','/api/carteiras');N.carteiras=[...ps.filter(x=>!x.inativo).map(x=>({nome:x.nome,walletId:x.wallet})),...lg.filter(w=>!ps.some(x=>x.nome.toLowerCase()===w.nome.toLowerCase()))]}catch{}
   fillSel($('#nCat'),S.listas.categorias,'','Sem categoria');fillSel($('#nPl'),S.listas.planos,'','Sem tipo de licença');plWrap($('#nCat'),$('#nPlWrap'));
   if(S.escopo&&(S.escopo.companyId||S.escopo.contactId)){N.cli=S.escopo.companyId?{tipo:'company',id:S.escopo.companyId,nome:S.escopo.nome}:{tipo:'contact',id:S.escopo.contactId,nome:S.escopo.nome};$('#nCli').value=S.escopo.nome;$('#nCli').readOnly=true;$('#nBusca').style.display='none'}
   else{$('#nCli').readOnly=false;$('#nBusca').style.display=''}
@@ -768,6 +852,17 @@ function chartTimeline(linha,W){
   });
   return `<svg class="vsvg" viewBox="0 0 ${W} ${H}" role="group" aria-label="Recebido, em atraso e a vencer por mês">${g}<line class="axis" x1="${ml}" x2="${W-mr}" y1="${mt+ph}" y2="${mt+ph}"/>${bars}${lab}${xl}${hits}</svg>`;
 }
+function chartFluxo(linha,W){
+  const H=250,ml=46,mr=8,mt=18,mb=34,pw=W-ml-mr,ph=H-mt-mb,n=linha.length,slot=pw/n,bw=Math.max(4,Math.min(18,(slot-8)/2));
+  const sc=niceScale(Math.max(...linha.flatMap(l=>[l.entradas,l.saidas]),1)),max=sc.max,ticks=Math.round(max/sc.step),every=n>8?(W<520?3:2):(W<420?2:1),lab=false;
+  let g='',bars='',hits='',xl='',vl='';
+  for(let i=0;i<=ticks;i++){const y=mt+ph-ph*i/ticks;g+=`<line class="grid" x1="${ml}" x2="${W-mr}" y1="${y}" y2="${y}"/><text x="${ml-8}" y="${y+4}" text-anchor="end">${axisFmt(sc.step*i)}</text>`}
+  linha.forEach((l,i)=>{const cx=ml+slot*i+slot/2,base=mt+ph;
+    [['entradas',cx-bw-1,'var(--v3)'],['saidas',cx+1,'var(--v4)']].forEach(([k,x0,c])=>{const h=l[k]/max*ph;if(l[k]>0){bars+=roundTop(x0,base-h,bw,Math.max(1,h),4,c);if(lab)vl+=`<text class="lbl" x="${x0+bw/2}" y="${base-h-5}" text-anchor="middle" style="font-size:10px">${axisFmt(l[k])}</text>`}});
+    if(i%every===0||l.atual)xl+=`<text class="${l.atual?'cur':''}" x="${cx}" y="${H-mb+16}" text-anchor="middle">${esc(l.label)}</text>`;
+    hits+=`<rect class="hit" tabindex="0" role="img" aria-label="${esc(l.label)}: entradas ${esc(brl(l.entradas))}, saídas ${esc(brl(l.saidas))}" x="${ml+slot*i}" y="${mt}" width="${slot}" height="${ph}" ${tipAttr({t:l.label+(l.atual?' · mês atual':''),rows:[['Entradas previstas',brl(l.entradas),'var(--v3)'],['Saídas previstas',brl(l.saidas),'var(--v4)'],['Saldo do mês',(l.saldo<0?'− ':'')+brl(Math.abs(l.saldo))],['Saldo acumulado',(l.acumulado<0?'− ':'')+brl(Math.abs(l.acumulado))]]})}/>`});
+  return `<svg class="vsvg" viewBox="0 0 ${W} ${H}" role="group" aria-label="Entradas e saídas previstas por mês">${g}<line class="axis" x1="${ml}" x2="${W-mr}" y1="${mt+ph}" y2="${mt+ph}"/>${bars}${vl}${xl}${hits}</svg>`;
+}
 const twinTable=(head,rows)=>`<table class="dtbl"><thead><tr>${head.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 const card=(title,sub,chart,table,extra='')=>`<div class="vcard" ${table?'data-twin':''}><div class="vhead"><div><h3>${title}</h3>${sub?`<div class="sub">${sub}</div>`:''}</div>${table?'<button type="button" class="tbtn" data-twin-btn>Ver tabela</button>':''}</div>${extra}<div class="cv">${chart}</div>${table?`<div class="tv" hidden>${table}</div>`:''}</div>`;
 
@@ -778,6 +873,7 @@ function hbRows(items,{label,value,color,tip,wide}){const max=Math.max(...items.
 
 function renderDash(host,pl,o={}){
   const d=pl.dashes?pl.dashes[DM]:pl.dash,ind=d.individual,r=d.resumo,sd=d.saude,e=pl.escopo;
+  const fx=pl.fluxos&&pl.fluxos[DM],sgn=v=>(v<0?'− ':'')+brl(Math.abs(v));
   host.className='dwrap'+(o.compact?' compact':'');
   const NV={excelente:'var(--v1)',boa:'var(--v1)',atencao:'var(--vw)',critica:'var(--vc)','sem-dados':'var(--mut)'}[sd.nivel],NI={excelente:I.check,boa:I.check,atencao:I.alert,critica:I.x,'sem-dados':I.clock}[sd.nivel];
   const delta=r.recebidoDeltaPct===null?'':`<span class="dl" style="color:${r.recebidoDeltaPct>=0?'var(--ink)':'var(--vc)'}">${r.recebidoDeltaPct>=0?'▲':'▼'} ${Math.abs(r.recebidoDeltaPct).toLocaleString('pt-BR')}% vs mesmo período do mês anterior</span>`;
@@ -785,7 +881,7 @@ function renderDash(host,pl,o={}){
   const filt=`<div class="dfilter"><div class="seg">${[3,6,12].map(m=>`<button type="button" data-dm="${m}" class="${DM===m?'on':''}">${m} meses</button>`).join('')}</div><span class="mini">Histórico e indicadores de tendência usam a janela; saldos e atrasos mostram a situação de hoje (${dbr(d.hoje)}).</span></div>`;
   const hero=`<div class="vcard"><div class="eyebrow">${ind?'Perfil de pagamento':'Saúde financeira'}</div><div class="hero-n">${sd.score===null?'—':sd.score}</div><div class="hero-l" style="color:${NV}">${ic(NI,18)}<span class="nivel-ok">${esc(sd.rotulo)}</span></div>
     <div class="mini" style="margin-top:8px">${sd.score===null?'Ainda não há histórico suficiente para calcular.':`Nota de 0 a 100 · confiança ${esc(sd.confianca)} · ${d.pontualidade.n+d.eficiencia.n} registros na base`}</div>${sd.teto?`<div class="mini" style="margin-top:6px;color:var(--ink2)">${ic(I.alert,14)} Nota limitada a ${sd.teto.max} por ${esc(sd.teto.motivo)}.</div>`:''}</div>`;
-  const insights=`<div class="vcard"><div class="vhead"><div><h3>O que merece atenção</h3></div></div><div class="ins">${d.insights.map(i=>`<div class="${i.tipo==='alerta'?'a':i.tipo==='ok'?'o':'i'}">${ic(i.tipo==='alerta'?I.alert:i.tipo==='ok'?I.check:I.clock,18)}<span>${esc(i.msg)}</span></div>`).join('')}</div></div>`;
+  const insights=`<div class="vcard"><div class="vhead"><div><h3>O que merece atenção</h3></div></div><div class="ins">${(()=>{const m=d.insights.concat(fx?fx.insights:[]);return m.some(i=>i.tipo==='alerta')?m.filter(i=>i.tipo!=='ok'):m})().map(i=>`<div class="${i.tipo==='alerta'?'a':i.tipo==='ok'?'o':'i'}">${ic(i.tipo==='alerta'?I.alert:i.tipo==='ok'?I.check:I.clock,18)}<span>${esc(i.msg)}</span></div>`).join('')}</div></div>`;
   const tiles=`<div class="dgrid dg-tiles">${
     tile('c-blue',I.clock,'Previsto · 30 dias',brl(r.proximos.d30),d.previsao30.esperado!==null?`Esperado pelo histórico: ${brl(d.previsao30.esperado)}`:`${r.aVencer.qtd} título${r.aVencer.qtd===1?'':'s'} a vencer no total`)
    +tile('c-green',I.check,'Recebido no mês',brl(r.recebidoMes),delta||`${r.pago.qtd} pago${r.pago.qtd===1?'':'s'} no total`)
@@ -796,6 +892,10 @@ function renderDash(host,pl,o={}){
     chartTimeline(tl,Math.max(300,Math.min(780,(host.clientWidth||780)-40))),
     twinTable(['Mês','Recebido','Em atraso','A vencer'],tl.map(x=>[x.label+(x.atual?' (atual)':''),brl(x.recebido),brl(x.atrasado),brl(x.aVencer)])),
     `<div class="leg2">${SER.map(([k,n,c])=>`<span><i style="background:${c}"></i>${n}</span>`).join('')}</div>`);
+  const fluxo=fx&&(!ind||fx.linha.some(l=>l.saidas>0)||fx.margem.repasses>0)?card(ind?'Entradas × repasses deste cliente':'Fluxo de caixa previsto',ind?'Cobranças a receber e repasses a parceiros ligados a elas':`Próximos ${fx.linha.length} meses · saldo parte de zero (o app não conhece o saldo do banco)`,
+    chartFluxo(fx.linha,Math.max(300,Math.min(780,(host.clientWidth||780)-40))),
+    twinTable(['Mês','Entradas','Saídas','Saldo','Acumulado'],fx.linha.map(l=>[l.label+(l.atual?' (atual)':''),brl(l.entradas),brl(l.saidas),sgn(l.saldo),sgn(l.acumulado)])),
+    `<div class="flux-strip"><div><small>Saldo previsto · 30 dias</small><b>${sgn(fx.resumo.saldo30)}</b></div><div><small>A pagar (abertas + aguardando)</small><b>${brl(fx.resumo.aPagarTotal+fx.resumo.aguardando)}</b></div><div><small>Margem · 90 dias</small><b>${fx.margem.pct===null?'—':brl(fx.margem.margem)+' ('+fx.margem.pct.toLocaleString('pt-BR')+'%)'}</b></div></div><div class="leg2"><span><i style="background:var(--v3)"></i>Entradas previstas</span><span><i style="background:var(--v4)"></i>Saídas previstas</span></div>`):'';
   const OC=['var(--o1)','var(--o2)','var(--o3)','var(--o4)'];
   const aging=card('Atraso por faixa',r.atrasado.qtd?`${r.atrasado.qtd} título${r.atrasado.qtd===1?'':'s'} · mais antigo há ${d.maisAntigo} dias`:'Nada em atraso',
     r.atrasado.qtd?hbRows(d.aging,{label:a=>a.faixa+' dias',value:a=>a.valor,color:a=>OC[d.aging.indexOf(a)],tip:a=>({t:a.faixa+' dias de atraso',rows:[['Valor',brl(a.valor)],['Títulos',String(a.qtd)]]})}):`<div class="mini" style="padding:14px 4px">${ic(I.check,16)} Sem títulos em atraso.</div>`,
@@ -808,7 +908,7 @@ function renderDash(host,pl,o={}){
     <details style="margin-top:10px"><summary class="mini" style="cursor:pointer">Como os números são calculados</summary><div class="mini" style="margin-top:6px;line-height:1.55"><b>Eficiência de cobrança:</b> do que venceu na janela, quanto já foi recebido; todo atraso em aberto conta, de qualquer idade. <b>Pontualidade:</b> % dos pagamentos feitos até 2 dias após o vencimento (compensação de boleto e fim de semana). <b>Inadimplência:</b> valor em atraso ÷ total a receber (a parte da nota cai 2 pontos a cada 1%). ${ind?'':'<b>Concentração:</b> quanto o maior cliente pesa no a receber (acima de 25% começa a reduzir). '}A nota fica limitada (máx. 84 com atraso acima de 60 dias, 69 acima de 90) para não parecer boa com dívida antiga. Previsão “esperada” = previsto × eficiência histórica, só com 10+ títulos de base.</div></details></div>`;
   const facts=[['Receita recorrente prevista (30 dias)',brl(d.recorrente30)],['Ticket médio dos pagos',brl(d.ticketMedio)],['Média recebida (3 meses)',brl(d.mediaRecebida3m)],['Cancelado (90 dias)',`${brl(d.cancelado90.valor)} · ${d.cancelado90.qtd}`],...(ind?[['Maior atraso atual',d.maisAntigo?d.maisAntigo+' dias':'—'],['Atraso médio ao pagar',d.pontualidade.atrasoMedio?d.pontualidade.atrasoMedio+' dias':'—'],['Cobranças no funil',String(d.total)]]:[['Clientes com saldo',String(d.concentracao.clientes)],['Maior cliente',d.concentracao.topCliente?`${d.concentracao.topCliente} · ${d.concentracao.top1Pct}%`:'—'],['5 maiores clientes',d.concentracao.top5Pct+'% do a receber']])];
   const kv=`<div class="vcard"><div class="vhead"><div><h3>Indicadores</h3></div></div><table class="dtbl"><tbody>${facts.map(([k,v])=>`<tr><td>${esc(k)}</td><td><b>${esc(v)}</b></td></tr>`).join('')}</tbody></table></div>`;
-  host.innerHTML=filt+`<div class="dgrid dg-top">${hero}${insights}</div>`+tiles+timeline+`<div class="dgrid dg-two">${aging}${ind?prox:dev}</div>`+`<div class="dgrid dg-two">${ind?kv:prox}${health}</div>`+(ind?'':kv);
+  host.innerHTML=filt+`<div class="dgrid dg-top">${hero}${insights}</div>`+tiles+timeline+fluxo+`<div class="dgrid dg-two">${aging}${ind?prox:dev}</div>`+`<div class="dgrid dg-two">${ind?kv:prox}${health}</div>`+(ind?'':kv);
 }
 
 // dicas ao passar o mouse / focar (conteúdo sempre via textContent)
@@ -841,6 +941,127 @@ function openDrawer(){$('#drawer').classList.add('open');$('#drawer').setAttribu
 function closeDrawer(){$('#drawer').classList.remove('open');$('#drawer').setAttribute('aria-hidden','true');$('#dim').classList.remove('on')}
 $('#bDash').onclick=openDrawer;$('#drClose').onclick=closeDrawer;$('#dim').onclick=closeDrawer;
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
+
+// ================= contas a pagar e parceiros =================
+let AP={contas:[],resumo:{},parceiros:[],consts:{},hoje:'',pronto:false},apTab='abertas',apOrigem=0;
+const AP_ST={aguardando:['Aguardando recebimento','c-slate'],aberto:['A pagar','c-blue'],proximo:['Vence em breve','c-amber'],atrasado:['Atrasado','c-red'],pago:['Pago','c-green'],cancelado:['Cancelado','c-gray']};
+const apPill=e=>{const [l,c]=AP_ST[e]||[e,'c-gray'];return `<span class="pill ${c}">${l}</span>`};
+const SPLIT_ST={PENDING:'aguardando crédito',AWAITING_CREDIT:'aguardando crédito',DONE:'creditado',CANCELLED:'cancelado',REFUNDED:'estornado'};
+const ABERTAS=['aberto','proximo','atrasado'];
+async function loadPagar(){try{AP=await api('GET','/api/pagar')}catch(x){toast(x.message);return}renderPagar();renderPar()}
+function relVenc(c){if(c.estado==='pago')return c.pagoEm?`<small class="okc">pago em ${dbr(c.pagoEm)}</small>`:'';if(c.estado==='cancelado')return '';
+  if(c.estado==='aguardando')return '<small class="mut">estimado · depende do recebimento</small>';
+  if(!c.venc)return '';const d=Math.round((Date.parse(c.venc)-Date.parse(AP.hoje))/864e5);
+  return d<0?`<small class="late">${-d} dia${-d>1?'s':''} em atraso</small>`:d===0?'<small class="soon">vence hoje</small>':d<=7?`<small class="soon">em ${d} dia${d>1?'s':''}</small>`:`<small class="mut">em ${d} dias</small>`}
+function apFiltered(){const q=$('#apQ').value.trim().toLowerCase(),par=$('#apPar').value,cat=$('#apCat').value,de=$('#apDe').value,ate=$('#apAte').value;
+  const tabs={abertas:c=>ABERTAS.includes(c.estado),aguardando:c=>c.estado==='aguardando',proximo:c=>c.estado==='proximo',atrasado:c=>c.estado==='atrasado',pago:c=>c.estado==='pago',cancelado:c=>c.estado==='cancelado',todas:()=>true};
+  return AP.contas.filter(tabs[apTab]).filter(c=>!apOrigem||c.origem===apOrigem).filter(c=>!par||(par==='__livre'?!c.parceiroId:String(c.parceiroId)===par)).filter(c=>!cat||c.categoria===cat)
+    .filter(c=>!de||(c.venc&&c.venc>=de)).filter(c=>!ate||(c.venc&&c.venc<=ate)).filter(c=>!q||`${c.beneficiario} ${c.titulo} ${c.id} ${c.regra}`.toLowerCase().includes(q))
+    .sort((a,b)=>(a.venc||'9999').localeCompare(b.venc||'9999')||a.id-b.id)}
+function renderPagar(){const r=AP.resumo||{};
+  const kp=(cls,icn,l,v,sb)=>`<div class="card kpi"><div class="ico ${cls}">${ic(icn,20)}</div><div><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${sb}</div></div></div>`;
+  $('#apKpis').innerHTML=AP.pronto?kp('c-blue',I.clock,'A pagar',brl(r.aPagar?.valor),`${r.aPagar?.qtd||0} conta(s)`)+kp('c-amber',I.alert,'Vence em 7 dias',brl(r.venceEm7),'a pagar na semana')+kp('c-red',I.alert,'Atrasado',brl(r.atrasado?.valor),`${r.atrasado?.qtd||0} conta(s)`)+kp('c-gray',I.list,'Aguardando recebimento',brl(r.aguardando?.valor),`${r.aguardando?.qtd||0} repasse(s) ligados a cobranças`)+kp('c-green',I.check,'Pago no mês',brl(r.pagoMes),`${r.pago?.qtd||0} pago(s) no total`):`<div class="card pad" style="grid-column:1/-1"><b>Preparando o módulo…</b><div class="mini">O funil “Contas a Pagar” é criado no Bitrix na próxima sincronização. Clique em <b>Sincronizar</b> no topo.</div></div>`;
+  const cnt=f=>AP.contas.filter(f).length,T=[['abertas','Abertas',c=>ABERTAS.includes(c.estado)],['aguardando','Aguardando recebimento',c=>c.estado==='aguardando'],['proximo','Vencem em breve',c=>c.estado==='proximo'],['atrasado','Atrasadas',c=>c.estado==='atrasado'],['pago','Pagas',c=>c.estado==='pago'],['cancelado','Canceladas',c=>c.estado==='cancelado'],['todas','Todas',()=>true]];
+  $('#apTabs').innerHTML=T.map(([id,l,f])=>`<button data-t="${id}" class="${apTab===id?'on':''}">${l}<em>${cnt(f)}</em></button>`).join('');
+  const keep=[$('#apPar').value,$('#apCat').value];
+  $('#apPar').innerHTML='<option value="">Todos os beneficiários</option>'+(AP.parceiros||[]).filter(p=>!p.inativo).map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')+'<option value="__livre">Sem parceiro cadastrado</option>';
+  $('#apCat').innerHTML='<option value="">Todas as categorias</option>'+(AP.consts.AP_CATEGORIAS||[]).map(c=>`<option>${esc(c)}</option>`).join('');
+  $('#apPar').value=keep[0]||'';$('#apCat').value=keep[1]||'';
+  $('#apOrigem').innerHTML=apOrigem?`<span class="filtchip">Repasses da cobrança #${apOrigem}<button type="button" data-ap="limpar-origem" aria-label="Remover filtro">✕</button></span>`:'';
+  const list=apFiltered(),sum=f=>list.filter(f).reduce((a,c)=>a+(c.estado==='pago'?(c.valorPago||c.valor):c.valor),0);
+  $('#apSum').innerHTML=`<span><b>${list.length}</b> conta${list.length===1?'':'s'}</span><span>Total <b>${brl(list.filter(c=>c.estado!=='cancelado').reduce((a,c)=>a+(c.estado==='pago'?(c.valorPago||c.valor):c.valor),0))}</b></span>`+[['Aguardando','var(--mut)',c=>c.estado==='aguardando'],['A pagar','var(--v1)',c=>ABERTAS.includes(c.estado)&&c.estado!=='atrasado'],['Atrasado','var(--vc)',c=>c.estado==='atrasado'],['Pago','var(--v3)',c=>c.estado==='pago']].filter(([,,f])=>list.some(f)).map(([n,col,f])=>`<span class="i"><i class="sw" style="background:${col}"></i>${n} <b style="font-size:13px">${brl(sum(f))}</b> <span class="mut">(${list.filter(f).length})</span></span>`).join('');
+  $('#apEmpty').style.display=list.length?'none':'block';
+  $('#apRows').innerHTML=list.map(c=>{const open=ABERTAS.includes(c.estado),fin=c.estado==='pago'||c.estado==='cancelado',auto=c.forma==='Split Asaas';
+    const menu=[!fin&&c.estado==='aguardando'&&!auto?`<button data-ap="pagar" data-id="${c.id}">${ic(I.check,16)}Pagar antes do recebimento</button>`:'',!fin?`<button data-ap="editar" data-id="${c.id}">${ic(I.doc,16)}Editar</button>`:'',c.pix?`<button data-ap="copy" data-v="${esc(c.pix)}">${ic(I.link,16)}Copiar chave Pix</button>`:'',c.linha?`<button data-ap="copy" data-v="${esc(c.linha)}">${ic(I.link,16)}Copiar linha digitável</button>`:'',
+      c.origem?`<a href="https://manda4.bitrix24.com.br/crm/deal/details/${c.origem}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir cobrança de origem</a>`:'',`<a href="https://manda4.bitrix24.com.br/crm/deal/details/${c.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
+      c.estado==='pago'?`<button data-ap="desfazer" data-id="${c.id}">${ic(I.x,16)}Desfazer pagamento</button>`:'',!fin?`<button class="dng" data-ap="cancelar" data-id="${c.id}">${ic(I.x,16)}Cancelar conta</button>`:''].join('');
+    return `<tr><td class="due"><b>${c.venc?dbr(c.venc):'—'}</b>${relVenc(c)}</td>
+      <td><div class="cli"><div class="av ${AVC[c.id%5]}">${esc(initials(c.beneficiario||'?'))}</div><div><b>${esc(c.beneficiario||'Sem beneficiário')}</b><small>#${c.id} · ${esc(c.titulo)}</small>
+      <div>${c.regra?`<span class="chip3">${esc(c.regra)}</span>`:''}${c.origem?`<span class="chip3">Origem #${c.origem}</span>`:''}${c.parcela?`<span class="chip3">${esc(c.parcela)}</span>`:''}${auto?'<span class="chip3 auto">⚡ Split automático</span>':''}${c.splitSt?`<span class="chip3">Split: ${esc(SPLIT_ST[c.splitSt]||c.splitSt)}</span>`:''}</div></div></div></td>
+      <td>${c.categoria?`<span class="tag">${esc(c.categoria)}</span>`:'<span class="mut">—</span>'}</td>
+      <td class="num val">${brl(c.valor)}${c.estado==='pago'&&c.valorPago&&c.valorPago!==c.valor?`<div class="mini">pago ${brl(c.valorPago)}</div>`:''}</td>
+      <td>${apPill(c.estado)}${c.forma&&c.estado==='pago'?`<div class="mini" style="margin-top:4px">${esc(c.forma)}${c.comprovante?' · '+esc(c.comprovante):''}</div>`:''}</td>
+      <td><div class="acts">${open?`<button class="btn sm" data-ap="pagar" data-id="${c.id}">${ic(I.check,14)}Pagar</button>`:''}<details class="menu"><summary aria-label="Mais ações">${ic(I.more,18)}</summary><div class="pop">${menu}</div></details></div></td></tr>`}).join('')}
+['apQ','apDe','apAte'].forEach(i=>$('#'+i).addEventListener('input',()=>renderPagar()));['apPar','apCat'].forEach(i=>$('#'+i).addEventListener('change',()=>renderPagar()));
+$('#apTabs').onclick=e=>{const b=e.target.closest('button[data-t]');if(b){apTab=b.dataset.t;renderPagar()}};
+$('#apRef').onclick=loadPagar;
+$('#apCsv').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`,list=apFiltered();
+  const head=['ID','Beneficiário','Descrição','Categoria','Vencimento','Valor','Situação','Pago em','Valor pago','Forma','Origem (cobrança)','Regra','Comprovante'];
+  const rows=list.map(c=>[c.id,c.beneficiario,c.titulo,c.categoria,dbr(c.venc),String(c.valor).replace('.',','),(AP_ST[c.estado]||[c.estado])[0],dbr(c.pagoEm),c.valorPago?String(c.valorPago).replace('.',','):'',c.forma,c.origem||'',c.regra,c.comprovante].map(q).join(';'));
+  const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`contas-a-pagar-${AP.hoje}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(`${list.length} conta(s) exportadas`)};
+$('#apOrigem').onclick=e=>{if(e.target.closest('[data-ap="limpar-origem"]')){apOrigem=0;renderPagar()}};
+$('#apRows').onclick=async e=>{const b=e.target.closest('[data-ap]');if(!b)return;const a=b.dataset.ap,id=+b.dataset.id;b.closest('details')&&(b.closest('details').open=false);
+  if(a==='copy'){copyText(b.dataset.v);return}if(a==='pagar'){openPagar(id);return}if(a==='editar'){openConta(id);return}
+  try{if(a==='cancelar'){const m=prompt('Motivo do cancelamento (opcional):');if(m===null)return;await api('POST',`/api/pagar/contas/${id}/cancelar`,{motivo:m});toast('Conta cancelada')}
+    if(a==='desfazer'){if(!confirm('Desfazer este pagamento? A conta volta a ficar em aberto.'))return;await api('POST',`/api/pagar/contas/${id}/desfazer`,{});toast('Pagamento desfeito')}
+    loadPagar()}catch(x){toast(x.message)}};
+
+// ---- nova / editar conta ----
+const dcn=$('#dConta');let cnId=null;
+function parOpts(sel){return (AP.parceiros||[]).filter(p=>!p.inativo).map(p=>`<option value="${p.id}"${String(sel)===String(p.id)?' selected':''}>${esc(p.nome)}${p.tipo==='SUPPLIER'?' (fornecedor)':''}</option>`).join('')}
+function openConta(id,parceiroId){cnId=id||null;const c=id?AP.contas.find(x=>x.id===id):null;$('#fConta').reset();$('#cnRes').className='res';
+  $('#cnTit').textContent=c?'Editar conta a pagar':'Nova conta a pagar';$('#cnSub').textContent=c?`#${c.id} · ${c.beneficiario||''}`:'Cria um título no funil Contas a Pagar do Bitrix.';
+  $('#cnBen').innerHTML=`<option value="">— escolha —</option>${parOpts(c?c.parceiroId:parceiroId)}<option value="__livre">Outro (nome livre)</option>`;
+  $('#cnCat').innerHTML=(AP.consts.AP_CATEGORIAS||[]).map(x=>`<option${(c?c.categoria===x:x==='Outros')?' selected':''}>${esc(x)}</option>`).join('');
+  $('#cnForma').innerHTML='<option value="">A definir</option>'+(AP.consts.AP_FORMAS||[]).filter(f=>f!=='Split Asaas').map(f=>`<option${c&&c.forma===f?' selected':''}>${f}</option>`).join('');
+  $('#cnBenWrap').style.display=c?'none':'';$('#cnRepWrap').style.display=c?'none':'';$('#cnLivreWrap').style.display='none';
+  if(c){$('#cnDesc').value=c.titulo;$('#cnVal').value=c.valor;$('#cnVenc').value=c.venc||'';$('#cnPix').value=c.pix||'';$('#cnLinha').value=c.linha||'';$('#cnObs').value=c.obs||''}else{$('#cnVenc').value=addD(AP.hoje||S.hoje,7)}
+  dcn.showModal()}
+$('#cnBen').onchange=()=>{$('#cnLivreWrap').style.display=$('#cnBen').value==='__livre'?'':'none';const p=(AP.parceiros||[]).find(x=>String(x.id)===$('#cnBen').value);if(p&&p.pix&&!$('#cnPix').value)$('#cnPix').value=p.pix};
+$('#cnCancel').onclick=()=>dcn.close();$('#apNova').onclick=()=>openConta();
+$('#fConta').onsubmit=async e=>{e.preventDefault();const b=$('#cnOk'),res=$('#cnRes');res.className='res';b.disabled=true;
+  try{if(cnId){await api('PUT',`/api/pagar/contas/${cnId}`,{titulo:$('#cnDesc').value,valor:$('#cnVal').value,venc:$('#cnVenc').value,categoria:$('#cnCat').value,forma:$('#cnForma').value,pix:$('#cnPix').value,linha:$('#cnLinha').value,obs:$('#cnObs').value})}
+    else{const ben=$('#cnBen').value;if(!ben){res.className='res bad';res.textContent='Escolha o beneficiário.';b.disabled=false;return}
+      await api('POST','/api/pagar/contas',{titulo:$('#cnDesc').value,valor:$('#cnVal').value,venc:$('#cnVenc').value,categoria:$('#cnCat').value,forma:$('#cnForma').value,pix:$('#cnPix').value,linha:$('#cnLinha').value,obs:$('#cnObs').value,repetir:$('#cnRep').value,...(ben==='__livre'?{beneficiario:$('#cnLivre').value}:{parceiroId:ben})})}
+    dcn.close();toast('Conta salva');loadPagar()}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=false};
+
+// ---- registrar pagamento ----
+const dpg=$('#dPagar');let pgId=null;
+function openPagar(id){const c=AP.contas.find(x=>x.id===id);if(!c)return;pgId=id;const p=(AP.parceiros||[]).find(x=>x.id===c.parceiroId);$('#pgRes').className='res';
+  $('#pgSub').textContent=`${c.beneficiario||'—'} · ${c.titulo}`;
+  $('#pgInfo').innerHTML=`<div class="kv"><div><small>Valor previsto</small><b>${brl(c.valor)}</b></div><div><small>Vencimento</small><b>${dbr(c.venc)}</b></div><div><small>Categoria</small><b>${esc(c.categoria||'—')}</b></div></div>`+cbox('Chave Pix',c.pix||(p&&p.pix)||'')+cbox('Linha digitável',c.linha||'')+(p&&p.banco?`<div class="dsec"><h3>Dados bancários</h3><div class="mini" style="margin-top:4px">${esc(p.banco)}</div></div>`:'')+(c.estado==='aguardando'?`<div class="note" style="display:block">O cliente ainda não pagou a cobrança de origem. Pague antes só se for essa a intenção.</div>`:'');
+  $('#pgData').value=AP.hoje;$('#pgData').max=AP.hoje;$('#pgVal').value=c.valor;$('#pgRef').value='';$('#pgForma').value=(c.forma&&c.forma!=='Split Asaas')?c.forma:(c.pix||(p&&p.pix)?'Pix':'Boleto');dpg.showModal()}
+$('#pgCancel').onclick=()=>dpg.close();
+$('#fPagar').onsubmit=async e=>{e.preventDefault();const b=$('#pgOk'),res=$('#pgRes');res.className='res';
+  if(!confirm(`Confirmar que ${brl($('#pgVal').value)} foi pago em ${dbr($('#pgData').value)}?`))return;b.disabled=true;
+  try{await api('POST',`/api/pagar/contas/${pgId}/pagar`,{data:$('#pgData').value,forma:$('#pgForma').value,valor:$('#pgVal').value,comprovante:$('#pgRef').value});dpg.close();toast('Pagamento registrado');loadPagar()}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=false};
+
+// ---- parceiros ----
+function renderPar(){const ps=AP.parceiros||[];$('#parEmpty').style.display=ps.length?'none':'block';
+  $('#parRows').innerHTML=ps.map(p=>{const regra=p.perc?`${p.perc}%`:p.fixo?brl(p.fixo):'—';
+    return `<tr style="${p.inativo?'opacity:.55':''}"><td><div class="cli"><div class="av ${AVC[p.id%5]}">${esc(initials(p.nome))}</div><div><b>${esc(p.nome)}</b><small>${p.tipo==='SUPPLIER'?'Fornecedor':'Parceiro'}${p.doc?' · '+esc(fmtDoc(p.doc)):''}${p.inativo?' · inativo':''}</small>${p.email||p.telefone?`<small>${esc([p.email,p.telefone].filter(Boolean).join(' · '))}</small>`:''}</div></div></td>
+      <td>${regra!=='—'?`<b>${regra}</b> <span class="mini">${p.perc?(p.base==='LIQUIDO'?'do líquido':'do bruto'):'fixo'}</span>`:'<span class="mut">—</span>'}<div class="mini">${p.prazo?`repasse em ${p.prazo} dia${p.prazo>1?'s':''}`:'repasse no ato'}</div></td>
+      <td>${p.wallet?'<span class="chip3 auto">⚡ Split automático</span>':'<span class="chip3">Repasse manual</span>'}<div class="mini">${p.pix?esc((p.pixTipo?p.pixTipo+': ':'')+p.pix):'<span class="mut">sem chave Pix</span>'}</div></td>
+      <td class="num val">${brl(p.aguardando)}</td><td class="num val">${brl(p.aPagar)}${p.atrasado?`<div class="iss">${brl(p.atrasado)} atrasado</div>`:''}</td><td class="num val">${brl(p.pagoTotal)}</td>
+      <td><div class="acts"><button class="btn sm" data-pr="extrato" data-id="${p.id}">Extrato</button><button class="btn sm" data-pr="editar" data-id="${p.id}">Editar</button><button class="btn sm" data-pr="conta" data-id="${p.id}" title="Nova conta a pagar para este beneficiário">+ Conta</button></div></td></tr>`}).join('')}
+$('#parRef').onclick=loadPagar;
+$('#parRows').onclick=e=>{const b=e.target.closest('[data-pr]');if(!b)return;const id=+b.dataset.id;if(b.dataset.pr==='editar')openPar(id);if(b.dataset.pr==='extrato')openExtrato(id);if(b.dataset.pr==='conta'){showView('pagar');openConta(null,id)}};
+const dpr=$('#dPar');let prId=null,prEmpresa=null;
+function openPar(id){prId=id||null;prEmpresa=null;const p=id?AP.parceiros.find(x=>x.id===id):null;$('#fPar').reset();$('#prRes').className='res';$('#prSel').style.display='none';$('#prExistNote').textContent='';
+  $('#prTit').textContent=p?'Editar parceiro':'Novo parceiro';$('#prExistWrap').style.display=p?'none':'';$('#prInatWrap').style.display=p?'flex':'none';
+  if(p){$('#prNome').value=p.nome;$('#prTipo').value=p.tipo;$('#prDoc').value=p.doc;$('#prWallet').value=p.wallet;$('#prEmail').value=p.email;$('#prTel').value=p.telefone;$('#prPerc').value=p.perc||'';$('#prFixo').value=p.fixo||'';$('#prBase').value=p.base;$('#prPrazo').value=p.prazo||'';$('#prPixTipo').value=p.pixTipo||'';$('#prPix').value=p.pix;$('#prBanco').value=p.banco;$('#prObs').value=p.obs;$('#prInat').checked=!!p.inativo}
+  dpr.showModal()}
+$('#parNovo').onclick=()=>openPar();$('#prCancel').onclick=()=>dpr.close();
+$('#prBuscaBt').onclick=async()=>{const q=$('#prBusca').value.trim();if(q.length<2)return;try{const r=(await api('GET','/api/clientes?q='+encodeURIComponent(q))).filter(c=>c.tipo==='company');const sl=$('#prSel');sl.innerHTML=r.map(c=>`<option value='${esc(JSON.stringify(c))}'>🏢 ${esc(c.nome)} (#${c.id})</option>`).join('')||'<option disabled>Nenhuma empresa encontrada</option>';sl.style.display='block'}catch(x){toast(x.message)}};
+$('#prSel').onchange=e=>{const c=JSON.parse(e.target.value);prEmpresa=c.id;$('#prNome').value=c.nome;$('#prExistNote').textContent=`A empresa #${c.id} será marcada como parceiro/fornecedor no Bitrix (os dados dela são mantidos).`};
+$('#fPar').onsubmit=async e=>{e.preventDefault();const b=$('#prOk'),res=$('#prRes');res.className='res';b.disabled=true;
+  const body={nome:$('#prNome').value,tipo:$('#prTipo').value,doc:$('#prDoc').value,wallet:$('#prWallet').value,email:$('#prEmail').value,telefone:$('#prTel').value,perc:$('#prPerc').value,fixo:$('#prFixo').value,base:$('#prBase').value,prazo:$('#prPrazo').value,pixTipo:$('#prPixTipo').value,pix:$('#prPix').value,banco:$('#prBanco').value,obs:$('#prObs').value};
+  try{if(prId){body.inativo=$('#prInat').checked;await api('PUT','/api/parceiros/'+prId,body)}else{if(prEmpresa)body.empresaId=prEmpresa;await api('POST','/api/parceiros',body)}
+    dpr.close();toast('Parceiro salvo');loadPagar()}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=false};
+
+// ---- extrato do parceiro ----
+const dex=$('#dExt');let EXT=null;
+async function openExtrato(id){try{EXT=await api('GET',`/api/parceiros/${id}/extrato`)}catch(x){toast(x.message);return}
+  const e=EXT,t=e.totais;$('#exTit').textContent=`Extrato · ${e.parceiro.nome}`;$('#exSub').textContent=`${e.parceiro.tipo==='SUPPLIER'?'Fornecedor':'Parceiro'}${e.parceiro.doc?' · '+fmtDoc(e.parceiro.doc):''} · ${e.itens.length} lançamento(s)`;
+  $('#exTot').innerHTML=[['Aguardando',t.aguardando],['A pagar',t.aPagar],['Pago',t.pago],['Cancelado',t.cancelado]].map(([l,v])=>`<div><small>${l}</small><b>${brl(v)}</b></div>`).join('');
+  $('#exRows').innerHTML=e.itens.map(c=>`<tr><td>${dbr(c.venc)}</td><td style="text-align:left;white-space:normal">${esc(c.titulo)}${c.regra?`<div class="mini">${esc(c.regra)}</div>`:''}</td><td>${apPill(c.estado)}</td><td><b>${brl(c.estado==='pago'?(c.valorPago||c.valor):c.valor)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="mini">Nada lançado ainda.</td></tr>';
+  dex.showModal()}
+$('#exClose').onclick=()=>dex.close();
+$('#exCopy').onclick=()=>{const p=EXT&&EXT.parceiro;if(p&&p.pix)copyText(p.pix);else toast('Parceiro sem chave Pix cadastrada')};
+$('#exCsv').onclick=()=>{if(!EXT)return;const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;const head=['Vencimento','Descrição','Regra','Situação','Pago em','Valor'];
+  const rows=EXT.itens.map(c=>[dbr(c.venc),c.titulo,c.regra,(AP_ST[c.estado]||[c.estado])[0],dbr(c.pagoEm),String(c.estado==='pago'?(c.valorPago||c.valor):c.valor).replace('.',',')].map(q).join(';'));
+  const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`extrato-${EXT.parceiro.nome.replace(/[^\w]+/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+[dcn,dpg,dpr,dex].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
 load();setInterval(load,60000);
 </script>
 </body>

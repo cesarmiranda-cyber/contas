@@ -45,10 +45,9 @@ test('emite cobrança, concilia pagamento e aciona a régua sem duplicar', async
   const today = R.todayBR();
   const due = R.addMonths(today, 0); // vence hoje -> D0
   const deals = [{ ID: '10', TITLE: 'Implantação — 1/2', STAGE_ID: R.STAGES.open, OPPORTUNITY: '500', COMPANY_ID: '5', CONTACT_ID: '0', ASSIGNED_BY_ID: '1', UF_CRM_CR_VENC: due + 'T03:00:00+03:00', UF_CRM_CR_FORMA: FORMA_ID('PIX') }];
-  const { bitrix, asaas, pays } = fakes(deals);
-  const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')));
-  store.setConfig({ reguaAtiva: true });
-  const svc = createService({ bitrix, asaas, store });
+  const w = require('../testkit/world').world(deals);
+  const { svc, pays } = w;
+  w.store.setConfig({ reguaAtiva: true });
 
   const r1 = await svc.sync();
   assert.equal(r1.errors.length, 0, r1.errors.join(';'));
@@ -98,19 +97,9 @@ test('classifica por categoria/plano e agrupa os valores', async () => {
     { ID: '2', TITLE: 'Licença Basic', STAGE_ID: R.STAGES.late, OPPORTUNITY: '300', COMPANY_ID: '5', UF_CRM_CR_VENC: '2020-01-01' },
     { ID: '3', TITLE: 'Projeto ERP', STAGE_ID: R.STAGES.open, OPPORTUNITY: '5000', COMPANY_ID: '5', UF_CRM_CR_VENC: '2099-01-01', UF_CRM_CR_CATEGORIA: '101' },
   ];
-  const lists = { UF_CRM_CR_CATEGORIA: R.CATEGORIAS, UF_CRM_CR_PLANO: R.PLANOS };
-  const bitrix = {
-    async call(m, p) {
-      if (m === 'crm.deal.userfield.list') return { result: userfields() };
-      if (m === 'crm.status.list') return { result: [{ STATUS_ID: 'GERAR' }, { STATUS_ID: 'CONTRATADO' }] };
-      if (m === 'crm.company.get') return { result: { TITLE: 'ACME', UF_CRM_CNPJ: '11.222.333/0001-81', EMAIL: [{ VALUE: 'a@b.c' }] } };
-      if (m === 'crm.requisite.list') return { result: [] };
-      if (m === 'crm.deal.update') { Object.assign(deals.find(d => d.ID == p.id), p.fields); return { result: true }; }
-      return { result: [] };
-    },
-    async listAll() { return deals; },
-  };
-  const svc = createService({ bitrix, asaas: { enabled: false }, store: createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'cr-'))) });
+  const w = require('../testkit/world').world(deals);
+  w.asaas.enabled = false;                             // este teste é só de classificação
+  const svc = w.svc;
   const r = await svc.sync();
   assert.equal(r.errors.length, 0, r.errors.join(';'));
   assert.equal(r.classified, 2);                       // 1 e 2 citam o plano; 3 já tinha categoria

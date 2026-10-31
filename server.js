@@ -76,6 +76,14 @@ const routes = {
   'GET /api/links': async () => store.links,
   'GET /api/assinaturas': async (u) => svc.cobrar.assinaturas({ status: ['ACTIVE', 'INACTIVE', 'EXPIRED'].includes(u.searchParams.get('status')) ? u.searchParams.get('status') : undefined }),
   'GET /api/carteiras': async () => store.wallets,
+  // ----- contas a pagar e parceiros -----
+  'GET /api/pagar': async () => {
+    const lista = await svc.pagar.contasCached(0), ps = await svc.pagar.parceiros(true);
+    return { pronto: !!store.ap, contas: lista, resumo: svc.pagar.resumoContas(lista), parceiros: svc.pagar.parceirosComResumo(ps, lista), consts: svc.pagar.consts, hoje: R.todayBR() };
+  },
+  'POST /api/pagar/contas': async (_, b) => svc.pagar.criarConta(b),
+  'GET /api/parceiros': async () => svc.pagar.parceirosComResumo(await svc.pagar.parceiros(true), await svc.pagar.contasCached(0)),
+  'POST /api/parceiros': async (_, b) => svc.pagar.salvarParceiro(b),
   'POST /api/carteiras': async (_, b) => {
     const nome = String(b.nome || '').trim(), walletId = String(b.walletId || '').trim();
     const bad = (m) => { const e = new Error(m); e.status = 400; return e; };
@@ -119,6 +127,19 @@ const server = http.createServer(async (req, res) => {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });
       return send(res, 200, await dealRoutes[m[2]](c, await readBody(req)));
+    }
+    const mp = u.pathname.match(/^\/api\/pagar\/contas\/(\d+)(?:\/(pagar|cancelar|desfazer))?$/);
+    if (mp) {
+      const [, id, acao] = mp, P = svc.pagar;
+      if (!acao && req.method === 'PUT') return send(res, 200, await P.editarConta(id, await readBody(req)));
+      if (acao === 'pagar' && req.method === 'POST') return send(res, 200, await P.pagarConta(id, await readBody(req)));
+      if (acao === 'cancelar' && req.method === 'POST') return send(res, 200, await P.cancelarConta(id, await readBody(req)));
+      if (acao === 'desfazer' && req.method === 'POST') return send(res, 200, await P.desfazerPagamento(id));
+    }
+    const mq = u.pathname.match(/^\/api\/parceiros\/(\d+)(\/extrato)?$/);
+    if (mq) {
+      if (mq[2] && req.method === 'GET') return send(res, 200, await svc.pagar.extrato(mq[1]));
+      if (!mq[2] && req.method === 'PUT') return send(res, 200, await svc.pagar.salvarParceiro(await readBody(req), { id: mq[1] }));
     }
     const m2 = u.pathname.match(/^\/api\/(assinaturas|links|carteiras)\/([\w.-]+)$/);
     if (m2 && (req.method === 'PUT' || req.method === 'DELETE')) {
