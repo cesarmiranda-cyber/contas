@@ -69,3 +69,30 @@ test('situação calculada pela data: vencida sem a etapa certa no Bitrix conta 
   const k = w.svc.kpis(ld);
   assert.equal(k.atrasado.qtd, 1); assert.equal(k.atrasado.valor, 100); assert.equal(k.aberto.qtd, 2); assert.equal(k.pago.qtd, 1); assert.equal(k.aging['1-30'], 100);
 });
+
+test('contas a pagar: agrupam por recorrência e por "Título — n/N"; vincular a cadastro/venda; prefixo duplicado do Asaas não quebra o grupo', async () => {
+  const dias = n => { const d = new Date(today + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const w = world([]); await w.svc.ensureFields(); await w.svc.pagar.ensure(); const p = w.svc.pagar;
+  const A = (await p.salvarParceiro({ nome: 'Imobiliária Centro' })).id;
+  await p.criarConta({ titulo: 'Aluguel', valor: 4500, venc: dias(5), beneficiario: 'Imobiliária Centro', categoria: 'Estrutura e software', repetir: 3 });
+  const rr = await w.svc.recs.criar({ tipo: 'pagar', template: { titulo: 'Internet', valor: 300, categoria: 'Estrutura e software', beneficiario: 'Provedor X' }, recorrencia: { freq: 'mensal', inicio: dias(3), qtd: 4 } });
+  const cs = await p.contas();
+  const alu = cs.filter(c => c.titulo.startsWith('Aluguel')), net = cs.filter(c => c.titulo === 'Internet');
+  assert.equal(new Set(alu.map(c => c.grupo)).size, 1); assert.match(alu[0].grupo, /^p_/); assert.equal(alu.length, 3);
+  assert.equal(new Set(net.map(c => c.grupo)).size, 1); assert.match(net[0].grupo, /^r/); assert.equal(net.length, 4);
+  assert.notEqual(alu[0].grupo, net[0].grupo);
+  // vincular o grupo inteiro ao cadastro e a uma venda
+  const r = await p.vincularContas({ ids: alu.map(c => c.id), parceiroId: A, vendaId: '321' });
+  assert.equal(r.vinculadas, 3);
+  const dep = (await p.contas()).filter(c => c.titulo.startsWith('Aluguel'));
+  assert.ok(dep.every(c => c.parceiroId === A && c.venda === '321' && c.beneficiario === 'Imobiliária Centro'));
+  await assert.rejects(() => p.vincularContas({ ids: [alu[0].id], parceiroId: 999999 }), /não encontrado/);
+  await assert.rejects(() => p.vincularContas({ ids: [], parceiroId: A }), /1 a 200/);
+  // título com prefixo repetido (Asaas): mesmo grupo
+  const a = R.parseParcelaTitulo('Parcela 3 de 12. RENOVAÇÃO BITRIX24 PRO'), b = R.parseParcelaTitulo('Parcela 2 de 12. Parcela 1 de 12. Renovação Bitrix24 Pro');
+  assert.equal(a.base, b.base);
+  // consolidado: não troca beneficiário
+  const B = (await p.salvarParceiro({ nome: 'Outro' })).id;
+  const c2 = await p.consolidar({ ids: net.slice(0, 2).map(c => c.id) });
+  await assert.rejects(() => p.vincularContas({ ids: [net[0].id], parceiroId: B }), /consolidado/);
+});

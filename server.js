@@ -127,6 +127,7 @@ const routes = {
   'GET /api/recorrencias': async () => svc.recs.listar(),
   'GET /api/folha': async (u) => svc.pagar.folha(/^\d{4}-(0[1-9]|1[0-2])$/.test(u.searchParams.get('mes') || '') ? u.searchParams.get('mes') : R.todayBR().slice(0, 7)),
   'POST /api/pagar/consolidar': async (_, b) => svc.pagar.consolidar(b),
+  'POST /api/pagar/vincular': async (_, b) => svc.pagar.vincularContas({ ids: b.ids, parceiroId: b.parceiroId, vendaId: b.vendaId }),
   'GET /api/parceiros': async () => svc.pagar.parceirosComResumo(await svc.pagar.parceiros(true), await svc.pagar.contasCached(0)),
   'POST /api/parceiros': async (_, b) => svc.pagar.salvarParceiro(b),
   'POST /api/carteiras': async (_, b) => {

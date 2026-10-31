@@ -38,6 +38,10 @@ Em aberto → Próximo do vencimento → Atrasado → Pago / Cancelado.
 - **Parceiro/fornecedor/colaborador**: vincule o usuário do Bitrix a um cadastro de *Parceiros e fornecedores*. Ele só abre o **portal**: o que tem a receber (previsto, a receber, atrasado, pago) e o detalhamento do pagamento consolidado — sem regras, margens, clientes nem valores de venda. Sem vínculo: acesso negado.
 - A pessoa também precisa estar liberada na política de acesso do servidor no Vibecode (usuários nomeados).
 
+## Contas a pagar: grupos e vínculo
+- Recorrências e despesas parceladas (“Aluguel — 1/12”) aparecem em **uma linha** com “X de N pagas”, barra de status, cores por situação e botão *Ver parcelas*; clicar numa parcela edita. O checkbox do grupo seleciona as parcelas em aberto para **consolidar**.
+- **Vincular a cadastro / venda**: liga a conta (ou o grupo inteiro) a um parceiro/fornecedor/colaborador cadastrado e, opcionalmente, ao negócio de venda (`CP_VENDA`, só referência). Conta de consolidado não muda de beneficiário.
+
 ## Revenda, comissões e folha
 - Split por cobrança (`CR · Split`): `Parceiro=30%` (ele recebe), `Parceiro=R$ 50,00`, e para **fornecedor de revenda** `Fornecedor=-20%` / `-R$ 100,00` = *Manda4 retém* (ele recebe o valor menos a sua margem). Dá para combinar fornecedor + indicador na mesma venda.
 - O resultado separa **custo de fornecedores (revenda)** de **comissões a parceiros/colaboradores** e de **despesas**.
