@@ -178,7 +178,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 details.analise{margin:14px 0}details.analise>summary{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;font-weight:650;list-style:none}details.analise>summary::-webkit-details-marker{display:none}details.analise[open]>summary{border-bottom:1px solid var(--line)}details.analise>.hero,details.analise>.cuts{padding:14px;margin:0}
 details.menu.topm summary{width:auto;height:auto;padding:8px 13px;border-radius:11px;font-weight:550;color:var(--ink);display:inline-flex}details.menu.topm summary:hover{border-color:var(--brand);color:var(--brand)}details.menu.topm .pop{min-width:240px}
 .pop .mi{display:flex;gap:9px;align-items:center;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:9px 10px;border-radius:8px;font:inherit;cursor:pointer}.pop .mi:hover{background:var(--surface2)}.pop .mi svg{width:16px;height:16px;flex:none}
-body[data-view=pagar] #topMais,body[data-view=par] #topMais,body[data-view=cfg] #topMais,body[data-view=rec] #topMais,body[data-view=res] #topMais,body[data-view=dash] #topMais{display:none}
+body[data-view=fol] #topMais,body[data-view=acc] #topMais,body[data-view=pagar] #topMais,body[data-view=par] #topMais,body[data-view=cfg] #topMais,body[data-view=rec] #topMais,body[data-view=res] #topMais,body[data-view=dash] #topMais{display:none}
 .btn.on{background:var(--brandbg);border-color:var(--brand);color:var(--brand)}.cnt{font-style:normal;background:var(--brand);color:#fff;border-radius:99px;padding:0 7px;font-size:11px;margin-left:2px}.cnt:empty{display:none}
 #fpanel{border-top:1px solid var(--line);background:var(--surface2)}#fpanel[hidden]{display:none}
 tr.gh td{background:var(--surface2);cursor:pointer;border-top:1px solid var(--line)}tr.gh:hover td{background:var(--brandbg)}
@@ -196,6 +196,8 @@ tr.gc.st-late>td{background:color-mix(in srgb,var(--red) 11%,var(--bg))}tr.gc.st
 tr.st-late .due b{color:var(--red)}tr.st-paid .due small{color:var(--green)}
 #bMenu{padding:8px 10px}body.scoped #bMenu{display:none}@media(max-width:900px){#bMenu{display:none}}
 .tleg{display:flex;gap:14px;flex-wrap:wrap;padding:8px 18px;font-size:12px;color:var(--mut)}.tleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+body.portal .shell{display:block}body.portal .side,body.portal #bMenu,body.portal .tools,body.portal #banner,body.portal .top{display:none!important}body.portal .top .ttl h1{font-size:18px}
+tr.st-prev>td{background:var(--surface2)}tr.st-prev>td:first-child{box-shadow:inset 4px 0 0 var(--mut)}
 /* ===== layout com menu lateral ===== */
 .shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
 .side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px;padding:16px 12px;background:var(--surface);border-right:1px solid var(--line);overflow-y:auto}
@@ -208,7 +210,7 @@ tr.st-late .due b{color:var(--red)}tr.st-paid .due small{color:var(--green)}
 .side .sp{flex:1}.side .fold{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--mut);padding:8px 10px;border-radius:10px;font:inherit;font-size:12.5px;cursor:pointer}.side .fold:hover{color:var(--ink)}
 .side .fold svg{width:16px;height:16px;transition:.2s}
 body.fold .shell{grid-template-columns:68px minmax(0,1fr)}body.fold .side .lbl2,body.fold .side .grp,body.fold .side .brand b,body.fold .side .nav .bd{display:none}body.fold .side{padding:16px 8px}body.fold .side .brand{justify-content:center;padding:4px 0 14px}body.fold .side button.nav{justify-content:center;padding:10px}body.fold .side button.nav.on::before{left:-8px}body.fold .side .fold svg{transform:rotate(180deg)}body.fold .side .fold{justify-content:center}
-.content{min-width:0}.top .logo,.top .ttl h1+.sub{display:none}.top .ttl h1{font-size:19px}body[data-view=rec] #bNova,body[data-view=rec] #bGerar,body[data-view=rec] #bImp,body[data-view=rec] #bDash,body[data-view=res] #bNova,body[data-view=res] #bGerar,body[data-view=res] #bImp,body[data-view=res] #bDash{display:none}
+.content{min-width:0}.top .logo,.top .ttl h1+.sub{display:none}.top .ttl h1{font-size:19px}body[data-view=fol] #bNova,body[data-view=fol] #bGerar,body[data-view=fol] #bImp,body[data-view=fol] #bDash,body[data-view=acc] #bNova,body[data-view=acc] #bGerar,body[data-view=acc] #bImp,body[data-view=acc] #bDash,body[data-view=rec] #bNova,body[data-view=rec] #bGerar,body[data-view=rec] #bImp,body[data-view=rec] #bDash,body[data-view=res] #bNova,body[data-view=res] #bGerar,body[data-view=res] #bImp,body[data-view=res] #bDash{display:none}
 .top .ttl .sub{display:flex!important}
 .vtabs{display:none!important}
 body[data-view=pagar] #bNova,body[data-view=pagar] #bGerar,body[data-view=pagar] #bImp,body[data-view=pagar] #bDash,body[data-view=par] #bNova,body[data-view=par] #bGerar,body[data-view=par] #bImp,body[data-view=par] #bDash,body[data-view=cfg] #bNova,body[data-view=cfg] #bGerar,body[data-view=cfg] #bImp,body[data-view=cfg] #bDash,body[data-view=subs] #bGerar,body[data-view=subs] #bImp,body[data-view=links] #bGerar,body[data-view=links] #bImp,body[data-view=dash] #bGerar,body[data-view=dash] #bImp,body[data-view=dash] #bDash{display:none}
@@ -405,6 +407,33 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   </div>
 </main>
 
+<main id="viewFol" hidden>
+  <div class="toolbar" style="padding:0 0 14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="seg" id="flMes" style="display:inline-flex"><button type="button" data-m="-1" aria-label="Mês anterior">‹</button><button type="button" id="flMesLbl" disabled style="min-width:130px;opacity:1;color:var(--ink)"></button><button type="button" data-m="1" aria-label="Próximo mês">›</button></div><span class="mini" id="flTot"></span></div>
+    <div style="display:flex;gap:8px"><button class="btn" id="flRef">Atualizar</button><button class="btn" id="flRec">Salário recorrente</button></div></div>
+  <div class="mini" style="margin:0 0 12px;max-width:760px">Cadastre cada pessoa em <b>Parceiros e fornecedores</b> com o tipo <b>Colaborador</b>. O salário entra como uma <b>despesa recorrente</b> (categoria “Pessoas”) e comissões/bônus como lançamentos avulsos. Ao fechar a folha, os lançamentos viram um <b>holerite consolidado</b> que o colaborador vê no portal dele.</div>
+  <section class="card"><div class="tw"><table><thead><tr><th>Colaborador</th><th>Lançamentos do mês</th><th class="num">Total</th><th>Situação</th><th></th></tr></thead><tbody id="flRows"></tbody></table></div>
+  <div class="empty" id="flEmpty" style="display:none"><b>Nenhum colaborador cadastrado</b>Em <b>Parceiros e fornecedores</b>, crie ou edite o cadastro e escolha o tipo <b>Colaborador</b>.</div></section>
+</main>
+
+<main id="viewAcc" hidden>
+  <div class="note" id="acBoot" style="display:none;color:var(--amber);background:var(--amberbg)"></div>
+  <div class="cuts" style="margin-top:0">
+    <section class="card pad"><h2 style="margin:0 0 4px;font-size:15px">Administradores <span class="mut" id="acN"></span></h2><p class="mini" style="margin:0 0 10px">Veem e fazem tudo. Limite de 3.</p><div id="acAdmins"></div>
+      <label>Adicionar administrador</label><div style="display:flex;gap:8px"><input id="acABusca" placeholder="Buscar usuário do Bitrix pelo nome… ou digite o ID"><button type="button" class="btn" id="acABt">Buscar</button></div><select id="acASel" size="4" style="display:none;margin-top:8px"></select><div class="foot" style="margin-top:10px"><button class="btn pri" id="acAOk" disabled>Adicionar</button></div></section>
+    <section class="card pad"><h2 style="margin:0 0 4px;font-size:15px">Parceiros, fornecedores e colaboradores</h2><p class="mini" style="margin:0 0 10px">Cada um vê só o que tem a receber (e o colaborador, o próprio holerite).</p><div class="tw"><table class="dtbl" style="min-width:420px"><thead><tr><th>Usuário Bitrix</th><th>Vinculado a</th><th></th></tr></thead><tbody id="acLinks"></tbody></table></div>
+      <label>Vincular usuário</label><div style="display:flex;gap:8px"><input id="acVBusca" placeholder="Buscar usuário do Bitrix pelo nome… ou digite o ID"><button type="button" class="btn" id="acVBt">Buscar</button></div><select id="acVSel" size="4" style="display:none;margin-top:8px"></select>
+      <label>Cadastro (parceiro / fornecedor / colaborador)</label><select id="acVPar"></select><div class="foot" style="margin-top:10px"><button class="btn pri" id="acVOk" disabled>Vincular</button></div></section>
+  </div>
+  <p class="mini" style="margin-top:14px;max-width:760px">Para a pessoa conseguir abrir o app, ela também precisa estar liberada na <b>política de acesso do servidor no Vibecode</b> (usuários nomeados). Aqui você define o que ela enxerga depois de entrar.</p>
+</main>
+
+<main id="viewPortal" hidden>
+  <div class="toolbar" style="padding:0 0 14px"><div><h1 style="margin:0;font-size:20px" id="ptTit">Meus recebimentos</h1><div class="mini" id="ptSub"></div></div><button class="btn" id="ptRef">Atualizar</button></div>
+  <section class="kpis" id="ptKpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))"></section>
+  <section class="card" style="margin-top:14px"><div class="tleg"><span><i style="background:var(--red)"></i>Atrasado</span><span><i style="background:var(--amber)"></i>Vence em breve</span><span><i style="background:var(--blue)"></i>A receber</span><span><i style="background:var(--green)"></i>Pago</span><span><i style="background:var(--mut)"></i>Previsto (depende do cliente)</span></div>
+    <div class="tw"><table><thead><tr><th>Vencimento</th><th>Descrição</th><th class="num">Valor</th><th>Situação</th><th>Pago em</th></tr></thead><tbody id="ptRows"></tbody></table></div>
+    <div class="empty" id="ptEmpty" style="display:none"><b>Nada a receber por enquanto</b>Quando houver um pagamento para você, ele aparece aqui.</div></section>
+</main>
 <main id="viewRec" hidden>
   <div class="toolbar" style="padding:0 0 14px"><div class="mini" style="max-width:640px">Regras que geram títulos automaticamente, sempre 12 meses à frente: aluguel, assinaturas de software, folha, mensalidades de clientes. Para criar, use <b>Nova despesa</b> (Contas a pagar) ou <b>Nova cobrança → Recebimento manual</b> e escolha a recorrência. Cobranças pelo Asaas continuam em <b>Assinaturas</b>.</div><div style="display:flex;gap:8px"><button class="btn" id="rcRef">Atualizar</button><button class="btn" id="rcNovaP">+ Despesa recorrente</button><button class="btn pri" id="rcNovaR">+ Recebimento recorrente</button></div></div>
   <section class="card"><div class="tw"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Recorrência</th><th class="num">Valor</th><th>Próxima</th><th class="num">Geradas</th><th>Situação</th><th></th></tr></thead><tbody id="rcRows"></tbody></table></div>
@@ -427,7 +456,7 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <section class="card pad" style="margin-top:14px"><h2 style="margin:0 0 2px;font-size:15px">Evolução · 6 meses</h2><div class="leg2" style="margin:6px 0"><span><i style="background:var(--v3)"></i>Receita</span><span><i style="background:var(--vw)"></i>Comissões + despesas</span></div><div id="rsChart"></div><div class="tw" style="margin-top:8px"><table class="dtbl" style="min-width:520px"><thead id="rsSH"></thead><tbody id="rsSB"></tbody></table></div></section>
   <div class="cuts" style="margin-top:14px">
     <section class="card pad"><h2 style="margin:0 0 8px;font-size:15px">Receita por origem</h2><div id="rsOri"></div></section>
-    <section class="card pad"><h2 style="margin:0 0 8px;font-size:15px">Comissões por parceiro</h2><div id="rsPar"></div></section>
+    <section class="card pad"><h2 style="margin:0 0 8px;font-size:15px">Repasses por beneficiário</h2><div id="rsPar"></div></section>
   </div>
 </main>
 </div></div>
@@ -526,7 +555,7 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
 <dialog id="dPar" style="max-width:600px"><form method="dialog" id="fPar">
   <h2 id="prTit">Novo parceiro</h2><p class="dlg-sub">Fica cadastrado como empresa no Bitrix (tipo Parceiro ou Fornecedor).</p>
   <div id="prExistWrap"><label>A empresa já existe no Bitrix?</label><div style="display:flex;gap:8px"><input id="prBusca" placeholder="Buscar empresa pelo nome…"><button type="button" class="btn" id="prBuscaBt">Buscar</button></div><select id="prSel" size="3" style="display:none;margin-top:8px"></select><p class="pnote" id="prExistNote"></p></div>
-  <div class="r2"><div><label>Nome</label><input id="prNome" maxlength="120" required></div><div><label>Tipo</label><select id="prTipo"><option value="PARTNER">Parceiro</option><option value="SUPPLIER">Fornecedor</option></select></div></div>
+  <div class="r2"><div><label>Nome</label><input id="prNome" maxlength="120" required></div><div><label>Tipo</label><select id="prTipo"><option value="PARTNER">Parceiro (indicação/comissão)</option><option value="SUPPLIER">Fornecedor (revenda)</option><option value="EMPLOYEE">Colaborador (folha)</option></select></div></div>
   <div class="r2"><div><label>CPF/CNPJ</label><input id="prDoc" placeholder="Somente números"></div><div><label>walletId do Asaas (split automático)</label><input id="prWallet" placeholder="00000000-0000-0000-0000-000000000000"></div></div>
   <div class="r2"><div><label>E-mail</label><input id="prEmail" type="email"></div><div><label>Telefone</label><input id="prTel"></div></div>
   <label>Regra padrão do repasse</label>
@@ -603,6 +632,12 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <label class="chk"><input type="checkbox" id="vcLembrar" checked><span><b>Lembrar para as próximas importações</b><br><span class="mut">Cobranças futuras desse mesmo cliente do Asaas já entram no cliente certo.</span></span></label>
   <div class="res" id="vcRes"></div>
   <div class="foot"><button type="button" class="btn" id="vcCancel">Cancelar</button><button class="btn pri" id="vcOk" disabled>Vincular</button></div>
+</form></dialog>
+
+<dialog id="dPortDet" style="max-width:640px"><form method="dialog" style="padding:22px">
+  <h2 id="pdTit">Detalhamento</h2><p class="dlg-sub" id="pdSub"></p>
+  <div class="tw" style="max-height:340px;overflow:auto"><table class="dtbl" style="min-width:420px"><thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th></tr></thead><tbody id="pdRows"></tbody></table></div>
+  <div class="foot"><button type="button" class="btn pri" id="pdClose">Fechar</button></div>
 </form></dialog>
 
 <dialog id="dBaixa"><form method="dialog" id="fBaixa">
@@ -853,18 +888,18 @@ $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disable
 let CFG=null,aEnv='sandbox';
 const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
 const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
-function showView(v){document.body.dataset.view=v;if(v==='res')loadRes();if(v==='rec')loadRec();$('#pgTitle').textContent=NAVT[v]||'Contas';document.querySelectorAll('#side button.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));['main','cfg','subs','links','dash','pagar','par','res','rec'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
+function showView(v){document.body.dataset.view=v;if(v==='fol')loadFol();if(v==='acc')loadAcc();if(v==='res')loadRes();if(v==='rec')loadRec();$('#pgTitle').textContent=NAVT[v]||'Contas';document.querySelectorAll('#side button.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));['main','cfg','subs','links','dash','pagar','par','res','rec','fol','acc'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
   if(v==='cfg'){loadSettings();location.hash='config'}else history.replaceState(null,'',location.pathname+location.search);
   if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();if(v==='dash')loadDash($('#dashHost'),{});if(v==='pagar'||v==='par')loadPagar();window.scrollTo(0,0)}
-const VTABS=[['main','Contas a receber'],['dash','Visão geral'],['res','Resultado (DRE)'],['rec','Recorrências'],['pagar','Contas a pagar'],['par','Parceiros e fornecedores'],['subs','Assinaturas'],['links','Links de pagamento']];
-const NAVI={rec:'<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',res:'<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',main:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',dash:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',pagar:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>',par:'<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',subs:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',links:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',cfg:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
+const VTABS=[['main','Contas a receber'],['dash','Visão geral'],['res','Resultado (DRE)'],['rec','Recorrências'],['pagar','Contas a pagar'],['fol','Folha de pagamento'],['par','Parceiros e fornecedores'],['acc','Acessos'],['subs','Assinaturas'],['links','Links de pagamento']];
+const NAVI={fol:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M17 11l2 2 4-4"/>',acc:'<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',rec:'<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',res:'<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',main:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',dash:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',pagar:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>',par:'<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',subs:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',links:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',cfg:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
 const NAVT={cfg:'Configurações'};VTABS.forEach(([k,l])=>NAVT[k]=l);
 (function(){const it=(k,l)=>`<button class="nav" data-v="${k}" title="${l}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${NAVI[k]}</svg><span class="lbl2">${l}</span><span class="bd" id="bd_${k}"></span></button>`;
   $('#side').innerHTML=`<div class="brand"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div><b>Contas<small>Receber e Pagar</small></b></div>
   <div class="grp">Gestão</div>${it('dash','Visão geral')}${it('res','Resultado (DRE)')}${it('rec','Recorrências')}
   <div class="grp">Receber</div>${it('main','Contas a receber')}${it('subs','Assinaturas')}${it('links','Links de pagamento')}
-  <div class="grp">Pagar</div>${it('pagar','Contas a pagar')}${it('par','Parceiros e fornecedores')}
-  <div class="grp">Sistema</div>${it('cfg','Configurações')}<div class="sp"></div>
+  <div class="grp">Pagar</div>${it('pagar','Contas a pagar')}${it('fol','Folha de pagamento')}${it('par','Parceiros e fornecedores')}
+  <div class="grp">Sistema</div>${it('acc','Acessos')}${it('cfg','Configurações')}<div class="sp"></div>
   <button class="fold" id="sideFold" title="Recolher menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span class="lbl2">Recolher menu</span></button>`;
   try{const v=localStorage.getItem('sideFold');if(v==='1'||(v===null&&window.innerWidth<1500))document.body.classList.add('fold')}catch{}
   const toggleFold=()=>{const f=document.body.classList.toggle('fold');try{localStorage.setItem('sideFold',f?'1':'0')}catch{}};
@@ -996,13 +1031,13 @@ function nPrev(){const v=+$('#nVal').value,n=+$('#nParc').value||2;let t='';
   $('#nPrev').textContent=t}
 const sOpts=()=>N.carteiras.map(w=>`<option value="${esc(w.nome)}">${esc(w.nome)}${w.walletId?' ⚡':''}</option>`).join('');
 function nSplitAdd(){if(!N.carteiras.length){$('#nSplitHint').textContent='Nenhum parceiro cadastrado. Cadastre na aba Parceiros.';return}
-  $('#nSplitHint').textContent=N.tipo==='manual'?'A comissão vira uma conta a pagar ao parceiro (em Contas a pagar) assim que você registrar o recebimento.':'⚡ = recebe direto pelo Asaas (split automático). Os demais viram conta a pagar quando o cliente paga.';const r=document.createElement('div');r.className='srow';r.innerHTML=`<select>${sOpts()}</select><input type="number" step="0.01" min="0.01" placeholder="Valor"><select><option value="%">%</option><option value="R$">R$</option></select><button type="button" class="btn sm" title="Remover">✕</button>`;
+  $('#nSplitHint').textContent='Parceiro/colaborador: “% p/ ele”. Fornecedor de revenda: “% Manda4 retém” (ele recebe o valor menos a sua margem). '+(N.tipo==='manual'?'A comissão vira uma conta a pagar ao parceiro (em Contas a pagar) assim que você registrar o recebimento.':'⚡ = recebe direto pelo Asaas (split automático). Os demais viram conta a pagar quando o cliente paga.');const r=document.createElement('div');r.className='srow';r.innerHTML=`<select>${sOpts()}</select><input type="number" step="0.01" min="0.01" placeholder="Valor"><select title="Como calcular"><option value="%">% p/ ele</option><option value="R$">R$ p/ ele</option><option value="-%">% Manda4 retém</option><option value="-R$">R$ Manda4 retém</option></select><button type="button" class="btn sm" title="Remover">✕</button>`;
   r.querySelector('button').onclick=()=>{r.remove();if(!document.querySelector('#nSplit .srow'))nSetCom('sem')};
-  const fill=()=>{const w=N.carteiras.find(x=>x.nome===r.children[0].value);if(!w)return;if(w.perc){r.children[1].value=w.perc;r.children[2].value='%'}else if(w.fixo){r.children[1].value=w.fixo;r.children[2].value='R$'}};r.children[0].onchange=fill;fill();$('#nSplit').appendChild(r)}
-const nSplitText=()=>[...document.querySelectorAll('#nSplit .srow')].map(r=>{const [a,b,c]=[r.children[0].value,r.children[1].value,r.children[2].value];return b?`${a}=${c==='%'?b+'%':'R$ '+String(b).replace('.',',')}`:''}).filter(Boolean).join('; ');
+  const fill=()=>{const w=N.carteiras.find(x=>x.nome===r.children[0].value);if(!w)return;const sup=w.tipo==='SUPPLIER'?'-':'';if(w.perc){r.children[1].value=w.perc;r.children[2].value=sup+'%'}else if(w.fixo){r.children[1].value=w.fixo;r.children[2].value=sup+'R$'}};r.children[0].onchange=fill;fill();$('#nSplit').appendChild(r)}
+const nSplitText=()=>[...document.querySelectorAll('#nSplit .srow')].map(r=>{const [a,b,c]=[r.children[0].value,r.children[1].value,r.children[2].value];const neg=c[0]==='-'?'-':'',pc=c.endsWith('%');return b?`${a}=${neg}${pc?b+'%':'R$ '+String(b).replace('.',',')}`:''}).filter(Boolean).join('; ');
 function nSetCom(c){document.querySelectorAll('#nCom button').forEach(b=>b.classList.toggle('on',b.dataset.c===c));$('#nComBox').style.display=c==='com'?'':'none';if(c==='com'&&!document.querySelector('#nSplit .srow'))nSplitAdd();if(c==='sem')$('#nSplit').innerHTML=''}
 async function openNova(tipo,prefill){N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};nSetCom('sem');$('#nRecBox').innerHTML='';$('#fNova').reset();$('#nSplit').innerHTML='';$('#nSplitHint').textContent='';$('#nRes').className='res';$('#nOut').innerHTML='';$('#nSel').style.display='none';$('#nOk').style.display='';$('#nOk').disabled=false;
-  try{const ps=await api('GET','/api/parceiros'),lg=await api('GET','/api/carteiras');N.carteiras=[...ps.filter(x=>!x.inativo).map(x=>({nome:x.nome,walletId:x.wallet,perc:x.perc,fixo:x.fixo})),...lg.filter(w=>!ps.some(x=>x.nome.toLowerCase()===w.nome.toLowerCase()))]}catch{}
+  try{const ps=await api('GET','/api/parceiros'),lg=await api('GET','/api/carteiras');N.carteiras=[...ps.filter(x=>!x.inativo).map(x=>({nome:x.nome,walletId:x.wallet,perc:x.perc,fixo:x.fixo,tipo:x.tipo})),...lg.filter(w=>!ps.some(x=>x.nome.toLowerCase()===w.nome.toLowerCase()))]}catch{}
   fillSel($('#nCat'),S.listas.categorias,'','Sem categoria');fillSel($('#nPl'),S.listas.planos,'','Sem tipo de licença');plWrap($('#nCat'),$('#nPlWrap'));
   if(S.escopo&&(S.escopo.companyId||S.escopo.contactId)){N.cli=S.escopo.companyId?{tipo:'company',id:S.escopo.companyId,nome:S.escopo.nome}:{tipo:'contact',id:S.escopo.contactId,nome:S.escopo.nome};$('#nCli').value=S.escopo.nome;$('#nCli').readOnly=true;$('#nBusca').style.display='none'}
   else{$('#nCli').readOnly=false;$('#nBusca').style.display=''}
@@ -1260,7 +1295,7 @@ function renderRes(){const g=RS,d=g.dre,cx=d.regime==='caixa',pc=(v)=>v===null||
   $('#rsSub').textContent=`${rsLbl(g.mes)} · regime de ${cx?'caixa':'competência'}`+(!cx?` · ainda a receber ${brl(d.aReceber)} · ainda a pagar ${brl(d.aPagar)}`:'');
   const row=(l,v,o={})=>`<tr style="${o.b?'font-weight:700;background:var(--surface2)':''}"><td style="text-align:left;padding-left:${o.i?28:10}px;${o.m?'color:var(--mut)':''}">${l}</td><td class="num">${o.neg&&v?'− ':''}${brl(v)}</td><td class="num mut">${d.receitaBruta&&v?pc(v/d.receitaBruta*100):''}</td></tr>`;
   $('#rsDre').innerHTML=row('Receita bruta',d.receitaBruta,{b:1})+d.receitaPorOrigem.map(o=>row(esc(o.nome)+` <small>(${o.qtd})</small>`,o.valor,{i:1,m:1})).join('')
-   +row('(−) Taxas de cobrança (Asaas)',d.taxas,{neg:1})+row('(−) Comissões e repasses a parceiros',d.comissoes,{neg:1})+row('= Margem da Manda4',d.margem,{b:1})
+   +row('(−) Taxas de cobrança (Asaas)',d.taxas,{neg:1})+row('(−) Custo de fornecedores (revenda)',d.custos||0,{neg:1})+row('(−) Comissões a parceiros e colaboradores',d.comissoes,{neg:1})+row('= Margem da Manda4',d.margem,{b:1})
    +row('(−) Despesas operacionais',d.despesas,{neg:1})+d.despesasPorCategoria.map(o=>row(esc(o.nome)+` <small>(${o.qtd})</small>`,o.valor,{i:1,m:1})).join('')+row('= Resultado do período',d.resultado,{b:1});
   const p=g.posicao;
   $('#rsPos').innerHTML=[['A receber',p.aReceber,p.receberAtrasado?`${brl(p.receberAtrasado)} em atraso`:'em dia','var(--v3)'],['A pagar',p.aPagar,p.pagarAtrasado?`${brl(p.pagarAtrasado)} em atraso`:'em dia','var(--vw)'],['Repasses aguardando recebimento',p.repassesAguardando,'dependem de clientes pagarem','var(--mut)']].map(([l,v,s2,c])=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)"><div><i class="sw" style="background:${c}"></i> <b>${l}</b><div class="mini">${s2}</div></div><b>${brl(v)}</b></div>`).join('')+`<div style="display:flex;justify-content:space-between;padding:12px 0 0"><b>Saldo projetado</b><b style="color:${p.saldoProjetado<0?'var(--red)':'var(--green)'}">${brl(p.saldoProjetado)}</b></div><p class="mini">A receber − a pagar (sem contar o caixa que você já tem).</p>`;
@@ -1270,7 +1305,7 @@ function renderRes(){const g=RS,d=g.dre,cx=d.regime==='caixa',pc=(v)=>v===null||
   $('#rsSH').innerHTML='<tr><th></th>'+sr.map(x=>`<th class="num">${x.label}</th>`).join('')+'</tr>';
   $('#rsSB').innerHTML=[['Receita',x=>x.receita],['Comissões',x=>x.comissoes],['Despesas',x=>x.despesas],['Resultado',x=>x.resultado]].map(([l,f],i)=>`<tr style="${i===3?'font-weight:700':''}"><td style="text-align:left">${l}</td>`+sr.map(x=>`<td class="num" style="${i===3&&f(x)<0?'color:var(--red)':''}">${brl(f(x))}</td>`).join('')+'</tr>').join('');
   const bar=(items,tot)=>items.length?items.map(o=>`<div style="display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin-bottom:10px"><b style="text-align:left">${esc(o.nome)} <small class="mut">(${o.qtd})</small></b><b>${brl(o.valor)}</b><div style="grid-column:1/-1;height:6px;border-radius:4px;background:var(--graybg)"><i style="display:block;height:100%;width:${tot?o.valor/tot*100:0}%;border-radius:4px;background:var(--v3)"></i></div></div>`).join(''):'<div class="mut">Nada neste período.</div>';
-  $('#rsOri').innerHTML=bar(d.receitaPorOrigem,d.receitaBruta);$('#rsPar').innerHTML=bar(d.comissaoPorParceiro,d.comissoes);
+  $('#rsOri').innerHTML=bar(d.receitaPorOrigem,d.receitaBruta);$('#rsPar').innerHTML=bar(d.comissaoPorParceiro,(d.comissoes||0)+(d.custos||0));
 }
 $('#rsMes').onclick=e=>{const b=e.target.closest('button[data-m]');if(b){rsMes=rsAdd(rsMes,+b.dataset.m);loadRes()}};
 $('#rsReg').onclick=e=>{const b=e.target.closest('button[data-r]');if(b){rsReg=b.dataset.r;loadRes()}};$('#rsRef').onclick=loadRes;
@@ -1279,6 +1314,7 @@ $('#rsReg').onclick=e=>{const b=e.target.closest('button[data-r]');if(b){rsReg=b
 let AP={contas:[],resumo:{},parceiros:[],consts:{},hoje:'',pronto:false},apTab='abertas',apOrigem=0;const apSel=new Set();
 const AP_ST={aguardando:['Aguardando recebimento','c-slate'],aberto:['A pagar','c-blue'],proximo:['Vence em breve','c-amber'],atrasado:['Atrasado','c-red'],pago:['Pago','c-green'],cancelado:['Cancelado','c-gray']};
 const apPill=e=>{const [l,c]=AP_ST[e]||[e,'c-gray'];return `<span class="pill ${c}">${l}</span>`};
+const tipoNome=t=>({SUPPLIER:'Fornecedor',EMPLOYEE:'Colaborador'}[t]||'Parceiro');
 const SPLIT_ST={PENDING:'aguardando crédito',AWAITING_CREDIT:'aguardando crédito',DONE:'creditado',CANCELLED:'cancelado',REFUNDED:'estornado'};
 const ABERTAS=['aberto','proximo','atrasado'];
 const benKey=c=>c.parceiroId?'p'+c.parceiroId:'n'+String(c.beneficiario||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
@@ -1346,7 +1382,7 @@ $('#apAll').onchange=e=>{const pg=apFiltered().filter(pagavel);pg.forEach(c=>e.t
 $('#apSel').onclick=e=>{const b=e.target.closest('[data-sel-a]');if(!b)return;if(b.dataset.selA==='limpar'){apSel.clear();renderPagar()}else openCons()};
 const dcs=$('#dCons');let csIds=new Set();
 function openCons(){const itens=[...apSel].map(i=>AP.contas.find(c=>c.id===i)).filter(Boolean);if(itens.length<2)return;csIds=new Set(itens.map(c=>c.id));const p=(AP.parceiros||[]).find(x=>x.id===itens[0].parceiroId);
-  $('#csSub').textContent=`${itens[0].beneficiario||'—'}${p&&p.tipo==='SUPPLIER'?' (fornecedor)':''}`;
+  $('#csSub').textContent=`${itens[0].beneficiario||'—'}${p?' ('+tipoNome(p.tipo).toLowerCase()+')':''}`;
   $('#csRows').innerHTML=itens.map(c=>`<tr><td class="ck"><input type="checkbox" data-cs="${c.id}" checked></td><td style="text-align:left;white-space:normal">${esc(c.titulo)}<div class="mini">#${c.id}${c.origem?' · cobrança #'+c.origem:''}${c.regra?' · '+esc(c.regra):''}</div></td><td>${dbr(c.venc)}</td><td><b>${brl(c.valor)}</b></td></tr>`).join('');
   const primeiro=itens.map(c=>c.venc).filter(Boolean).sort()[0]||AP.hoje;$('#csVenc').min=AP.hoje;$('#csVenc').value=primeiro>AP.hoje?primeiro:AP.hoje;
   $('#csForma').innerHTML='<option value="">A definir</option>'+(AP.consts.AP_FORMAS||[]).filter(f=>f!=='Split Asaas').map(f=>`<option>${f}</option>`).join('');
@@ -1399,7 +1435,7 @@ $('#fMail').onsubmit=async e=>{e.preventDefault();const b=$('#emOk'),res=$('#emR
 
 // ---- nova / editar conta ----
 const dcn=$('#dConta');let cnId=null;
-function parOpts(sel){return (AP.parceiros||[]).filter(p=>!p.inativo).map(p=>`<option value="${p.id}"${String(sel)===String(p.id)?' selected':''}>${esc(p.nome)}${p.tipo==='SUPPLIER'?' (fornecedor)':''}</option>`).join('')}
+function parOpts(sel){return (AP.parceiros||[]).filter(p=>!p.inativo).map(p=>`<option value="${p.id}"${String(sel)===String(p.id)?' selected':''}>${esc(p.nome)}${p.tipo==='SUPPLIER'?' (fornecedor)':p.tipo==='EMPLOYEE'?' (colaborador)':''}</option>`).join('')}
 function openConta(id,parceiroId){cnId=id||null;const c=id?AP.contas.find(x=>x.id===id):null;$('#fConta').reset();$('#cnRes').className='res';$('#cnRecBox').innerHTML=recCtl('cn');
   $('#cnTit').textContent=c?'Editar conta a pagar':'Nova conta a pagar';$('#cnSub').textContent=c?`#${c.id} · ${c.beneficiario||''}`:'Cria um título no funil Contas a Pagar do Bitrix.';
   $('#cnBen').innerHTML=`<option value="">— escolha —</option>${parOpts(c?c.parceiroId:parceiroId)}<option value="__livre">Outro (nome livre)</option>`;
@@ -1430,13 +1466,13 @@ $('#fPagar').onsubmit=async e=>{e.preventDefault();const b=$('#pgOk'),res=$('#pg
 // ---- parceiros ----
 function renderPar(){const ps=AP.parceiros||[];$('#parEmpty').style.display=ps.length?'none':'block';
   $('#parRows').innerHTML=ps.map(p=>{const regra=p.perc?`${p.perc}%`:p.fixo?brl(p.fixo):'—';
-    return `<tr style="${p.inativo?'opacity:.55':''}"><td><div class="cli"><div class="av ${AVC[p.id%5]}">${esc(initials(p.nome))}</div><div><b>${esc(p.nome)}</b><small>${p.tipo==='SUPPLIER'?'Fornecedor':'Parceiro'}${p.doc?' · '+esc(fmtDoc(p.doc)):''}${p.inativo?' · inativo':''}</small>${p.email||p.telefone?`<small>${esc([p.email,p.telefone].filter(Boolean).join(' · '))}</small>`:''}</div></div></td>
+    return `<tr style="${p.inativo?'opacity:.55':''}"><td><div class="cli"><div class="av ${AVC[p.id%5]}">${esc(initials(p.nome))}</div><div><b>${esc(p.nome)}</b><small>${tipoNome(p.tipo)}${p.doc?' · '+esc(fmtDoc(p.doc)):''}${p.inativo?' · inativo':''}</small>${p.email||p.telefone?`<small>${esc([p.email,p.telefone].filter(Boolean).join(' · '))}</small>`:''}</div></div></td>
       <td>${regra!=='—'?`<b>${regra}</b> <span class="mini">${p.perc?(p.base==='LIQUIDO'?'do líquido':'do bruto'):'fixo'}</span>`:'<span class="mut">—</span>'}<div class="mini">${p.prazo?`repasse em ${p.prazo} dia${p.prazo>1?'s':''}`:'repasse no ato'}</div></td>
       <td>${p.wallet?'<span class="chip3 auto">⚡ Split automático</span>':'<span class="chip3">Repasse manual</span>'}<div class="mini">${p.pix?esc((p.pixTipo?p.pixTipo+': ':'')+p.pix):'<span class="mut">sem chave Pix</span>'}</div></td>
       <td class="num val">${brl(p.aguardando)}</td><td class="num val">${brl(p.aPagar)}${p.atrasado?`<div class="iss">${brl(p.atrasado)} atrasado</div>`:''}</td><td class="num val">${brl(p.pagoTotal)}</td>
-      <td><div class="acts"><button class="btn sm" data-pr="extrato" data-id="${p.id}">Extrato</button><button class="btn sm" data-pr="editar" data-id="${p.id}">Editar</button><button class="btn sm" data-pr="conta" data-id="${p.id}" title="Nova conta a pagar para este beneficiário">+ Conta</button></div></td></tr>`}).join('')}
+      <td><div class="acts"><button class="btn sm" data-pr="extrato" data-id="${p.id}">Extrato</button><button class="btn sm" data-pr="editar" data-id="${p.id}">Editar</button><button class="btn sm" data-pr="conta" data-id="${p.id}" title="Nova conta a pagar para este beneficiário">+ Conta</button><button class="btn sm" data-pr="consolidar" data-id="${p.id}" title="Agrupa todos os títulos em aberto deste beneficiário em um pagamento só">Consolidar em aberto</button></div></td></tr>`}).join('')}
 $('#parRef').onclick=loadPagar;
-$('#parRows').onclick=e=>{const b=e.target.closest('[data-pr]');if(!b)return;const id=+b.dataset.id;if(b.dataset.pr==='editar')openPar(id);if(b.dataset.pr==='extrato')openExtrato(id);if(b.dataset.pr==='conta'){showView('pagar');openConta(null,id)}};
+$('#parRows').onclick=e=>{const b=e.target.closest('[data-pr]');if(!b)return;const id=+b.dataset.id;if(b.dataset.pr==='editar')openPar(id);if(b.dataset.pr==='extrato')openExtrato(id);if(b.dataset.pr==='conta'){showView('pagar');openConta(null,id)}if(b.dataset.pr==='consolidar'){const ids=(AP.contas||[]).filter(c=>c.parceiroId===id&&pagavel(c)).map(c=>c.id);if(ids.length<2){toast(ids.length?'Só há 1 título em aberto: pague direto, não precisa consolidar.':'Nenhum título em aberto para consolidar.');return}showView('pagar');apSel.clear();ids.forEach(i=>apSel.add(i));openCons()}};
 const dpr=$('#dPar');let prId=null,prEmpresa=null;
 function openPar(id){prId=id||null;prEmpresa=null;const p=id?AP.parceiros.find(x=>x.id===id):null;$('#fPar').reset();$('#prRes').className='res';$('#prSel').style.display='none';$('#prExistNote').textContent='';
   $('#prTit').textContent=p?'Editar parceiro':'Novo parceiro';$('#prExistWrap').style.display=p?'none':'';$('#prInatWrap').style.display=p?'flex':'none';
@@ -1453,7 +1489,7 @@ $('#fPar').onsubmit=async e=>{e.preventDefault();const b=$('#prOk'),res=$('#prRe
 // ---- extrato do parceiro ----
 const dex=$('#dExt');let EXT=null;
 async function openExtrato(id){try{EXT=await api('GET',`/api/parceiros/${id}/extrato`)}catch(x){toast(x.message);return}
-  const e=EXT,t=e.totais;$('#exTit').textContent=`Extrato · ${e.parceiro.nome}`;$('#exSub').textContent=`${e.parceiro.tipo==='SUPPLIER'?'Fornecedor':'Parceiro'}${e.parceiro.doc?' · '+fmtDoc(e.parceiro.doc):''} · ${e.itens.length} lançamento(s)`;
+  const e=EXT,t=e.totais;$('#exTit').textContent=`Extrato · ${e.parceiro.nome}`;$('#exSub').textContent=`${tipoNome(e.parceiro.tipo)}${e.parceiro.doc?' · '+fmtDoc(e.parceiro.doc):''} · ${e.itens.length} lançamento(s)`;
   $('#exTot').innerHTML=[['Aguardando',t.aguardando],['A pagar',t.aPagar],['Pago',t.pago],['Cancelado',t.cancelado]].map(([l,v])=>`<div><small>${l}</small><b>${brl(v)}</b></div>`).join('');
   $('#exRows').innerHTML=e.itens.map(c=>`<tr><td>${dbr(c.venc)}</td><td style="text-align:left;white-space:normal">${esc(c.titulo)}${c.regra?`<div class="mini">${esc(c.regra)}</div>`:''}</td><td>${apPill(c.estado)}</td><td><b>${brl(c.estado==='pago'?(c.valorPago||c.valor):c.valor)}</b></td></tr>`).join('')||'<tr><td colspan="4" class="mini">Nada lançado ainda.</td></tr>';
   dex.showModal()}
@@ -1462,8 +1498,62 @@ $('#exCopy').onclick=()=>{const p=EXT&&EXT.parceiro;if(p&&p.pix)copyText(p.pix);
 $('#exCsv').onclick=()=>{if(!EXT)return;const q=csvq;const head=['Vencimento','Descrição','Regra','Situação','Pago em','Valor'];
   const rows=EXT.itens.map(c=>[dbr(c.venc),c.titulo,c.regra,(AP_ST[c.estado]||[c.estado])[0],dbr(c.pagoEm),String(c.estado==='pago'?(c.valorPago||c.valor):c.valor).replace('.',',')].map(q).join(';'));
   const blob=new Blob(['﻿'+[head.map(q).join(';'),...rows].join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`extrato-${EXT.parceiro.nome.replace(/[^\w]+/g,'-')}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
-[dcn,dpg,dpr,dex,dcs,dcd,dml].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
-load();setInterval(load,60000);
+[dcn,dpg,dpr,dex,dcs,dcd,dml,$('#dPortDet')].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));
+
+// ================= acessos (administradores e vínculos) =================
+let ACC=null,accAdm=null,accVin=null;
+async function loadAcc(){try{ACC=await api('GET','/api/acessos');if(!(AP.parceiros||[]).length)AP.parceiros=await api('GET','/api/parceiros')}catch(x){toast(x.message);return}renderAcc()}
+function renderAcc(){const a=ACC;$('#acN').textContent=`(${a.admins.length}/${a.maxAdmins})`;
+  $('#acBoot').style.display=ME.bootstrap?'block':'none';$('#acBoot').textContent='Nenhum administrador foi definido ainda: hoje os administradores do portal Bitrix24 têm acesso total. Defina até 3 administradores abaixo para fechar o acesso só a eles.';
+  $('#acAdmins').innerHTML=a.admins.map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><span><b>${esc(u.nome)}</b> <small class="mut">#${esc(u.id)}</small></span><button class="btn sm dng" data-ac="rmadm" data-id="${esc(u.id)}">Remover</button></div>`).join('')||'<div class="mut">Nenhum administrador definido.</div>';
+  $('#acLinks').innerHTML=a.vinculos.map(v=>`<tr><td><b>${esc(v.nome)}</b><small class="mut" style="display:block">#${esc(v.userId)}</small></td><td>${esc(v.parceiro)}<div class="mini">${v.tipo==='colaborador'?'Colaborador':'Parceiro / fornecedor'}</div></td><td><button class="btn sm dng" data-ac="rmvin" data-id="${esc(v.userId)}">Remover</button></td></tr>`).join('')||'<tr><td colspan="3" class="mini">Ninguém vinculado ainda.</td></tr>';
+  $('#acVPar').innerHTML='<option value="">— escolha o cadastro —</option>'+(AP.parceiros||[]).filter(p=>!p.inativo).map(p=>`<option value="${p.id}">${esc(p.nome)} (${tipoNome(p.tipo).toLowerCase()})</option>`).join('')}
+async function accBuscar(inp,sel,setSel){const q=$(inp).value.trim();if(/^\d+$/.test(q)){$(sel).innerHTML=`<option value='{"id":"${q}","nome":"Usuário #${q}"}'>Usuário #${q} (ID informado)</option>`;$(sel).style.display='block';$(sel).selectedIndex=0;setSel(JSON.parse($(sel).value));return}
+  if(q.length<2)return;try{const r=await api('GET','/api/usuarios?q='+encodeURIComponent(q));$(sel).innerHTML=r.map(u=>`<option value='${esc(JSON.stringify(u))}'>${esc(u.nome)} · #${esc(u.id)}${u.email?' · '+esc(u.email):''}</option>`).join('')||'<option disabled>Ninguém encontrado</option>';$(sel).style.display='block'}catch(x){toast(x.message)}}
+$('#acABt').onclick=()=>accBuscar('#acABusca','#acASel',u=>{accAdm=u;$('#acAOk').disabled=false});$('#acASel').onchange=e=>{try{accAdm=JSON.parse(e.target.value);$('#acAOk').disabled=false}catch{}};
+$('#acVBt').onclick=()=>accBuscar('#acVBusca','#acVSel',u=>{accVin=u;vinOk()});$('#acVSel').onchange=e=>{try{accVin=JSON.parse(e.target.value);vinOk()}catch{}};
+const vinOk=()=>{$('#acVOk').disabled=!(accVin&&$('#acVPar').value)};$('#acVPar').onchange=vinOk;
+$('#acAOk').onclick=async()=>{try{ACC=await api('POST','/api/acessos/admins',{userId:accAdm.id});toast('Administrador adicionado');$('#acASel').style.display='none';$('#acAOk').disabled=true;ME=await api('GET','/api/me');renderAcc()}catch(x){toast(x.message)}};
+$('#acVOk').onclick=async()=>{try{ACC=await api('POST','/api/acessos/vinculos',{userId:accVin.id,parceiroId:$('#acVPar').value});toast('Usuário vinculado');$('#acVSel').style.display='none';$('#acVOk').disabled=true;renderAcc()}catch(x){toast(x.message)}};
+$('#viewAcc').onclick=async e=>{const b=e.target.closest('[data-ac]');if(!b)return;const a=b.dataset.ac;
+  try{if(a==='rmadm'){if(!confirm('Remover este administrador?'))return;ACC=await api('DELETE','/api/acessos/admins/'+b.dataset.id);ME=await api('GET','/api/me');if(ME.papel!=='admin'&&!ME.portalAdmin){location.reload();return}}
+    if(a==='rmvin'){if(!confirm('Remover o acesso deste usuário?'))return;ACC=await api('DELETE','/api/acessos/vinculos/'+b.dataset.id)}renderAcc()}catch(x){toast(x.message)}};
+
+// ================= folha de pagamento =================
+let FOL=null,flMes='';
+async function loadFol(){if(!flMes)flMes=(S&&S.hoje||new Date().toISOString().slice(0,10)).slice(0,7);
+  try{FOL=await api('GET','/api/folha?mes='+flMes);await loadPagar()}catch(x){toast(x.message);return}renderFol()}
+function renderFol(){const f=FOL;$('#flMesLbl').textContent=rsLbl(f.mes);$('#flTot').textContent=`Total da folha: ${brl(f.total)}`;$('#flEmpty').style.display=f.colaboradores.length?'none':'block';
+  $('#flRows').innerHTML=f.colaboradores.map(c=>{const lote=c.lotes[0],paga=c.itens.length&&c.itens.every(i=>i.estado==='pago'),sit=!c.itens.length?'<span class="pill c-gray">Sem lançamentos</span>':paga?'<span class="pill c-green">Paga</span>':lote?'<span class="pill c-blue">Holerite fechado</span>':'<span class="pill c-amber">Em aberto</span>';
+    return `<tr><td><b>${esc(c.nome)}</b>${c.email?`<small class="mut" style="display:block">${esc(c.email)}</small>`:''}</td><td>${c.itens.map(i=>`<span class="chip3" title="${esc(i.estado)}">${esc(i.titulo)} · ${brl(i.valor)}</span>`).join('')||'<span class="mut">—</span>'}</td><td class="num val">${brl(c.total)}</td><td>${sit}</td>
+    <td><div class="acts"><button class="btn sm" data-fl="add" data-id="${c.id}">+ Lançamento</button>${c.soltos.length>1?`<button class="btn sm pri" data-fl="fechar" data-id="${c.id}">Fechar holerite</button>`:''}${lote?`<button class="btn sm" data-fl="ver" data-id="${lote.id}">Ver holerite</button><button class="btn sm" data-fl="mail" data-id="${lote.id}">E-mail</button>`:''}</div></td></tr>`}).join('')}
+$('#flMes').onclick=e=>{const b=e.target.closest('button[data-m]');if(b){flMes=rsAdd(flMes,+b.dataset.m);loadFol()}};$('#flRef').onclick=loadFol;$('#flRec').onclick=()=>{showView('rec')};
+$('#flRows').onclick=async e=>{const b=e.target.closest('[data-fl]');if(!b)return;const a=b.dataset.fl,id=+b.dataset.id,c=FOL.colaboradores.find(x=>x.id===id);
+  if(a==='add'){showView('pagar');await loadPagar();openConta(null,id);$('#cnCat').value='Pessoas';return}
+  if(a==='ver'){openCdet(id);return}if(a==='mail'){showView('pagar');await loadPagar();openMailCons(id);return}
+  if(a==='fechar'){if(!confirm(`Fechar o holerite de ${c.nome} com ${c.soltos.length} lançamentos (${brl(c.itens.filter(i=>c.soltos.includes(i.id)).reduce((s,i)=>s+i.valor,0))})?`))return;
+    try{const r=await api('POST','/api/pagar/consolidar',{ids:c.soltos,forma:'Pix',obs:'Folha '+rsLbl(FOL.mes)});toast('Holerite fechado');await loadFol();openCdet(r.id)}catch(x){toast(x.message)}}};
+
+// ================= portal do parceiro / colaborador (só o que ele tem a receber) =================
+let ME={papel:'admin',bootstrap:false},PT=null;
+const PT_ST={aguardando:['Previsto','st-prev','c-gray'],aberto:['A receber','st-open','c-blue'],proximo:['Vence em breve','st-soon','c-amber'],atrasado:['Atrasado','st-late','c-red'],pago:['Pago','st-paid','c-green']};
+async function loadPortal(){try{PT=await api('GET','/api/portal'+(ME.preview?'?parceiro='+ME.preview:''))}catch(x){$('#ptSub').textContent=x.message;return}renderPortal()}
+function renderPortal(){const p=PT,r=p.resumo,emp=p.quem.tipo==='EMPLOYEE';
+  $('#ptTit').textContent=emp?'Meu holerite e recebimentos':'Meus recebimentos';$('#ptSub').textContent=`${p.quem.nome} · posição de ${dbr(p.hoje)}`;
+  const kp=(cls,icn,l,v,sb)=>`<div class="card kpi"><div class="ico ${cls}">${ic(icn,20)}</div><div><div class="eyebrow">${l}</div><div class="v">${v}</div><div class="s">${sb}</div></div></div>`;
+  $('#ptKpis').innerHTML=kp('c-blue',I.clock,'A receber',brl(r.aReceber),'já liberado para pagamento')+kp('c-red',I.alert,'Atrasado',brl(r.atrasado),'vencido e não pago')+kp('c-amber',I.alert,'Vence em 7 dias',brl(r.venceEm7),'próximos pagamentos')+kp('c-gray',I.list,'Previsto',brl(r.previsto),'depende do pagamento do cliente')+kp('c-green',I.check,'Pago no mês',brl(r.pagoMes),`${brl(r.pagoTotal)} no total`);
+  $('#ptEmpty').style.display=p.contas.length?'none':'block';
+  $('#ptRows').innerHTML=p.contas.map(c=>{const [l,cls,pc]=PT_ST[c.estado]||[c.estado,'',''];return `<tr class="${cls}" ${c.consolidado?`data-pc="${c.id}" style="cursor:pointer"`:''}><td class="due"><b>${c.venc?dbr(c.venc):'—'}</b></td><td><b>${esc(c.titulo)}</b>${c.consolidado?`<small class="mut" style="display:block">${c.qtdItens} lançamentos · clique para ver o detalhamento</small>`:''}${c.categoria?`<small class="mut" style="display:block">${esc(c.categoria)}</small>`:''}</td><td class="num val">${brl(c.estado==='pago'&&c.valorPago>0?c.valorPago:c.valor)}</td><td><span class="pill ${pc}">${l}</span></td><td>${c.pagoEm?dbr(c.pagoEm):'<span class="mut">—</span>'}</td></tr>`}).join('')}
+$('#ptRef').onclick=loadPortal;$('#pdClose').onclick=()=>$('#dPortDet').close();
+$('#ptRows').onclick=async e=>{const tr=e.target.closest('tr[data-pc]');if(!tr)return;try{const d=await api('GET',`/api/portal/consolidados/${tr.dataset.pc}`+(ME.preview?'?parceiro='+ME.preview:''));$('#pdTit').textContent=d.consolidado.titulo;$('#pdSub').textContent=`Total ${brl(d.total)} · vencimento ${dbr(d.consolidado.venc)}`;$('#pdRows').innerHTML=d.itens.map(i=>`<tr><td style="text-align:left;white-space:normal">${esc(i.titulo)}</td><td>${dbr(i.venc)}</td><td><b>${brl(i.valor)}</b></td></tr>`).join('');$('#dPortDet').showModal()}catch(x){toast(x.message)}};
+async function boot(){
+  try{ME=await api('GET','/api/me')}catch(x){document.body.classList.add('portal');$('#viewMain').hidden=true;$('#viewPortal').hidden=false;$('#ptTit').textContent='Acesso indisponível';$('#ptSub').textContent=x.message;$('#ptKpis').innerHTML='';return}
+  if(ME.papel==='admin'){load();setInterval(load,60000);return}
+  document.body.classList.add('portal');['viewMain','viewDash','viewPagar','viewPar','viewSubs','viewLinks','viewCfg','viewRes','viewRec','viewFol','viewAcc'].forEach(i=>{const e=$('#'+i);if(e)e.hidden=true});$('#viewPortal').hidden=false;
+  if(ME.papel==='sem'){$('#ptTit').textContent='Acesso ainda não liberado';$('#ptSub').textContent='Seu usuário ainda não foi vinculado a nenhum cadastro. Peça a um administrador para liberar.';$('#ptKpis').innerHTML='';$('#viewPortal .card').style.display='none';if(ME.portalAdmin){$('#ptSub').innerHTML+=' <button class="btn sm" id="ptAcc">Abrir Acessos</button>';$('#ptAcc').onclick=()=>{document.body.classList.remove('portal');$('#viewPortal').hidden=true;showView('acc')}}return}
+  loadPortal();setInterval(loadPortal,120000)}
+
+boot();
 </script>
 </body>
 </html>

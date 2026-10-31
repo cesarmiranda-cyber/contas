@@ -49,7 +49,7 @@ test('tela de Configurações: testa, salva, nunca devolve a chave e permite rem
   const fakeBitrix = await listen((q, r) => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify(q.url.includes('profile') ? { result: { NAME: 'Cesar', LAST_NAME: 'Miranda', ADMIN: true } } : { result: [] })); });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'srv-'));
   const port = 20000 + Math.floor(Math.random() * 20000);
-  const child = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, PORT: String(port), DATA_DIR: dir, ASAAS_BASE_URL: `http://127.0.0.1:${fakeAsaas.address().port}`, BITRIX_WEBHOOK: '', ASAAS_API_KEY: '', SYNC_MINUTES: '600' } });
+  const child = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, AUTH_DISABLED: '1', PORT: String(port), DATA_DIR: dir, ASAAS_BASE_URL: `http://127.0.0.1:${fakeAsaas.address().port}`, BITRIX_WEBHOOK: '', ASAAS_API_KEY: '', SYNC_MINUTES: '600' } });
   t.after(() => { child.kill(); fakeAsaas.close(); fakeBitrix.close(); });
   for (let i = 0; i < 50; i++) { try { await fetch(`http://127.0.0.1:${port}/health`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }
   const api = async (m, u, b) => { const r = await fetch(`http://127.0.0.1:${port}${u}`, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return { status: r.status, json: await r.json() }; };
@@ -90,7 +90,7 @@ test('configuração de e-mail (SMTP): valida, só salva o que funciona, esconde
   const fakeBitrix = await listen((q, r) => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify({ result: [] })); });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'srvm-'));
   const port = 20000 + Math.floor(Math.random() * 20000);
-  const child = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, PORT: String(port), DATA_DIR: dir, BITRIX_WEBHOOK: '', ASAAS_API_KEY: '', SYNC_MINUTES: '600', QUICK_MINUTES: '600' } });
+  const child = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, AUTH_DISABLED: '1', PORT: String(port), DATA_DIR: dir, BITRIX_WEBHOOK: '', ASAAS_API_KEY: '', SYNC_MINUTES: '600', QUICK_MINUTES: '600' } });
   t.after(() => { child.kill(); fakeBitrix.close(); });
   for (let i = 0; i < 50; i++) { try { await fetch(`http://127.0.0.1:${port}/health`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }
   const api = async (m, u, b) => { const r = await fetch(`http://127.0.0.1:${port}${u}`, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return { status: r.status, json: await r.json() }; };

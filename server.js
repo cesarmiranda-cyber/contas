@@ -11,6 +11,7 @@ const { createSettingsApi } = require('./lib/settingsApi');
 const { createMailer } = require('./lib/mailer');
 const R = require('./lib/rules');
 const G = require('./lib/gestao');
+const { createAcl } = require('./lib/acl');
 
 // .env opcional (a plataforma de deploy já injeta as variáveis no processo).
 try {
@@ -29,6 +30,7 @@ const bitrix = createBitrix('');
 const asaas = createAsaas({});
 const mailer = createMailer({ secrets });
 const svc = createService({ bitrix, asaas, store, mailer });
+const acl = createAcl({ store, bitrix, parceiros: () => svc.pagar.parceiros() });
 const settings = createSettingsApi({ secrets, asaas, bitrix, store, svc, mailer });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
@@ -55,8 +57,11 @@ const readBody = req => new Promise((ok, no) => {
   });
   req.on('error', () => no(bad(400, 'Requisição interrompida.')));
 });
-// Bloqueia requisições de outro site (CSRF) e DNS rebinding: sem Origin = chamada direta/ferramenta.
+// Bloqueia requisições de outro site (CSRF). Atrás do gateway da Vibecode o Host é interno, então o sinal confiável é o Sec-Fetch-Site
+// do navegador (não dá para forjar por script); sem ele, cai na comparação Origin × Host. Sem Origin = chamada direta/ferramenta.
 const sameOrigin = req => {
+  const sf = req.headers['sec-fetch-site'];
+  if (sf) return sf === 'same-origin' || sf === 'none';
   const o = req.headers.origin; if (!o) return true;
   try { return new URL(o).host === req.headers.host; } catch { return false; }
 };
@@ -120,6 +125,7 @@ const routes = {
     return svc.pagar.criarConta(b);
   },
   'GET /api/recorrencias': async () => svc.recs.listar(),
+  'GET /api/folha': async (u) => svc.pagar.folha(/^\d{4}-(0[1-9]|1[0-2])$/.test(u.searchParams.get('mes') || '') ? u.searchParams.get('mes') : R.todayBR().slice(0, 7)),
   'POST /api/pagar/consolidar': async (_, b) => svc.pagar.consolidar(b),
   'GET /api/parceiros': async () => svc.pagar.parceirosComResumo(await svc.pagar.parceiros(true), await svc.pagar.contasCached(0)),
   'POST /api/parceiros': async (_, b) => svc.pagar.salvarParceiro(b),
@@ -171,7 +177,38 @@ const server = http.createServer(async (req, res) => {
   try { u = new URL(req.url.replace(/^\/{2,}/, '/'), 'http://x'); } catch { return send(res, 400, { error: 'URL inválida.' }); }
   try {
     if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOrigin(req)) throw bad(403, 'Origem não permitida.');
+    // ---- identidade e permissões (usuário do Bitrix24 vindo do gateway) ----
+    let user = null;
+    if (u.pathname.startsWith('/api/')) {
+      user = acl.resolve(req.headers);
+      if (!user) throw bad(401, 'Não consegui identificar seu usuário. Abra o app pelo Bitrix24.');
+      if (u.pathname === '/api/me') return send(res, 200, acl.me(user));
+      if (user.papel !== 'admin') {
+        const gestaoAcesso = u.pathname.startsWith('/api/acessos') || u.pathname === '/api/usuarios';
+        if (gestaoAcesso && user.portalAdmin) { /* administrador do portal pode corrigir os acessos (evita ficar trancado de fora) */ }
+        else if (u.pathname.startsWith('/api/portal') && (user.papel === 'parceiro' || user.papel === 'colaborador') && req.method === 'GET') { /* só leitura dos próprios dados */ }
+        else throw bad(403, user.papel === 'sem' ? 'Seu usuário ainda não foi liberado neste app. Peça a um administrador.' : 'Você não tem permissão para esta ação.');
+      }
+    }
     const key = `${req.method} ${u.pathname}`;
+    if (u.pathname.startsWith('/api/acessos') || u.pathname === '/api/usuarios') {
+      if (key === 'GET /api/acessos') return send(res, 200, await acl.listar());
+      if (key === 'GET /api/usuarios') return send(res, 200, await acl.buscarUsuarios(u.searchParams.get('q')));
+      if (key === 'POST /api/acessos/admins') return send(res, 200, await acl.addAdmin((await readBody(req)).userId));
+      if (key === 'POST /api/acessos/vinculos') { const b = await readBody(req); return send(res, 200, await acl.addVinculo({ userId: b.userId, parceiroId: b.parceiroId })); }
+      const ma = u.pathname.match(/^\/api\/acessos\/(admins|vinculos)\/(\d+)$/);
+      if (ma && req.method === 'DELETE') return send(res, 200, ma[1] === 'admins' ? await acl.removeAdmin(ma[2]) : await acl.removeVinculo(ma[2]));
+    }
+    if (u.pathname === '/api/portal' && req.method === 'GET') {
+      const pid = user.papel === 'admin' ? +u.searchParams.get('parceiro') : user.parceiroId;      // admin pode pré-visualizar o portal de um parceiro
+      if (!pid) throw bad(400, 'Informe o parceiro (?parceiro=ID).');
+      return send(res, 200, await svc.pagar.visaoPortal(pid));
+    }
+    const mpc = u.pathname.match(/^\/api\/portal\/consolidados\/(\d+)$/);
+    if (mpc && req.method === 'GET') {
+      const pid = user.papel === 'admin' ? +u.searchParams.get('parceiro') : user.parceiroId;
+      return send(res, 200, await svc.pagar.detalhePortal(mpc[1], pid));
+    }
     if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
     const m = u.pathname.match(/^\/api\/deals\/(\d+)\/(charge|remind|cancel|doc|categoria|gerar|editar|detalhe|receber|estornar|baixar|desbaixar)$/);

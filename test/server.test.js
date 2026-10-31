@@ -11,7 +11,7 @@ const raw = (port, method, p, { headers = {}, body } = {}) => new Promise((ok, n
 
 test('servidor: entradas inválidas não derrubam o processo e requisições de outro site são recusadas', async () => {
   const port = 3900 + Math.floor(Math.random() * 90), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'srv-'));
-  const p = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], { env: { ...process.env, PORT: String(port), DATA_DIR: dir }, stdio: 'ignore' });
+  const p = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], { env: { ...process.env, AUTH_DISABLED: '1', PORT: String(port), DATA_DIR: dir }, stdio: 'ignore' });
   try {
     for (let i = 0; i < 30; i++) { try { await raw(port, 'GET', '/health'); break; } catch { await new Promise(r => setTimeout(r, 100)); } }
     const J = { 'Content-Type': 'application/json' };
@@ -21,6 +21,9 @@ test('servidor: entradas inválidas não derrubam o processo e requisições de 
     assert.equal((await raw(port, 'PUT', '/api/config', { headers: J, body: 'null' })).status, 400);
     assert.equal((await raw(port, 'POST', '/api/settings/asaas/test', { headers: { 'Content-Type': 'text/plain' }, body: '{}' })).status, 415);
     assert.equal((await raw(port, 'POST', '/api/settings/asaas/test', { headers: { ...J, Origin: 'https://evil.example' }, body: '{}' })).status, 403);
+    // atrás do gateway o Host é interno: o navegador legítimo é reconhecido pelo Sec-Fetch-Site, e outro site não
+    assert.notEqual((await raw(port, 'POST', '/api/settings/asaas/test', { headers: { ...J, Origin: 'https://app-x.vibecode.bitrix24.com', 'Sec-Fetch-Site': 'same-origin' }, body: '{}' })).status, 403);
+    assert.equal((await raw(port, 'POST', '/api/settings/asaas/test', { headers: { ...J, Origin: 'https://app-x.vibecode.bitrix24.com', 'Sec-Fetch-Site': 'cross-site' }, body: '{}' })).status, 403);
     assert.equal((await raw(port, 'POST', '/api/pagar/consolidar', { headers: { ...J, Origin: `http://127.0.0.1:${port}` }, body: '{}' })).status !== 403, true);
     assert.equal((await raw(port, 'POST', '/api/settings/asaas/test', { headers: J, body: 'x'.repeat(1.2e6) })).status === 413 || true, true);
     const h = (await raw(port, 'GET', '/')).headers;

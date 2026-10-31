@@ -32,6 +32,17 @@ Em aberto → Próximo do vencimento → Atrasado → Pago / Cancelado.
 - O agrupamento usa `CR_GRUPO` (parcelamento/assinatura de origem no Asaas), preenchido nas novas cobranças e, uma vez, nas já importadas (*Mais ações → Organizar parcelas do Asaas* refaz sob demanda).
 - **Vincular a cliente / venda**: em qualquer cobrança (ou grupo inteiro) escolha a empresa/contato do Bitrix e, opcionalmente, o negócio de venda (`CR_VENDA`). “Lembrar” grava o cliente do Asaas para as próximas importações.
 
+## Acesso por usuário (admins, parceiros e colaboradores)
+- A identidade vem do gateway da Vibecode (`X-Vibe-User-Id`/`-Role`), que o navegador não consegue forjar. Sem identidade numérica do Bitrix24 → 401.
+- **Administradores** (até 3, tela *Acessos*) veem e fazem tudo. Enquanto ninguém foi definido, os administradores do portal Bitrix24 agem como admin (configuração inicial) e sempre conseguem corrigir os acessos.
+- **Parceiro/fornecedor/colaborador**: vincule o usuário do Bitrix a um cadastro de *Parceiros e fornecedores*. Ele só abre o **portal**: o que tem a receber (previsto, a receber, atrasado, pago) e o detalhamento do pagamento consolidado — sem regras, margens, clientes nem valores de venda. Sem vínculo: acesso negado.
+- A pessoa também precisa estar liberada na política de acesso do servidor no Vibecode (usuários nomeados).
+
+## Revenda, comissões e folha
+- Split por cobrança (`CR · Split`): `Parceiro=30%` (ele recebe), `Parceiro=R$ 50,00`, e para **fornecedor de revenda** `Fornecedor=-20%` / `-R$ 100,00` = *Manda4 retém* (ele recebe o valor menos a sua margem). Dá para combinar fornecedor + indicador na mesma venda.
+- O resultado separa **custo de fornecedores (revenda)** de **comissões a parceiros/colaboradores** e de **despesas**.
+- **Folha de pagamento**: cadastre o colaborador (tipo *Colaborador*), salário como despesa recorrente (categoria *Pessoas*), comissões/bônus como lançamentos; *Fechar holerite* consolida o mês e o colaborador vê no portal. Descontos (INSS/IR/adiantamentos) ainda não são suportados.
+
 ## Painel financeiro
 - **Geral** (aba *Dashboard* e gaveta lateral *Painel financeiro*) e **do cliente** (aba dentro da deal): nota de saúde 0–100 com as partes à mostra, previsão de recebimento (30/60/90 dias e por mês), recebido, atraso por faixa, maiores devedores, próximas cobranças, concentração e alertas.
 - Cálculo em `lib/dashboard.js` (função pura, testada). Atrasos antigos pesam na nota e a limitam (máx. 84 com atraso > 60 dias, 69 > 90). Pagamento até 2 dias após o vencimento conta como no prazo.

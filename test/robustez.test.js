@@ -59,3 +59,16 @@ test('pagamento do consolidado ignora filho cancelado e não redistribui o que j
   await p.tickDatas();                                                            // reconciliação não pode alterar o total
   assert.equal((await p.contas()).filter(x => ids.includes(x.id)).reduce((a, x) => a + x.valorPago, 0), 300);
 });
+
+test('revenda: "Nome=-20%" = Manda4 retém 20% (fornecedor recebe o resto); fixo retém valor; indicação soma junto', () => {
+  const ps = [{ id: 1, nome: 'Bitrix', wallet: 'aaaaaaaa-1111-2222-3333-444444444444' }, { id: 2, nome: 'Indicador', wallet: '' }];
+  const es = R.parseRepasses('Bitrix=-20%; Indicador=5%', { partners: ps });
+  assert.equal(R.repasseValor(es[0], 1000), 800); assert.equal(R.repasseValor(es[1], 1000), 50);
+  assert.equal(R.repasseRegra(es[0], 'bruto'), 'Manda4 retém 20% do bruto');
+  assert.deepEqual(R.nativeSplit(es, 1000), [{ walletId: 'aaaaaaaa-1111-2222-3333-444444444444', percentualValue: 80 }]);
+  const fx = R.parseRepasses('Bitrix=-R$ 150,00', { partners: ps });
+  assert.equal(R.repasseValor(fx[0], 1000), 850); assert.equal(R.repasseRegra(fx[0], 'bruto'), 'Manda4 retém R$ 150,00');
+  assert.deepEqual(R.nativeSplit(fx, 1000), [{ walletId: 'aaaaaaaa-1111-2222-3333-444444444444', fixedValue: 850 }]);
+  assert.throws(() => R.parseRepasses('Bitrix=-100%', { partners: ps }), /menor que 100/);
+  assert.throws(() => R.parseRepasses('Bitrix=-20%; Indicador=90%', { partners: ps }), /máximo 100/);   // 80% + 90%
+});
