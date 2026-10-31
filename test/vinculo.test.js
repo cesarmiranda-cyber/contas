@@ -58,3 +58,14 @@ test('agrupamento de parcelas manuais: lote do recebimento manual, "Título — 
   const w2 = world(deals); const l2 = await w2.svc.loadDeals();
   assert.equal(new Set(l2.map(d => d.grupo)).size, 1); assert.ok(l2[0].grupo.startsWith('p_'));
 });
+
+test('situação calculada pela data: vencida sem a etapa certa no Bitrix conta como atrasada (filtro, KPI e aging)', async () => {
+  const dias = n => { const d = new Date(today + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const deals = [deal(1, { UF_CRM_CR_VENC: dias(-10), UF_CRM_CR_ASAAS_ID: '' }), deal(2, { UF_CRM_CR_VENC: dias(2), UF_CRM_CR_ASAAS_ID: '' }), deal(3, { UF_CRM_CR_VENC: dias(40), UF_CRM_CR_ASAAS_ID: '' }),
+    deal(4, { STAGE_ID: R.STAGES.paid, UF_CRM_CR_VENC: dias(-5), UF_CRM_CR_ASAAS_ID: '' }), deal(5, { STAGE_ID: R.STAGES.cancelled, UF_CRM_CR_ASAAS_ID: '' })];
+  const w = world(deals); w.asaas.enabled = false;
+  const ld = await w.svc.loadDeals();
+  assert.deepEqual([1, 2, 3, 4, 5].map(i => ld.find(d => d.id === i).sit), ['late', 'soon', 'open', 'paid', 'canc']);
+  const k = w.svc.kpis(ld);
+  assert.equal(k.atrasado.qtd, 1); assert.equal(k.atrasado.valor, 100); assert.equal(k.aberto.qtd, 2); assert.equal(k.pago.qtd, 1); assert.equal(k.aging['1-30'], 100);
+});
