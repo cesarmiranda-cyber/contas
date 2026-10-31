@@ -14,7 +14,7 @@ env = {"BITRIX_WEBHOOK": os.environ["BITRIX_WEBHOOK"], "DATA_DIR": "/opt/data/st
 if os.environ.get("ASAAS_API_KEY"): env["ASAAS_API_KEY"] = os.environ["ASAAS_API_KEY"]
 print(json.dumps({
   "source": {"content": base64.b64encode(open(os.environ["T"]+"/app.tgz","rb").read()).decode()},
-  "runtime": "node20", "start": "cd /opt/app && node server.js", "port": 3000,
+  "runtime": os.environ.get("RUNTIME", "node20"), "start": "cd /opt/app && node server.js", "port": 3000,
   "env": env, "dataDirs": ["/opt/data/state"], "healthPath": "/health",
   "displayName": "Contas a Receber", "description": "Contas a receber do funil Contas (Bitrix24) integrado ao Asaas, com régua de cobrança automática.",
   "changelog": os.environ.get("CHANGELOG", "Atualização do app"),
