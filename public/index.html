@@ -185,7 +185,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin:14px
 .side .sp{flex:1}.side .fold{display:flex;align-items:center;gap:10px;border:0;background:transparent;color:var(--mut);padding:8px 10px;border-radius:10px;font:inherit;font-size:12.5px;cursor:pointer}.side .fold:hover{color:var(--ink)}
 .side .fold svg{width:16px;height:16px;transition:.2s}
 body.fold .shell{grid-template-columns:68px minmax(0,1fr)}body.fold .side .lbl2,body.fold .side .grp,body.fold .side .brand b,body.fold .side .nav .bd{display:none}body.fold .side{padding:16px 8px}body.fold .side .brand{justify-content:center;padding:4px 0 14px}body.fold .side button.nav{justify-content:center;padding:10px}body.fold .side button.nav.on::before{left:-8px}body.fold .side .fold svg{transform:rotate(180deg)}body.fold .side .fold{justify-content:center}
-.content{min-width:0}.top .logo,.top .ttl h1+.sub{display:none}.top .ttl h1{font-size:19px}body[data-view=res] #bNova,body[data-view=res] #bGerar,body[data-view=res] #bImp,body[data-view=res] #bDash{display:none}
+.content{min-width:0}.top .logo,.top .ttl h1+.sub{display:none}.top .ttl h1{font-size:19px}body[data-view=rec] #bNova,body[data-view=rec] #bGerar,body[data-view=rec] #bImp,body[data-view=rec] #bDash,body[data-view=res] #bNova,body[data-view=res] #bGerar,body[data-view=res] #bImp,body[data-view=res] #bDash{display:none}
 .top .ttl .sub{display:flex!important}
 .vtabs{display:none!important}
 body[data-view=pagar] #bNova,body[data-view=pagar] #bGerar,body[data-view=pagar] #bImp,body[data-view=pagar] #bDash,body[data-view=par] #bNova,body[data-view=par] #bGerar,body[data-view=par] #bImp,body[data-view=par] #bDash,body[data-view=cfg] #bNova,body[data-view=cfg] #bGerar,body[data-view=cfg] #bImp,body[data-view=cfg] #bDash,body[data-view=subs] #bGerar,body[data-view=subs] #bImp,body[data-view=links] #bGerar,body[data-view=links] #bImp,body[data-view=dash] #bGerar,body[data-view=dash] #bImp,body[data-view=dash] #bDash{display:none}
@@ -372,6 +372,11 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   </div>
 </main>
 
+<main id="viewRec" hidden>
+  <div class="toolbar" style="padding:0 0 14px"><div class="mini" style="max-width:640px">Regras que geram títulos automaticamente, sempre 12 meses à frente: aluguel, assinaturas de software, folha, mensalidades de clientes. Para criar, use <b>Nova despesa</b> (Contas a pagar) ou <b>Nova cobrança → Recebimento manual</b> e escolha a recorrência. Cobranças pelo Asaas continuam em <b>Assinaturas</b>.</div><div style="display:flex;gap:8px"><button class="btn" id="rcRef">Atualizar</button><button class="btn" id="rcNovaP">+ Despesa recorrente</button><button class="btn pri" id="rcNovaR">+ Recebimento recorrente</button></div></div>
+  <section class="card"><div class="tw"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Recorrência</th><th class="num">Valor</th><th>Próxima</th><th class="num">Geradas</th><th>Situação</th><th></th></tr></thead><tbody id="rcRows"></tbody></table></div>
+  <div class="empty" id="rcEmpty" style="display:none"><b>Nenhuma recorrência ainda</b>Crie uma despesa ou um recebimento recorrente e ele aparece aqui.</div></section>
+</main>
 <main id="viewRes" hidden>
   <div class="toolbar" style="padding:0 0 14px">
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -429,7 +434,8 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <div class="seg" id="nForma" style="display:flex"><button type="button" data-f="UNDEFINED" class="on">Cliente escolhe</button><button type="button" data-f="BOLETO">Boleto</button><button type="button" data-f="PIX">Pix</button><button type="button" data-f="CREDIT_CARD">Cartão</button></div>
   <p class="dlg-sub" id="nFormaHint" style="margin-top:6px"></p></div>
   <div class="r2"><div><label id="nValLbl">Valor (R$)</label><input id="nVal" type="number" step="0.01" min="0.01"></div><div id="nVencWrap"><label id="nVencLbl">Vencimento</label><input id="nVenc" type="date"></div></div>
-  <div id="nParcWrap" style="display:none"><label>Nº de parcelas</label><input id="nParc" type="number" min="2" max="60" value="2"></div>
+  <div id="nRecWrap" style="display:none"><div id="nRecBox"></div></div>
+  <div id="nParcWrap" style="display:none"><label id="nParcLbl">Nº de parcelas</label><input id="nParc" type="number" min="2" max="60" value="2"></div>
   <div id="nAssWrap" style="display:none"><div class="r2"><div><label>Ciclo</label><select id="nCiclo"><option value="MENSAL">Mensal</option><option value="SEMANAL">Semanal</option><option value="QUINZENAL">Quinzenal</option><option value="BIMESTRAL">Bimestral</option><option value="TRIMESTRAL">Trimestral</option><option value="SEMESTRAL">Semestral</option><option value="ANUAL">Anual</option></select></div><div><label>Máx. de cobranças (opcional)</label><input id="nMax" type="number" min="1"></div></div><label>Data de término (opcional)</label><input id="nFim" type="date"></div>
   <div id="nLinkWrap" style="display:none"><div class="r2"><div><label>Tipo do link</label><select id="nLTipo"><option value="DETACHED">Avulso (paga uma vez)</option><option value="INSTALLMENT">Parcelado (cliente escolhe até N)</option><option value="RECURRENT">Assinatura recorrente</option></select></div><div id="nLParcWrap" style="display:none"><label>Máx. de parcelas</label><input id="nLParc" type="number" min="2" max="21" value="12"></div><div id="nLCicloWrap" style="display:none"><label>Ciclo</label><select id="nLCiclo"><option value="MENSAL">Mensal</option><option value="SEMANAL">Semanal</option><option value="QUINZENAL">Quinzenal</option><option value="BIMESTRAL">Bimestral</option><option value="TRIMESTRAL">Trimestral</option><option value="SEMESTRAL">Semestral</option><option value="ANUAL">Anual</option></select></div></div>
     <div class="r2"><div><label>Dias para vencer (boleto)</label><input id="nLDias" type="number" min="1" max="365"></div><div><label>Link válido até (opcional)</label><input id="nLFim" type="date"></div></div><label>Descrição (opcional)</label><input id="nLDesc" maxlength="500"></div>
@@ -467,7 +473,7 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <label>Descrição</label><input id="cnDesc" maxlength="255" placeholder="Ex.: Aluguel do escritório">
   <div class="r2"><div><label>Categoria</label><select id="cnCat"></select></div><div><label>Forma de pagamento</label><select id="cnForma"><option value="">A definir</option></select></div></div>
   <div class="r2"><div><label>Valor (R$)</label><input id="cnVal" type="number" step="0.01" min="0.01"></div><div><label id="cnVencLbl">Vencimento</label><input id="cnVenc" type="date"></div></div>
-  <div id="cnRepWrap"><label>Repetir todo mês por quantos meses? <span class="mini">(1 = só esta conta)</span></label><input id="cnRep" type="number" min="1" max="60" value="1"></div>
+  <div id="cnRepWrap"><div id="cnRecBox"></div></div>
   <details class="adv"><summary>Dados de pagamento e observações</summary>
     <label>Chave Pix</label><input id="cnPix" maxlength="140"><label>Linha digitável do boleto</label><input id="cnLinha" maxlength="120"><label>Observações</label><textarea id="cnObs"></textarea></details>
   <div class="res" id="cnRes"></div>
@@ -540,6 +546,15 @@ body.scoped .shell{display:block}body.scoped .side{display:none}
   <iframe id="emPrev" sandbox="" title="Prévia do e-mail" style="width:100%;height:300px;border:1px solid var(--line);border-radius:12px;background:#fff"></iframe>
   <div class="res" id="emRes"></div>
   <div class="foot"><button type="button" class="btn" id="emCancel">Cancelar</button><button class="btn pri" id="emOk">Enviar e-mail</button></div>
+</form></dialog>
+
+<dialog id="dRecEd"><form method="dialog" id="fRecEd">
+  <h2>Editar recorrência</h2><p class="dlg-sub" id="reSub"></p>
+  <label>Descrição</label><input id="reTit" maxlength="255">
+  <div class="r2"><div><label>Valor de cada ocorrência (R$)</label><input id="reVal" type="number" step="0.01" min="0.01"></div><div><label>Data final (opcional)</label><input id="reFim" type="date"></div></div>
+  <p class="pnote">Valor e descrição novos valem para as ocorrências <b>futuras ainda não pagas</b>. As já pagas ou em consolidado não mudam.</p>
+  <div class="res" id="reRes"></div>
+  <div class="foot"><button type="button" class="btn" id="reCancel">Cancelar</button><button class="btn pri" id="reOk">Salvar</button></div>
 </form></dialog>
 
 <dialog id="dBaixa"><form method="dialog" id="fBaixa">
@@ -675,7 +690,7 @@ function render(){
       `<a href="https://${BX_HOST}/crm/deal/details/${d.id}/" target="_blank" rel="noopener">${ic(I.ext,16)}Abrir no Bitrix</a>`,
       !fin?`<button class="dng" data-a="cancel" data-id="${d.id}">${ic(I.x,16)}Cancelar cobrança</button>`:''].join('');
     return `<tr class="${d.id===CUR_DEAL?'cur':''}">
-      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.manual?'<span class="chip3 est">Recebimento manual</span>':''}${!d.manual&&!d.split&&!d.repasses&&!isC(d)&&d.stageId!=='C90:GERAR'?'<span class="chip3">100% Manda4</span>':''}${d.split?`<span class="chip3" title="${esc(d.split)}">Comissão: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
+      <td class="c-cli"><div class="cli"><div class="av ${AVC[d.id%5]}">${esc(initials(nome))}</div><div><b>${esc(nome)}</b><small>#${d.id} · ${esc(d.titulo)}</small>${d.manual?'<span class="chip3 est">Recebimento manual</span>':''}${d.recor?'<span class="chip3" title="Gerado por uma recorrência">↻ Recorrente</span>':''}${!d.manual&&!d.split&&!d.repasses&&!isC(d)&&d.stageId!=='C90:GERAR'?'<span class="chip3">100% Manda4</span>':''}${d.split?`<span class="chip3" title="${esc(d.split)}">Comissão: ${esc(d.split.length>46?d.split.slice(0,45)+'…':d.split)}</span>`:''}${d.categoria?`<span class="cat">${esc(d.categoria)}${d.plano?' · '+esc(d.plano):''}</span>`:''}${warns?`<div class="warns">${warns}</div>`:''}</div></div></td>
       <td class="hide-m">${d.parcela?`<span class="tag">${esc(d.parcela)}</span>`:isC(d)&&d.tipo?`<span class="tag">${{UNICA:'À vista',PARCELADO:(d.qtd||'?')+'x',RECORRENTE:d.qtd?d.qtd+' meses':'mensal'}[d.tipo]||''}</span>`:'<span class="mut">—</span>'}</td>
       <td class="hide-m">${FORMA[d.forma]||'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(d.valor)}</td>
@@ -781,15 +796,15 @@ $('#iOk').onclick=async e=>{e.preventDefault();const b=e.currentTarget;b.disable
 let CFG=null,aEnv='sandbox';
 const res=(el,ok,msg)=>{el.className='res '+(ok?'ok':'bad');el.textContent=msg};
 const stat=(ok,title,sub)=>`<div class="ico ${ok?'c-green':'c-red'}">${ic(ok?I.check:I.alert,20)}</div><div><b>${title}</b><small>${sub}</small></div>`;
-function showView(v){document.body.dataset.view=v;if(v==='res')loadRes();$('#pgTitle').textContent=NAVT[v]||'Contas';document.querySelectorAll('#side button.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));['main','cfg','subs','links','dash','pagar','par','res'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
+function showView(v){document.body.dataset.view=v;if(v==='res')loadRes();if(v==='rec')loadRec();$('#pgTitle').textContent=NAVT[v]||'Contas';document.querySelectorAll('#side button.nav').forEach(b=>b.classList.toggle('on',b.dataset.v===v));['main','cfg','subs','links','dash','pagar','par','res','rec'].forEach(k=>{const el=$('#view'+k[0].toUpperCase()+k.slice(1));if(el)el.hidden=k!==v});
   if(v==='cfg'){loadSettings();location.hash='config'}else history.replaceState(null,'',location.pathname+location.search);
   if(v==='main')load();if(v==='subs')loadSubs();if(v==='links')loadLinks();if(v==='dash')loadDash($('#dashHost'),{});if(v==='pagar'||v==='par')loadPagar();window.scrollTo(0,0)}
-const VTABS=[['main','Contas a receber'],['dash','Visão geral'],['res','Resultado (DRE)'],['pagar','Contas a pagar'],['par','Parceiros e fornecedores'],['subs','Assinaturas'],['links','Links de pagamento']];
-const NAVI={res:'<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',main:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',dash:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',pagar:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>',par:'<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',subs:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',links:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',cfg:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
+const VTABS=[['main','Contas a receber'],['dash','Visão geral'],['res','Resultado (DRE)'],['rec','Recorrências'],['pagar','Contas a pagar'],['par','Parceiros e fornecedores'],['subs','Assinaturas'],['links','Links de pagamento']];
+const NAVI={rec:'<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',res:'<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',main:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',dash:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',pagar:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>',par:'<path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',subs:'<path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/>',links:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',cfg:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'};
 const NAVT={cfg:'Configurações'};VTABS.forEach(([k,l])=>NAVT[k]=l);
 (function(){const it=(k,l)=>`<button class="nav" data-v="${k}" title="${l}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${NAVI[k]}</svg><span class="lbl2">${l}</span><span class="bd" id="bd_${k}"></span></button>`;
   $('#side').innerHTML=`<div class="brand"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div><b>Contas<small>Receber e Pagar</small></b></div>
-  <div class="grp">Gestão</div>${it('dash','Visão geral')}${it('res','Resultado (DRE)')}
+  <div class="grp">Gestão</div>${it('dash','Visão geral')}${it('res','Resultado (DRE)')}${it('rec','Recorrências')}
   <div class="grp">Receber</div>${it('main','Contas a receber')}${it('subs','Assinaturas')}${it('links','Links de pagamento')}
   <div class="grp">Pagar</div>${it('pagar','Contas a pagar')}${it('par','Parceiros e fornecedores')}
   <div class="grp">Sistema</div>${it('cfg','Configurações')}<div class="sp"></div>
@@ -861,10 +876,10 @@ $('#fBaixa').onsubmit=async e=>{e.preventDefault();const b=$('#bxOk'),res=$('#bx
   try{await api('POST',`/api/deals/${bxId}/baixar`,{data:$('#bxData').value,valor:$('#bxVal').value,forma:$('#bxForma').value,obs:$('#bxObs').value});dbx.close();toast('Recebimento registrado');load();if(!$('#viewPagar').hidden)loadPagar()}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=false};
 const dn=$('#dNova');let N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};
 const FORMA_HINT={UNDEFINED:'O cliente escolhe boleto, Pix ou cartão na página do link.',BOLETO:'Gera boleto com PDF e linha digitável.',PIX:'Gera QR Code e Pix copia e cola.',CREDIT_CARD:'O cliente informa o cartão na página segura do Asaas — o app não guarda dados de cartão.'};
-function nSetTipo(t){N.tipo=t;document.querySelectorAll('#nTipo button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+function nSetTipo(t){N.tipo=t;if(t==='manual'&&!$('#nRecBox').innerHTML)$('#nRecBox').innerHTML=recCtl('n',nRecChange);document.querySelectorAll('#nTipo button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   const man=t==='manual';$('#nFormaWrap').style.display=man?'none':'';$('#nParc').min=man?1:2;if(man&&+$('#nParc').value<1)$('#nParc').value=1;
   const link=t==='link';$('#nCliWrap').style.display=link?'none':'';$('#nTitWrap').style.display=link?'none':'';$('#nNomeWrap').style.display=link?'':'none';$('#nVencWrap').style.display=link?'none':'';
-  $('#nParcWrap').style.display=t==='parcelada'||man?'':'none';$('#nAssWrap').style.display=t==='assinatura'?'':'none';$('#nLinkWrap').style.display=link?'':'none';
+  $('#nRecWrap').style.display=man?'':'none';$('#nParcWrap').style.display=t==='parcelada'||(man&&recVal('n')===null)?'':'none';$('#nAssWrap').style.display=t==='assinatura'?'':'none';$('#nLinkWrap').style.display=link?'':'none';
   $('#nDescWrap').style.display=link||man?'none':'';$('#nClassWrap').style.display=link?'none':'';
   $('#nValLbl').textContent={avulsa:'Valor (R$)',parcelada:'Valor total (R$)',assinatura:'Valor por cobrança (R$)',link:'Valor (R$, opcional)',manual:'Valor total (R$)'}[t];
   $('#nVencLbl').textContent={avulsa:'Vencimento',parcelada:'1º vencimento',assinatura:'1º vencimento',manual:'1º vencimento'}[t]||'';
@@ -882,7 +897,7 @@ function nSplitAdd(){if(!N.carteiras.length){$('#nSplitHint').textContent='Nenhu
   const fill=()=>{const w=N.carteiras.find(x=>x.nome===r.children[0].value);if(!w)return;if(w.perc){r.children[1].value=w.perc;r.children[2].value='%'}else if(w.fixo){r.children[1].value=w.fixo;r.children[2].value='R$'}};r.children[0].onchange=fill;fill();$('#nSplit').appendChild(r)}
 const nSplitText=()=>[...document.querySelectorAll('#nSplit .srow')].map(r=>{const [a,b,c]=[r.children[0].value,r.children[1].value,r.children[2].value];return b?`${a}=${c==='%'?b+'%':'R$ '+String(b).replace('.',',')}`:''}).filter(Boolean).join('; ');
 function nSetCom(c){document.querySelectorAll('#nCom button').forEach(b=>b.classList.toggle('on',b.dataset.c===c));$('#nComBox').style.display=c==='com'?'':'none';if(c==='com'&&!document.querySelector('#nSplit .srow'))nSplitAdd();if(c==='sem')$('#nSplit').innerHTML=''}
-async function openNova(tipo,prefill){N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};nSetCom('sem');$('#fNova').reset();$('#nSplit').innerHTML='';$('#nSplitHint').textContent='';$('#nRes').className='res';$('#nOut').innerHTML='';$('#nSel').style.display='none';$('#nOk').style.display='';$('#nOk').disabled=false;
+async function openNova(tipo,prefill){N={tipo:'avulsa',forma:'UNDEFINED',cli:null,carteiras:[]};nSetCom('sem');$('#nRecBox').innerHTML='';$('#fNova').reset();$('#nSplit').innerHTML='';$('#nSplitHint').textContent='';$('#nRes').className='res';$('#nOut').innerHTML='';$('#nSel').style.display='none';$('#nOk').style.display='';$('#nOk').disabled=false;
   try{const ps=await api('GET','/api/parceiros'),lg=await api('GET','/api/carteiras');N.carteiras=[...ps.filter(x=>!x.inativo).map(x=>({nome:x.nome,walletId:x.wallet,perc:x.perc,fixo:x.fixo})),...lg.filter(w=>!ps.some(x=>x.nome.toLowerCase()===w.nome.toLowerCase()))]}catch{}
   fillSel($('#nCat'),S.listas.categorias,'','Sem categoria');fillSel($('#nPl'),S.listas.planos,'','Sem tipo de licença');plWrap($('#nCat'),$('#nPlWrap'));
   if(S.escopo&&(S.escopo.companyId||S.escopo.contactId)){N.cli=S.escopo.companyId?{tipo:'company',id:S.escopo.companyId,nome:S.escopo.nome}:{tipo:'contact',id:S.escopo.contactId,nome:S.escopo.nome};$('#nCli').value=S.escopo.nome;$('#nCli').readOnly=true;$('#nBusca').style.display='none'}
@@ -908,6 +923,7 @@ $('#fNova').onsubmit=async e=>{e.preventDefault();const t=N.tipo,res=$('#nRes');
     Object.assign(body,{titulo:$('#nTit').value,venc:$('#nVenc').value,[N.cli.tipo==='company'?'companyId':'contactId']:N.cli.id,doc:$('#nDoc').value||undefined,categoria:$('#nCat').value,plano:$('#nCat').value===S.listas.licenca?$('#nPl').value:''});
     if(+$('#nDVal').value>0)body.desconto={valor:+$('#nDVal').value,tipo:$('#nDTipo').value,dias:+$('#nDDias').value||0};
     if(t==='parcelada'||t==='manual')body.parcelas=$('#nParc').value;
+    if(t==='manual'){const rc=recVal('n');if(rc)body.recorrencia=rc}
     if(t==='assinatura'){body.ciclo=$('#nCiclo').value;body.maxCobrancas=$('#nMax').value||undefined;body.fim=$('#nFim').value||undefined}}
   if(t!=='manual'&&S.asaas.env==='production'&&!confirm('Você está em PRODUÇÃO: isto cria uma cobrança REAL no Asaas e o cliente pode ser notificado. Continuar?'))return;
   const b=$('#nOk');b.disabled=true;
@@ -1089,6 +1105,42 @@ $('#bDash').onclick=openDrawer;$('#drClose').onclick=closeDrawer;$('#dim').oncli
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
 
 
+
+// ================= recorrência (controles compartilhados) =================
+const FREQ_NOME={semanal:'Semanal',quinzenal:'Quinzenal',mensal:'Todo mês',bimestral:'A cada 2 meses',trimestral:'A cada 3 meses',semestral:'A cada 6 meses',anual:'Todo ano'};
+function recCtl(px,onchg){return `<label>Recorrência</label><div class="r2"><select id="${px}Freq"><option value="nao">Não repete</option>${Object.entries(FREQ_NOME).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select>
+  <div id="${px}FimWrap" style="display:none"><select id="${px}FimT"><option value="nunca">Sem data final</option><option value="qtd">Termina após N vezes</option><option value="data">Termina em uma data</option></select></div></div>
+  <div id="${px}FimIn" style="display:none"><div class="r2"><input id="${px}Qtd" type="number" min="1" max="600" placeholder="Nº de vezes (ex.: 12)" style="display:none"><input id="${px}Fim" type="date" style="display:none"></div></div>
+  <p class="pnote" id="${px}RecNote" style="display:none">Os títulos são criados automaticamente, sempre 12 meses à frente. Você acompanha e edita em <b>Recorrências</b>.</p>`}
+document.addEventListener('change',e=>{const m=/^(cn|n)(Freq|FimT)$/.exec(e.target.id||'');if(!m)return;const px=m[1],f=$('#'+px+'Freq').value,t=$('#'+px+'FimT').value;
+  $('#'+px+'FimWrap').style.display=f==='nao'?'none':'';$('#'+px+'RecNote').style.display=f==='nao'?'none':'';$('#'+px+'FimIn').style.display=f!=='nao'&&t!=='nunca'?'':'none';$('#'+px+'Qtd').style.display=t==='qtd'?'':'none';$('#'+px+'Fim').style.display=t==='data'?'':'none';
+  if(px==='n')nRecChange();else{const l=$('#cnVencLbl');if(l)l.textContent=f==='nao'?'Vencimento':'1º vencimento da recorrência'}});
+function recVal(px){const f=$('#'+px+'Freq');if(!f||f.value==='nao')return null;const t=$('#'+px+'FimT').value;return {freq:f.value,...(t==='qtd'?{qtd:$('#'+px+'Qtd').value}:{}),...(t==='data'?{fim:$('#'+px+'Fim').value}:{})}}
+function nRecChange(){if(N.tipo!=='manual')return;const r=recVal('n')!==null;$('#nParcWrap').style.display=r?'none':'';$('#nValLbl').textContent=r?'Valor de cada ocorrência (R$)':'Valor total (R$)';nPrev()}
+
+
+// ================= recorrências (gestão das regras) =================
+let RECS=[],reId='';
+async function loadRec(){try{RECS=await api('GET','/api/recorrencias');if(!(AP.parceiros||[]).length)AP.parceiros=await api('GET','/api/parceiros')}catch(x){toast(x.message);return}renderRec()}
+function renderRec(){$('#rcEmpty').style.display=RECS.length?'none':'block';
+  $('#rcRows').innerHTML=RECS.map(r=>{const t=r.template||{},pag=r.tipo==='pagar',enc=!!r.encerradaEm,sit=enc?['Encerrada','c-gray']:r.ativa?['Ativa','c-green']:['Pausada','c-amber'];
+    return `<tr style="${enc?'opacity:.6':''}"><td><span class="pill ${pag?'c-amber':'c-blue'}">${pag?'A pagar':'A receber'}</span></td>
+    <td><b>${esc(t.titulo||'—')}</b><small class="mut" style="display:block">${esc(pag?(t.beneficiario||(AP.parceiros||[]).find(p=>p.id==t.parceiroId)?.nome||''):'')}${t.categoria?' · '+esc(t.categoria):''}</small></td>
+    <td>${esc(r.rotulo)}<div class="mini">desde ${dbr(r.inicio)}</div></td><td class="num val">${brl(t.valor)}</td><td>${r.proxima?dbr(r.proxima):'<span class="mut">—</span>'}</td><td class="num">${r.geradas}</td>
+    <td><span class="pill ${sit[1]}">${sit[0]}</span></td>
+    <td><div class="acts">${enc?'':`<button class="btn sm" data-rc="editar" data-id="${r.id}">Editar</button><button class="btn sm" data-rc="${r.ativa?'pausar':'retomar'}" data-id="${r.id}">${r.ativa?'Pausar':'Retomar'}</button><button class="btn sm dng" data-rc="encerrar" data-id="${r.id}">Encerrar</button>`}</div></td></tr>`}).join('')}
+$('#rcRef').onclick=loadRec;$('#rcNovaP').onclick=()=>{showView('pagar');loadPagar().then(()=>openConta())};$('#rcNovaR').onclick=()=>{showView('main');openNova('manual')};
+const dre2=$('#dRecEd');
+$('#rcRows').onclick=async e=>{const b=e.target.closest('[data-rc]');if(!b)return;const id=b.dataset.id,r=RECS.find(x=>x.id===id),a=b.dataset.rc;if(!r)return;
+  try{if(a==='editar'){reId=id;$('#reRes').className='res';$('#reSub').textContent=`${r.tipo==='pagar'?'Conta a pagar':'Recebimento'} · ${r.rotulo}`;$('#reTit').value=r.template.titulo;$('#reVal').value=r.template.valor;$('#reFim').value=r.fim||'';dre2.showModal();return}
+    if(a==='pausar'||a==='retomar'){await api('PUT','/api/recorrencias/'+id,{ativa:a==='retomar'});toast(a==='pausar'?'Recorrência pausada: nada novo será gerado':'Recorrência retomada');loadRec();return}
+    if(a==='encerrar'){if(!confirm('Encerrar esta recorrência? Nada novo será gerado e ela não pode ser reativada.'))return;const c=confirm('Cancelar também as ocorrências futuras ainda não pagas?\n\nOK = cancelar as futuras · Cancelar = manter as já geradas');const x=await api('POST',`/api/recorrencias/${id}/encerrar`,{cancelarFuturas:c});toast(`Recorrência encerrada${x.canceladas?` · ${x.canceladas} futura(s) cancelada(s)`:''}`);loadRec()}
+  }catch(x){toast(x.message)}};
+$('#reCancel').onclick=()=>dre2.close();
+$('#fRecEd').onsubmit=async e=>{e.preventDefault();const b=$('#reOk'),res=$('#reRes');res.className='res';b.disabled=true;
+  try{const r=await api('PUT','/api/recorrencias/'+reId,{titulo:$('#reTit').value,valor:$('#reVal').value,fim:$('#reFim').value});dre2.close();toast(r.atualizadas?`Salvo · ${r.atualizadas} ocorrência(s) futura(s) atualizada(s)`:'Salvo');loadRec()}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=false};
+dre2.addEventListener('click',e=>{if(e.target===dre2)dre2.close()});
+
 // ================= resultado (DRE) =================
 let RS=null,rsMes='',rsReg='caixa';
 const rsAdd=(m,n)=>{const [y,mo]=m.split('-').map(Number),t=y*12+mo-1+n;return `${Math.floor(t/12)}-${String(t%12+1).padStart(2,'0')}`};
@@ -1159,7 +1211,7 @@ function renderPagar(){const r=AP.resumo||{};{const bd=$('#bd_pagar');if(bd)bd.t
       c.estado==='pago'?`<button data-ap="desfazer" data-id="${c.id}">${ic(I.x,16)}Desfazer pagamento</button>`:'',!fin&&!c.lote&&!eCons?`<button class="dng" data-ap="cancelar" data-id="${c.id}">${ic(I.x,16)}Cancelar conta</button>`:''].join('');
     return `<tr class="${sel?'picked':''}"><td class="ck">${tick}</td><td class="due"><b>${c.venc?dbr(c.venc):'—'}</b>${relVenc(c)}</td>
       <td><div class="cli"><div class="av ${AVC[c.id%5]}">${esc(initials(c.beneficiario||'?'))}</div><div><b>${esc(c.beneficiario||'Sem beneficiário')}</b><small>#${c.id} · ${esc(c.titulo)}</small>
-      <div>${eCons?'':c.origem?'<span class="chip3 auto">Repasse de venda</span>':'<span class="chip3">Despesa</span>'}${c.regra?`<span class="chip3">${esc(c.regra)}</span>`:''}${c.origem?`<span class="chip3">Origem #${c.origem}</span>`:''}${c.parcela?`<span class="chip3">${esc(c.parcela)}</span>`:''}${auto?'<span class="chip3 auto">⚡ Split automático</span>':''}${eCons?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.id}">Consolidado · ${c.itens.length} título${c.itens.length>1?'s':''} · ver quais</button>`:''}${c.lote?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.lote}">No consolidado #${c.lote}</button>`:''}${eCons&&c.enviadoEm?`<span class="chip3 auto" title="${esc(c.enviadoPara||'')}">✉ enviado ${dbr(c.enviadoEm.slice(0,10))}</span>`:''}${c.splitSt?`<span class="chip3">Split: ${esc(SPLIT_ST[c.splitSt]||c.splitSt)}</span>`:''}</div></div></div></td>
+      <div>${c.recor?'<span class="chip3" title="Gerada por uma recorrência">↻ Recorrente</span>':''}${eCons?'':c.origem?'<span class="chip3 auto">Repasse de venda</span>':'<span class="chip3">Despesa</span>'}${c.regra?`<span class="chip3">${esc(c.regra)}</span>`:''}${c.origem?`<span class="chip3">Origem #${c.origem}</span>`:''}${c.parcela?`<span class="chip3">${esc(c.parcela)}</span>`:''}${auto?'<span class="chip3 auto">⚡ Split automático</span>':''}${eCons?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.id}">Consolidado · ${c.itens.length} título${c.itens.length>1?'s':''} · ver quais</button>`:''}${c.lote?`<button type="button" class="chip3 cons" data-ap="ver" data-id="${c.lote}">No consolidado #${c.lote}</button>`:''}${eCons&&c.enviadoEm?`<span class="chip3 auto" title="${esc(c.enviadoPara||'')}">✉ enviado ${dbr(c.enviadoEm.slice(0,10))}</span>`:''}${c.splitSt?`<span class="chip3">Split: ${esc(SPLIT_ST[c.splitSt]||c.splitSt)}</span>`:''}</div></div></div></td>
       <td>${c.categoria?`<span class="tag">${esc(c.categoria)}</span>`:'<span class="mut">—</span>'}</td>
       <td class="num val">${brl(c.valor)}${c.estado==='pago'&&c.valorPago&&c.valorPago!==c.valor?`<div class="mini">pago ${brl(c.valorPago)}</div>`:''}</td>
       <td>${apPill(c.estado)}${c.forma&&c.estado==='pago'?`<div class="mini" style="margin-top:4px">${esc(c.forma)}${c.comprovante?' · '+esc(c.comprovante):''}</div>`:''}</td>
@@ -1244,7 +1296,7 @@ $('#fMail').onsubmit=async e=>{e.preventDefault();const b=$('#emOk'),res=$('#emR
 // ---- nova / editar conta ----
 const dcn=$('#dConta');let cnId=null;
 function parOpts(sel){return (AP.parceiros||[]).filter(p=>!p.inativo).map(p=>`<option value="${p.id}"${String(sel)===String(p.id)?' selected':''}>${esc(p.nome)}${p.tipo==='SUPPLIER'?' (fornecedor)':''}</option>`).join('')}
-function openConta(id,parceiroId){cnId=id||null;const c=id?AP.contas.find(x=>x.id===id):null;$('#fConta').reset();$('#cnRes').className='res';
+function openConta(id,parceiroId){cnId=id||null;const c=id?AP.contas.find(x=>x.id===id):null;$('#fConta').reset();$('#cnRes').className='res';$('#cnRecBox').innerHTML=recCtl('cn');
   $('#cnTit').textContent=c?'Editar conta a pagar':'Nova conta a pagar';$('#cnSub').textContent=c?`#${c.id} · ${c.beneficiario||''}`:'Cria um título no funil Contas a Pagar do Bitrix.';
   $('#cnBen').innerHTML=`<option value="">— escolha —</option>${parOpts(c?c.parceiroId:parceiroId)}<option value="__livre">Outro (nome livre)</option>`;
   $('#cnCat').innerHTML=(AP.consts.AP_CATEGORIAS||[]).map(x=>`<option${(c?c.categoria===x:x==='Outros')?' selected':''}>${esc(x)}</option>`).join('');
@@ -1257,7 +1309,7 @@ $('#cnCancel').onclick=()=>dcn.close();$('#apNova').onclick=()=>openConta();
 $('#fConta').onsubmit=async e=>{e.preventDefault();const b=$('#cnOk'),res=$('#cnRes');res.className='res';b.disabled=true;
   try{if(cnId){await api('PUT',`/api/pagar/contas/${cnId}`,{titulo:$('#cnDesc').value,valor:$('#cnVal').value,venc:$('#cnVenc').value,categoria:$('#cnCat').value,forma:$('#cnForma').value,pix:$('#cnPix').value,linha:$('#cnLinha').value,obs:$('#cnObs').value})}
     else{const ben=$('#cnBen').value;if(!ben){res.className='res bad';res.textContent='Escolha o beneficiário.';b.disabled=false;return}
-      await api('POST','/api/pagar/contas',{titulo:$('#cnDesc').value,valor:$('#cnVal').value,venc:$('#cnVenc').value,categoria:$('#cnCat').value,forma:$('#cnForma').value,pix:$('#cnPix').value,linha:$('#cnLinha').value,obs:$('#cnObs').value,repetir:$('#cnRep').value,...(ben==='__livre'?{beneficiario:$('#cnLivre').value}:{parceiroId:ben})})}
+      await api('POST','/api/pagar/contas',{titulo:$('#cnDesc').value,valor:$('#cnVal').value,venc:$('#cnVenc').value,categoria:$('#cnCat').value,forma:$('#cnForma').value,pix:$('#cnPix').value,linha:$('#cnLinha').value,obs:$('#cnObs').value,recorrencia:recVal('cn'),...(ben==='__livre'?{beneficiario:$('#cnLivre').value}:{parceiroId:ben})})}
     dcn.close();toast('Conta salva');loadPagar()}catch(x){res.className='res bad';res.textContent=x.message}b.disabled=false};
 
 // ---- registrar pagamento ----

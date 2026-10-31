@@ -22,6 +22,11 @@ Em aberto → Próximo do vencimento → Atrasado → Pago / Cancelado.
 - **Contas a pagar** (funil Contas a Pagar): **repasses** (nascem da venda com comissão, liberados quando o cliente paga) e **despesas** (sem parceiro/venda: aluguel, fornecedores, impostos, pessoas…). Dá para filtrar por tipo.
 - **Resultado (DRE gerencial)** em `GET /api/gestao?mes=AAAA-MM&regime=caixa|competencia`: receita bruta (por origem) − taxas Asaas − comissões = **margem da Manda4** − despesas por categoria = **resultado**; evolução de 6 meses e posição de hoje. Cálculo em `lib/gestao.js` (consolidados não contam em dobro).
 
+## Recorrências (pagar e receber)
+- Despesas e recebimentos manuais podem repetir: semanal, quinzenal, mensal, bimestral, trimestral, semestral ou anual, **sem fim**, por **quantidade** ou até uma **data**. Mensal+ preserva o dia do mês (dia 31 cai no fim do mês, sem derrapar).
+- A regra fica no app (`lib/recorrencia.js`); cada ocorrência é um título comum no Bitrix, marcado em `CP_RECOR`/`CR_RECOR`. O app mantém **12 meses à frente** e completa a cada sincronização, sem duplicar.
+- Tela **Recorrências**: pausar/retomar, editar valor/descrição (vale para as futuras não pagas) e encerrar (opcionalmente cancelando as futuras). Cobranças pelo Asaas seguem em *Assinaturas*.
+
 ## Painel financeiro
 - **Geral** (aba *Dashboard* e gaveta lateral *Painel financeiro*) e **do cliente** (aba dentro da deal): nota de saúde 0–100 com as partes à mostra, previsão de recebimento (30/60/90 dias e por mês), recebido, atraso por faixa, maiores devedores, próximas cobranças, concentração e alertas.
 - Cálculo em `lib/dashboard.js` (função pura, testada). Atrasos antigos pesam na nota e a limitam (máx. 84 com atraso > 60 dias, 69 > 90). Pagamento até 2 dias após o vencimento conta como no prazo.

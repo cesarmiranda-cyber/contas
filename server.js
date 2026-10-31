@@ -111,7 +111,15 @@ const routes = {
     const lista = await svc.pagar.contasCached(0), ps = await svc.pagar.parceiros(true);
     return { pronto: !!store.ap, contas: lista, resumo: svc.pagar.resumoContas(lista), parceiros: svc.pagar.parceirosComResumo(ps, lista), consts: svc.pagar.consts, hoje: R.todayBR() };
   },
-  'POST /api/pagar/contas': async (_, b) => svc.pagar.criarConta(b),
+  'POST /api/pagar/contas': async (_, b) => {
+    if (b.recorrencia && b.recorrencia.freq && b.recorrencia.freq !== 'nao') {
+      const { recorrencia, repetir, ...t } = b;
+      const r = await svc.recs.criar({ tipo: 'pagar', template: t, recorrencia: { ...recorrencia, inicio: b.venc } });
+      svc.pagar.invalidate(); return { ok: true, recorrenciaId: r.regra.id, geradas: r.geradas };
+    }
+    return svc.pagar.criarConta(b);
+  },
+  'GET /api/recorrencias': async () => svc.recs.listar(),
   'POST /api/pagar/consolidar': async (_, b) => svc.pagar.consolidar(b),
   'GET /api/parceiros': async () => svc.pagar.parceirosComResumo(await svc.pagar.parceiros(true), await svc.pagar.contasCached(0)),
   'POST /api/parceiros': async (_, b) => svc.pagar.salvarParceiro(b),
@@ -162,6 +170,11 @@ const server = http.createServer(async (req, res) => {
       const c = await svc.byId(m[1]);
       if (!c) return send(res, 404, { error: 'Deal não encontrada no funil 90' });
       return send(res, 200, await dealRoutes[m[2]](c, await readBody(req)));
+    }
+    const mr = u.pathname.match(/^\/api\/recorrencias\/(rc_[a-z0-9]+)(?:\/(encerrar))?$/);
+    if (mr) {
+      if (!mr[2] && req.method === 'PUT') { const b = await readBody(req); const r = await svc.recs.editar(mr[1], { valor: b.valor, titulo: b.titulo, ativa: typeof b.ativa === 'boolean' ? b.ativa : undefined, fim: b.fim }); svc.invalidate(); svc.pagar.invalidate(); return send(res, 200, r); }
+      if (mr[2] && req.method === 'POST') { const b = await readBody(req); const r = await svc.recs.encerrar(mr[1], { cancelarFuturas: !!b.cancelarFuturas }); svc.invalidate(); svc.pagar.invalidate(); return send(res, 200, r); }
     }
     const mp = u.pathname.match(/^\/api\/pagar\/contas\/(\d+)(?:\/(pagar|cancelar|desfazer))?$/);
     if (mp) {
