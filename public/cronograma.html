@@ -84,7 +84,7 @@ const dt = s => s ? s.split('-').reverse().join('/') : '—';
 const dm = s => s.split('-').reverse().slice(0, 2).join('/');
 const fm = m => Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
 const somaDias = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const ABAS = [['semana', 'Semana'], ['clientes', 'Clientes'], ['consultoras', 'Consultoras'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
+const ABAS = [['semana', 'Semana'], ['clientes', 'Clientes'], ['conferencia', 'Conferência mensal'], ['consultoras', 'Consultoras'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
 let ME = {}, BOOT = {}, aba = 'semana', podeEditar = false, podeAdmin = false, operacional = false;
 let W = { data: '', consultora: '', q: '' }, CL = { q: '', filtro: '', page: 1 };
 function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
@@ -93,12 +93,12 @@ function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#g
 function gavFecha() { $('#gav').hidden = true; $('#gbk').hidden = true; $('#gav').innerHTML = ''; }
 $('#gbk').onclick = gavFecha; addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gav').hidden) gavFecha(); });
 const topo = () => '<div class="top"><span class="sp"></span><button class="btn" data-x aria-label="Fechar">✕</button></div>';
-const recarrega = () => ({ semana, clientes, consultoras, feriados, processo })[aba]();
+const recarrega = () => ({ semana, clientes, conferencia, consultoras, feriados, processo })[aba]();
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
 function abrirAba(a) {
   aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
-  gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, consultoras, feriados, processo })[a]();
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, conferencia, consultoras, feriados, processo })[a]();
 }
 const hojeISO = () => BOOT.hoje;
 
@@ -126,14 +126,21 @@ const semana = guarda(async () => {
     $('#wger').onclick = guarda(async () => { const r = await api('POST', '/semana/gerar', { data: W.data, semanas: 1 }); aviso(r.criadas ? `${r.criadas} visita(s) criadas a partir das recorrências.` : 'Nada a gerar: a semana já está completa.'); semana(); });
     if ($('#wfer')) $('#wfer').onclick = guarda(async () => { if (!confirm('Remarcar as visitas em feriado para o próximo dia útil livre?')) return; const r = await api('POST', '/semana/remarcar-feriados', { data: W.data }); aviso(`${r.remarcadas} visita(s) remarcada(s).`); semana(); }); }
 });
+const lk = (url, txt) => `<a href="${h(url)}" target="_blank" rel="noopener">${h(txt)}</a>`;
+function vinculos(c) {   // empresa, contato e negócio do Bitrix24 de um cliente
+  if (!c) return '';
+  const H = BOOT.host, e = c.empresaBitrixId ? lk(`https://${H}/crm/company/details/${c.empresaBitrixId}/`, 'Empresa #' + c.empresaBitrixId) : '<b style="color:var(--warn)">empresa não vinculada</b>';
+  const t = c.contatoBitrixId ? lk(c.contatoUrl || `https://${H}/crm/contact/details/${c.contatoBitrixId}/`, c.contatoNome || 'Contato #' + c.contatoBitrixId) : '<b style="color:var(--warn)">sem contato</b>';
+  const n = c.dealId ? lk(c.dealUrl || `https://${H}/crm/deal/details/${c.dealId}/`, 'Negócio #' + c.dealId) : '<b style="color:var(--mut)">negócio ainda não criado</b>';
+  return `<label>Empresa (Bitrix24)${e}</label><label>Contato (Bitrix24)${t}</label><label class="w">Negócio no funil Assessoria Recorrente / RT${n}</label>`;
+}
 async function visitaDrawer(id, s) {
   const v = s.linhas.flatMap(l => l.dias.flat()).find(x => x.id === id); if (!v) return;
   const c = (await api('GET', '/clientes?q=' + encodeURIComponent(v.clienteNome))).itens.find(x => x.id === v.clienteId);
   gav(`${topo()}<h2 style="margin:0">${h(v.clienteNome)}</h2><p class="mut" style="margin:0 0 12px">${h(v.consultoraNome)} · ${dt(v.data)} · ${fm(v.min)} · <span class="pill">${h(BOOT.status[v.status])}</span></p>
   ${v.feriado ? `<div class="box" style="border-color:var(--bad)"><b>Feriado na cidade do cliente:</b> ${h(v.feriado)}.${v.sugestao ? ` Sugestão: ${dt(v.sugestao)}.` : ''}${podeEditar && v.sugestao ? ` <button class="btn" id="vs">Remarcar para ${dm(v.sugestao)}</button>` : ''}</div>` : ''}
   <div class="f"><label>Cliente<b style="color:var(--ink)">${h(v.clienteNome)}</b></label><label>Cidade<b style="color:var(--ink)">${c ? h(c.cidade || 'não informada (usando São Paulo/SP)') + (c.uf ? '/' + h(c.uf) : '') : '—'}</b></label>
-  <label>Empresa no Bitrix24${c && c.empresaBitrixId ? `<a href="https://${h(BOOT.host)}/crm/company/details/${h(c.empresaBitrixId)}/" target="_blank" rel="noopener">abrir no Bitrix24</a>` : '<b style="color:var(--warn)">não vinculada</b>'}</label>
-  <label>Negócio no funil${c && c.dealUrl ? `<a href="${h(c.dealUrl)}" target="_blank" rel="noopener">abrir negócio</a>` : '<b style="color:var(--mut)">ainda não criado</b>'}</label>${v.obs ? `<label class="w">Observação<span style="color:var(--ink)">${h(v.obs)}</span></label>` : ''}</div>
+  ${vinculos(c)}${v.obs ? `<label class="w">Observação<span style="color:var(--ink)">${h(v.obs)}</span></label>` : ''}</div>
   ${podeEditar ? `<div class="dr"><button class="btn d" id="vx">Excluir</button><button class="btn" id="vr">Marcar realizada</button><button class="btn p" id="ve">Editar</button></div>` : ''}`);
   if (podeEditar) { $('#ve').onclick = () => visitaForm(v, s); $('#vx').onclick = guarda(async () => { if (!confirm('Excluir esta visita?')) return; await api('DELETE', '/visitas/' + id); gavFecha(); semana(); });
     $('#vr').onclick = guarda(async () => { await api('PUT', '/visitas/' + id, { status: 'realizada' }); gavFecha(); semana(); });
@@ -156,16 +163,16 @@ async function todosClientes() { const out = []; let p = 1, r; do { r = await ap
 // ---------- Clientes ----------
 const clientes = guarda(async () => {
   await boot(); const l = await api('GET', '/clientes?' + new URLSearchParams(CL));
-  $('#tela').innerHTML = `<h1>Clientes do cronograma</h1><p class="sub">A origem dos clientes é o <b>cadastro de empresas do Bitrix24</b>: cada cliente do cronograma deve apontar para uma empresa de lá, sem duplicar. ${BOOT.semEmpresa ? `<b style="color:var(--warn)">${BOOT.semEmpresa} cliente(s) ainda sem empresa vinculada.</b>` : '<b style="color:var(--ok)">Todos vinculados.</b>'}</p>
-  <div class="tools"><input id="cq" type="search" placeholder="Buscar cliente" value="${h(CL.q)}" style="flex:1;min-width:200px"><select id="cf">${[['', 'Todos'], ['semempresa', 'Sem empresa no Bitrix24'], ['semnegocio', 'Sem negócio no funil']].map(([k, n]) => `<option value="${k}" ${k === CL.filtro ? 'selected' : ''}>${n}</option>`).join('')}</select>
+  $('#tela').innerHTML = `<h1>Clientes do cronograma</h1><p class="sub">A origem dos clientes é o <b>cadastro de empresas do Bitrix24</b>: cada cliente do cronograma deve apontar para uma empresa de lá, sem duplicar. ${BOOT.semEmpresa ? `<b style="color:var(--warn)">${BOOT.semEmpresa} cliente(s) ainda sem empresa vinculada.</b>` : '<b style="color:var(--ok)">Todos com empresa vinculada.</b>'} Cada cliente liga <b>empresa</b>, <b>contato</b> e <b>negócio</b> do Bitrix24.</p>
+  <div class="tools"><input id="cq" type="search" placeholder="Buscar cliente" value="${h(CL.q)}" style="flex:1;min-width:200px"><select id="cf">${[['', 'Todos'], ['semempresa', 'Sem empresa no Bitrix24'], ['semcontato', 'Sem contato'], ['semnegocio', 'Sem negócio no funil']].map(([k, n]) => `<option value="${k}" ${k === CL.filtro ? 'selected' : ''}>${n}</option>`).join('')}</select>
   ${podeAdmin ? '<button class="btn" id="cva">Vincular automaticamente</button><button class="btn p" id="csf">Sincronizar com o funil</button>' : ''}</div>
-  <div class="box tw"><table><tr><th>Cliente</th><th>Empresa no Bitrix24</th><th>Cidade/UF</th><th>Negócio no funil</th><th>Visitas</th></tr>${l.itens.map(c => `<tr class="cl" data-id="${h(c.id)}"><td>${h(c.nome)}</td><td>${c.empresaBitrixId ? `<a href="https://${h(BOOT.host)}/crm/company/details/${h(c.empresaBitrixId)}/" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${h(c.empresaBitrixId)}</a>` : c.sugestaoId ? '<span class="sel w">sugestão a confirmar</span>' : '<span class="sel b">sem vínculo</span>'}</td><td>${h(c.cidade) || '<span class="mut">São Paulo (assumida)</span>'}${c.uf ? '/' + h(c.uf) : ''}</td><td>${c.dealUrl ? `<a href="${h(c.dealUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${h(c.dealId)}</a>` : '—'}</td><td>${c.visitas}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">Nenhum cliente.</td></tr>'}</table>
+  <div class="box tw"><table><tr><th>Cliente</th><th>Empresa</th><th>Contato</th><th>Negócio no funil</th><th>Cidade/UF</th><th>Visitas</th></tr>${l.itens.map(c => `<tr class="cl" data-id="${h(c.id)}"><td>${h(c.nome)}</td><td>${c.empresaBitrixId ? `<a href="https://${h(BOOT.host)}/crm/company/details/${h(c.empresaBitrixId)}/" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${h(c.empresaBitrixId)}</a>` : c.sugestaoId ? '<span class="sel w">sugestão a confirmar</span>' : '<span class="sel b">sem vínculo</span>'}</td><td>${c.contatoBitrixId ? `<a href="${h(c.contatoUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${h(c.contatoNome || '#' + c.contatoBitrixId)}</a>` : c.empresaBitrixId ? '<span class="sel w">sem contato</span>' : '—'}</td><td>${c.dealUrl ? `<a href="${h(c.dealUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${h(c.dealId)}</a>` : '—'}</td><td>${h(c.cidade) || '<span class="mut">São Paulo (assumida)</span>'}${c.uf ? '/' + h(c.uf) : ''}</td><td>${c.visitas}</td></tr>`).join('') || '<tr><td colspan="6" class="mut">Nenhum cliente.</td></tr>'}</table>
   <div class="pag"><button class="btn" id="pa" ${l.pagina <= 1 ? 'disabled' : ''}>‹</button> página ${l.pagina} de ${l.paginas} · ${l.total} <button class="btn" id="pn" ${l.pagina >= l.paginas ? 'disabled' : ''}>›</button></div></div>`;
   let t; $('#cq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { CL.q = e.target.value; CL.page = 1; await clientes(); const i = $('#cq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
   $('#cf').onchange = e => { CL.filtro = e.target.value; CL.page = 1; clientes(); }; $('#pa').onclick = () => { CL.page--; clientes(); }; $('#pn').onclick = () => { CL.page++; clientes(); };
   $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = () => clienteDrawer(l.itens.find(x => x.id === r.dataset.id)));
   if (podeAdmin) {
-    $('#cva').onclick = guarda(async () => { const r = await api('POST', '/vincular-auto', {}); aviso(`${r.vinculados} cliente(s) vinculados automaticamente; ${r.semEmpresa} ainda sem empresa.`); clientes(); });
+    $('#cva').onclick = guarda(async () => { const r = await api('POST', '/vincular-auto', {}); aviso(`${r.vinculados} cliente(s) vinculados a empresas, ${r.contatos} com contato definido; ${r.semEmpresa} ainda sem empresa.`); clientes(); });
     $('#csf').onclick = guarda(async () => { const r = await api('POST', '/funil/sincronizar', { simular: true });
       if (!confirm(`Funil Assessoria Recorrente / RT:\n• ${r.criar} negócio(s) novo(s) serão criados\n• ${r.vincular} cliente(s) serão ligados a negócios que já existem\n• ${r.semEmpresa} cliente(s) ficam de fora por não terem empresa vinculada\n\nConfirmar?`)) return;
       const x = await api('POST', '/funil/sincronizar', { simular: false }); aviso(`${x.criados} negócio(s) criados, ${x.vinculados} vinculados.${x.erros.length ? ' Erros: ' + x.erros.slice(0, 3).join('; ') : ''}`); clientes(); });
@@ -176,8 +183,14 @@ async function clienteDrawer(c) {
   gav(`${topo()}<h2 style="margin:0 0 4px">${h(c.nome)}</h2><p class="mut" style="margin:0 0 12px">${c.empresaBitrixId ? `Empresa #${h(c.empresaBitrixId)} no Bitrix24` : 'Sem empresa vinculada'}</p>
   ${sug.length ? `<div class="box"><h2>Será que é?</h2>${sug.map(e => `<div class="lk" data-e="${h(e.id)}"><span><b>${h(e.nome)}</b><br><small class="mut">${h(e.cidade)}${e.uf ? '/' + h(e.uf) : ''} · ${Math.round(e.similaridade * 100)}% parecido</small></span><button class="btn p">Vincular</button></div>`).join('')}</div>` : ''}
   ${podeAdmin ? `<div class="box" style="position:relative"><h2>Buscar empresa no Bitrix24</h2><input id="eq" type="search" placeholder="Nome, razão social ou CNPJ" style="width:100%" autocomplete="off"><div class="sug" id="er" hidden></div></div>` : ''}
+  ${c.empresaBitrixId ? `<div class="box"><h2>Contato no Bitrix24</h2><select id="ct" style="width:100%"><option value="">carregando…</option></select><small class="mut">Os contatos vêm da empresa vinculada. O contato escolhido vai junto no negócio do funil.</small></div>` : ''}
+  <div class="box"><h2>Vínculos</h2><div class="f">${vinculos(c)}</div></div>
   <form id="fc"><div id="fe"></div><div class="f"><label>Cidade<input name="cidade" value="${h(c.cidade)}" placeholder="usada para os feriados"></label><label>UF<input name="uf" value="${h(c.uf)}" maxlength="2"></label></div>
   ${podeAdmin ? '<div class="dr"><button class="btn p">Salvar cidade</button></div>' : ''}</form>`);
+  if (c.empresaBitrixId) guarda(async () => { const l = await api('GET', `/clientes/${c.id}/contatos`); const sel = $('#ct');
+    sel.innerHTML = `<option value="">— nenhum —</option>${l.map(x => `<option value="${h(x.id)}" ${x.id === c.contatoBitrixId ? 'selected' : ''}>${h(x.nome)}${x.telefone ? ' · ' + h(x.telefone) : ''}</option>`).join('')}`;
+    if (!l.length) sel.innerHTML = '<option value="">Nenhum contato nessa empresa no Bitrix24</option>';
+    if (podeEditar && podeAdmin) sel.onchange = guarda(async () => { await api('PUT', '/clientes/' + c.id, { contatoBitrixId: sel.value }); aviso('Contato salvo.'); clientes(); }); else sel.disabled = true; })();
   const vincula = guarda(async id => { await api('PUT', '/clientes/' + c.id, { empresaBitrixId: id }); gavFecha(); clientes(); });
   $('#gav').querySelectorAll('[data-e]').forEach(x => x.onclick = () => vincula(x.dataset.e));
   if (podeAdmin) {
@@ -185,6 +198,58 @@ async function clienteDrawer(c) {
       t = setTimeout(guarda(async () => { const l = await api('GET', '/empresas?q=' + encodeURIComponent(v)); $('#er').hidden = false; $('#er').innerHTML = l.map(e => `<div class="lk" data-e="${h(e.id)}"><span><b>${h(e.nome)}</b><br><small class="mut">${h(e.cidade)}${e.uf ? '/' + h(e.uf) : ''}${e.cnpj ? ' · ' + h(e.cnpj) : ''}</small></span></div>`).join('') || '<div class="lk mut">Nada encontrado. Cadastre a empresa no Bitrix24 antes.</div>'; $('#er').querySelectorAll('[data-e]').forEach(x => x.onclick = () => vincula(x.dataset.e)); }), 300); };
     $('#fc').onsubmit = async e => { e.preventDefault(); try { await api('PUT', '/clientes/' + c.id, Object.fromEntries(new FormData(e.target))); gavFecha(); clientes(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
   }
+}
+
+// ---------- Conferência mensal ----------
+let CF = { mes: '', q: '', consultora: '', freq: '', vinculo: '', page: 1 };
+const FREQ = { semanal: 'Semanal', quinzenal: 'Quinzenal (15x15)', mensal: 'Mensal' }, MESES = ['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const mesNome = m => MESES[Number(m.slice(5))] + '/' + m.slice(0, 4);
+const conferencia = guarda(async () => {
+  await boot(); const meses = await api('GET', '/conferencia/meses'); if (!CF.mes) CF.mes = (meses[0] || {}).mes || '';
+  const l = await api('GET', '/conferencia?' + new URLSearchParams(CF)), mAtual = meses.find(m => m.mes === CF.mes) || { obs: [] }, geral = await api('GET', '/conferencia/geral');
+  $('#tela').innerHTML = `<h1>Lista de conferência mensal</h1><p class="sub">Por estabelecimento e mês: consultora, horas, frequência e as semanas marcadas. Cada linha é um cliente do cronograma, ligado à <b>empresa</b>, ao <b>contato</b> e ao <b>negócio</b> do Bitrix24. Clique na linha para abrir e editar.</p>
+  <div class="tools"><select id="fm">${meses.map(m => `<option value="${m.mes}" ${m.mes === CF.mes ? 'selected' : ''}>${mesNome(m.mes)} (${m.linhas})</option>`).join('')}</select><input id="fq" type="search" placeholder="Buscar estabelecimento" value="${h(CF.q)}" style="min-width:200px;flex:1">
+  <select id="fc2"><option value="">Todas as consultoras</option>${BOOT.consultoras.map(c => `<option value="${h(c.id)}" ${c.id === CF.consultora ? 'selected' : ''}>${h(c.nome)}</option>`).join('')}</select>
+  <select id="ff"><option value="">Toda frequência</option>${Object.entries(FREQ).map(([k, t]) => `<option value="${k}" ${k === CF.freq ? 'selected' : ''}>${t}</option>`).join('')}</select>
+  <select id="fv"><option value="">Com e sem vínculo</option><option value="sem" ${CF.vinculo === 'sem' ? 'selected' : ''}>Sem empresa no Bitrix24</option></select>${podeEditar ? '<button class="btn p" id="fnova">Nova linha</button>' : ''}</div>
+  <div class="box tw"><table><tr><th>Estabelecimento</th><th>Consultora</th><th>Horas</th><th>Frequência</th>${[1, 2, 3, 4, 5].map(i => `<th style="text-align:center">${i}ª S</th>`).join('')}<th>Bitrix24</th></tr>
+  ${l.itens.map(r => `<tr class="cl" data-id="${h(r.id)}"><td><b>${h(r.clienteNome)}</b>${r.restricao ? `<small class="mut" style="display:block">${h(r.restricao)}</small>` : ''}</td><td>${h(r.consultoraNomes) || '—'}</td><td>${h(r.horasTxt) || '—'}</td><td>${h(r.freqTxt) || '—'}</td>${r.semanas.map((x, i) => `<td style="text-align:center">${podeEditar ? `<input type="checkbox" class="mk" data-id="${h(r.id)}" data-i="${i}" ${x ? 'checked' : ''} aria-label="${i + 1}ª semana">` : x ? '✓' : ''}</td>`).join('')}<td>${r.empresaBitrixId ? '<span class="sel ok">empresa</span>' : '<span class="sel b">sem empresa</span>'}${r.dealId ? ' <span class="sel ok">negócio</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="mut">Nenhuma linha.</td></tr>'}</table>
+  <div class="pag"><button class="btn" id="pa" ${l.pagina <= 1 ? 'disabled' : ''}>‹</button> página ${l.pagina} de ${l.paginas} · ${l.total} linha(s) · ${l.marcadas} marcação(ões) <button class="btn" id="pn" ${l.pagina >= l.paginas ? 'disabled' : ''}>›</button></div></div>
+  <div class="grid2"><div class="box"><h2>Observações de ${mesNome(CF.mes || '2026-01')}</h2><textarea id="om" rows="5" style="width:100%" ${podeEditar ? '' : 'readonly'}>${h(mAtual.obs.join('\n'))}</textarea>${podeEditar ? '<div class="dr"><button class="btn" id="oms">Salvar observações do mês</button></div>' : ''}</div>
+  <div class="box"><h2>Observações dos clientes (preferências e restrições)</h2><textarea id="og" rows="5" style="width:100%" ${podeEditar ? '' : 'readonly'}>${h(geral.obsClientes.join('\n'))}</textarea>${podeEditar ? '<div class="dr"><button class="btn" id="ogs">Salvar</button></div>' : ''}</div></div>`;
+  const re = () => conferencia(); let t;
+  $('#fm').onchange = e => { CF.mes = e.target.value; CF.page = 1; re(); }; $('#fc2').onchange = e => { CF.consultora = e.target.value; CF.page = 1; re(); }; $('#ff').onchange = e => { CF.freq = e.target.value; CF.page = 1; re(); }; $('#fv').onchange = e => { CF.vinculo = e.target.value; CF.page = 1; re(); };
+  $('#fq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { CF.q = e.target.value; CF.page = 1; await conferencia(); const i = $('#fq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  $('#pa').onclick = () => { CF.page--; re(); }; $('#pn').onclick = () => { CF.page++; re(); };
+  $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = e => { if (e.target.closest('input')) return; confDrawer(l.itens.find(x => x.id === r.dataset.id)); });
+  if (podeEditar) {
+    $('#tela').querySelectorAll('.mk').forEach(c => c.onchange = guarda(async () => { const r = l.itens.find(x => x.id === c.dataset.id), sem = [...r.semanas]; sem[Number(c.dataset.i)] = c.checked; r.semanas = sem; await api('PUT', '/conferencia/' + r.id, { semanas: sem }); }));
+    $('#oms').onclick = guarda(async () => { await api('PUT', '/conferencia/mes/' + CF.mes, { obs: $('#om').value.split('\n').map(x => x.trim()).filter(Boolean) }); aviso('Observações do mês salvas.'); });
+    $('#ogs').onclick = guarda(async () => { await api('PUT', '/conferencia/geral', { obsClientes: $('#og').value.split('\n').map(x => x.trim()).filter(Boolean) }); aviso('Observações dos clientes salvas.'); });
+    $('#fnova').onclick = () => confForm(null);
+  }
+});
+async function confDrawer(r) {
+  const hist = await api('GET', `/clientes/${r.clienteId}/conferencia`), c = (await api('GET', '/clientes?q=' + encodeURIComponent(r.clienteNome))).itens.find(x => x.id === r.clienteId);
+  gav(`${topo()}<h2 style="margin:0">${h(r.clienteNome)}</h2><p class="mut" style="margin:0 0 12px">${mesNome(r.mes)} · ${h(r.consultoraNomes) || 'sem consultora'} · ${h(r.horasTxt) || '—'} · ${h(r.freqTxt) || '—'}</p>
+  <div class="f">${vinculos(c)}<label class="w">Semanas marcadas${r.semanas.map((x, i) => (x ? `${i + 1}ª` : '')).filter(Boolean).join(', ') || 'nenhuma'}</label>${r.restricao ? `<label class="w">Preferência / restrição<span style="color:var(--ink)">${h(r.restricao)}</span></label>` : ''}${r.obs ? `<label class="w">Observação<span style="color:var(--ink)">${h(r.obs)}</span></label>` : ''}</div>
+  <h2 style="font-size:15px;margin:16px 0 6px">Histórico mensal</h2><table><tr><th>Mês</th><th>Consultora</th><th>Horas</th><th>Frequência</th><th>Semanas</th></tr>${hist.map(x => `<tr><td>${mesNome(x.mes)}</td><td>${h(x.consultoraNomes) || '—'}</td><td>${h(x.horasTxt) || '—'}</td><td>${h(x.freqTxt) || '—'}</td><td>${x.semanas.map((y, i) => y ? i + 1 : '').filter(Boolean).join(', ') || '—'}</td></tr>`).join('')}</table>
+  <div class="dr">${podeEditar ? '<button class="btn d" id="cx">Excluir linha</button>' : ''}${podeAdmin ? '<button class="btn" id="cc">Vínculos do cliente</button>' : ''}${podeEditar ? '<button class="btn p" id="ce">Editar</button>' : ''}</div>`);
+  if (podeEditar) { $('#ce').onclick = () => confForm(r); $('#cx').onclick = guarda(async () => { if (!confirm('Excluir esta linha da conferência?')) return; await api('DELETE', '/conferencia/' + r.id); gavFecha(); conferencia(); }); }
+  if (podeAdmin && c) $('#cc').onclick = () => clienteDrawer(c);
+}
+async function confForm(r) {
+  const cls = await todosClientes(); r = r || { mes: CF.mes, consultoras: [], semanas: [false, false, false, false, false], freqTipo: '' };
+  const op = (k, t, sel) => `<option value="${h(k)}" ${k === sel ? 'selected' : ''}>${h(t)}</option>`;
+  gav(`${topo()}<h2 style="margin:0 0 12px">${r.id ? 'Editar linha' : 'Nova linha'} · ${mesNome(r.mes)}</h2><form id="ff2"><div id="fe"></div><div class="f">
+  <label class="w">Cliente *<select name="clienteId" required ${r.id ? 'disabled' : ''}><option value="">Escolha…</option>${cls.map(c => op(c.id, c.nome, r.clienteId)).join('')}</select></label>
+  <label>Consultora<select name="cons"><option value="">—</option>${BOOT.consultoras.map(c => op(c.id, c.nome, r.consultoras[0])).join('')}</select></label><label>Horas (texto, ex.: 1h30 – 2h)<input name="horasTxt" value="${h(r.horasTxt || '')}"></label>
+  <label>Frequência (texto)<input name="freqTxt" value="${h(r.freqTxt || '')}" placeholder="1x por semana"></label><label>Tipo<select name="freqTipo"><option value="">—</option>${Object.entries(FREQ).map(([k, t]) => op(k, t, r.freqTipo)).join('')}</select></label>
+  <label class="w">Semanas marcadas<span>${[0, 1, 2, 3, 4].map(i => `<label style="display:inline-flex;gap:4px;margin-right:12px"><input type="checkbox" name="s${i}" ${r.semanas[i] ? 'checked' : ''}> ${i + 1}ª</label>`).join('')}</span></label>
+  <label class="w">Observação<textarea name="obs" rows="2">${h(r.obs || '')}</textarea></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  $('#ff2').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    const b = { mes: r.mes, clienteId: r.clienteId || f.clienteId, consultoras: f.cons ? [f.cons] : [], horasTxt: f.horasTxt, freqTxt: f.freqTxt, freqTipo: f.freqTipo, obs: f.obs, semanas: [0, 1, 2, 3, 4].map(i => !!f['s' + i]), min: r.min, consultoraTxt: r.consultoraTxt };
+    try { await api(r.id ? 'PUT' : 'POST', '/conferencia' + (r.id ? '/' + r.id : ''), b); gavFecha(); conferencia(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
 }
 
 // ---------- Consultoras ----------

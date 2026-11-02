@@ -53,6 +53,7 @@ const fakeBitrix = () => {
       calls.push([m, p]);
       if (m === 'crm.company.userfield.list') return { result: [{ FIELD_NAME: 'UF_CNPJ', EDIT_FORM_LABEL: 'CNPJ' }, { FIELD_NAME: 'UF_CID', EDIT_FORM_LABEL: 'Cidade' }, { FIELD_NAME: 'UF_UF', EDIT_FORM_LABEL: 'Estado' }] };
       if (m === 'crm.company.list') return { result: empresas };
+      if (m === 'crm.contact.list') return { result: p.filter.COMPANY_ID === '1' ? [{ ID: '31', NAME: 'Ana', LAST_NAME: 'Lima', PHONE: [{ VALUE: '1199' }] }] : [{ ID: '41', NAME: 'A' }, { ID: '42', NAME: 'B' }] };
       if (m === 'crm.deal.list') return { result: [] };
       if (m === 'crm.deal.add') return { result: '900' + calls.length };
       if (m === 'user.get') return { result: [{ ID: '7', NAME: 'Mônica', LAST_NAME: 'Silva' }, { ID: '8', NAME: 'Iris', LAST_NAME: 'X' }] };
@@ -73,8 +74,11 @@ test('API do cronograma: cliente ← empresa do Bitrix24, consultora ← usuári
   const c1 = await call('PUT', `/clientes/${domus.id}`, { empresaBitrixId: '1' }); assert.equal(c1.cidade, 'Santos');
   assert.equal((await call('POST', '/consultoras/auto', {})).ligadas, 2);
   const simul = await call('POST', '/funil/sincronizar', {}); assert.equal(simul.simulacao, true); assert.equal(simul.criar, 2); assert.equal(bitrix.calls.filter(c => c[0] === 'crm.deal.add').length, 0);
+  assert.equal((await call('GET', `/clientes/${domus.id}/contatos`))[0].nome, 'Ana Lima');
+  await assert.rejects(call('PUT', `/clientes/${domus.id}`, { contatoBitrixId: '99' }), /não pertence/);
+  const ct = await call('PUT', `/clientes/${domus.id}`, { contatoBitrixId: '31' }); assert.equal(ct.contatoNome, 'Ana Lima');
   const real = await call('POST', '/funil/sincronizar', { simular: false }); assert.equal(real.criados, 2);
-  const add = bitrix.calls.filter(c => c[0] === 'crm.deal.add'); assert.equal(add[0][1].fields.CATEGORY_ID, 6); assert.equal(add[0][1].fields.COMPANY_ID, '1'); assert.equal(add[0][1].fields.ASSIGNED_BY_ID, '7');
+  const add = bitrix.calls.filter(c => c[0] === 'crm.deal.add'); assert.equal(add[0][1].fields.CATEGORY_ID, 6); assert.equal(add[0][1].fields.COMPANY_ID, '1'); assert.equal(add[0][1].fields.ASSIGNED_BY_ID, '7'); assert.equal(add.find(a => a[1].fields.COMPANY_ID === '1')[1].fields.CONTACT_ID, '31');
   assert.equal((await call('POST', '/funil/sincronizar', { simular: false })).criados, 0);      // não duplica
   const m = api.dados().consultoras[0], visita = await call('POST', '/visitas', { data: '2026-10-12', min: 60, consultora: m.id, clienteId: domus.id });
   const sem = await call('GET', '/semana?data=2026-10-12'); assert.equal(sem.comFeriado, 1);
@@ -96,4 +100,24 @@ test('perfis: consultora só vê o cronograma; funil e vínculos são do adminis
   assert.equal(auth.permite('operacional', 'POST', '/api/cron/funil/sincronizar'), false); assert.equal(auth.permite('operacional', 'GET', '/api/cron/clientes'), true);
   assert.equal(auth.permite('financeiro', 'POST', '/api/cron/funil/sincronizar'), false); assert.equal(auth.permite('financeiro', 'POST', '/api/cron/visitas'), true); assert.equal(auth.permite('admin', 'POST', '/api/cron/funil/sincronizar'), true);
   assert.equal(auth.permite('consulta', 'POST', '/api/cron/visitas'), false);
+});
+
+test('lista de conferência: carga mensal ligada aos clientes, edição e histórico', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cf-')), seed = path.join(dir, 'c.json'), bitrix = { enabled: false };
+  const linha = (nome, c, sem) => ({ nome, consultoras: c, consultoraTxt: c[0] || '', horasTxt: '2h', min: 120, freqTxt: '1x por semana', freqTipo: 'semanal', freqN: 1, semanas: sem });
+  fs.writeFileSync(seed, JSON.stringify({ meses: { '2026-09': { obsMes: ['obs set'], linhas: [linha('Askoll', ['Iris'], [true, false, false, false, false]), linha('Cliente Novo', ['Tais'], [false, false, false, false, false])] }, '2026-10': { obsMes: [], linhas: [linha('Askoll', ['Iris'], [false, true, false, false, true])] } },
+    obsClientes: ['Askoll: só terça ou quinta;'], clientes: { 'Cliente Novo': { cidade: 'Santos', uf: 'SP' } } }));
+  const api = createCronApi({ bitrix, bx: createBxEmpresas({ bitrix }), store: { log() {} }, dir, confSeedFile: seed });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/cron' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  assert.equal(api.dados().conferencia.length, 3); assert.ok(api.dados().consultoras.some(c => c.nome === 'Tais'));
+  const meses = await call('GET', '/conferencia/meses'); assert.equal(meses[0].mes, '2026-10');
+  const lst = await call('GET', '/conferencia?mes=2026-10'); assert.equal(lst.total, 1); assert.equal(lst.itens[0].marcadas, 2); assert.match(lst.itens[0].restricao, /terça ou quinta/);
+  const id = lst.itens[0].id, up = await call('PUT', '/conferencia/' + id, { semanas: [true, true, true, true, true], obs: 'ok' }); assert.equal(up.marcadas, 5);
+  assert.equal((await call('GET', `/clientes/${lst.itens[0].clienteId}/conferencia`)).length, 2);   // set + out
+  await assert.rejects(call('POST', '/conferencia', { mes: '2026-10', clienteId: lst.itens[0].clienteId }), /já está/);
+  await assert.rejects(call('PUT', '/conferencia/' + id, { mes: '2026-13' }), /Mês inválido/);
+  await call('PUT', '/conferencia/mes/2026-10', { obs: ['a', 'b'] }); assert.deepEqual(api.dados().confMeses['2026-10'].obs, ['a', 'b']);
+  assert.equal(api.dados().clientes.find(c => c.nome === 'Cliente Novo').cidade, 'Santos');
+  const auth = createAuth({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), env: { ADMIN_USER: 'a', ADMIN_HASH: await hashSenha('Inicial12345') } });
+  assert.equal(auth.permite('operacional', 'GET', '/api/cron/conferencia'), true); assert.equal(auth.permite('operacional', 'PUT', '/api/cron/conferencia/x'), false); assert.equal(auth.permite('financeiro', 'PUT', '/api/cron/conferencia/x'), true);
 });

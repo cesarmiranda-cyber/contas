@@ -43,7 +43,7 @@ const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir:
 const { createBitrixLogin } = require('./lib/bitrixLogin');
 const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
 const bx = createBxEmpresas({ bitrix });
-const cronApi = createCronApi({ bitrix, bx, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json') });
+const cronApi = createCronApi({ bitrix, bx, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
 const bkApi = createBkApi({ fin, empresas, bitrix, bx, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
