@@ -85,7 +85,7 @@ footer{padding:16px;text-align:center;color:var(--mut);font-size:12.5px}
     <h1 id="ola">Olá</h1>
     <p class="sub">Escolha uma área para começar.</p>
     <div class="tiles">
-      <a class="tile" href="/financeiro.html" aria-label="Abrir Contas">
+      <a class="tile" id="tileContas" href="/financeiro.html" aria-label="Abrir Contas">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 7h16a2 2 0 012 2v9H5a2 2 0 01-2-2z"/><path d="M3 7l12-3v3M16 13h2"/></svg></span>
         <h2>Contas</h2>
         <p>Contas a pagar e a receber, cobranças, contratos, fluxo de caixa, bancos, notas de entrada e estoque.</p>
@@ -122,6 +122,8 @@ async function entrou(u) {
   const v = volta(); if (v) { location.replace(v); return; }
   $('#uNome').textContent = u.nome; $('#uPerfil').textContent = u.perfilNome; $('#ola').textContent = 'Olá, ' + u.nome.split(' ')[0];
   mostra('#vHub');
+  $('#tileContas').hidden = u.perfil === 'operacional';
+  if (u.perfil === 'operacional') return;
   try { const b = await nmJson('GET', '/api/fin/bootstrap', null, { semRedirect: true }); $('#faixaDemo').hidden = !b.demo; } catch { /* sem dado */ }
   try { const r = await nmJson('GET', '/api/fin/resumo?empresa=todas', null, { semRedirect: true }); $('#resumoContas').textContent = `A receber ${brk(r.aReceber)} · A pagar ${brk(r.aPagar)}`; } catch { /* mantém o texto padrão */ }
 }

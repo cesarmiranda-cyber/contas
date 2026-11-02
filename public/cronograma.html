@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrimix · Cronograma</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--bg:#f2f3f5;--surface:#fff;--ink:#16202e;--ink2:#46515f;--mut:#6b7684;--line:#d8dce2;--brand:#1c4a82;--brandbg:#e8eff8;--ok:#1b6b3a;--okbg:#e2f4e8;--warn:#8a5a00;--warnbg:#fff3d6;--bad:#a1281f;--badbg:#fde8e6}
+@media(prefers-color-scheme:dark){:root{--bg:#10151c;--surface:#171e27;--ink:#eaeef3;--ink2:#b5bfcb;--mut:#8996a5;--line:#2a3441;--brand:#7fb0ee;--brandbg:#1b2a3d;--ok:#6fd49a;--okbg:#143324;--warn:#f0c46a;--warnbg:#3a2f12;--bad:#ff9a90;--badbg:#401c19}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}[hidden]{display:none!important}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);height:56px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5}
+.marca{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;color:var(--ink);text-decoration:none}.marca b{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;background:var(--brand);color:#fff}
+.sp{flex:1}.user{font-size:13px;color:var(--ink2)}
+nav{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);display:flex;gap:2px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 14px;font:inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+nav button[aria-selected=true]{color:var(--brand);border-color:var(--brand);font-weight:650}
+main{max-width:1240px;margin:0 auto;padding:20px clamp(12px,3vw,32px) 60px}
+h1{margin:0 0 2px;font-size:22px}.sub{margin:0 0 18px;color:var(--mut)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.k{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.k:hover{border-color:var(--brand)}.k small{display:block;color:var(--mut);font-size:12.5px}.k strong{font-size:26px;letter-spacing:-.02em}.k.bad strong{color:var(--bad)}.k.warn strong{color:var(--warn)}.k.ok strong{color:var(--ok)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}.box h2{margin:0 0 10px;font-size:15.5px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.bar i{display:block;height:10px;border-radius:5px;background:var(--brand);min-width:2px}.bar span:first-child{width:150px;color:var(--ink2)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th{text-align:left;font-weight:600;color:var(--mut);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}tr.cl{cursor:pointer}tr.cl:hover td{background:var(--brandbg)}
+.tw{overflow-x:auto}
+.sel{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--brandbg);color:var(--brand)}
+.sel.ok{background:var(--okbg);color:var(--ok)}.sel.w{background:var(--warnbg);color:var(--warn)}.sel.b{background:var(--badbg);color:var(--bad)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px;max-width:100%}
+.btn{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:7px 14px;cursor:pointer}.btn:hover{border-color:var(--brand)}
+.btn.p{background:var(--brand);border-color:var(--brand);color:#fff}[data-t=dark] .btn.p,.btn.p{color:#fff}.btn.d{color:var(--bad)}
+@media(prefers-color-scheme:dark){.btn.p{color:#0b1420}}
+.pag{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;color:var(--mut)}
+.col{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}.cx{flex:0 0 255px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+.cx h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between}.ct{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:pointer}.ct:hover{border-color:var(--brand)}.ct small{color:var(--mut);display:block}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:20px;width:min(720px,94vw);max-height:92vh}dialog::backdrop{background:#0008}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
+.msg{padding:9px 12px;border-radius:8px;margin:0 0 12px;background:var(--brandbg);color:var(--brand)}.msg.e{background:var(--badbg);color:var(--bad)}
+.fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin:6px 0 4px}
+.st{position:relative;background:var(--surface);border:1px solid var(--line);padding:12px 14px 14px;margin-right:-1px}
+.st:first-child{border-radius:10px 0 0 10px}.st:last-child{border-radius:0 10px 10px 0;margin-right:0}
+.st b.n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:12.5px;margin-right:6px}
+.st h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center}.st p{margin:4px 0;font-size:13px;color:var(--ink2)}.st .q{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
+.st.end{border-color:var(--ok)}.st.alt{border-style:dashed}
+.rq{border-collapse:collapse}.rq td{vertical-align:top}
+.gv-bk{position:fixed;inset:0;background:#0007;z-index:20}
+#gav{position:fixed;top:0;right:0;bottom:0;width:min(580px,100vw);background:var(--surface);color:var(--ink);border-left:1px solid var(--line);z-index:21;overflow:auto;padding:18px 20px 28px;box-shadow:-8px 0 30px #0004}
+#gav .top{display:flex;gap:8px;align-items:center;margin-bottom:10px}#gav .top .sp{flex:1}
+.lk{display:flex;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13.5px}.lk:hover{border-color:var(--brand);background:var(--brandbg)}
+.sug{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;z-index:6;max-height:320px;overflow:auto;box-shadow:0 8px 24px #0003;margin-top:2px}
+.sug .lk{border:0;border-radius:0;margin:0;border-bottom:1px solid var(--line)}
+.cl2{cursor:pointer}.bar.cl2:hover b,.bar.cl2:hover span:first-child{color:var(--brand)}
+.ct[draggable=true]{cursor:grab}.ct.arr{opacity:.4}.cx.alvo{outline:2px dashed var(--brand);background:var(--brandbg)}
+.col{min-height:60vh}.cx{min-height:120px}
+.lst{margin:0;padding-left:18px;color:var(--ink2)}.mut{color:var(--mut)}.dr{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.gr{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:980px}
+.gr th{background:var(--surface);border:1px solid var(--line);padding:8px;font-size:12.5px;text-align:center}
+.gr th small{display:block;color:var(--mut);font-weight:400}.gr th.fer{background:var(--warnbg);color:var(--warn)}
+.gr td{border:1px solid var(--line);vertical-align:top;padding:6px;background:var(--surface);height:96px}
+.gr td.nm{width:118px;background:var(--bg);font-weight:650;font-size:13.5px}.gr td.nm small{display:block;font-weight:400;color:var(--mut)}
+.gr td.alvo{outline:2px dashed var(--brand);outline-offset:-2px;background:var(--brandbg)}
+.vc{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:6px;background:var(--surface);color:var(--ink);padding:4px 6px;margin-bottom:4px;cursor:grab}
+.vc:hover{border-color:var(--brand)}.vc.realizada{border-left-color:var(--ok);opacity:.85}.vc.remarcada,.vc.cancelada,.vc.faltou{border-left-color:var(--mut);opacity:.6;text-decoration:line-through}
+.vc.fer{border-left-color:var(--bad);background:var(--badbg)}.vc small{color:var(--mut);display:block}.vc .w{color:var(--bad);font-weight:600}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;background:var(--brandbg);color:var(--brand)}
+</style>
+</head>
+<body>
+<header><a class="marca" href="/"><b>N</b>Nutrimix</a><span class="mut">/ <a href="/processos.html" style="color:inherit">Processos</a> / Cronograma</span><span class="sp"></span><span class="user" id="user"></span></header>
+<nav role="tablist" id="abas"></nav>
+<main hidden id="app"><div id="msg"></div><div id="tela"></div></main>
+<div class="gv-bk" id="gbk" hidden></div><aside id="gav" hidden aria-label="Detalhes" role="dialog"></aside>
+<script src="/auth.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const api = (m, u, b) => nmJson(m, '/api/cron' + u, b);
+const dt = s => s ? s.split('-').reverse().join('/') : '—';
+const dm = s => s.split('-').reverse().slice(0, 2).join('/');
+const fm = m => Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
+const somaDias = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const ABAS = [['semana', 'Semana'], ['clientes', 'Clientes'], ['consultoras', 'Consultoras'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
+let ME = {}, BOOT = {}, aba = 'semana', podeEditar = false, podeAdmin = false, operacional = false;
+let W = { data: '', consultora: '', q: '' }, CL = { q: '', filtro: '', page: 1 };
+function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
+const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
+function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#gbk').hidden = false; $('#gav').scrollTop = 0; $('#gav').querySelectorAll('[data-x]').forEach(b => b.onclick = gavFecha); }
+function gavFecha() { $('#gav').hidden = true; $('#gbk').hidden = true; $('#gav').innerHTML = ''; }
+$('#gbk').onclick = gavFecha; addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gav').hidden) gavFecha(); });
+const topo = () => '<div class="top"><span class="sp"></span><button class="btn" data-x aria-label="Fechar">✕</button></div>';
+const recarrega = () => ({ semana, clientes, consultoras, feriados, processo })[aba]();
+async function boot() { BOOT = await api('GET', '/bootstrap'); }
+function abrirAba(a) {
+  aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
+  $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, consultoras, feriados, processo })[a]();
+}
+const hojeISO = () => BOOT.hoje;
+
+// ---------- Semana ----------
+const semana = guarda(async () => {
+  await boot(); if (!W.data) W.data = BOOT.hoje; if (operacional && !W.inicializado && BOOT.minhaConsultora) { W.consultora = BOOT.minhaConsultora; W.inicializado = true; }
+  const s = await api('GET', '/semana?' + new URLSearchParams({ data: W.data, consultora: W.consultora, q: W.q }));
+  const aviso0 = BOOT.semVinculo ? `<p class="msg">${BOOT.semVinculo} consultora(s) ainda sem usuário do Bitrix24. Ligue-as na aba Consultoras para que cada uma veja a sua agenda.</p>` : '';
+  const keep = $('#ebar') ? 1 : 0;
+  $('#tela').innerHTML = `<h1>Cronograma de visitas</h1><p class="sub">${dt(s.inicio)} a ${dt(s.fim)} · ${s.total} visita(s)${s.comFeriado ? ` · <b style="color:var(--bad)">${s.comFeriado} em feriado do cliente</b>` : ''}. ${podeEditar ? 'Arraste uma visita para outro dia ou outra consultora; clique para abrir e editar.' : 'Clique numa visita para ver os detalhes.'}</p>${aviso0}
+  <div class="tools" id="ebar"><button class="btn" id="wa">‹</button><button class="btn" id="wh">Hoje</button><button class="btn" id="wn">›</button>
+  <select id="wc"><option value="">Todas as consultoras</option>${BOOT.consultoras.map(c => `<option value="${h(c.id)}" ${c.id === W.consultora ? 'selected' : ''}>${h(c.nome)}</option>`).join('')}</select>
+  <input id="wq" type="search" placeholder="Buscar cliente" value="${h(W.q)}" style="min-width:200px">
+  ${podeEditar ? `<button class="btn p" id="wnova">Nova visita</button><button class="btn" id="wger" title="Cria as visitas da semana a partir das recorrências">Gerar semana</button>${s.comFeriado ? `<button class="btn d" id="wfer">Remarcar feriados (${s.comFeriado})</button>` : ''}` : ''}</div>
+  <div class="box tw" style="padding:0"><table class="gr"><tr><th style="width:118px"></th>${s.dias.map((d, i) => `<th class="${d.nacional.some(x => !x.facultativo) ? 'fer' : ''}">${BOOT.dias[i]}<small>${dm(d.data)}${d.nacional.length ? ' · ' + h(d.nacional.map(x => x.nome).join(', ')) : ''}</small></th>`).join('')}</tr>
+  ${s.linhas.map(l => `<tr><td class="nm">${h(l.consultora.nome)}<small>${fm(l.minutos)} na semana</small>${l.consultora.bitrixId ? '' : '<small style="color:var(--warn)">sem usuário Bitrix</small>'}</td>${l.dias.map((vs, i) => `<td data-d="${s.dias[i].data}" data-c="${h(l.consultora.id)}">${vs.map(v => `<button class="vc ${v.status} ${v.feriado ? 'fer' : ''}" data-id="${h(v.id)}" ${podeEditar ? 'draggable="true"' : ''}>${h(v.clienteNome)} <b>${fm(v.min)}</b>${v.feriado ? `<small class="w">Feriado: ${h(v.feriado)}</small>` : v.facultativo ? `<small>Facultativo: ${h(v.facultativo)}</small>` : ''}${v.status !== 'agendada' ? `<small>${h(BOOT.status[v.status])}</small>` : ''}</button>`).join('')}</td>`).join('')}</tr>`).join('') || `<tr><td class="mut" style="padding:20px">Nenhuma consultora cadastrada.</td></tr>`}</table></div>`;
+  const nav = n => { W.data = somaDias(W.data, n); semana(); };
+  $('#wa').onclick = () => nav(-7); $('#wn').onclick = () => nav(7); $('#wh').onclick = () => { W.data = BOOT.hoje; semana(); };
+  $('#wc').onchange = e => { W.consultora = e.target.value; semana(); }; let t; $('#wq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { W.q = e.target.value; await semana(); const i = $('#wq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  const tab = $('#tela'); tab.querySelectorAll('.vc').forEach(b => { b.onclick = () => visitaDrawer(b.dataset.id, s);
+    b.ondragstart = e => { e.dataTransfer.setData('text/plain', b.dataset.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => b.style.opacity = .4, 0); }; b.ondragend = () => { b.style.opacity = ''; tab.querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); }; });
+  if (podeEditar) { tab.querySelectorAll('td[data-d]').forEach(c => { c.ondragover = e => { e.preventDefault(); c.classList.add('alvo'); }; c.ondragleave = () => c.classList.remove('alvo');
+    c.ondrop = guarda(async e => { e.preventDefault(); c.classList.remove('alvo'); const id = e.dataTransfer.getData('text/plain'); if (!id) return; await api('POST', `/visitas/${id}/mover`, { data: c.dataset.d, consultora: c.dataset.c }); semana(); }); });
+    $('#wnova').onclick = () => visitaForm(null, s);
+    $('#wger').onclick = guarda(async () => { const r = await api('POST', '/semana/gerar', { data: W.data, semanas: 1 }); aviso(r.criadas ? `${r.criadas} visita(s) criadas a partir das recorrências.` : 'Nada a gerar: a semana já está completa.'); semana(); });
+    if ($('#wfer')) $('#wfer').onclick = guarda(async () => { if (!confirm('Remarcar as visitas em feriado para o próximo dia útil livre?')) return; const r = await api('POST', '/semana/remarcar-feriados', { data: W.data }); aviso(`${r.remarcadas} visita(s) remarcada(s).`); semana(); }); }
+});
+async function visitaDrawer(id, s) {
+  const v = s.linhas.flatMap(l => l.dias.flat()).find(x => x.id === id); if (!v) return;
+  const c = (await api('GET', '/clientes?q=' + encodeURIComponent(v.clienteNome))).itens.find(x => x.id === v.clienteId);
+  gav(`${topo()}<h2 style="margin:0">${h(v.clienteNome)}</h2><p class="mut" style="margin:0 0 12px">${h(v.consultoraNome)} · ${dt(v.data)} · ${fm(v.min)} · <span class="pill">${h(BOOT.status[v.status])}</span></p>
+  ${v.feriado ? `<div class="box" style="border-color:var(--bad)"><b>Feriado na cidade do cliente:</b> ${h(v.feriado)}.${v.sugestao ? ` Sugestão: ${dt(v.sugestao)}.` : ''}${podeEditar && v.sugestao ? ` <button class="btn" id="vs">Remarcar para ${dm(v.sugestao)}</button>` : ''}</div>` : ''}
+  <div class="f"><label>Cliente<b style="color:var(--ink)">${h(v.clienteNome)}</b></label><label>Cidade<b style="color:var(--ink)">${c ? h(c.cidade || 'não informada (usando São Paulo/SP)') + (c.uf ? '/' + h(c.uf) : '') : '—'}</b></label>
+  <label>Empresa no Bitrix24${c && c.empresaBitrixId ? `<a href="https://${h(BOOT.host)}/crm/company/details/${h(c.empresaBitrixId)}/" target="_blank" rel="noopener">abrir no Bitrix24</a>` : '<b style="color:var(--warn)">não vinculada</b>'}</label>
+  <label>Negócio no funil${c && c.dealUrl ? `<a href="${h(c.dealUrl)}" target="_blank" rel="noopener">abrir negócio</a>` : '<b style="color:var(--mut)">ainda não criado</b>'}</label>${v.obs ? `<label class="w">Observação<span style="color:var(--ink)">${h(v.obs)}</span></label>` : ''}</div>
+  ${podeEditar ? `<div class="dr"><button class="btn d" id="vx">Excluir</button><button class="btn" id="vr">Marcar realizada</button><button class="btn p" id="ve">Editar</button></div>` : ''}`);
+  if (podeEditar) { $('#ve').onclick = () => visitaForm(v, s); $('#vx').onclick = guarda(async () => { if (!confirm('Excluir esta visita?')) return; await api('DELETE', '/visitas/' + id); gavFecha(); semana(); });
+    $('#vr').onclick = guarda(async () => { await api('PUT', '/visitas/' + id, { status: 'realizada' }); gavFecha(); semana(); });
+    if ($('#vs')) $('#vs').onclick = guarda(async () => { await api('POST', `/visitas/${id}/mover`, { data: v.sugestao }); gavFecha(); semana(); }); }
+}
+async function visitaForm(v, s) {
+  const cls = (await api('GET', '/clientes?page=1')).total ? await todosClientes() : [];
+  v = v || { data: W.data, min: 120, status: 'agendada', consultora: W.consultora || (BOOT.consultoras[0] || {}).id };
+  const mins = [30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480], op = (k, t, sel) => `<option value="${h(k)}" ${k == sel ? 'selected' : ''}>${h(t)}</option>`;
+  gav(`${topo()}<h2 style="margin:0 0 12px">${v.id ? 'Editar visita' : 'Nova visita'}</h2><form id="fv"><div id="fe"></div><div class="f">
+  <label class="w">Cliente *<select name="clienteId" required><option value="">Escolha…</option>${cls.map(c => op(c.id, c.nome, v.clienteId)).join('')}</select></label>
+  <label>Consultora *<select name="consultora">${BOOT.consultoras.map(c => op(c.id, c.nome, v.consultora)).join('')}</select></label><label>Data *<input type="date" name="data" value="${h(v.data)}" required></label>
+  <label>Duração<select name="min">${mins.map(m => op(m, fm(m), v.min)).join('')}</select></label><label>Situação<select name="status">${Object.entries(BOOT.status).map(([k, t]) => op(k, t, v.status)).join('')}</select></label>
+  <label class="w">Observação<textarea name="obs" rows="2">${h(v.obs || '')}</textarea></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  $('#fv').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.min = Number(f.min);
+    try { await api(v.id ? 'PUT' : 'POST', '/visitas' + (v.id ? '/' + v.id : ''), f); gavFecha(); semana(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+}
+async function todosClientes() { const out = []; let p = 1, r; do { r = await api('GET', '/clientes?page=' + p++); out.push(...r.itens); } while (p <= r.paginas); return out.sort((a, b) => a.nome.localeCompare(b.nome)); }
+
+// ---------- Clientes ----------
+const clientes = guarda(async () => {
+  await boot(); const l = await api('GET', '/clientes?' + new URLSearchParams(CL));
+  $('#tela').innerHTML = `<h1>Clientes do cronograma</h1><p class="sub">A origem dos clientes é o <b>cadastro de empresas do Bitrix24</b>: cada cliente do cronograma deve apontar para uma empresa de lá, sem duplicar. ${BOOT.semEmpresa ? `<b style="color:var(--warn)">${BOOT.semEmpresa} cliente(s) ainda sem empresa vinculada.</b>` : '<b style="color:var(--ok)">Todos vinculados.</b>'}</p>
+  <div class="tools"><input id="cq" type="search" placeholder="Buscar cliente" value="${h(CL.q)}" style="flex:1;min-width:200px"><select id="cf">${[['', 'Todos'], ['semempresa', 'Sem empresa no Bitrix24'], ['semnegocio', 'Sem negócio no funil']].map(([k, n]) => `<option value="${k}" ${k === CL.filtro ? 'selected' : ''}>${n}</option>`).join('')}</select>
+  ${podeAdmin ? '<button class="btn" id="cva">Vincular automaticamente</button><button class="btn p" id="csf">Sincronizar com o funil</button>' : ''}</div>
+  <div class="box tw"><table><tr><th>Cliente</th><th>Empresa no Bitrix24</th><th>Cidade/UF</th><th>Negócio no funil</th><th>Visitas</th></tr>${l.itens.map(c => `<tr class="cl" data-id="${h(c.id)}"><td>${h(c.nome)}</td><td>${c.empresaBitrixId ? `<a href="https://${h(BOOT.host)}/crm/company/details/${h(c.empresaBitrixId)}/" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${h(c.empresaBitrixId)}</a>` : c.sugestaoId ? '<span class="sel w">sugestão a confirmar</span>' : '<span class="sel b">sem vínculo</span>'}</td><td>${h(c.cidade) || '<span class="mut">São Paulo (assumida)</span>'}${c.uf ? '/' + h(c.uf) : ''}</td><td>${c.dealUrl ? `<a href="${h(c.dealUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">#${h(c.dealId)}</a>` : '—'}</td><td>${c.visitas}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">Nenhum cliente.</td></tr>'}</table>
+  <div class="pag"><button class="btn" id="pa" ${l.pagina <= 1 ? 'disabled' : ''}>‹</button> página ${l.pagina} de ${l.paginas} · ${l.total} <button class="btn" id="pn" ${l.pagina >= l.paginas ? 'disabled' : ''}>›</button></div></div>`;
+  let t; $('#cq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { CL.q = e.target.value; CL.page = 1; await clientes(); const i = $('#cq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  $('#cf').onchange = e => { CL.filtro = e.target.value; CL.page = 1; clientes(); }; $('#pa').onclick = () => { CL.page--; clientes(); }; $('#pn').onclick = () => { CL.page++; clientes(); };
+  $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = () => clienteDrawer(l.itens.find(x => x.id === r.dataset.id)));
+  if (podeAdmin) {
+    $('#cva').onclick = guarda(async () => { const r = await api('POST', '/vincular-auto', {}); aviso(`${r.vinculados} cliente(s) vinculados automaticamente; ${r.semEmpresa} ainda sem empresa.`); clientes(); });
+    $('#csf').onclick = guarda(async () => { const r = await api('POST', '/funil/sincronizar', { simular: true });
+      if (!confirm(`Funil Assessoria Recorrente / RT:\n• ${r.criar} negócio(s) novo(s) serão criados\n• ${r.vincular} cliente(s) serão ligados a negócios que já existem\n• ${r.semEmpresa} cliente(s) ficam de fora por não terem empresa vinculada\n\nConfirmar?`)) return;
+      const x = await api('POST', '/funil/sincronizar', { simular: false }); aviso(`${x.criados} negócio(s) criados, ${x.vinculados} vinculados.${x.erros.length ? ' Erros: ' + x.erros.slice(0, 3).join('; ') : ''}`); clientes(); });
+  }
+});
+async function clienteDrawer(c) {
+  let sug = []; try { sug = c.empresaBitrixId ? [] : await api('GET', `/clientes/${c.id}/sugestoes`); } catch { /* sem Bitrix */ }
+  gav(`${topo()}<h2 style="margin:0 0 4px">${h(c.nome)}</h2><p class="mut" style="margin:0 0 12px">${c.empresaBitrixId ? `Empresa #${h(c.empresaBitrixId)} no Bitrix24` : 'Sem empresa vinculada'}</p>
+  ${sug.length ? `<div class="box"><h2>Será que é?</h2>${sug.map(e => `<div class="lk" data-e="${h(e.id)}"><span><b>${h(e.nome)}</b><br><small class="mut">${h(e.cidade)}${e.uf ? '/' + h(e.uf) : ''} · ${Math.round(e.similaridade * 100)}% parecido</small></span><button class="btn p">Vincular</button></div>`).join('')}</div>` : ''}
+  ${podeAdmin ? `<div class="box" style="position:relative"><h2>Buscar empresa no Bitrix24</h2><input id="eq" type="search" placeholder="Nome, razão social ou CNPJ" style="width:100%" autocomplete="off"><div class="sug" id="er" hidden></div></div>` : ''}
+  <form id="fc"><div id="fe"></div><div class="f"><label>Cidade<input name="cidade" value="${h(c.cidade)}" placeholder="usada para os feriados"></label><label>UF<input name="uf" value="${h(c.uf)}" maxlength="2"></label></div>
+  ${podeAdmin ? '<div class="dr"><button class="btn p">Salvar cidade</button></div>' : ''}</form>`);
+  const vincula = guarda(async id => { await api('PUT', '/clientes/' + c.id, { empresaBitrixId: id }); gavFecha(); clientes(); });
+  $('#gav').querySelectorAll('[data-e]').forEach(x => x.onclick = () => vincula(x.dataset.e));
+  if (podeAdmin) {
+    let t; $('#eq').oninput = e => { clearTimeout(t); const v = e.target.value.trim(); if (v.length < 2) { $('#er').hidden = true; return; }
+      t = setTimeout(guarda(async () => { const l = await api('GET', '/empresas?q=' + encodeURIComponent(v)); $('#er').hidden = false; $('#er').innerHTML = l.map(e => `<div class="lk" data-e="${h(e.id)}"><span><b>${h(e.nome)}</b><br><small class="mut">${h(e.cidade)}${e.uf ? '/' + h(e.uf) : ''}${e.cnpj ? ' · ' + h(e.cnpj) : ''}</small></span></div>`).join('') || '<div class="lk mut">Nada encontrado. Cadastre a empresa no Bitrix24 antes.</div>'; $('#er').querySelectorAll('[data-e]').forEach(x => x.onclick = () => vincula(x.dataset.e)); }), 300); };
+    $('#fc').onsubmit = async e => { e.preventDefault(); try { await api('PUT', '/clientes/' + c.id, Object.fromEntries(new FormData(e.target))); gavFecha(); clientes(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+  }
+}
+
+// ---------- Consultoras ----------
+const consultoras = guarda(async () => {
+  await boot(); let us = []; try { us = await api('GET', '/usuarios-bitrix'); } catch (e) { aviso(e.message, true); }
+  $('#tela').innerHTML = `<h1>Consultoras</h1><p class="sub">Cada consultora é um <b>usuário do Bitrix24</b>. Depois de ligar, ela entra com a conta do Bitrix24 (o administrador libera o acesso em Contas → Configurações → Usuários e acessos, perfil “Consultora”) e vê só a sua agenda. O negócio no funil fica com ela como responsável.</p>
+  ${podeAdmin ? '<div class="tools"><button class="btn" id="aut">Ligar automaticamente por nome</button><button class="btn" id="nova">Nova consultora</button></div>' : ''}
+  <div class="box tw"><table><tr><th>Consultora</th><th>Usuário no Bitrix24</th></tr>${BOOT.consultoras.map(c => `<tr><td>${h(c.nome)}</td><td>${podeAdmin ? `<select data-c="${h(c.id)}"><option value="">— não ligada —</option>${us.map(u => `<option value="${h(u.id)}" ${u.id === c.bitrixId ? 'selected' : ''}>${h(u.nome)}</option>`).join('')}</select>` : h((us.find(u => u.id === c.bitrixId) || {}).nome || (c.bitrixId ? '#' + c.bitrixId : '—'))}</td></tr>`).join('')}</table></div>
+  ${us.length ? '' : '<p class="mut">Nenhum usuário do Bitrix24 encontrado (ou o webhook ainda não foi conectado).</p>'}`;
+  if (!podeAdmin) return;
+  $('#tela').querySelectorAll('select[data-c]').forEach(s => s.onchange = guarda(async () => { await api('PUT', '/consultoras/' + s.dataset.c, { bitrixId: s.value }); aviso('Salvo.'); await boot(); }));
+  $('#aut').onclick = guarda(async () => { const r = await api('POST', '/consultoras/auto', {}); aviso(`${r.ligadas} ligada(s); ${r.pendentes} ainda sem usuário no Bitrix24 — crie o usuário lá e ligue aqui.`); consultoras(); });
+  $('#nova').onclick = guarda(async () => { const n = prompt('Nome da consultora:'); if (!n) return; await api('POST', '/consultoras', { nome: n }); consultoras(); });
+});
+
+// ---------- Feriados ----------
+let FF = { ano: new Date().getFullYear(), cidade: 'São Paulo', uf: 'SP' };
+const feriados = guarda(async () => {
+  await boot(); const [l, cu] = await Promise.all([api('GET', '/feriados?' + new URLSearchParams(FF)), api('GET', '/feriados-custom')]);
+  $('#tela').innerHTML = `<h1>Feriados</h1><p class="sub">Cada visita é conferida com os feriados da <b>cidade do cliente</b>: nacionais, estaduais e municipais conhecidos, mais os que você cadastrar abaixo. Ao gerar a semana, visitas que caem em feriado já vão para o próximo dia útil; nas existentes, aparece o aviso e o botão para remarcar.</p>
+  <div class="tools"><input id="fa" type="number" value="${FF.ano}" style="width:90px"><input id="fc" placeholder="Cidade" value="${h(FF.cidade)}"><input id="fu" placeholder="UF" maxlength="2" value="${h(FF.uf)}" style="width:70px"><button class="btn" id="fok">Ver feriados</button></div>
+  <div class="grid2"><div class="box"><h2>${h(FF.cidade || 'Brasil')}${FF.uf ? '/' + h(FF.uf) : ''} em ${FF.ano}</h2><table><tr><th>Data</th><th>Feriado</th><th>Tipo</th></tr>${l.map(f => `<tr><td>${dt(f.data)}</td><td>${h(f.nome)}</td><td>${h(f.nivel)}${f.facultativo ? ' · facultativo' : ''}</td></tr>`).join('')}</table>
+  <p class="mut">Carnaval e Corpus Christi são pontos facultativos: aparecem como aviso, não bloqueiam a visita. Feriados municipais fora da tabela interna precisam ser cadastrados ao lado.</p></div>
+  <div class="box"><h2>Feriados cadastrados por você</h2>${cu.length ? `<table><tr><th>Data</th><th>Onde</th><th>Nome</th><th></th></tr>${cu.map(x => `<tr><td>${x.data.length === 5 ? x.data.split('-').reverse().join('/') + ' (todo ano)' : dt(x.data)}</td><td>${h(x.cidade || x.uf || 'Todos')}${x.cidade && x.uf ? '/' + h(x.uf) : ''}</td><td>${h(x.nome)}</td><td>${podeAdmin ? `<button class="btn d" data-del="${h(x.id)}">✕</button>` : ''}</td></tr>`).join('')}</table>` : '<p class="mut">Nenhum.</p>'}
+  ${podeAdmin ? `<form id="fn" class="f" style="margin-top:12px"><label>Data (AAAA-MM-DD ou MM-DD p/ todo ano)<input name="data" required placeholder="08-15"></label><label>Nome<input name="nome" required></label><label>Cidade (vazio = todas)<input name="cidade"></label><label>UF<input name="uf" maxlength="2"></label><div class="dr" style="grid-column:1/-1"><button class="btn p">Adicionar</button></div></form>` : ''}</div></div>`;
+  $('#fok').onclick = () => { FF = { ano: Number($('#fa').value) || FF.ano, cidade: $('#fc').value.trim(), uf: $('#fu').value.trim().toUpperCase() }; feriados(); };
+  if (podeAdmin) { $('#fn').onsubmit = guarda(async e => { e.preventDefault(); await api('POST', '/feriados-custom', Object.fromEntries(new FormData(e.target))); feriados(); });
+    $('#tela').querySelectorAll('[data-del]').forEach(b => b.onclick = guarda(async () => { await api('DELETE', '/feriados-custom/' + b.dataset.del); feriados(); })); }
+});
+
+// ---------- Como funciona ----------
+const processo = guarda(async () => {
+  await boot();
+  $('#tela').innerHTML = `<h1>Como funciona o Cronograma</h1><p class="sub">A agenda de visitas técnicas da Assessoria Recorrente / RT: quem visita qual cliente, quando e por quanto tempo.</p>
+  <div class="box"><h2>Fluxo</h2><div class="fl">
+  <div class="st"><h3><b class="n">1</b>Cliente</h3><p>O cliente é uma <b>empresa do Bitrix24</b>. Aqui só se vincula; nunca se cadastra de novo.</p><div class="q">Requisito</div><p>Empresa existente no Bitrix24, com cidade (para os feriados).</p></div>
+  <div class="st"><h3><b class="n">2</b>Negócio no funil</h3><p>Cada cliente ganha um negócio no funil <b>Assessoria Recorrente / RT</b>, com a consultora como responsável.</p><div class="q">Como</div><p>Aba Clientes → Sincronizar com o funil.</p></div>
+  <div class="st"><h3><b class="n">3</b>Modelo de recorrência</h3><p>Semanal ou quinzenal, no mesmo dia e com a mesma duração. Vem do histórico importado e é ajustável.</p></div>
+  <div class="st"><h3><b class="n">4</b>Semana gerada</h3><p>“Gerar semana” cria as visitas. Quem cai em <b>feriado da cidade do cliente</b> já vai para o próximo dia útil.</p></div>
+  <div class="st end"><h3><b class="n">5</b>Visita realizada</h3><p>A consultora marca como realizada ou “não aconteceu”. O resultado vira comentário no negócio do cliente.</p></div></div></div>
+  <div class="grid2"><div class="box"><h2>Quem faz o quê</h2><ul class="lst"><li><b>Consultora:</b> vê a sua agenda, abre a visita, marca realizada e ajusta datas das próprias visitas.</li><li><b>Administrador/financeiro:</b> vê todas, arrasta visitas entre consultoras e dias, gera semanas e remarca feriados.</li><li><b>Administrador:</b> liga consultoras a usuários do Bitrix24, vincula clientes às empresas e sincroniza o funil.</li></ul></div>
+  <div class="box"><h2>Cores das visitas</h2><ul class="lst"><li>Borda azul: agendada.</li><li>Verde: realizada.</li><li>Cinza riscada: remarcada, cancelada ou não aconteceu.</li><li>Vermelha: cai em feriado do cliente — remarque.</li></ul></div></div>`;
+});
+
+(async () => {
+  if (!NM.token) return NM.paraLogin();
+  try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
+    ME = j.usuario; operacional = ME.perfil === 'operacional'; podeEditar = ME.perfil !== 'consulta'; podeAdmin = ME.perfil === 'admin'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
+    const a = location.hash.slice(1); abrirAba(ABAS.some(x => x[0] === a) ? a : 'semana');
+  } catch { NM.paraLogin(); }
+})();
+</script>
+</body>
+</html>

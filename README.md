@@ -104,3 +104,12 @@ Configurações → Demonstração carrega 2 empresas fictícias com histórico 
 - Abrindo o app pelo menu do Bitrix24, o portal envia `AUTH_ID`/`DOMAIN` por POST; o servidor confirma o token no próprio portal (`user.current`, só para o domínio do webhook conectado) e abre a sessão.
 - Fora do Bitrix24, o botão "Entrar com Bitrix24" usa OAuth (tela de login do Bitrix24). Requer um aplicativo local no portal; Client ID/Secret em Configurações → Usuários e acessos, com a URL de retorno `<endereço do app>/auth/bitrix/callback`.
 - Em ambos os casos só entra quem o administrador liberou (Configurações → Usuários e acessos → Liberar usuário do Bitrix24), com um perfil. Usuário e senha ficam para o administrador.
+
+## Processos de negócios → Cronograma (Assessoria Recorrente / RT)
+
+`/cronograma.html`, API `/api/cron/*`, dados em `cron.json`; ligado ao funil **Assessoria Recorrente / RT** (categoria 6).
+- **Clientes** vêm do cadastro de empresas do Bitrix24 (`crm.company`), vinculados sem duplicar; o BK usa a mesma origem (`/api/bk/empresas`, vínculo por CNPJ completo e único, criação no Bitrix24 só depois de checar CNPJ/nome iguais).
+- **Consultoras** são usuários do Bitrix24 (perfil “Consultora (cronograma)”: só vê e altera a própria agenda; sem acesso ao financeiro).
+- **Feriados** por cidade/UF do cliente: nacionais calculados (Páscoa, Carnaval e Corpus Christi como facultativos), estaduais e municipais de uma tabela interna, mais os cadastrados à mão. Ao gerar a semana, visita em feriado vai para o próximo dia útil; nas existentes há aviso e remarcação em um clique.
+- **Funil**: “Sincronizar com o funil” cria um negócio por cliente vinculado (consultora como responsável), sem duplicar os que já existem; mostra a simulação antes de criar. Visita realizada ou que não aconteceu vira comentário no negócio.
+- Carga inicial (uma vez): semanas de outubro/2026 importadas do PDF, de `seed/cron-outubro.json` (fora do repositório).

@@ -37,10 +37,14 @@ const empresas = createEmpresas({ fin, secrets, bitrix, createAsaas });
 const asaas = createAsaasRouter({ base: asaasBase, clientFor: id => empresas.clientFor(id), allClients: () => empresas.allClients() });
 const svc = createService({ bitrix, asaas, store, empresas });
 const { createBkApi } = require('./lib/bkApi');
+const { createCronApi } = require('./lib/cronApi');
+const { createBxEmpresas } = require('./lib/bxEmpresas');
 const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR });
 const { createBitrixLogin } = require('./lib/bitrixLogin');
 const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
-const bkApi = createBkApi({ fin, empresas, bitrix, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
+const bx = createBxEmpresas({ bitrix });
+const cronApi = createCronApi({ bitrix, bx, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json') });
+const bkApi = createBkApi({ fin, empresas, bitrix, bx, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
@@ -141,7 +145,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && u.pathname === '/auth/opcoes') return send(res, 200, { bitrix: bxLogin.oauthPronto() });
     if (req.method === 'GET' && u.pathname === '/auth/bitrix/start') { try { res.writeHead(302, { Location: bxLogin.inicio(`${origem}/auth/bitrix/callback`), 'Cache-Control': 'no-store' }); return res.end(); } catch (e) { return volta(e.message); } }
     if (req.method === 'GET' && u.pathname === '/auth/bitrix/callback') { try { return paraApp(await bxLogin.retorno({ code: u.searchParams.get('code'), state: u.searchParams.get('state') }), '/'); } catch (e) { return volta(e.message); } }
-    if (req.method === 'POST' && ['/', '/index.html', '/financeiro.html', '/processos.html', '/bk.html'].includes(u.pathname) && /^application\/x-www-form-urlencoded/i.test(req.headers['content-type'] || '')) {   // o Bitrix24 abre o app com POST
+    if (req.method === 'POST' && ['/', '/index.html', '/financeiro.html', '/processos.html', '/bk.html', '/cronograma.html'].includes(u.pathname) && /^application\/x-www-form-urlencoded/i.test(req.headers['content-type'] || '')) {   // o Bitrix24 abre o app com POST
       let raw = ''; for await (const c of req) { raw += c; if (raw.length > 20000) return volta('Pedido grande demais.'); }
       const f = Object.fromEntries(new URLSearchParams(raw));
       try { const alvo = u.pathname === '/' || u.pathname === '/index.html' ? (/[?&](deal|company|contact)=/.test(req.url) ? '/financeiro.html' : '/') : u.pathname; return paraApp(await bxLogin.porPlacement(f), alvo + u.search); } catch (e) { return volta(e.message); }
@@ -189,6 +193,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (u.pathname.startsWith('/api/bk/')) {
       const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : 1e6));
+      return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
+    }
+    if (u.pathname.startsWith('/api/cron/')) {
+      const r = await cronApi.handle(req.method, u.pathname, u, () => readBody(req, 1e6), req.user);
       return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
     }
     const key = `${req.method} ${u.pathname}`;
