@@ -3,13 +3,19 @@
 Extrai marca / modelo / ano / combustivel da Tabela FIPE para CSV, usando os
 endpoints do site oficial (veiculos.fipe.org.br). Nao precisa de token.
 
-Gera um CSV por marca na pasta de saida e PULA marcas cujo CSV ja existe,
-entao se for interrompido basta rodar de novo para retomar.
+Gera UM CSV POR MODELO, um depois do outro, em saida/<marca>/<modelo>.csv.
+Pula modelos cujo CSV ja existe, entao se for interrompido basta rodar de
+novo para retomar.
 
 Uso:
-  python fipe_csv.py --tipo carros --saida fipe_carros
-  python fipe_csv.py --tipo carros --marca toyota --saida fipe_carros
-  python fipe_csv.py --tipo carros --juntar fipe_carros.csv --saida fipe_carros
+  python fipe_csv.py --marca toyota --modelo hilux corolla etios
+  python fipe_csv.py --marca ford --marca fiat --modelo ka uno
+  python fipe_csv.py --marca toyota              (todos os modelos da marca)
+  python fipe_csv.py --tipo carros               (todas as marcas e modelos)
+  python fipe_csv.py --marca toyota --juntar toyota.csv
+
+--marca e --modelo podem ser repetidos ou receber varios valores; cada um
+filtra pelo nome (contem). Os modelos sao processados na ordem informada.
 
 Tipos: carros, motos, caminhoes.
 Obs.: nao inclui preco (exigiria 1 requisicao extra por modelo/ano).
@@ -57,12 +63,13 @@ def ano(rotulo):
     return "0km" if n == 32000 else n
 
 
-def nome_arquivo(marca):
-    return re.sub(r"[^A-Za-z0-9_-]+", "_", marca).strip("_") + ".csv"
+def limpo(nome):
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", nome).strip("_")
 
 
 def juntar(pasta, destino):
-    arquivos = sorted(glob.glob(os.path.join(pasta, "*.csv")))
+    arquivos = sorted(glob.glob(os.path.join(pasta, "**", "*.csv"),
+                                recursive=True))
     n = 0
     with open(destino, "w", newline="", encoding="utf-8-sig") as out:
         w = csv.writer(out, delimiter=";")
@@ -77,16 +84,19 @@ def juntar(pasta, destino):
                 cab = True
             w.writerows(linhas[1:])
             n += len(linhas) - 1
-    print(f"{n} linhas de {len(arquivos)} marcas em {destino}")
+    print(f"{n} linhas de {len(arquivos)} arquivos em {destino}")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tipo", default="carros", choices=list(TIPOS))
-    ap.add_argument("--marca", help="filtra marcas pelo nome (contem)")
+    ap.add_argument("--marca", nargs="+", action="extend",
+                    help="filtra marcas pelo nome (contem); aceita varias")
+    ap.add_argument("--modelo", nargs="+", action="extend",
+                    help="filtra modelos pelo nome (contem); aceita varios")
     ap.add_argument("--saida", default="fipe_saida", help="pasta de saida")
     ap.add_argument("--juntar", metavar="ARQUIVO",
-                    help="ao final, junta os CSVs por marca neste arquivo")
+                    help="ao final, junta todos os CSVs neste arquivo")
     ap.add_argument("--pausa", type=float, default=0.5,
                     help="segundos entre requisicoes (padrao 0.5)")
     args = ap.parse_args()
@@ -107,44 +117,57 @@ def main():
 
     marcas = post(s, "ConsultarMarcas", base)
     if args.marca:
-        f = args.marca.lower()
-        marcas = [m for m in marcas if f in m["Label"].lower()]
+        fs = [f.lower() for f in args.marca]
+        marcas = [m for m in marcas
+                  if any(f in m["Label"].lower() for f in fs)]
     if not marcas:
         sys.exit("Nenhuma marca encontrada.")
 
-    os.makedirs(args.saida, exist_ok=True)
     for marca in marcas:
-        destino = os.path.join(args.saida, nome_arquivo(marca["Label"]))
-        if os.path.exists(destino):
-            print(f"Marca {marca['Label']}: ja existe, pulando")
-            continue
         print(f"Marca {marca['Label']}")
         modelos = post(s, "ConsultarModelos",
                        {**base, "codigoMarca": marca["Value"]})["Modelos"]
         time.sleep(args.pausa)
 
-        linhas = []
+        if args.modelo:
+            # na ordem informada: um filtro por vez, sem repetir modelo
+            escolhidos, vistos = [], set()
+            for f in args.modelo:
+                for mod in modelos:
+                    if f.lower() in mod["Label"].lower() \
+                            and mod["Value"] not in vistos:
+                        vistos.add(mod["Value"])
+                        escolhidos.append(mod)
+                if not any(f.lower() in m["Label"].lower() for m in modelos):
+                    print(f"  modelo '{f}' nao encontrado nesta marca")
+            modelos = escolhidos
+
+        pasta = os.path.join(args.saida, limpo(marca["Label"]))
+        os.makedirs(pasta, exist_ok=True)
         for mod in modelos:
+            destino = os.path.join(
+                pasta, f"{limpo(mod['Label'])}_{mod['Value']}.csv")
+            if os.path.exists(destino):
+                print(f"  {mod['Label']}: ja existe, pulando")
+                continue
             anos = post(s, "ConsultarAnoModelo",
                         {**base, "codigoMarca": marca["Value"],
                          "codigoModelo": mod["Value"]})
             time.sleep(args.pausa)
-            for a in anos:
-                linhas.append([
-                    args.tipo, marca["Label"], mod["Label"],
-                    ano(a["Label"]), combustivel(a["Label"]),
-                    marca["Value"], mod["Value"], a["Value"],
-                ])
-
-        # grava so no fim da marca (via .tmp) para nao deixar CSV pela metade
-        tmp = destino + ".tmp"
-        with open(tmp, "w", newline="", encoding="utf-8-sig") as fh:
-            w = csv.writer(fh, delimiter=";")
-            w.writerow(["tipo", "marca", "modelo", "ano", "combustivel",
-                        "codigo_marca", "codigo_modelo", "codigo_ano"])
-            w.writerows(linhas)
-        os.replace(tmp, destino)
-        print(f"  {len(modelos)} modelos, {len(linhas)} linhas")
+            # grava via .tmp para nao deixar CSV pela metade
+            tmp = destino + ".tmp"
+            with open(tmp, "w", newline="", encoding="utf-8-sig") as fh:
+                w = csv.writer(fh, delimiter=";")
+                w.writerow(["tipo", "marca", "modelo", "ano", "combustivel",
+                            "codigo_marca", "codigo_modelo", "codigo_ano"])
+                for a in anos:
+                    w.writerow([
+                        args.tipo, marca["Label"], mod["Label"],
+                        ano(a["Label"]), combustivel(a["Label"]),
+                        marca["Value"], mod["Value"], a["Value"],
+                    ])
+            os.replace(tmp, destino)
+            print(f"  {mod['Label']}: {len(anos)} linhas -> {destino}")
 
     if args.juntar:
         juntar(args.saida, args.juntar)
