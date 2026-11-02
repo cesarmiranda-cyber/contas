@@ -116,6 +116,10 @@ test('lista de conferência: carga mensal ligada aos clientes, edição e histó
   assert.equal((await call('GET', `/clientes/${lst.itens[0].clienteId}/conferencia`)).length, 2);   // set + out
   await assert.rejects(call('POST', '/conferencia', { mes: '2026-10', clienteId: lst.itens[0].clienteId }), /já está/);
   await assert.rejects(call('PUT', '/conferencia/' + id, { mes: '2026-13' }), /Mês inválido/);
+  assert.equal(K.semanasDoMes('2026-10'), 5); assert.equal(K.semanasDoMes('2026-02'), 4);
+  assert.equal(K.previstoDe({ mes: '2026-10', freqTipo: 'semanal', freqN: 2 }), 10); assert.equal(K.previstoDe({ mes: '2026-10', freqTipo: 'quinzenal' }), 3); assert.equal(K.previstoDe({ mes: '2026-10', freqTipo: 'mensal' }), 1); assert.equal(K.previstoDe({ mes: '2026-10', freqTipo: '' }), null);
+  const rs = await call('GET', '/conferencia/resumo?mes=2026-10'); assert.equal(rs.previsto, 5); assert.equal(rs.realizado, 5); assert.equal(rs.pct, 100); assert.equal(rs.porConsultora[0].consultora, 'Iris');
+  const r9 = await call('GET', '/conferencia/resumo?mes=2026-09'); assert.equal(r9.linhas, 2); assert.equal(r9.realizado, 1); assert.equal(r9.pct, 10);   // 1 de 10 (2 clientes × 5 semanas)
   await call('PUT', '/conferencia/mes/2026-10', { obs: ['a', 'b'] }); assert.deepEqual(api.dados().confMeses['2026-10'].obs, ['a', 'b']);
   assert.equal(api.dados().clientes.find(c => c.nome === 'Cliente Novo').cidade, 'Santos');
   const auth = createAuth({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), env: { ADMIN_USER: 'a', ADMIN_HASH: await hashSenha('Inicial12345') } });
