@@ -41,6 +41,13 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:20px;width:min(720px,94vw);max-height:92vh}dialog::backdrop{background:#0008}
 .f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
 .msg{padding:9px 12px;border-radius:8px;margin:0 0 12px;background:var(--brandbg);color:var(--brand)}.msg.e{background:var(--badbg);color:var(--bad)}
+.fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin:6px 0 4px}
+.st{position:relative;background:var(--surface);border:1px solid var(--line);padding:12px 14px 14px;margin-right:-1px}
+.st:first-child{border-radius:10px 0 0 10px}.st:last-child{border-radius:0 10px 10px 0;margin-right:0}
+.st b.n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:12.5px;margin-right:6px}
+.st h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center}.st p{margin:4px 0;font-size:13px;color:var(--ink2)}.st .q{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
+.st.end{border-color:var(--ok)}.st.alt{border-style:dashed}
+.rq{border-collapse:collapse}.rq td{vertical-align:top}
 .lst{margin:0;padding-left:18px;color:var(--ink2)}.mut{color:var(--mut)}.dr{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 </style>
 </head>
@@ -56,7 +63,7 @@ const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp
 const api = (m, u, b) => nmJson(m, '/api/bk' + u, b);
 const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = s => s ? s.split('-').reverse().join('/') : '—';
-const ABAS = [['painel', 'Painel'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações']];
+const ABAS = [['painel', 'Painel'], ['processo', 'Como funciona'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações']];
 let ME = {}, BOOT = {}, aba = 'painel', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false;
 const NIV = { vencido: 'b', critico: 'b', atencao: 'w', ok: 'ok' };
 function aviso(t, erro) { const m = $('#msg'); m.innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
@@ -65,7 +72,7 @@ const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } c
 function abrirAba(a) {
   aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
-  history.replaceState(null, '', '#' + a); ({ painel, unidades, esteira, medicao, config })[a]();
+  history.replaceState(null, '', '#' + a); ({ painel, processo, unidades, esteira, medicao, config })[a]();
 }
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
 const selUnidade = u => u.pendencias && u.pendencias.length ? `<span class="sel b">${u.pendencias.length} pendência(s)</span>` : u.ativa ? '<span class="sel ok">Conforme</span>' : '<span class="sel">Inativa</span>';
@@ -74,18 +81,49 @@ const selUnidade = u => u.pendencias && u.pendencias.length ? `<span class="sel 
 const painel = guarda(async () => {
   await boot(); const r = BOOT.resumo, max = Math.max(1, ...r.porUf.map(x => x.unidades));
   const k = (t, v, c, f) => `<button class="k ${c}" data-f='${f}'><small>${t}</small><strong>${v}</strong></button>`;
-  $('#tela').innerHTML = `<h1>Licença sanitária e Responsável Técnico</h1><p class="sub">Situação de ${r.ativas} unidade(s) ativa(s) · posição de ${dt(BOOT.hoje)}${BOOT.demo ? ' · <span class="sel w">dados de demonstração</span>' : ''}</p>
+  $('#tela').innerHTML = `<h1>Licença sanitária e Responsável Técnico</h1><p class="sub">Situação de ${r.ativas} unidade(s) ativa(s) · posição de ${dt(BOOT.hoje)} · <a href="#processo" id="lkProc">Como funciona o processo</a>${BOOT.demo ? ' · <span class="sel w">dados de demonstração</span>' : ''}</p>
   <div class="cards">${k('Conformes', r.conformes, 'ok', '{"situacao":"conforme"}')}${k('Com pendência', r.comPendencia, r.comPendencia ? 'bad' : '', '{"situacao":"pendente"}')}${k('Precisam de RT e não têm', r.semRt, r.semRt ? 'bad' : '', '{"situacao":"semrt"}')}${k('Vencidos ou a vencer em 7 dias', r.vencidos + r.criticos, r.vencidos + r.criticos ? 'warn' : '', '{"situacao":"vencendo"}')}${k('Necessitam de RT', r.necessitamRt, '', '{}')}</div>
   <div class="grid2"><div class="box"><h2>Situação da documentação</h2>${r.porEtapa.map(e => `<div class="bar"><span>${h(e.nome)}</span><i style="width:${Math.round(e.qtd / Math.max(1, r.total) * 220)}px"></i><b>${e.qtd}</b></div>`).join('')}</div>
   <div class="box"><h2>Unidades por estado</h2>${r.porUf.slice(0, 12).map(x => `<div class="bar"><span>${h(x.uf)}</span><i style="width:${Math.round(x.unidades / max * 200)}px"></i><b>${x.unidades}</b>${x.pendentes ? `<span class="sel b">${x.pendentes} pend.</span>` : ''}</div>`).join('') || '<p class="mut">Sem unidades.</p>'}</div></div>
   <div class="box"><h2>Próximos vencimentos e prazos</h2><div id="prox"></div></div>
   ${r.total ? '' : '<div class="box"><h2>Comece por aqui</h2><p>Importe a planilha de controle das unidades (Excel → Salvar como CSV) na aba Unidades, ou carregue os dados de demonstração.</p></div>'}`;
+  $('#lkProc').onclick = e => { e.preventDefault(); abrirAba('processo'); };
   $('#tela').querySelectorAll('.k').forEach(b => b.onclick = () => { F = { q: '', uf: '', etapa: '', situacao: '', page: 1, ...JSON.parse(b.dataset.f) }; abrirAba('unidades'); });
   const l = await api('GET', '/unidades?pp=100&situacao=vencendo'), ev = [];
   for (const u of l.itens) for (const a of u.alertas) if (a.nivel !== 'ok') ev.push({ u, a });
   ev.sort((x, y) => x.a.dias - y.a.dias);
   $('#prox').innerHTML = ev.length ? `<div class="tw"><table><tr><th>Unidade</th><th>O quê</th><th>Data</th><th>Situação</th></tr>${ev.slice(0, 15).map(({ u, a }) => `<tr class="cl" data-id="${h(u.id)}"><td>${h(u.bkn)} · ${h(u.nome)}</td><td>${h(a.rotulo)}</td><td>${dt(a.data)}</td><td><span class="sel ${NIV[a.nivel]}">${a.dias < 0 ? 'vencido há ' + -a.dias + ' d' : a.dias === 0 ? 'hoje' : 'em ' + a.dias + ' d'}</span></td></tr>`).join('')}</table></div>` : '<p class="mut">Nada vencendo nas próximas semanas.</p>';
   $('#prox').querySelectorAll('tr.cl').forEach(t => t.onclick = () => ficha(t.dataset.id));
+});
+
+
+// ---------- Como funciona ----------
+const processo = guarda(async () => {
+  await boot(); const r = BOOT.resumo, ir = (f) => `<button class="btn" data-ir='${f}'>Ver unidades</button>`;
+  const E = (n, t, cls, qm, o, req, saida) => `<div class="st ${cls || ''}"><h3><b class="n">${n}</b>${t}</h3><p>${qm}</p><div class="q">O que fazer</div><p>${o}</p><div class="q">Requisitos</div><p>${req}</p><div class="q">Fica pronto quando</div><p>${saida}</p></div>`;
+  $('#tela').innerHTML = `<h1>Como funciona o processo BK</h1><p class="sub">Cada unidade Burger King precisa estar regular com a vigilância sanitária e, onde a regra local exige, ter um nutricionista como Responsável Técnico (RT). Este processo acompanha isso unidade por unidade, do cadastro ao deferimento.</p>
+  <div class="box"><h2>Fluxo de cada unidade</h2><p class="mut" style="margin:0 0 10px">Use a aba <b>Esteira de protocolos</b> para ver as unidades em cada etapa e a ficha da unidade (botão “Mover na esteira”) para avançar.</p><div class="fl">
+  ${E(1, 'Aguardando documentos', '', 'A unidade foi cadastrada, mas a documentação ainda não saiu.', 'Confirmar se a unidade precisa de RT, designar o nutricionista (CRN da região da loja) e reunir a documentação do protocolo.', 'Necessidade de RT definida · RT com CRN ativo na região · dados da loja (CNPJ, endereço).', 'Documentação completa e pronta para protocolar.')}
+  ${E(2, 'Protocolo enviado', '', 'O pedido foi protocolado no órgão (sistema do estado, VRE ou vigilância municipal).', 'Registrar o envio, anotar o número do protocolo na observação e definir o <b>prazo</b> para acompanhar a resposta.', 'Documentação do passo 1 · prazo preenchido.', 'O órgão responde (deferido ou com exigência).')}
+  ${E(3, 'Em análise / Reenviado', 'alt', 'O órgão pediu ajuste ou ainda está avaliando. Se voltou com exigência, a unidade vai para “Reenviado” depois do ajuste.', 'Corrigir o que foi pedido, reenviar e atualizar o prazo. Acompanhar pelo e-mail do protocolo.', 'Exigência do órgão entendida e corrigida.', 'O órgão aceita o reenvio.')}
+  ${E(4, 'Aguarda licença', 'alt', 'A documentação está certa, mas depende da licença sanitária da loja para seguir.', 'Cobrar a licença junto à BK/loja; registrar a validade assim que chegar.', 'Licença sanitária emitida · validade informada na ficha.', 'Licença registrada como “Sim”, com validade.')}
+  ${E(5, 'Deferido', 'end', 'O órgão aprovou. A unidade está regular.', 'Manter vigilância: acompanhar validade da licença e do RT e a previsão de virada.', 'Licença “Sim” · RT designado (quando exigido).', 'Fica em acompanhamento. Alertas avisam antes do vencimento.')}
+  </div><p class="mut" style="margin:10px 0 0"><b>Desligado</b>: loja fechada ou fora do contrato. Sai dos indicadores e da medição mensal.</p></div>
+
+  <div class="grid2"><div class="box"><h2>Quando uma unidade é “conforme”</h2><ul class="lst"><li>Se precisa de RT, tem nutricionista designado.</li><li>Licença sanitária informada como “Sim”.</li><li>Nenhuma validade (licença ou RT) vencida.</li><li>Não está parada aguardando licença.</li></ul><p class="mut">Qualquer item fora disso vira <b>pendência</b> na ficha da unidade, escrita em linguagem simples.</p></div>
+  <div class="box"><h2>Como resolver cada pendência</h2><table class="rq"><tr><td><b>Sem RT</b></td><td>Edite a unidade e informe o nutricionista, CRN e validade. ${ir('{"situacao":"semrt"}')}</td></tr>
+  <tr><td><b>Licença não informada</b></td><td>Confirme com a loja e marque “Sim” ou “Não” na ficha, com a validade.</td></tr>
+  <tr><td><b>Vencida</b></td><td>Renove e atualize a data. Os avisos reiniciam sozinhos com a nova data. ${ir('{"situacao":"vencendo"}')}</td></tr>
+  <tr><td><b>Necessidade a definir</b></td><td>Consulte a regra do estado/município e marque se precisa de RT.</td></tr></table></div></div>
+
+  <div class="grid2"><div class="box"><h2>Alertas automáticos</h2><p>O sistema avisa o responsável no Bitrix24 quando faltam 60, 30, 15, 7 dias e no dia, e depois do vencimento, para: licença sanitária, validade do RT, previsão de virada e prazo de protocolo. Cada aviso sai uma vez. Ajuste os marcos e o responsável em <b>Configurações</b>; o botão “Simular avisos agora” mostra o que sairia.</p></div>
+  <div class="box"><h2>Rotina mensal</h2><ol class="lst"><li><b>Início do mês:</b> revisar o Painel e atacar as pendências críticas.</li><li><b>Durante o mês:</b> mover unidades na esteira conforme as respostas dos órgãos.</li><li><b>Fechamento:</b> na aba <b>Medição mensal</b>, conferir a competência e gerar os títulos em A Receber (uma vez por unidade ativa).</li><li><b>Cobrança:</b> em Contas → A receber, emitir o boleto/Pix e acompanhar o pagamento.</li></ol></div></div>
+
+  <div class="box"><h2>Quem precisa de RT e qual conselho (CRN)</h2><p class="mut" style="margin-top:0">A exigência de RT varia por estado e município; confirme a regra local de cada unidade. O CRN do nutricionista deve ser da região onde a loja está:</p><div class="tw"><table><tr><th>CRN</th><th>Estados</th><th>CRN</th><th>Estados</th></tr>${Object.entries(BOOT.crn).reduce((a, [k, v], i, all) => i % 2 ? a : a + `<tr><td>CRN-${k}</td><td>${h(v)}</td>${all[i + 1] ? `<td>CRN-${all[i + 1][0]}</td><td>${h(all[i + 1][1])}</td>` : '<td></td><td></td>'}</tr>`, '')}</table></div></div>
+
+  <div class="box"><h2>Glossário</h2><dl style="margin:0;display:grid;gap:6px"><div><b>BKN</b> — código da unidade BK.</div><div><b>RT</b> — Responsável Técnico, nutricionista responsável perante a vigilância.</div><div><b>Virada</b> — troca/assunção da responsabilidade técnica numa data prevista; acompanhe a “previsão de virada”.</div><div><b>Protocolo</b> — pedido formal enviado ao órgão sanitário.</div><div><b>Deferido</b> — aprovado pelo órgão.</div></dl></div>
+  <div class="box"><h2>Situação agora</h2><p style="margin:0">${r.ativas} unidades ativas · ${r.conformes} conformes · ${r.comPendencia} com pendência. ${ir('{"situacao":"pendente"}')}</p></div>`;
+  $('#tela').querySelectorAll('[data-ir]').forEach(b => b.onclick = () => { F = { q: '', uf: '', etapa: '', situacao: '', page: 1, ...JSON.parse(b.dataset.ir) }; abrirAba('unidades'); });
 });
 
 // ---------- Unidades ----------
