@@ -90,6 +90,9 @@ test('API do cronograma: cliente ← empresa do Bitrix24, consultora ← usuári
   assert.equal((await call('POST', '/reconciliar', { simular: false })).reativados, 1);
   const m = api.dados().consultoras[0], visita = await call('POST', '/visitas', { data: '2026-10-12', min: 60, consultora: m.id, clienteId: domus.id });
   const sem = await call('GET', '/semana?data=2026-10-12'); assert.equal(sem.comFeriado, 1);
+  const per = await call('GET', '/periodo?de=2026-10-01&ate=2026-10-31'); assert.ok(per.total >= 7); assert.equal(per.comFeriado, 1); assert.ok(per.feriadosNacionais.some(f => f.data === '2026-10-12'));
+  assert.equal((await call('GET', '/periodo?de=2026-10-01&ate=2026-10-31&feriado=1')).itens.length, 1); assert.equal((await call('GET', `/periodo?de=2026-10-01&ate=2026-10-31&consultora=${api.dados().consultoras[1].id}`)).itens.every(v => v.consultoraNome === 'Iris'), true);
+  assert.equal((await call('GET', '/periodo?de=2026-10-12&ate=2026-10-12')).total, 1); await assert.rejects(call('GET', '/periodo?de=2026-01-01&ate=2026-12-31'), /Período inválido/);
   assert.equal(visita.feriado, 'Nossa Senhora Aparecida'); assert.equal(visita.sugestao, '2026-10-13');
   assert.equal((await call('POST', '/semana/remarcar-feriados', { data: '2026-10-12' })).remarcadas, 1);
   assert.equal((await call('GET', '/semana?data=2026-10-12')).comFeriado, 0);

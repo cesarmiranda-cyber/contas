@@ -67,6 +67,11 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .vc{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:6px;background:var(--surface);color:var(--ink);padding:4px 6px;margin-bottom:4px;cursor:grab}
 .vc:hover{border-color:var(--brand)}.vc.realizada{border-left-color:var(--ok);opacity:.85}.vc.remarcada,.vc.cancelada,.vc.faltou{border-left-color:var(--mut);opacity:.6;text-decoration:line-through}
 .vc.fer{border-left-color:var(--bad);background:var(--badbg)}.vc small{color:var(--mut);display:block}.vc .w{color:var(--bad);font-weight:600}
+.segb{display:inline-flex;gap:0}.segb .btn{border-radius:0;margin-left:-1px}.segb .btn:first-child{border-radius:7px 0 0 7px;margin-left:0}.segb .btn:last-child{border-radius:0 7px 7px 0}
+.mes{width:100%;table-layout:fixed;border-collapse:collapse;min-width:900px}.mes th{padding:6px;font-size:12.5px;border:1px solid var(--line);background:var(--surface)}
+.mes td{vertical-align:top;height:118px;border:1px solid var(--line);padding:4px;background:var(--surface)}.mes td.fora{background:var(--bg);opacity:.55}.mes td.fds{background:var(--bg)}.mes td.fer{background:var(--warnbg)}
+.mes .dn{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:2px}.mes .dn a{color:var(--ink);text-decoration:none}.mes .mais{font-size:11.5px;color:var(--brand)}.w2{display:block;color:var(--warn);font-size:11px}
+.vc.mini{font-size:11.5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;background:var(--brandbg);color:var(--brand)}
 </style>
 </head>
@@ -86,7 +91,7 @@ const fm = m => Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, 
 const somaDias = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const ABAS = [['semana', 'Semana'], ['clientes', 'Clientes'], ['conferencia', 'Conferência mensal'], ['consultoras', 'Consultoras'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
 let ME = {}, BOOT = {}, aba = 'semana', podeEditar = false, podeAdmin = false, operacional = false;
-let W = { data: '', consultora: '', q: '' }, CL = { q: '', filtro: '', page: 1 };
+let W = { view: 'semana', data: '', consultora: '', q: '', status: '', fer: false, page: 1 }, CL = { q: '', filtro: '', page: 1 };
 function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
 const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
 function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#gbk').hidden = false; $('#gav').scrollTop = 0; $('#gav').querySelectorAll('[data-x]').forEach(b => b.onclick = gavFecha); }
@@ -102,47 +107,98 @@ function abrirAba(a) {
 }
 const hojeISO = () => BOOT.hoje;
 
-// ---------- Semana ----------
-const semana = guarda(async () => {
-  await boot(); if (!W.data) W.data = BOOT.hoje; if (operacional && !W.inicializado && BOOT.minhaConsultora) { W.consultora = BOOT.minhaConsultora; W.inicializado = true; }
-  const s = await api('GET', '/semana?' + new URLSearchParams({ data: W.data, consultora: W.consultora, q: W.q }));
-  const aviso0 = BOOT.semVinculo ? `<p class="msg">${BOOT.semVinculo} consultora(s) ainda sem usuário do Bitrix24. Ligue-as na aba Consultoras para que cada uma veja a sua agenda.</p>` : '';
-  const keep = $('#ebar') ? 1 : 0;
-  $('#tela').innerHTML = `<h1>Cronograma de visitas</h1><p class="sub">${dt(s.inicio)} a ${dt(s.fim)} · ${s.total} visita(s)${s.comFeriado ? ` · <b style="color:var(--bad)">${s.comFeriado} em feriado do cliente</b>` : ''}. ${podeEditar ? 'Arraste uma visita para outro dia ou outra consultora; clique para abrir e editar.' : 'Clique numa visita para ver os detalhes.'}</p>${aviso0}
-  <div class="tools" id="ebar"><button class="btn" id="wa">‹</button><button class="btn" id="wh">Hoje</button><button class="btn" id="wn">›</button>
-  <select id="wc"><option value="">Todas as consultoras</option>${BOOT.consultoras.map(c => `<option value="${h(c.id)}" ${c.id === W.consultora ? 'selected' : ''}>${h(c.nome)}</option>`).join('')}</select>
-  <input id="wq" type="search" placeholder="Buscar cliente" value="${h(W.q)}" style="min-width:200px">
-  ${podeEditar ? `<button class="btn p" id="wnova">Nova visita</button><button class="btn" id="wger" title="Cria as visitas da semana a partir das recorrências">Gerar semana</button>${s.comFeriado ? `<button class="btn d" id="wfer">Remarcar feriados (${s.comFeriado})</button>` : ''}` : ''}</div>
-  <div class="box tw" style="padding:0"><table class="gr"><tr><th style="width:118px"></th>${s.dias.map((d, i) => `<th class="${d.nacional.some(x => !x.facultativo) ? 'fer' : ''}">${BOOT.dias[i]}<small>${dm(d.data)}${d.nacional.length ? ' · ' + h(d.nacional.map(x => x.nome).join(', ')) : ''}</small></th>`).join('')}</tr>
-  ${s.linhas.map(l => `<tr><td class="nm">${h(l.consultora.nome)}<small>${fm(l.minutos)} na semana</small>${l.consultora.bitrixId ? '' : '<small style="color:var(--warn)">sem usuário Bitrix</small>'}</td>${l.dias.map((vs, i) => `<td data-d="${s.dias[i].data}" data-c="${h(l.consultora.id)}">${vs.map(v => `<button class="vc ${v.status} ${v.feriado ? 'fer' : ''}" data-id="${h(v.id)}" ${podeEditar ? 'draggable="true"' : ''}>${h(v.clienteNome)} <b>${fm(v.min)}</b>${v.feriado ? `<small class="w">Feriado: ${h(v.feriado)}</small>` : v.facultativo ? `<small>Facultativo: ${h(v.facultativo)}</small>` : ''}${v.status !== 'agendada' ? `<small>${h(BOOT.status[v.status])}</small>` : ''}</button>`).join('')}</td>`).join('')}</tr>`).join('') || `<tr><td class="mut" style="padding:20px">Nenhuma consultora cadastrada.</td></tr>`}</table></div>`;
-  const nav = n => { W.data = somaDias(W.data, n); semana(); };
-  $('#wa').onclick = () => nav(-7); $('#wn').onclick = () => nav(7); $('#wh').onclick = () => { W.data = BOOT.hoje; semana(); };
-  $('#wc').onchange = e => { W.consultora = e.target.value; semana(); }; let t; $('#wq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { W.q = e.target.value; await semana(); const i = $('#wq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
-  const tab = $('#tela'); tab.querySelectorAll('.vc').forEach(b => { b.onclick = () => visitaDrawer(b.dataset.id, s);
-    b.ondragstart = e => { e.dataTransfer.setData('text/plain', b.dataset.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => b.style.opacity = .4, 0); }; b.ondragend = () => { b.style.opacity = ''; tab.querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); }; });
-  if (podeEditar) { tab.querySelectorAll('td[data-d]').forEach(c => { c.ondragover = e => { e.preventDefault(); c.classList.add('alvo'); }; c.ondragleave = () => c.classList.remove('alvo');
-    c.ondrop = guarda(async e => { e.preventDefault(); c.classList.remove('alvo'); const id = e.dataTransfer.getData('text/plain'); if (!id) return; await api('POST', `/visitas/${id}/mover`, { data: c.dataset.d, consultora: c.dataset.c }); semana(); }); });
-    $('#wnova').onclick = () => visitaForm(null, s);
-    $('#wger').onclick = guarda(async () => { const r = await api('POST', '/semana/gerar', { data: W.data, semanas: 1 }); aviso(r.criadas ? `${r.criadas} visita(s) criadas a partir das recorrências.` : 'Nada a gerar: a semana já está completa.'); semana(); });
-    if ($('#wfer')) $('#wfer').onclick = guarda(async () => { if (!confirm('Remarcar as visitas em feriado para o próximo dia útil livre?')) return; const r = await api('POST', '/semana/remarcar-feriados', { data: W.data }); aviso(`${r.remarcadas} visita(s) remarcada(s).`); semana(); }); }
-});
-const lk = (url, txt) => `<a href="${h(url)}" target="_blank" rel="noopener">${h(txt)}</a>`;
-function vinculos(c) {   // empresa, contato e negócio do Bitrix24 de um cliente
-  if (!c) return '';
-  const H = BOOT.host, e = c.empresaBitrixId ? lk(`https://${H}/crm/company/details/${c.empresaBitrixId}/`, 'Empresa #' + c.empresaBitrixId) : '<b style="color:var(--warn)">empresa não vinculada</b>';
-  const t = c.contatoBitrixId ? lk(c.contatoUrl || `https://${H}/crm/contact/details/${c.contatoBitrixId}/`, c.contatoNome || 'Contato #' + c.contatoBitrixId) : '<b style="color:var(--warn)">sem contato</b>';
-  const n = c.dealId ? lk(c.dealUrl || `https://${H}/crm/deal/details/${c.dealId}/`, 'Negócio #' + c.dealId) : '<b style="color:var(--mut)">negócio ainda não criado</b>';
-  return `<label>Empresa (Bitrix24)${e}</label><label>Contato (Bitrix24)${t}</label><label class="w">Negócio no funil Assessoria Recorrente / RT${n}</label>`;
+// ---------- Agenda: dia, semana, mês e lista ----------
+const VISOES = [['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês'], ['lista', 'Lista']];
+const lsGet = k => { try { return localStorage.getItem(k) || ''; } catch { return ''; } }, lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* sem armazenamento */ } };
+const segundaDe = d => somaDias(d, -((new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7)), ultimoMes = d => { const [y, m] = d.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+const mesSoma = (d, n) => { const [y, m] = d.split('-').map(Number), x = new Date(Date.UTC(y, m - 1 + n, 1)); return x.toISOString().slice(0, 10); };
+const MESES_EXT = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'], DIAS_CURTOS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+const diaSemana = d => (new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7;
+function intervalo() {
+  const d = W.data, a = d.slice(0, 8) + '01', b = ultimoMes(d);
+  if (W.view === 'dia') return [d, d];
+  if (W.view === 'semana') { const s = segundaDe(d); return [s, somaDias(s, 4)]; }
+  return W.view === 'mes' ? [segundaDe(a), somaDias(segundaDe(b), 6)] : [a, b];
 }
-async function visitaDrawer(id, s) {
-  const v = s.linhas.flatMap(l => l.dias.flat()).find(x => x.id === id); if (!v) return;
+function rotuloPeriodo() {
+  const [y, m] = W.data.split('-').map(Number);
+  if (W.view === 'dia') return `${DIAS_CURTOS[diaSemana(W.data)]}, ${dt(W.data)}`;
+  if (W.view === 'semana') { const [a, b] = intervalo(); return `${dm(a)} a ${dm(b)}/${a.slice(0, 4)}`; }
+  return `${MESES_EXT[m]} de ${y}`;
+}
+const navega = n => {
+  if (W.view === 'dia') { let d = W.data; do { d = somaDias(d, n); } while (diaSemana(d) > 4); W.data = d; }
+  else if (W.view === 'semana') W.data = somaDias(W.data, 7 * n); else W.data = mesSoma(W.data, n);
+  W.page = 1; semana();
+};
+const vchip = (v, mini) => `<button class="vc ${mini ? 'mini' : ''} ${v.status} ${v.feriado ? 'fer' : ''}" data-id="${h(v.id)}" ${podeEditar ? 'draggable="true"' : ''} title="${h(v.clienteNome)} · ${h(v.consultoraNome)} · ${fm(v.min)}${v.feriado ? ' · feriado: ' + h(v.feriado) : ''}">${h(v.clienteNome)} <b>${fm(v.min)}</b>${mini ? '' : v.feriado ? `<small class="w">Feriado: ${h(v.feriado)}</small>` : v.facultativo ? `<small>Facultativo: ${h(v.facultativo)}</small>` : ''}${!mini && v.status !== 'agendada' ? `<small>${h(BOOT.status[v.status])}</small>` : ''}</button>`;
+
+const semana = guarda(async () => {
+  await boot(); if (!W.data) W.data = BOOT.hoje;
+  if (operacional && !W.inicializado && BOOT.minhaConsultora) { W.consultora = BOOT.minhaConsultora; W.inicializado = true; }
+  const [de, ate] = intervalo(), p = await api('GET', '/periodo?' + new URLSearchParams({ de, ate, consultora: W.consultora, q: W.q, status: W.status, feriado: W.fer ? '1' : '0' })), VM = new Map(p.itens.map(v => [v.id, v]));
+  const aviso0 = BOOT.semVinculo ? `<p class="msg">${BOOT.semVinculo} consultora(s) ainda sem usuário do Bitrix24. Ligue-as na aba Consultoras para que cada uma veja a sua agenda.</p>` : '';
+  const mesView = W.view === 'mes' || W.view === 'lista', fer = [];
+  if (podeEditar && p.comFeriado) for (let s0 = segundaDe(de); s0 <= ate; s0 = somaDias(s0, 7)) fer.push(s0);
+  $('#tela').innerHTML = `<h1>Cronograma de visitas</h1>${aviso0}
+  <div class="tools" id="ebar"><span class="segb">${VISOES.map(([k, n]) => `<button class="btn ${k === W.view ? 'p' : ''}" data-v="${k}">${n}</button>`).join('')}</span>
+  <button class="btn" id="wa" aria-label="Anterior">‹</button><button class="btn" id="wh">Hoje</button><button class="btn" id="wn" aria-label="Próximo">›</button><b style="min-width:150px;text-align:center">${h(rotuloPeriodo())}</b>
+  <input type="${mesView ? 'month' : 'date'}" id="wir" value="${mesView ? W.data.slice(0, 7) : W.data}" aria-label="Ir para" title="Ir para">
+  ${podeEditar ? `<button class="btn p" id="wnova">Nova visita</button><button class="btn" id="wger" title="Cria as visitas a partir das recorrências">Gerar ${W.view === 'mes' || W.view === 'lista' ? 'mês' : 'semana'}</button>${p.comFeriado ? `<button class="btn d" id="wfer">Remarcar feriados (${p.comFeriado})</button>` : ''}` : ''}</div>
+  <div class="tools"><select id="wc"><option value="">Todas as consultoras</option>${BOOT.consultoras.map(c => `<option value="${h(c.id)}" ${c.id === W.consultora ? 'selected' : ''}>${h(c.nome)}</option>`).join('')}</select>
+  <select id="ws"><option value="">Toda situação</option>${Object.entries(BOOT.status).map(([k, t]) => `<option value="${k}" ${k === W.status ? 'selected' : ''}>${h(t)}</option>`).join('')}</select>
+  <input id="wq" type="search" placeholder="Buscar cliente" value="${h(W.q)}" style="min-width:200px"><label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="wf" ${W.fer ? 'checked' : ''}> só em feriado</label></div>
+  <div class="cards" style="margin-bottom:12px"><div class="k"><small>Visitas</small><strong>${p.total}</strong></div><div class="k"><small>Horas previstas</small><strong>${fm(p.minutos)}</strong></div><div class="k ok"><small>Realizadas</small><strong>${p.realizadas}</strong></div><div class="k ${p.comFeriado ? 'bad' : ''}"><small>Em feriado do cliente</small><strong>${p.comFeriado}</strong></div></div>
+  <div id="vista"></div>`;
+  const V = $('#vista'), nacMap = new Map(p.feriadosNacionais.map(f => [f.data, f])), cons = BOOT.consultoras.filter(c => !W.consultora || c.id === W.consultora);
+  const cab = d => { const f = nacMap.get(d); return `<th class="${f && !f.facultativo ? 'fer' : ''}">${DIAS_CURTOS[diaSemana(d)]} ${dm(d)}${f ? `<small>${h(f.nome)}</small>` : ''}</th>`; };
+  if (W.view === 'semana' || W.view === 'dia') {
+    const dias = W.view === 'dia' ? [W.data] : [0, 1, 2, 3, 4].map(i => somaDias(intervalo()[0], i));
+    if (W.view === 'dia') {   // consultoras em colunas
+      V.innerHTML = `<div class="box tw" style="padding:0"><table class="gr"><tr>${cons.map(c => `<th>${h(c.nome)}<small>${fm(p.itens.filter(v => v.consultora === c.id && !['cancelada', 'remarcada', 'faltou'].includes(v.status)).reduce((s, v) => s + v.min, 0))} no dia${c.bitrixId ? '' : ' · sem usuário Bitrix'}</small></th>`).join('')}</tr>
+      <tr>${cons.map(c => `<td data-c="${h(c.id)}" style="height:320px">${p.itens.filter(v => v.consultora === c.id).map(v => vchip(v)).join('') || '<span class="mut">sem visitas</span>'}</td>`).join('')}</tr></table></div>${nacMap.has(W.data) ? `<p class="mut">${h(nacMap.get(W.data).nome)}</p>` : ''}`;
+    } else {
+      V.innerHTML = `<div class="box tw" style="padding:0"><table class="gr"><tr><th style="width:118px"></th>${dias.map(cab).join('')}</tr>${cons.map(c => `<tr><td class="nm">${h(c.nome)}<small>${fm(p.itens.filter(v => v.consultora === c.id && !['cancelada', 'remarcada', 'faltou'].includes(v.status)).reduce((s, v) => s + v.min, 0))} na semana</small>${c.bitrixId ? '' : '<small style="color:var(--warn)">sem usuário Bitrix</small>'}</td>${dias.map(d => `<td data-d="${d}" data-c="${h(c.id)}">${p.itens.filter(v => v.consultora === c.id && v.data === d).map(v => vchip(v)).join('')}</td>`).join('')}</tr>`).join('') || '<tr><td class="mut" style="padding:20px">Nenhuma consultora.</td></tr>'}</table></div>`;
+    }
+  } else if (W.view === 'mes') {
+    const mes = W.data.slice(0, 7), semanas = []; for (let s0 = intervalo()[0]; s0 <= intervalo()[1]; s0 = somaDias(s0, 7)) semanas.push(s0);
+    V.innerHTML = `<div class="box tw" style="padding:0"><table class="mes"><tr>${DIAS_CURTOS.map((n, i) => `<th class="${i > 4 ? 'mut' : ''}">${n}</th>`).join('')}</tr>${semanas.map(s0 => `<tr>${[0, 1, 2, 3, 4, 5, 6].map(i => { const d = somaDias(s0, i), vs = p.itens.filter(v => v.data === d), f = nacMap.get(d), mins = vs.filter(v => !['cancelada', 'remarcada', 'faltou'].includes(v.status)).reduce((x, v) => x + v.min, 0);
+      return `<td data-d="${d}" class="${d.slice(0, 7) !== mes ? 'fora' : ''} ${f && !f.facultativo ? 'fer' : ''} ${i > 4 ? 'fds' : ''}"><div class="dn"><a href="#" data-dia="${d}"><b>${Number(d.slice(8))}</b></a><span>${vs.length ? `${vs.length} · ${fm(mins)}` : ''}</span></div>${f ? `<small class="w2">${h(f.nome)}</small>` : ''}${vs.slice(0, 4).map(v => vchip(v, true)).join('')}${vs.length > 4 ? `<a href="#" data-dia="${d}" class="mais">+${vs.length - 4} mais</a>` : ''}</td>`; }).join('')}</tr>`).join('')}</table></div>`;
+  } else {
+    const pp = 50, pg = Math.max(1, Math.ceil(p.itens.length / pp)); W.page = Math.min(W.page, pg);
+    V.innerHTML = `<div class="box tw"><table><tr><th>Data</th><th>Consultora</th><th>Cliente</th><th>Duração</th><th>Situação</th><th>Observação</th></tr>${p.itens.slice((W.page - 1) * pp, W.page * pp).map(v => `<tr class="cl" data-id="${h(v.id)}"><td>${DIAS_CURTOS[diaSemana(v.data)]} ${dt(v.data)}</td><td>${h(v.consultoraNome)}</td><td><b>${h(v.clienteNome)}</b>${v.feriado ? `<small class="w" style="display:block">Feriado: ${h(v.feriado)}</small>` : ''}</td><td>${fm(v.min)}</td><td><span class="pill">${h(BOOT.status[v.status])}</span></td><td>${h(v.obs)}</td></tr>`).join('') || '<tr><td colspan="6" class="mut">Nenhuma visita no período.</td></tr>'}</table>
+    <div class="pag"><button class="btn" id="exp">Exportar CSV</button><button class="btn" id="pa" ${W.page <= 1 ? 'disabled' : ''}>‹</button> página ${W.page} de ${pg} <button class="btn" id="pn" ${W.page >= pg ? 'disabled' : ''}>›</button></div></div>`;
+  }
+  // eventos
+  $('#tela').querySelectorAll('[data-v]').forEach(b => b.onclick = () => { W.view = b.dataset.v; lsSet('cr.view', W.view); W.page = 1; semana(); });
+  $('#wa').onclick = () => navega(-1); $('#wn').onclick = () => navega(1); $('#wh').onclick = () => { W.data = BOOT.hoje; semana(); };
+  $('#wir').onchange = e => { if (e.target.value) { W.data = mesView ? e.target.value + '-01' : e.target.value; semana(); } };
+  $('#wc').onchange = e => { W.consultora = e.target.value; semana(); }; $('#ws').onchange = e => { W.status = e.target.value; semana(); }; $('#wf').onchange = e => { W.fer = e.target.checked; semana(); };
+  let t; $('#wq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { W.q = e.target.value; await semana(); const i = $('#wq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  V.querySelectorAll('.vc').forEach(b => { b.onclick = () => visitaDrawer(VM.get(b.dataset.id));
+    b.ondragstart = e => { e.dataTransfer.setData('text/plain', b.dataset.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => b.style.opacity = .4, 0); }; b.ondragend = () => { b.style.opacity = ''; V.querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); }; });
+  V.querySelectorAll('tr.cl[data-id]').forEach(r => r.onclick = () => visitaDrawer(VM.get(r.dataset.id)));
+  V.querySelectorAll('[data-dia]').forEach(a => a.onclick = e => { e.preventDefault(); W.view = 'dia'; lsSet('cr.view', 'dia'); W.data = a.dataset.dia; semana(); });
+  if (podeEditar) {
+    V.querySelectorAll('td[data-d],td[data-c]').forEach(c => { c.ondragover = e => { e.preventDefault(); c.classList.add('alvo'); }; c.ondragleave = () => c.classList.remove('alvo');
+      c.ondrop = guarda(async e => { e.preventDefault(); c.classList.remove('alvo'); const id = e.dataTransfer.getData('text/plain'); if (!id) return; const b = {}; if (c.dataset.d) b.data = c.dataset.d; if (c.dataset.c) b.consultora = c.dataset.c; await api('POST', `/visitas/${id}/mover`, b); semana(); }); });
+    $('#wnova').onclick = () => visitaForm(null);
+    $('#wger').onclick = guarda(async () => { const n = mesView ? Math.round((Date.parse(intervalo()[1] + 'T00:00:00Z') - Date.parse(segundaDe(intervalo()[0]) + 'T00:00:00Z')) / (7 * 864e5)) + 1 : 1; const r = await api('POST', '/semana/gerar', { data: mesView ? segundaDe(intervalo()[0]) : W.data, semanas: Math.min(8, n) }); aviso(r.criadas ? `${r.criadas} visita(s) criadas a partir das recorrências.` : 'Nada a gerar: o período já está completo.'); semana(); });
+    if ($('#wfer')) $('#wfer').onclick = guarda(async () => { if (!confirm('Remarcar as visitas em feriado para o próximo dia útil livre?')) return; let n = 0; for (const s0 of fer) n += (await api('POST', '/semana/remarcar-feriados', { data: s0 })).remarcadas; aviso(`${n} visita(s) remarcada(s).`); semana(); });
+  }
+  if (W.view === 'lista') { $('#pa').onclick = () => { W.page--; semana(); }; $('#pn').onclick = () => { W.page++; semana(); };
+    $('#exp').onclick = () => { const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/^([=+\-@])/, "'$1") + '"', rows = p.itens.map(v => [v.data, v.consultoraNome, v.clienteNome, fm(v.min), BOOT.status[v.status], v.feriado || '', v.obs].map(q).join(';'));
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [['Data', 'Consultora', 'Cliente', 'Duração', 'Situação', 'Feriado', 'Observação'].map(q).join(';'), ...rows].join('\r\n')], { type: 'text/csv' })); a.download = `visitas-${W.data.slice(0, 7)}.csv`; a.click(); }; }
+});
+async function visitaDrawer(v) {
+  if (!v) return; const id = v.id;
   const c = (await api('GET', '/clientes?q=' + encodeURIComponent(v.clienteNome))).itens.find(x => x.id === v.clienteId);
   gav(`${topo()}<h2 style="margin:0">${h(v.clienteNome)}</h2><p class="mut" style="margin:0 0 12px">${h(v.consultoraNome)} · ${dt(v.data)} · ${fm(v.min)} · <span class="pill">${h(BOOT.status[v.status])}</span></p>
   ${v.feriado ? `<div class="box" style="border-color:var(--bad)"><b>Feriado na cidade do cliente:</b> ${h(v.feriado)}.${v.sugestao ? ` Sugestão: ${dt(v.sugestao)}.` : ''}${podeEditar && v.sugestao ? ` <button class="btn" id="vs">Remarcar para ${dm(v.sugestao)}</button>` : ''}</div>` : ''}
   <div class="f"><label>Cliente<b style="color:var(--ink)">${h(v.clienteNome)}</b></label><label>Cidade<b style="color:var(--ink)">${c ? h(c.cidade || 'não informada (usando São Paulo/SP)') + (c.uf ? '/' + h(c.uf) : '') : '—'}</b></label>
   ${vinculos(c)}${v.obs ? `<label class="w">Observação<span style="color:var(--ink)">${h(v.obs)}</span></label>` : ''}</div>
   ${podeEditar ? `<div class="dr"><button class="btn d" id="vx">Excluir</button><button class="btn" id="vr">Marcar realizada</button><button class="btn p" id="ve">Editar</button></div>` : ''}`);
-  if (podeEditar) { $('#ve').onclick = () => visitaForm(v, s); $('#vx').onclick = guarda(async () => { if (!confirm('Excluir esta visita?')) return; await api('DELETE', '/visitas/' + id); gavFecha(); semana(); });
+  if (podeEditar) { $('#ve').onclick = () => visitaForm(v); $('#vx').onclick = guarda(async () => { if (!confirm('Excluir esta visita?')) return; await api('DELETE', '/visitas/' + id); gavFecha(); semana(); });
     $('#vr').onclick = guarda(async () => { await api('PUT', '/visitas/' + id, { status: 'realizada' }); gavFecha(); semana(); });
     if ($('#vs')) $('#vs').onclick = guarda(async () => { await api('POST', `/visitas/${id}/mover`, { data: v.sugestao }); gavFecha(); semana(); }); }
 }
