@@ -48,6 +48,15 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .st h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center}.st p{margin:4px 0;font-size:13px;color:var(--ink2)}.st .q{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
 .st.end{border-color:var(--ok)}.st.alt{border-style:dashed}
 .rq{border-collapse:collapse}.rq td{vertical-align:top}
+.gv-bk{position:fixed;inset:0;background:#0007;z-index:20}
+#gav{position:fixed;top:0;right:0;bottom:0;width:min(580px,100vw);background:var(--surface);color:var(--ink);border-left:1px solid var(--line);z-index:21;overflow:auto;padding:18px 20px 28px;box-shadow:-8px 0 30px #0004}
+#gav .top{display:flex;gap:8px;align-items:center;margin-bottom:10px}#gav .top .sp{flex:1}
+.lk{display:flex;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13.5px}.lk:hover{border-color:var(--brand);background:var(--brandbg)}
+.sug{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;z-index:6;max-height:320px;overflow:auto;box-shadow:0 8px 24px #0003;margin-top:2px}
+.sug .lk{border:0;border-radius:0;margin:0;border-bottom:1px solid var(--line)}
+.cl2{cursor:pointer}.bar.cl2:hover b,.bar.cl2:hover span:first-child{color:var(--brand)}
+.ct[draggable=true]{cursor:grab}.ct.arr{opacity:.4}.cx.alvo{outline:2px dashed var(--brand);background:var(--brandbg)}
+.col{min-height:60vh}.cx{min-height:120px}
 .lst{margin:0;padding-left:18px;color:var(--ink2)}.mut{color:var(--mut)}.dr{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 </style>
 </head>
@@ -56,6 +65,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 <nav role="tablist" id="abas"></nav>
 <main hidden id="app"><div id="msg"></div><div id="tela"></div></main>
 <dialog id="dlg"></dialog>
+<div class="gv-bk" id="gbk" hidden></div><aside id="gav" hidden aria-label="Detalhes da unidade" role="dialog"></aside>
 <script src="/auth.js"></script>
 <script>
 const $ = s => document.querySelector(s);
@@ -63,7 +73,7 @@ const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp
 const api = (m, u, b) => nmJson(m, '/api/bk' + u, b);
 const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = s => s ? s.split('-').reverse().join('/') : '—';
-const ABAS = [['painel', 'Painel'], ['processo', 'Como funciona'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações']];
+const ABAS = [['painel', 'Painel'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações'], ['processo', 'Como funciona']];
 let ME = {}, BOOT = {}, aba = 'painel', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false;
 const NIV = { vencido: 'b', critico: 'b', atencao: 'w', ok: 'ok' };
 function aviso(t, erro) { const m = $('#msg'); m.innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
@@ -72,7 +82,7 @@ const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } c
 function abrirAba(a) {
   aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
-  history.replaceState(null, '', '#' + a); ({ painel, processo, unidades, esteira, medicao, config })[a]();
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ painel, processo, unidades, esteira, medicao, config })[a]();
 }
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
 const selUnidade = u => u.pendencias && u.pendencias.length ? `<span class="sel b">${u.pendencias.length} pendência(s)</span>` : u.ativa ? '<span class="sel ok">Conforme</span>' : '<span class="sel">Inativa</span>';
@@ -82,13 +92,20 @@ const painel = guarda(async () => {
   await boot(); const r = BOOT.resumo, max = Math.max(1, ...r.porUf.map(x => x.unidades));
   const k = (t, v, c, f) => `<button class="k ${c}" data-f='${f}'><small>${t}</small><strong>${v}</strong></button>`;
   $('#tela').innerHTML = `<h1>Licença sanitária e Responsável Técnico</h1><p class="sub">Situação de ${r.ativas} unidade(s) ativa(s) · posição de ${dt(BOOT.hoje)} · <a href="#processo" id="lkProc">Como funciona o processo</a>${BOOT.demo ? ' · <span class="sel w">dados de demonstração</span>' : ''}</p>
+  <div class="tools" style="position:relative"><input id="psq" type="search" placeholder="Buscar unidade por BKN, nome, cidade ou RT…" style="flex:1" autocomplete="off"><div class="sug" id="psr" hidden></div></div>
   <div class="cards">${k('Conformes', r.conformes, 'ok', '{"situacao":"conforme"}')}${k('Com pendência', r.comPendencia, r.comPendencia ? 'bad' : '', '{"situacao":"pendente"}')}${k('Precisam de RT e não têm', r.semRt, r.semRt ? 'bad' : '', '{"situacao":"semrt"}')}${k('Vencidos ou a vencer em 7 dias', r.vencidos + r.criticos, r.vencidos + r.criticos ? 'warn' : '', '{"situacao":"vencendo"}')}${k('Necessitam de RT', r.necessitamRt, '', '{}')}</div>
-  <div class="grid2"><div class="box"><h2>Situação da documentação</h2>${r.porEtapa.map(e => `<div class="bar"><span>${h(e.nome)}</span><i style="width:${Math.round(e.qtd / Math.max(1, r.total) * 220)}px"></i><b>${e.qtd}</b></div>`).join('')}</div>
-  <div class="box"><h2>Unidades por estado</h2>${r.porUf.slice(0, 12).map(x => `<div class="bar"><span>${h(x.uf)}</span><i style="width:${Math.round(x.unidades / max * 200)}px"></i><b>${x.unidades}</b>${x.pendentes ? `<span class="sel b">${x.pendentes} pend.</span>` : ''}</div>`).join('') || '<p class="mut">Sem unidades.</p>'}</div></div>
+  <div class="grid2"><div class="box"><h2>Situação da documentação</h2>${r.porEtapa.map(e => `<div class="bar cl2" data-lt="${h(e.nome)}" data-lp='${JSON.stringify({ etapa: e.etapa })}'><span>${h(e.nome)}</span><i style="width:${Math.round(e.qtd / Math.max(1, r.total) * 220)}px"></i><b>${e.qtd}</b></div>`).join('')}</div>
+  <div class="box"><h2>Unidades por estado</h2>${r.porUf.slice(0, 12).map(x => `<div class="bar cl2" data-lt="Unidades de ${h(x.uf)}" data-lp='${JSON.stringify({ uf: x.uf })}'><span>${h(x.uf)}</span><i style="width:${Math.round(x.unidades / max * 200)}px"></i><b>${x.unidades}</b>${x.pendentes ? `<span class="sel b">${x.pendentes} pend.</span>` : ''}</div>`).join('') || '<p class="mut">Sem unidades.</p>'}</div></div>
   <div class="box"><h2>Próximos vencimentos e prazos</h2><div id="prox"></div></div>
   ${r.total ? '' : '<div class="box"><h2>Comece por aqui</h2><p>Importe a planilha de controle das unidades (Excel → Salvar como CSV) na aba Unidades, ou carregue os dados de demonstração.</p></div>'}`;
   $('#lkProc').onclick = e => { e.preventDefault(); abrirAba('processo'); };
-  $('#tela').querySelectorAll('.k').forEach(b => b.onclick = () => { F = { q: '', uf: '', etapa: '', situacao: '', page: 1, ...JSON.parse(b.dataset.f) }; abrirAba('unidades'); });
+  $('#tela').querySelectorAll('.k').forEach(b => b.onclick = () => listaDrawer(b.querySelector('small').textContent, JSON.parse(b.dataset.f)));
+  $('#tela').querySelectorAll('.bar.cl2').forEach(b => b.onclick = () => listaDrawer(b.dataset.lt, JSON.parse(b.dataset.lp)));
+  document.onclick = e => { const r = $('#psr'); if (r && !e.target.closest('#psr,#psq')) r.hidden = true; };
+  let tp; $('#psq').oninput = e => { clearTimeout(tp); const v = e.target.value.trim(); if (v.length < 2) { $('#psr').hidden = true; return; }
+    tp = setTimeout(guarda(async () => { const l = await api('GET', '/unidades?pp=8&q=' + encodeURIComponent(v)); $('#psr').hidden = false;
+      $('#psr').innerHTML = l.itens.map(u => `<div class="lk" data-id="${h(u.id)}"><span><b>${h(u.bkn)}</b> ${h(u.nome)}<br><small class="mut">${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''}</small></span>${selUnidade(u)}</div>`).join('') || '<div class="lk mut">Nada encontrado.</div>';
+      $('#psr').querySelectorAll('[data-id]').forEach(x => x.onclick = () => { $('#psr').hidden = true; ficha(x.dataset.id); }); }), 300); };
   const l = await api('GET', '/unidades?pp=100&situacao=vencendo'), ev = [];
   for (const u of l.itens) for (const a of u.alertas) if (a.nivel !== 'ok') ev.push({ u, a });
   ev.sort((x, y) => x.a.dias - y.a.dias);
@@ -156,35 +173,51 @@ function csv(ls) {
 }
 const dlg = $('#dlg');
 function abre(html) { dlg.innerHTML = html; if (!dlg.open) dlg.showModal(); dlg.querySelectorAll('[data-x]').forEach(b => b.onclick = () => dlg.close()); }
-const ficha = guarda(async id => {
-  const u = await api('GET', '/unidades/' + id), et = n => (BOOT.etapas.find(e => e[0] === n) || [])[1] || n;
-  abre(`<h2 style="margin:0">${h(u.nome)}</h2><p class="mut" style="margin:0 0 12px">BKN ${h(u.bkn)} · ${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''} · ${selUnidade(u)}</p>
-  ${u.pendencias.length ? `<div class="box" style="border-color:var(--bad)"><h2>Pendências</h2><ul class="lst">${u.pendencias.map(p => `<li>${h(p)}</li>`).join('')}</ul></div>` : ''}
-  <div class="f"><label>Responsável Técnico<b style="color:var(--ink)">${h(u.rt.nome) || '—'}</b></label><label>CRN<b style="color:var(--ink)">${h(u.rt.crn) || '—'}</b></label><label>Validade do RT<b style="color:var(--ink)">${dt(u.rt.validade)}</b></label>
-  <label>Licença sanitária<b style="color:var(--ink)">${u.licenca === 'sim' ? 'Sim' : u.licenca === 'nao' ? 'Não' : 'Não informada'} ${u.licencaValidade ? '· até ' + dt(u.licencaValidade) : ''}</b></label><label>Previsão de virada<b style="color:var(--ink)">${dt(u.previsaoVirada)}</b></label><label>Etapa<b style="color:var(--ink)">${h(et(u.etapa))}</b></label>
-  <label>Visitas por mês<b style="color:var(--ink)">${u.visitas || '—'}</b></label><label>Valor mensal<b style="color:var(--ink)">${u.valorMensal != null ? brl(u.valorMensal) : 'padrão'}</b></label><label>CNPJ<b style="color:var(--ink)">${h(u.cnpj) || '—'}</b></label>
-  ${u.observacao ? `<label class="w">Observação<b style="color:var(--ink);font-weight:400">${h(u.observacao)}</b></label>` : ''}</div>
-  <h2 style="font-size:15px;margin:16px 0 6px">Histórico</h2>${u.historico.length ? `<ul class="lst">${u.historico.slice(0, 12).map(e => `<li>${dt(e.data)} — ${h(et(e.de))} → ${h(et(e.para))}${e.nota ? ' · ' + h(e.nota) : ''}${e.por ? ' · ' + h(e.por) : ''}</li>`).join('')}</ul>` : '<p class="mut">Sem movimentações registradas.</p>'}
-  <div class="dr">${podeEditar ? `<button class="btn d" id="del">Excluir</button><button class="btn" id="mov">Mover na esteira</button><button class="btn p" id="ed">Editar</button>` : ''}<button class="btn" data-x>Fechar</button></div>`);
-  if (podeEditar) { $('#ed').onclick = () => formUnidade(u); $('#mov').onclick = () => moverDialog(u); $('#del').onclick = guarda(async () => { if (!confirm(`Excluir a unidade ${u.bkn}? Esta ação não pode ser desfeita.`)) return; await api('DELETE', '/unidades/' + u.id); dlg.close(); abrirAba(aba); }); }
+// ---------- painel lateral (ficha, edição e lista) — nada tira o usuário da tela ----------
+function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#gbk').hidden = false; $('#gav').scrollTop = 0; $('#gav').querySelectorAll('[data-x]').forEach(b => b.onclick = gavFecha); }
+function gavFecha() { $('#gav').hidden = true; $('#gbk').hidden = true; $('#gav').innerHTML = ''; }
+$('#gbk').onclick = gavFecha; addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gav').hidden && !dlg.open) gavFecha(); });
+const recarrega = () => ({ painel, unidades, esteira, medicao, config, processo })[aba]();
+const etNome = n => (BOOT.etapas.find(e => e[0] === n) || [])[1] || n;
+const topo = voltar => `<div class="top">${voltar ? '<button class="btn" id="gvv">‹ Voltar</button>' : ''}<span class="sp"></span><button class="btn" data-x aria-label="Fechar">✕</button></div>`;
+const listaDrawer = guarda(async (titulo, params) => {
+  const l = await api('GET', '/unidades?pp=100&' + new URLSearchParams(params));
+  gav(`${topo(false)}<h2 style="margin:0 0 4px">${h(titulo)}</h2><p class="mut" style="margin:0 0 12px">${l.total} unidade(s)${l.total > 100 ? ' · mostrando as 100 primeiras; refine na aba Unidades' : ''}. Clique para abrir.</p>
+  ${l.itens.map(u => `<div class="lk" data-id="${h(u.id)}"><span><b>${h(u.bkn)}</b> ${h(u.nome)}<br><small class="mut">${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''} · ${h(etNome(u.etapa))}</small></span>${selUnidade(u)}</div>`).join('') || '<p class="mut">Nenhuma unidade.</p>'}`);
+  $('#gav').querySelectorAll('.lk').forEach(x => x.onclick = () => ficha(x.dataset.id, () => listaDrawer(titulo, params)));
 });
-function formUnidade(u) {
+const ficha = guarda(async (id, voltar) => {
+  const u = await api('GET', '/unidades/' + id), V = c => `<b style="color:var(--ink)">${c}</b>`;
+  gav(`${topo(voltar)}<h2 style="margin:0">${h(u.nome)}</h2><p class="mut" style="margin:0 0 12px">BKN ${h(u.bkn)} · ${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''} · ${selUnidade(u)}</p>
+  ${u.pendencias.length ? `<div class="box" style="border-color:var(--bad)"><h2>Pendências</h2><ul class="lst">${u.pendencias.map(p => `<li>${h(p)}</li>`).join('')}</ul></div>` : ''}
+  <div class="f"><label>Responsável Técnico${V(h(u.rt.nome) || '—')}</label><label>CRN${V(h(u.rt.crn) || '—')}</label><label>Validade do RT${V(dt(u.rt.validade))}</label>
+  <label>Licença sanitária${V((u.licenca === 'sim' ? 'Sim' : u.licenca === 'nao' ? 'Não' : 'Não informada') + (u.licencaValidade ? ' · até ' + dt(u.licencaValidade) : ''))}</label><label>Previsão de virada${V(dt(u.previsaoVirada))}</label><label>Prazo do protocolo${V(dt(u.prazo))}</label>
+  <label>Visitas por mês${V(u.visitas || '—')}</label><label>Valor mensal${V(u.valorMensal != null ? brl(u.valorMensal) : 'padrão')}</label><label>CNPJ${V(h(u.cnpj) || '—')}</label>
+  ${u.observacao ? `<label class="w">Observação<span style="color:var(--ink)">${h(u.observacao)}</span></label>` : ''}</div>
+  ${podeEditar ? `<form id="fm" class="box" style="margin-top:14px"><h2>Etapa: ${h(etNome(u.etapa))}</h2><div id="fe"></div><div class="f"><label>Mover para<select name="etapa">${BOOT.etapas.filter(e => e[0] !== u.etapa).map(([k, n]) => `<option value="${k}">${h(n)}</option>`).join('')}</select></label><label>Nota (opcional)<input name="nota" maxlength="300"></label></div><div class="dr"><button class="btn p">Mover</button></div></form>` : ''}
+  <h2 style="font-size:15px;margin:16px 0 6px">Histórico</h2>${u.historico.length ? `<ul class="lst">${u.historico.slice(0, 12).map(e => `<li>${dt(e.data)} — ${h(etNome(e.de))} → ${h(etNome(e.para))}${e.nota ? ' · ' + h(e.nota) : ''}${e.por ? ' · ' + h(e.por) : ''}</li>`).join('')}</ul>` : '<p class="mut">Sem movimentações registradas.</p>'}
+  ${podeEditar ? '<div class="dr"><button class="btn d" id="del">Excluir</button><button class="btn p" id="ed">Editar dados</button></div>' : ''}`);
+  if (voltar) $('#gvv').onclick = voltar;
+  if (podeEditar) {
+    $('#ed').onclick = () => formUnidade(u, () => ficha(id, voltar));
+    $('#fm').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); try { await api('POST', `/unidades/${u.id}/mover`, { ...f, por: ME.nome }); await ficha(id, voltar); recarrega(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+    $('#del').onclick = guarda(async () => { if (!confirm(`Excluir a unidade ${u.bkn}? Esta ação não pode ser desfeita.`)) return; await api('DELETE', '/unidades/' + u.id); gavFecha(); recarrega(); });
+  }
+});
+function formUnidade(u, voltar) {
   u = u || { rt: {}, licenca: 'pendente', necessitaRt: 'sim', etapa: 'aguardando' };
   const I = (n, l, v, t = 'text', ex = '') => `<label>${l}<input name="${n}" type="${t}" value="${h(v == null ? '' : v)}" ${ex}></label>`;
   const S = (n, l, v, o) => `<label>${l}<select name="${n}">${o.map(([k, t]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
-  abre(`<h2 style="margin:0 0 12px">${u.id ? 'Editar unidade' : 'Nova unidade'}</h2><form id="fu"><div id="fe"></div><div class="f">
+  gav(`${topo(false)}<h2 style="margin:0 0 12px">${u.id ? 'Editar unidade' : 'Nova unidade'}</h2><form id="fu"><div id="fe"></div><div class="f">
   ${I('bkn', 'BKN *', u.bkn, 'text', 'required')}${I('nome', 'Nome da unidade *', u.nome, 'text', 'required')}${I('cnpj', 'CNPJ', u.cnpj)}${I('cidade', 'Cidade', u.cidade)}${I('uf', 'UF', u.uf, 'text', 'maxlength=2')}${I('endereco', 'Endereço', u.endereco)}
   ${S('licenca', 'Licença sanitária', u.licenca, [['sim', 'Sim'], ['nao', 'Não'], ['pendente', 'Não informada']])}${I('licencaValidade', 'Validade da licença', u.licencaValidade, 'date')}${S('necessitaRt', 'Precisa de RT?', u.necessitaRt, [['sim', 'Sim'], ['nao', 'Não'], ['pendente', 'A definir']])}
   ${I('rtNome', 'Nutricionista RT', u.rt.nome)}${I('rtCrn', 'CRN do RT', u.rt.crn)}${I('rtValidade', 'Validade do RT', u.rt.validade, 'date')}${I('rtAnterior', 'RT anterior', u.rt.anterior)}${I('previsaoVirada', 'Previsão de virada do RT', u.previsaoVirada, 'date')}${I('visitas', 'Visitas por mês', u.visitas, 'number', 'min=0 max=31')}
   ${S('etapa', 'Etapa do protocolo', u.etapa, BOOT.etapas)}${I('prazo', 'Prazo do protocolo', u.prazo, 'date')}${I('valorMensal', 'Valor mensal (R$)', u.valorMensal, 'number', 'min=0 step=0.01 placeholder="usar padrão"')}${I('responsavel', 'ID do responsável no Bitrix (alertas)', u.responsavel, 'text', 'inputmode=numeric')}
-  <label class="w">Observação<textarea name="observacao" rows="2">${h(u.observacao)}</textarea></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  <label class="w">Observação<textarea name="observacao" rows="2">${h(u.observacao)}</textarea></label></div><div class="dr"><button type="button" class="btn" id="cn">Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  $('#cn').onclick = () => (voltar ? voltar() : gavFecha());
   $('#fu').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
     const b = { ...f, rt: { nome: f.rtNome, crn: f.rtCrn, validade: f.rtValidade, anterior: f.rtAnterior }, valorMensal: f.valorMensal };
-    try { await api(u.id ? 'PUT' : 'POST', '/unidades' + (u.id ? '/' + u.id : ''), b); dlg.close(); abrirAba(aba); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
-}
-function moverDialog(u) {
-  abre(`<h2 style="margin:0 0 12px">Mover ${h(u.nome)}</h2><form id="fm"><div id="fe"></div><div class="f"><label>Nova etapa<select name="etapa">${BOOT.etapas.filter(e => e[0] !== u.etapa).map(([k, n]) => `<option value="${k}">${h(n)}</option>`).join('')}</select></label><label>Nota (opcional)<input name="nota" maxlength="300"></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Mover</button></div></form>`);
-  $('#fm').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); try { await api('POST', `/unidades/${u.id}/mover`, { ...f, por: ME.nome }); dlg.close(); abrirAba(aba); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+    try { const r = await api(u.id ? 'PUT' : 'POST', '/unidades' + (u.id ? '/' + u.id : ''), b); aviso(u.id ? 'Unidade salva.' : 'Unidade criada.'); recarrega(); if (u.id && voltar) voltar(); else if (r.id) ficha(r.id); else gavFecha(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
 }
 function importar() {
   abre(`<h2 style="margin:0 0 6px">Importar unidades (CSV)</h2><p class="mut">No Excel: Arquivo → Salvar como → CSV. Colunas reconhecidas: BKN, Nome da loja (ou Unidade BK), CNPJ, Estado, Cidade, Licença sanitária, Status da documentação, Previsão de virada, Nutricionista RT, Validade, Visitas. Unidades com o mesmo BKN são atualizadas.</p><div id="fe"></div><input type="file" id="arq" accept=".csv,text/csv,text/plain"><div class="dr"><button class="btn" data-x>Cancelar</button></div>`);
@@ -193,28 +226,58 @@ function importar() {
 }
 
 // ---------- Esteira ----------
+let E = { q: '', uf: '', situacao: '', lim: 40 };
 const esteira = guarda(async () => {
-  await boot(); const cols = await api('GET', '/esteira');
-  $('#tela').innerHTML = `<h1>Esteira de protocolos</h1><p class="sub">Cada unidade avança da documentação até o deferimento. Clique no cartão para ver a ficha e mover de etapa. Prazos vencidos aparecem em vermelho.</p>
-  <div class="col">${cols.map(c => `<div class="cx"><h3>${h(c.nome)} <span class="sel">${c.total}</span></h3>${c.itens.map(u => { const atr = u.prazo && u.prazo < BOOT.hoje && u.etapa !== 'deferido'; return `<div class="ct" data-id="${h(u.id)}"><b>${h(u.bkn)}</b> ${h(u.nome)}<small>${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''}</small>${u.prazo ? `<small style="${atr ? 'color:var(--bad);font-weight:600' : ''}">Prazo ${dt(u.prazo)}${atr ? ' · atrasado' : ''}</small>` : ''}${u.pendencias.length ? `<small style="color:var(--bad)">${h(u.pendencias[0])}</small>` : ''}</div>`; }).join('') || '<p class="mut" style="font-size:13px">Vazio</p>'}${c.total > c.itens.length ? `<p class="mut" style="font-size:12.5px">+ ${c.total - c.itens.length} (use a aba Unidades)</p>` : ''}</div>`).join('')}</div>`;
-  $('#tela').querySelectorAll('.ct').forEach(c => c.onclick = () => ficha(c.dataset.id));
+  await boot(); const ufs = [...new Set(BOOT.resumo.porUf.map(x => x.uf))].sort();
+  const keep = $('.col') ? $('.col').scrollLeft : 0, qs = new URLSearchParams({ q: E.q, uf: E.uf, situacao: E.situacao, lim: E.lim });
+  const cols = await api('GET', '/esteira?' + qs), total = cols.reduce((s, c) => s + c.total, 0);
+  if (!$('#ebar')) $('#tela').innerHTML = `<h1>Esteira de protocolos</h1><p class="sub" id="esub"></p>
+  <div class="tools" id="ebar"><input id="eq" type="search" placeholder="Buscar BKN, nome, cidade, CNPJ ou RT" style="flex:1;min-width:220px" value="${h(E.q)}"><select id="euf"><option value="">Todos os estados</option>${ufs.map(u => `<option ${u === E.uf ? 'selected' : ''}>${h(u)}</option>`).join('')}</select>
+  <select id="esi">${[['', 'Toda situação'], ['pendente', 'Com pendência'], ['conforme', 'Conformes'], ['semrt', 'Sem RT'], ['vencendo', 'Vencendo']].map(([k, n]) => `<option value="${k}" ${k === E.situacao ? 'selected' : ''}>${n}</option>`).join('')}</select>${podeEditar ? '<button class="btn p" id="enova">Nova unidade</button>' : ''}</div><div id="ecols"></div>`;
+  $('#esub').textContent = `${total} unidade(s). ${podeEditar ? 'Arraste um cartão para outra coluna para mudar a etapa. ' : ''}Clique no cartão para ver e editar sem sair daqui. Prazos vencidos aparecem em vermelho.`;
+  $('#ecols').innerHTML = `<div class="col">${cols.map(c => `<div class="cx" data-et="${c.etapa}"><h3>${h(c.nome)} <span class="sel">${c.total}</span></h3>${c.itens.map(u => { const atr = u.prazo && u.prazo < BOOT.hoje && u.etapa !== 'deferido'; return `<div class="ct" data-id="${h(u.id)}" ${podeEditar ? 'draggable="true"' : ''}><b>${h(u.bkn)}</b> ${h(u.nome)}<small>${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''}</small>${u.prazo ? `<small style="${atr ? 'color:var(--bad);font-weight:600' : ''}">Prazo ${dt(u.prazo)}${atr ? ' · atrasado' : ''}</small>` : ''}${u.pendencias.length ? `<small style="color:var(--bad)">${h(u.pendencias[0])}</small>` : ''}</div>`; }).join('') || '<p class="mut" style="font-size:13px">Solte um cartão aqui</p>'}${c.total > c.itens.length ? `<button class="btn mais" style="width:100%">Mostrar mais (${c.total - c.itens.length})</button>` : ''}</div>`).join('')}</div>`;
+  $('.col').scrollLeft = keep;
+  const col = $('#ecols');
+  col.querySelectorAll('.ct').forEach(c => { c.onclick = () => ficha(c.dataset.id);
+    c.ondragstart = e => { e.dataTransfer.setData('text/plain', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => c.classList.add('arr'), 0); }; c.ondragend = () => { c.classList.remove('arr'); col.querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); }; });
+  col.querySelectorAll('.mais').forEach(b => b.onclick = () => { E.lim += 60; esteira(); });
+  if (podeEditar) col.querySelectorAll('.cx').forEach(x => {
+    x.ondragover = e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; x.classList.add('alvo'); }; x.ondragleave = e => { if (!x.contains(e.relatedTarget)) x.classList.remove('alvo'); };
+    x.ondrop = guarda(async e => { e.preventDefault(); x.classList.remove('alvo'); const id = e.dataTransfer.getData('text/plain'), de = col.querySelector(`.ct[data-id="${CSS.escape(id)}"]`); if (!id || !de || de.closest('.cx') === x) return;
+      const nome = etNome(x.dataset.et); if (x.dataset.et === 'desligado' && !confirm('Desligar esta unidade? Ela sai dos indicadores e da medição mensal.')) return;
+      await api('POST', `/unidades/${id}/mover`, { etapa: x.dataset.et, nota: 'Movido na esteira', por: ME.nome }); aviso(`Unidade movida para “${nome}”.`); esteira(); });
+  });
+  if (!esteira.ligado) { esteira.ligado = true; }
+  let t; $('#eq').oninput = e => { clearTimeout(t); t = setTimeout(() => { E.q = e.target.value; E.lim = 40; esteira(); }, 350); };
+  $('#euf').onchange = e => { E.uf = e.target.value; E.lim = 40; esteira(); }; $('#esi').onchange = e => { E.situacao = e.target.value; E.lim = 40; esteira(); };
+  if (podeEditar) $('#enova').onclick = () => formUnidade();
 });
 
 // ---------- Medição ----------
-let COMP = '';
+let COMP = '', SEL = null, MQ = '', MP = 1;
 const medicao = guarda(async () => {
-  await boot(); COMP = COMP || (await api('GET', '/medicao/previa')).competencia;
+  await boot(); const nova = !COMP; COMP = COMP || (await api('GET', '/medicao/previa')).competencia;
   const [p, hist] = await Promise.all([api('GET', '/medicao/previa?competencia=' + COMP), api('GET', '/medicoes')]);
-  const cfgOk = p.config.empresaId;
-  $('#tela').innerHTML = `<h1>Medição mensal</h1><p class="sub">Gera um título em <b>A Receber</b> para cada unidade ativa, com o valor mensal da unidade (ou o valor padrão). Cada unidade só é medida uma vez por competência.</p>
+  const geraveis = new Set(p.itens.filter(i => i.gerar).map(i => i.unidadeId)); SEL = SEL ? new Set([...SEL].filter(x => geraveis.has(x))) : new Set(geraveis);
+  const cfgOk = p.config.empresaId, t = MQ.toLowerCase(), vis = p.itens.filter(i => !t || `${i.bkn} ${i.nome} ${i.uf}`.toLowerCase().includes(t)), pp = 50, pg = Math.max(1, Math.ceil(vis.length / pp)); MP = Math.min(MP, pg);
+  const selTot = Math.round(p.itens.filter(i => SEL.has(i.unidadeId)).reduce((s, i) => s + i.valor, 0) * 100) / 100, pagina = vis.slice((MP - 1) * pp, MP * pp), todosVis = pagina.filter(i => i.gerar);
+  $('#tela').innerHTML = `<h1>Medição mensal</h1><p class="sub">Gera um título em <b>A Receber</b> para cada unidade marcada, com o valor mensal da unidade (ou o valor padrão). Cada unidade só é medida uma vez por competência. Clique numa unidade para ver ou corrigir os dados sem sair daqui.</p>
   ${cfgOk ? '' : '<p class="msg e">Defina a empresa que fatura em Configurações antes de gerar.</p>'}
-  <div class="tools"><label>Competência <input type="month" id="comp" value="${h(COMP)}"></label><span class="sel ok">${p.geram} a faturar · ${brl(p.total)}</span>${p.ignoradas ? `<span class="sel w">${p.ignoradas} ignorada(s)</span>` : ''}${podeEditar ? `<button class="btn p" id="ger" ${p.geram && cfgOk ? '' : 'disabled'}>Gerar títulos</button>` : ''}</div>
-  <div class="box tw"><table><tr><th>BKN</th><th>Unidade</th><th>UF</th><th style="text-align:right">Valor</th><th>Situação</th></tr>${p.itens.slice(0, 200).map(i => `<tr><td>${h(i.bkn)}</td><td>${h(i.nome)}</td><td>${h(i.uf)}</td><td style="text-align:right">${brl(i.valor)}</td><td>${i.gerar ? '<span class="sel ok">Será gerado</span>' : `<span class="sel w">${h(i.motivo)}</span>`}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">Sem unidades ativas.</td></tr>'}</table></div>
+  <div class="tools"><label>Competência <input type="month" id="comp" value="${h(COMP)}"></label><input id="mq" type="search" placeholder="Buscar unidade" value="${h(MQ)}" style="min-width:200px"><span class="sel ok" id="mres">${SEL.size} marcada(s) · ${brl(selTot)}</span>${p.ignoradas ? `<span class="sel w">${p.ignoradas} ignorada(s)</span>` : ''}${podeEditar ? `<button class="btn p" id="ger" ${SEL.size && cfgOk ? '' : 'disabled'}>Gerar títulos</button>` : ''}</div>
+  <div class="box tw"><table><tr>${podeEditar ? `<th><input type="checkbox" id="mall" ${todosVis.length && todosVis.every(i => SEL.has(i.unidadeId)) ? 'checked' : ''} aria-label="Marcar todas"></th>` : ''}<th>BKN</th><th>Unidade</th><th>UF</th><th style="text-align:right">Valor</th><th>Situação</th></tr>${pagina.map(i => `<tr class="cl" data-id="${h(i.unidadeId)}">${podeEditar ? `<td><input type="checkbox" class="msel" data-u="${h(i.unidadeId)}" ${i.gerar ? '' : 'disabled'} ${SEL.has(i.unidadeId) ? 'checked' : ''}></td>` : ''}<td>${h(i.bkn)}</td><td>${h(i.nome)}</td><td>${h(i.uf)}</td><td style="text-align:right">${brl(i.valor)}</td><td>${i.gerar ? '<span class="sel ok">Pode gerar</span>' : `<span class="sel w">${h(i.motivo)}</span>`}</td></tr>`).join('') || `<tr><td colspan="6" class="mut">Nenhuma unidade.</td></tr>`}</table>
+  <div class="pag"><button class="btn" id="mpa" ${MP <= 1 ? 'disabled' : ''}>‹</button> página ${MP} de ${pg} · ${vis.length} unidade(s) <button class="btn" id="mpn" ${MP >= pg ? 'disabled' : ''}>›</button></div></div>
   <div class="box"><h2>Medições geradas</h2>${hist.length ? `<table><tr><th>Competência</th><th>Unidades</th><th style="text-align:right">Total</th><th></th></tr>${hist.map(m => `<tr><td>${h(m.competencia)}</td><td>${m.unidades}</td><td style="text-align:right">${brl(m.total)}</td><td>${podeEditar ? `<button class="btn d" data-des="${h(m.competencia)}">Desfazer</button>` : ''}</td></tr>`).join('')}</table><p class="mut">Os títulos aparecem em Contas → A receber, onde você emite boleto/Pix pelo Asaas e faz a baixa.</p>` : '<p class="mut">Nenhuma medição ainda.</p>'}</div>`;
-  $('#comp').onchange = e => { COMP = e.target.value || COMP; medicao(); };
+  const q = $('#mq'); if (q === document.activeElement) q.setSelectionRange(q.value.length, q.value.length);
+  $('#comp').onchange = e => { COMP = e.target.value || COMP; SEL = null; MP = 1; medicao(); };
+  let tm; $('#mq').oninput = e => { clearTimeout(tm); tm = setTimeout(async () => { MQ = e.target.value; MP = 1; await medicao(); const i = $('#mq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  $('#mpa').onclick = () => { MP--; medicao(); }; $('#mpn').onclick = () => { MP++; medicao(); };
+  $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = e => { if (e.target.closest('input')) return; ficha(r.dataset.id); });
   if (podeEditar) {
-    $('#ger').onclick = guarda(async () => { if (!confirm(`Gerar ${p.geram} título(s) em A Receber, total ${brl(p.total)}, vencimento dia ${p.config.diaVenc} do mês seguinte?`)) return; const r = await api('POST', '/medicao/gerar', { competencia: COMP }); aviso(`${r.geradas} título(s) gerados (${brl(r.total)}), vencimento ${dt(r.venc)}.`); medicao(); });
-    $('#tela').querySelectorAll('[data-des]').forEach(b => b.onclick = guarda(async () => { if (!confirm(`Desfazer a medição ${b.dataset.des}? Os títulos em aberto serão removidos do A Receber.`)) return; const r = await api('POST', '/medicao/desfazer', { competencia: b.dataset.des }); aviso(`${r.removidos} título(s) removidos.`); medicao(); }));
+    const atualiza = () => { const tot = Math.round(p.itens.filter(i => SEL.has(i.unidadeId)).reduce((s, i) => s + i.valor, 0) * 100) / 100; $('#mres').textContent = `${SEL.size} marcada(s) · ${brl(tot)}`; $('#ger').disabled = !(SEL.size && cfgOk); };
+    $('#tela').querySelectorAll('.msel').forEach(c => c.onchange = () => { c.checked ? SEL.add(c.dataset.u) : SEL.delete(c.dataset.u); atualiza(); });
+    $('#mall').onchange = e => { todosVis.forEach(i => e.target.checked ? SEL.add(i.unidadeId) : SEL.delete(i.unidadeId)); $('#tela').querySelectorAll('.msel:not(:disabled)').forEach(c => c.checked = e.target.checked); atualiza(); };
+    $('#ger').onclick = guarda(async () => { const tot = Math.round(p.itens.filter(i => SEL.has(i.unidadeId)).reduce((s, i) => s + i.valor, 0) * 100) / 100; if (!confirm(`Gerar ${SEL.size} título(s) em A Receber, total ${brl(tot)}, vencimento dia ${p.config.diaVenc} do mês seguinte?`)) return; const r = await api('POST', '/medicao/gerar', { competencia: COMP, unidades: [...SEL] }); SEL = null; aviso(`${r.geradas} título(s) gerados (${brl(r.total)}), vencimento ${dt(r.venc)}.`); medicao(); });
+    $('#tela').querySelectorAll('[data-des]').forEach(b => b.onclick = guarda(async () => { if (!confirm(`Desfazer a medição ${b.dataset.des}? Os títulos em aberto serão removidos do A Receber.`)) return; const r = await api('POST', '/medicao/desfazer', { competencia: b.dataset.des }); SEL = null; aviso(`${r.removidos} título(s) removidos.`); medicao(); }));
   }
 });
 
