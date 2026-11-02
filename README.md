@@ -87,3 +87,14 @@ Configurações → Demonstração carrega 2 empresas fictícias com histórico 
 - **Perfis**: Administrador (tudo, inclusive usuários, integrações, chaves, empresas, configurações e atividades), Financeiro (opera; não administra) e Somente consulta (só lê). Gestão em Contas → Configurações → Usuários e acessos.
 - **Administrador inicial**: vem do ambiente do servidor — `ADMIN_USER` e `ADMIN_HASH` (hash scrypt, nunca a senha) — e é obrigado a trocar a senha no 1º acesso. Sem essas variáveis e sem usuários, ninguém entra. Recuperação: novo `ADMIN_HASH` + novo valor em `ADMIN_RESET` no deploy.
 - Para gerar o hash: `node -e "require('./lib/auth').hashSenha(process.argv[1]).then(console.log)" 'SenhaProvisoria123'`.
+
+
+## Processos de negócios → BK
+
+`/processos.html` lista os processos; o primeiro é o **BK** (`/bk.html`, API `/api/bk/*`, dados em `bk.json`):
+
+- **Unidades, RT e licença**: cadastro por BKN (CNPJ, RT/CRN, licença e validade, previsão de virada), importação por CSV (Excel → Salvar como CSV; colunas reconhecidas pelo título), situação e pendências calculadas.
+- **Alertas**: notificação no Bitrix ao responsável (por unidade ou padrão) nos marcos configurados (60/30/15/7/0 dias e vencido) para licença, RT, virada e prazo de protocolo; cada marco só uma vez; rotina horária.
+- **Esteira de protocolos**: aguardando → enviado → reenviado → em análise → aguarda licença → deferido / desligado, com histórico e prazo.
+- **Medição mensal**: gera um título em A Receber por unidade ativa (valor da unidade ou padrão), uma vez por competência; pode ser desfeita enquanto os títulos estiverem em aberto.
+- Dados de demonstração fictícios em Configurações do BK.

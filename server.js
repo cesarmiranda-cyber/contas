@@ -36,7 +36,9 @@ const empresas = createEmpresas({ fin, secrets, bitrix, createAsaas });
 // Multiempresa: cada empresa pode ter a própria chave do Asaas; quem não tem usa a conta padrão.
 const asaas = createAsaasRouter({ base: asaasBase, clientFor: id => empresas.clientFor(id), allClients: () => empresas.allClients() });
 const svc = createService({ bitrix, asaas, store, empresas });
+const { createBkApi } = require('./lib/bkApi');
 const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR });
+const bkApi = createBkApi({ fin, empresas, bitrix, store, dir: DATA_DIR });
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
@@ -167,6 +169,10 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, r.json);
     }
+    if (u.pathname.startsWith('/api/bk/')) {
+      const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : 1e6));
+      return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
+    }
     const key = `${req.method} ${u.pathname}`;
     if (req.method === 'DELETE' && routes[key]) return send(res, 200, await routes[key](u, {}));
     if (routes[key]) return send(res, 200, await routes[key](u, ['POST', 'PUT'].includes(req.method) ? await readBody(req) : {}));
@@ -208,6 +214,8 @@ server.listen(PORT, () => {
   // Contratos (funil 15): avisa o responsável nos marcos de vencimento, 1x por hora (cada marco só uma vez por contrato).
   const avisar = () => bitrix.enabled && finApi.avisarContratos().then(r => r.enviados.length && console.log('avisos de contrato', r.enviados.length)).catch(e => console.error('avisos', e.message));
   setTimeout(avisar, 30000); setInterval(avisar, 3600 * 1000);
+  const avisarBk = () => bitrix.enabled && bkApi.avisar().then(r => r.enviados.length && console.log('avisos BK', r.enviados.length)).catch(e => console.error('avisos BK', e.message));
+  setTimeout(avisarBk, 45000); setInterval(avisarBk, 3600 * 1000);
   const recorr = () => { try { const n = finApi.gerarRecorrenciasAgora(); if (n) console.log('recorrências geradas', n); } catch (e) { console.error('recorrências', e.message); } };
   setTimeout(recorr, 12000); setInterval(recorr, 3600 * 1000);
   const folha = () => { try { finApi.folhaAuto(); } catch (e) { console.error('folha', e.message); } };

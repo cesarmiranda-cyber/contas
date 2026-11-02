@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrimix · BK</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--bg:#f2f3f5;--surface:#fff;--ink:#16202e;--ink2:#46515f;--mut:#6b7684;--line:#d8dce2;--brand:#1c4a82;--brandbg:#e8eff8;--ok:#1b6b3a;--okbg:#e2f4e8;--warn:#8a5a00;--warnbg:#fff3d6;--bad:#a1281f;--badbg:#fde8e6}
+@media(prefers-color-scheme:dark){:root{--bg:#10151c;--surface:#171e27;--ink:#eaeef3;--ink2:#b5bfcb;--mut:#8996a5;--line:#2a3441;--brand:#7fb0ee;--brandbg:#1b2a3d;--ok:#6fd49a;--okbg:#143324;--warn:#f0c46a;--warnbg:#3a2f12;--bad:#ff9a90;--badbg:#401c19}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}[hidden]{display:none!important}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);height:56px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5}
+.marca{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;color:var(--ink);text-decoration:none}.marca b{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;background:var(--brand);color:#fff}
+.sp{flex:1}.user{font-size:13px;color:var(--ink2)}
+nav{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);display:flex;gap:2px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 14px;font:inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+nav button[aria-selected=true]{color:var(--brand);border-color:var(--brand);font-weight:650}
+main{max-width:1240px;margin:0 auto;padding:20px clamp(12px,3vw,32px) 60px}
+h1{margin:0 0 2px;font-size:22px}.sub{margin:0 0 18px;color:var(--mut)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.k{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.k:hover{border-color:var(--brand)}.k small{display:block;color:var(--mut);font-size:12.5px}.k strong{font-size:26px;letter-spacing:-.02em}.k.bad strong{color:var(--bad)}.k.warn strong{color:var(--warn)}.k.ok strong{color:var(--ok)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}.box h2{margin:0 0 10px;font-size:15.5px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.bar i{display:block;height:10px;border-radius:5px;background:var(--brand);min-width:2px}.bar span:first-child{width:150px;color:var(--ink2)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th{text-align:left;font-weight:600;color:var(--mut);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}tr.cl{cursor:pointer}tr.cl:hover td{background:var(--brandbg)}
+.tw{overflow-x:auto}
+.sel{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--brandbg);color:var(--brand)}
+.sel.ok{background:var(--okbg);color:var(--ok)}.sel.w{background:var(--warnbg);color:var(--warn)}.sel.b{background:var(--badbg);color:var(--bad)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px;max-width:100%}
+.btn{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:7px 14px;cursor:pointer}.btn:hover{border-color:var(--brand)}
+.btn.p{background:var(--brand);border-color:var(--brand);color:#fff}[data-t=dark] .btn.p,.btn.p{color:#fff}.btn.d{color:var(--bad)}
+@media(prefers-color-scheme:dark){.btn.p{color:#0b1420}}
+.pag{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;color:var(--mut)}
+.col{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}.cx{flex:0 0 255px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+.cx h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between}.ct{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:pointer}.ct:hover{border-color:var(--brand)}.ct small{color:var(--mut);display:block}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:20px;width:min(720px,94vw);max-height:92vh}dialog::backdrop{background:#0008}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
+.msg{padding:9px 12px;border-radius:8px;margin:0 0 12px;background:var(--brandbg);color:var(--brand)}.msg.e{background:var(--badbg);color:var(--bad)}
+.lst{margin:0;padding-left:18px;color:var(--ink2)}.mut{color:var(--mut)}.dr{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+</style>
+</head>
+<body>
+<header><a class="marca" href="/"><b>N</b>Nutrimix</a><span class="mut">/ <a href="/processos.html" style="color:inherit">Processos</a> / BK</span><span class="sp"></span><span class="user" id="user"></span></header>
+<nav role="tablist" id="abas"></nav>
+<main hidden id="app"><div id="msg"></div><div id="tela"></div></main>
+<dialog id="dlg"></dialog>
+<script src="/auth.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const api = (m, u, b) => nmJson(m, '/api/bk' + u, b);
+const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dt = s => s ? s.split('-').reverse().join('/') : '—';
+const ABAS = [['painel', 'Painel'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações']];
+let ME = {}, BOOT = {}, aba = 'painel', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false;
+const NIV = { vencido: 'b', critico: 'b', atencao: 'w', ok: 'ok' };
+function aviso(t, erro) { const m = $('#msg'); m.innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
+const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
+
+function abrirAba(a) {
+  aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
+  $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
+  history.replaceState(null, '', '#' + a); ({ painel, unidades, esteira, medicao, config })[a]();
+}
+async function boot() { BOOT = await api('GET', '/bootstrap'); }
+const selUnidade = u => u.pendencias && u.pendencias.length ? `<span class="sel b">${u.pendencias.length} pendência(s)</span>` : u.ativa ? '<span class="sel ok">Conforme</span>' : '<span class="sel">Inativa</span>';
+
+// ---------- Painel ----------
+const painel = guarda(async () => {
+  await boot(); const r = BOOT.resumo, max = Math.max(1, ...r.porUf.map(x => x.unidades));
+  const k = (t, v, c, f) => `<button class="k ${c}" data-f='${f}'><small>${t}</small><strong>${v}</strong></button>`;
+  $('#tela').innerHTML = `<h1>Licença sanitária e Responsável Técnico</h1><p class="sub">Situação de ${r.ativas} unidade(s) ativa(s) · posição de ${dt(BOOT.hoje)}${BOOT.demo ? ' · <span class="sel w">dados de demonstração</span>' : ''}</p>
+  <div class="cards">${k('Conformes', r.conformes, 'ok', '{"situacao":"conforme"}')}${k('Com pendência', r.comPendencia, r.comPendencia ? 'bad' : '', '{"situacao":"pendente"}')}${k('Precisam de RT e não têm', r.semRt, r.semRt ? 'bad' : '', '{"situacao":"semrt"}')}${k('Vencidos ou a vencer em 7 dias', r.vencidos + r.criticos, r.vencidos + r.criticos ? 'warn' : '', '{"situacao":"vencendo"}')}${k('Necessitam de RT', r.necessitamRt, '', '{}')}</div>
+  <div class="grid2"><div class="box"><h2>Situação da documentação</h2>${r.porEtapa.map(e => `<div class="bar"><span>${h(e.nome)}</span><i style="width:${Math.round(e.qtd / Math.max(1, r.total) * 220)}px"></i><b>${e.qtd}</b></div>`).join('')}</div>
+  <div class="box"><h2>Unidades por estado</h2>${r.porUf.slice(0, 12).map(x => `<div class="bar"><span>${h(x.uf)}</span><i style="width:${Math.round(x.unidades / max * 200)}px"></i><b>${x.unidades}</b>${x.pendentes ? `<span class="sel b">${x.pendentes} pend.</span>` : ''}</div>`).join('') || '<p class="mut">Sem unidades.</p>'}</div></div>
+  <div class="box"><h2>Próximos vencimentos e prazos</h2><div id="prox"></div></div>
+  ${r.total ? '' : '<div class="box"><h2>Comece por aqui</h2><p>Importe a planilha de controle das unidades (Excel → Salvar como CSV) na aba Unidades, ou carregue os dados de demonstração.</p></div>'}`;
+  $('#tela').querySelectorAll('.k').forEach(b => b.onclick = () => { F = { q: '', uf: '', etapa: '', situacao: '', page: 1, ...JSON.parse(b.dataset.f) }; abrirAba('unidades'); });
+  const l = await api('GET', '/unidades?pp=100&situacao=vencendo'), ev = [];
+  for (const u of l.itens) for (const a of u.alertas) if (a.nivel !== 'ok') ev.push({ u, a });
+  ev.sort((x, y) => x.a.dias - y.a.dias);
+  $('#prox').innerHTML = ev.length ? `<div class="tw"><table><tr><th>Unidade</th><th>O quê</th><th>Data</th><th>Situação</th></tr>${ev.slice(0, 15).map(({ u, a }) => `<tr class="cl" data-id="${h(u.id)}"><td>${h(u.bkn)} · ${h(u.nome)}</td><td>${h(a.rotulo)}</td><td>${dt(a.data)}</td><td><span class="sel ${NIV[a.nivel]}">${a.dias < 0 ? 'vencido há ' + -a.dias + ' d' : a.dias === 0 ? 'hoje' : 'em ' + a.dias + ' d'}</span></td></tr>`).join('')}</table></div>` : '<p class="mut">Nada vencendo nas próximas semanas.</p>';
+  $('#prox').querySelectorAll('tr.cl').forEach(t => t.onclick = () => ficha(t.dataset.id));
+});
+
+// ---------- Unidades ----------
+const unidades = guarda(async () => {
+  await boot();
+  const q = new URLSearchParams({ ...F, pp: 25 }); const l = await api('GET', '/unidades?' + q);
+  const ufs = [...new Set(BOOT.resumo.porUf.map(x => x.uf))].sort();
+  $('#tela').innerHTML = `<h1>Unidades</h1><p class="sub">${l.total} unidade(s). Clique numa linha para ver a ficha, o RT e o histórico.</p>
+  <div class="tools"><input id="fq" type="search" placeholder="Buscar BKN, nome, cidade, RT ou CNPJ" value="${h(F.q)}" style="flex:1;min-width:220px">
+  <select id="fuf"><option value="">Todos os estados</option>${ufs.map(u => `<option ${u === F.uf ? 'selected' : ''}>${h(u)}</option>`).join('')}</select>
+  <select id="fet"><option value="">Todas as etapas</option>${BOOT.etapas.map(([k, n]) => `<option value="${k}" ${k === F.etapa ? 'selected' : ''}>${h(n)}</option>`).join('')}</select>
+  <select id="fsi">${[['', 'Toda situação'], ['conforme', 'Conformes'], ['pendente', 'Com pendência'], ['semrt', 'Sem RT'], ['vencendo', 'Vencendo']].map(([k, n]) => `<option value="${k}" ${k === F.situacao ? 'selected' : ''}>${n}</option>`).join('')}</select>
+  ${podeEditar ? '<button class="btn p" id="nova">Nova unidade</button><button class="btn" id="imp">Importar CSV</button>' : ''}<button class="btn" id="exp">Exportar CSV</button></div>
+  <div class="box tw"><table><tr><th>BKN</th><th>Unidade</th><th>Cidade/UF</th><th>Licença</th><th>RT</th><th>Etapa</th><th>Situação</th></tr>
+  ${l.itens.map(u => `<tr class="cl" data-id="${h(u.id)}"><td>${h(u.bkn)}</td><td>${h(u.nome)}</td><td>${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''}</td><td>${u.licenca === 'sim' ? 'Sim' + (u.licencaValidade ? ' · até ' + dt(u.licencaValidade) : '') : u.licenca === 'nao' ? 'Não' : '—'}</td><td>${h(u.rt.nome) || (u.necessitaRt === 'sim' ? '<span class="sel b">sem RT</span>' : '—')}</td><td>${h((BOOT.etapas.find(e => e[0] === u.etapa) || [])[1])}</td><td>${selUnidade(u)}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Nenhuma unidade encontrada.</td></tr>'}</table>
+  <div class="pag"><button class="btn" id="pa" ${l.pagina <= 1 ? 'disabled' : ''}>‹</button> página ${l.pagina} de ${l.paginas} <button class="btn" id="pn" ${l.pagina >= l.paginas ? 'disabled' : ''}>›</button></div></div>`;
+  const re = () => unidades(); let t;
+  $('#fq').oninput = e => { clearTimeout(t); t = setTimeout(() => { F.q = e.target.value; F.page = 1; re(); }, 350); };
+  $('#fuf').onchange = e => { F.uf = e.target.value; F.page = 1; re(); }; $('#fet').onchange = e => { F.etapa = e.target.value; F.page = 1; re(); }; $('#fsi').onchange = e => { F.situacao = e.target.value; F.page = 1; re(); };
+  $('#pa').onclick = () => { F.page = l.pagina - 1; re(); }; $('#pn').onclick = () => { F.page = l.pagina + 1; re(); };
+  $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = () => ficha(r.dataset.id));
+  if (podeEditar) { $('#nova').onclick = () => formUnidade(); $('#imp').onclick = importar; }
+  $('#exp').onclick = guarda(async () => { const t = await api('GET', '/unidades?pp=100&page=1'); const todas = []; for (let p = 1; p <= t.paginas; p++) todas.push(...(await api('GET', '/unidades?pp=100&page=' + p)).itens); csv(todas); });
+});
+function csv(ls) {
+  const c = ['BKN', 'Unidade', 'CNPJ', 'Cidade', 'UF', 'Licença', 'Validade licença', 'Precisa RT', 'RT', 'CRN', 'Validade RT', 'Etapa', 'Previsão virada', 'Pendências'];
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""').replace(/^([=+\-@])/, "'$1") + '"';
+  const rows = ls.map(u => [u.bkn, u.nome, u.cnpj, u.cidade, u.uf, u.licenca, u.licencaValidade, u.necessitaRt, u.rt.nome, u.rt.crn, u.rt.validade, u.etapa, u.previsaoVirada, u.pendencias.join(' | ')].map(q).join(';'));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [c.map(q).join(';'), ...rows].join('\r\n')], { type: 'text/csv' })); a.download = 'unidades-bk.csv'; a.click();
+}
+const dlg = $('#dlg');
+function abre(html) { dlg.innerHTML = html; if (!dlg.open) dlg.showModal(); dlg.querySelectorAll('[data-x]').forEach(b => b.onclick = () => dlg.close()); }
+const ficha = guarda(async id => {
+  const u = await api('GET', '/unidades/' + id), et = n => (BOOT.etapas.find(e => e[0] === n) || [])[1] || n;
+  abre(`<h2 style="margin:0">${h(u.nome)}</h2><p class="mut" style="margin:0 0 12px">BKN ${h(u.bkn)} · ${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''} · ${selUnidade(u)}</p>
+  ${u.pendencias.length ? `<div class="box" style="border-color:var(--bad)"><h2>Pendências</h2><ul class="lst">${u.pendencias.map(p => `<li>${h(p)}</li>`).join('')}</ul></div>` : ''}
+  <div class="f"><label>Responsável Técnico<b style="color:var(--ink)">${h(u.rt.nome) || '—'}</b></label><label>CRN<b style="color:var(--ink)">${h(u.rt.crn) || '—'}</b></label><label>Validade do RT<b style="color:var(--ink)">${dt(u.rt.validade)}</b></label>
+  <label>Licença sanitária<b style="color:var(--ink)">${u.licenca === 'sim' ? 'Sim' : u.licenca === 'nao' ? 'Não' : 'Não informada'} ${u.licencaValidade ? '· até ' + dt(u.licencaValidade) : ''}</b></label><label>Previsão de virada<b style="color:var(--ink)">${dt(u.previsaoVirada)}</b></label><label>Etapa<b style="color:var(--ink)">${h(et(u.etapa))}</b></label>
+  <label>Visitas por mês<b style="color:var(--ink)">${u.visitas || '—'}</b></label><label>Valor mensal<b style="color:var(--ink)">${u.valorMensal != null ? brl(u.valorMensal) : 'padrão'}</b></label><label>CNPJ<b style="color:var(--ink)">${h(u.cnpj) || '—'}</b></label>
+  ${u.observacao ? `<label class="w">Observação<b style="color:var(--ink);font-weight:400">${h(u.observacao)}</b></label>` : ''}</div>
+  <h2 style="font-size:15px;margin:16px 0 6px">Histórico</h2>${u.historico.length ? `<ul class="lst">${u.historico.slice(0, 12).map(e => `<li>${dt(e.data)} — ${h(et(e.de))} → ${h(et(e.para))}${e.nota ? ' · ' + h(e.nota) : ''}${e.por ? ' · ' + h(e.por) : ''}</li>`).join('')}</ul>` : '<p class="mut">Sem movimentações registradas.</p>'}
+  <div class="dr">${podeEditar ? `<button class="btn d" id="del">Excluir</button><button class="btn" id="mov">Mover na esteira</button><button class="btn p" id="ed">Editar</button>` : ''}<button class="btn" data-x>Fechar</button></div>`);
+  if (podeEditar) { $('#ed').onclick = () => formUnidade(u); $('#mov').onclick = () => moverDialog(u); $('#del').onclick = guarda(async () => { if (!confirm(`Excluir a unidade ${u.bkn}? Esta ação não pode ser desfeita.`)) return; await api('DELETE', '/unidades/' + u.id); dlg.close(); abrirAba(aba); }); }
+});
+function formUnidade(u) {
+  u = u || { rt: {}, licenca: 'pendente', necessitaRt: 'sim', etapa: 'aguardando' };
+  const I = (n, l, v, t = 'text', ex = '') => `<label>${l}<input name="${n}" type="${t}" value="${h(v == null ? '' : v)}" ${ex}></label>`;
+  const S = (n, l, v, o) => `<label>${l}<select name="${n}">${o.map(([k, t]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+  abre(`<h2 style="margin:0 0 12px">${u.id ? 'Editar unidade' : 'Nova unidade'}</h2><form id="fu"><div id="fe"></div><div class="f">
+  ${I('bkn', 'BKN *', u.bkn, 'text', 'required')}${I('nome', 'Nome da unidade *', u.nome, 'text', 'required')}${I('cnpj', 'CNPJ', u.cnpj)}${I('cidade', 'Cidade', u.cidade)}${I('uf', 'UF', u.uf, 'text', 'maxlength=2')}${I('endereco', 'Endereço', u.endereco)}
+  ${S('licenca', 'Licença sanitária', u.licenca, [['sim', 'Sim'], ['nao', 'Não'], ['pendente', 'Não informada']])}${I('licencaValidade', 'Validade da licença', u.licencaValidade, 'date')}${S('necessitaRt', 'Precisa de RT?', u.necessitaRt, [['sim', 'Sim'], ['nao', 'Não'], ['pendente', 'A definir']])}
+  ${I('rtNome', 'Nutricionista RT', u.rt.nome)}${I('rtCrn', 'CRN do RT', u.rt.crn)}${I('rtValidade', 'Validade do RT', u.rt.validade, 'date')}${I('rtAnterior', 'RT anterior', u.rt.anterior)}${I('previsaoVirada', 'Previsão de virada do RT', u.previsaoVirada, 'date')}${I('visitas', 'Visitas por mês', u.visitas, 'number', 'min=0 max=31')}
+  ${S('etapa', 'Etapa do protocolo', u.etapa, BOOT.etapas)}${I('prazo', 'Prazo do protocolo', u.prazo, 'date')}${I('valorMensal', 'Valor mensal (R$)', u.valorMensal, 'number', 'min=0 step=0.01 placeholder="usar padrão"')}${I('responsavel', 'ID do responsável no Bitrix (alertas)', u.responsavel, 'text', 'inputmode=numeric')}
+  <label class="w">Observação<textarea name="observacao" rows="2">${h(u.observacao)}</textarea></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  $('#fu').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    const b = { ...f, rt: { nome: f.rtNome, crn: f.rtCrn, validade: f.rtValidade, anterior: f.rtAnterior }, valorMensal: f.valorMensal };
+    try { await api(u.id ? 'PUT' : 'POST', '/unidades' + (u.id ? '/' + u.id : ''), b); dlg.close(); abrirAba(aba); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+}
+function moverDialog(u) {
+  abre(`<h2 style="margin:0 0 12px">Mover ${h(u.nome)}</h2><form id="fm"><div id="fe"></div><div class="f"><label>Nova etapa<select name="etapa">${BOOT.etapas.filter(e => e[0] !== u.etapa).map(([k, n]) => `<option value="${k}">${h(n)}</option>`).join('')}</select></label><label>Nota (opcional)<input name="nota" maxlength="300"></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Mover</button></div></form>`);
+  $('#fm').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); try { await api('POST', `/unidades/${u.id}/mover`, { ...f, por: ME.nome }); dlg.close(); abrirAba(aba); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+}
+function importar() {
+  abre(`<h2 style="margin:0 0 6px">Importar unidades (CSV)</h2><p class="mut">No Excel: Arquivo → Salvar como → CSV. Colunas reconhecidas: BKN, Nome da loja (ou Unidade BK), CNPJ, Estado, Cidade, Licença sanitária, Status da documentação, Previsão de virada, Nutricionista RT, Validade, Visitas. Unidades com o mesmo BKN são atualizadas.</p><div id="fe"></div><input type="file" id="arq" accept=".csv,text/csv,text/plain"><div class="dr"><button class="btn" data-x>Cancelar</button></div>`);
+  $('#arq').onchange = async e => { const f = e.target.files[0]; if (!f) return; if (f.size > 2.5e6) { $('#fe').innerHTML = '<p class="msg e">Arquivo maior que 2,5 MB.</p>'; return; }
+    try { const r = await api('POST', '/importar', { csv: await f.text() }); dlg.close(); aviso(`Importação concluída: ${r.criadas} nova(s), ${r.atualizadas} atualizada(s)${r.totalErros ? `, ${r.totalErros} linha(s) com problema (${r.erros.slice(0, 3).join('; ')}…)` : ''}.`); abrirAba('unidades'); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+}
+
+// ---------- Esteira ----------
+const esteira = guarda(async () => {
+  await boot(); const cols = await api('GET', '/esteira');
+  $('#tela').innerHTML = `<h1>Esteira de protocolos</h1><p class="sub">Cada unidade avança da documentação até o deferimento. Clique no cartão para ver a ficha e mover de etapa. Prazos vencidos aparecem em vermelho.</p>
+  <div class="col">${cols.map(c => `<div class="cx"><h3>${h(c.nome)} <span class="sel">${c.total}</span></h3>${c.itens.map(u => { const atr = u.prazo && u.prazo < BOOT.hoje && u.etapa !== 'deferido'; return `<div class="ct" data-id="${h(u.id)}"><b>${h(u.bkn)}</b> ${h(u.nome)}<small>${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''}</small>${u.prazo ? `<small style="${atr ? 'color:var(--bad);font-weight:600' : ''}">Prazo ${dt(u.prazo)}${atr ? ' · atrasado' : ''}</small>` : ''}${u.pendencias.length ? `<small style="color:var(--bad)">${h(u.pendencias[0])}</small>` : ''}</div>`; }).join('') || '<p class="mut" style="font-size:13px">Vazio</p>'}${c.total > c.itens.length ? `<p class="mut" style="font-size:12.5px">+ ${c.total - c.itens.length} (use a aba Unidades)</p>` : ''}</div>`).join('')}</div>`;
+  $('#tela').querySelectorAll('.ct').forEach(c => c.onclick = () => ficha(c.dataset.id));
+});
+
+// ---------- Medição ----------
+let COMP = '';
+const medicao = guarda(async () => {
+  await boot(); COMP = COMP || (await api('GET', '/medicao/previa')).competencia;
+  const [p, hist] = await Promise.all([api('GET', '/medicao/previa?competencia=' + COMP), api('GET', '/medicoes')]);
+  const cfgOk = p.config.empresaId;
+  $('#tela').innerHTML = `<h1>Medição mensal</h1><p class="sub">Gera um título em <b>A Receber</b> para cada unidade ativa, com o valor mensal da unidade (ou o valor padrão). Cada unidade só é medida uma vez por competência.</p>
+  ${cfgOk ? '' : '<p class="msg e">Defina a empresa que fatura em Configurações antes de gerar.</p>'}
+  <div class="tools"><label>Competência <input type="month" id="comp" value="${h(COMP)}"></label><span class="sel ok">${p.geram} a faturar · ${brl(p.total)}</span>${p.ignoradas ? `<span class="sel w">${p.ignoradas} ignorada(s)</span>` : ''}${podeEditar ? `<button class="btn p" id="ger" ${p.geram && cfgOk ? '' : 'disabled'}>Gerar títulos</button>` : ''}</div>
+  <div class="box tw"><table><tr><th>BKN</th><th>Unidade</th><th>UF</th><th style="text-align:right">Valor</th><th>Situação</th></tr>${p.itens.slice(0, 200).map(i => `<tr><td>${h(i.bkn)}</td><td>${h(i.nome)}</td><td>${h(i.uf)}</td><td style="text-align:right">${brl(i.valor)}</td><td>${i.gerar ? '<span class="sel ok">Será gerado</span>' : `<span class="sel w">${h(i.motivo)}</span>`}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">Sem unidades ativas.</td></tr>'}</table></div>
+  <div class="box"><h2>Medições geradas</h2>${hist.length ? `<table><tr><th>Competência</th><th>Unidades</th><th style="text-align:right">Total</th><th></th></tr>${hist.map(m => `<tr><td>${h(m.competencia)}</td><td>${m.unidades}</td><td style="text-align:right">${brl(m.total)}</td><td>${podeEditar ? `<button class="btn d" data-des="${h(m.competencia)}">Desfazer</button>` : ''}</td></tr>`).join('')}</table><p class="mut">Os títulos aparecem em Contas → A receber, onde você emite boleto/Pix pelo Asaas e faz a baixa.</p>` : '<p class="mut">Nenhuma medição ainda.</p>'}</div>`;
+  $('#comp').onchange = e => { COMP = e.target.value || COMP; medicao(); };
+  if (podeEditar) {
+    $('#ger').onclick = guarda(async () => { if (!confirm(`Gerar ${p.geram} título(s) em A Receber, total ${brl(p.total)}, vencimento dia ${p.config.diaVenc} do mês seguinte?`)) return; const r = await api('POST', '/medicao/gerar', { competencia: COMP }); aviso(`${r.geradas} título(s) gerados (${brl(r.total)}), vencimento ${dt(r.venc)}.`); medicao(); });
+    $('#tela').querySelectorAll('[data-des]').forEach(b => b.onclick = guarda(async () => { if (!confirm(`Desfazer a medição ${b.dataset.des}? Os títulos em aberto serão removidos do A Receber.`)) return; const r = await api('POST', '/medicao/desfazer', { competencia: b.dataset.des }); aviso(`${r.removidos} título(s) removidos.`); medicao(); }));
+  }
+});
+
+// ---------- Configurações ----------
+const config = guarda(async () => {
+  await boot(); const c = BOOT.config;
+  $('#tela').innerHTML = `<h1>Configurações do BK</h1><p class="sub">Alertas de vencimento e parâmetros da medição.</p><form class="box" id="fc"><div class="f">
+  <label>Empresa que fatura<select name="empresaId"><option value="">Escolha…</option>${BOOT.empresas.map(e => `<option value="${h(e.id)}" ${e.id === c.empresaId ? 'selected' : ''}>${h(e.nome)}</option>`).join('')}</select></label>
+  <label>Cliente nos títulos<input name="cliente" value="${h(c.cliente)}"></label><label>Valor mensal padrão (R$)<input name="valorPadrao" type="number" min="0" step="0.01" value="${c.valorPadrao}"></label>
+  <label>Dia de vencimento (1 a 28)<input name="diaVenc" type="number" min="1" max="28" value="${c.diaVenc}"></label><label>Categoria<input name="categoria" value="${h(c.categoria)}"></label>
+  <label>Avisar quando faltarem (dias)<input name="marcos" value="${c.marcos.join(', ')}"></label><label>Responsável padrão dos alertas (ID do usuário no Bitrix)<input name="responsavelPadrao" inputmode="numeric" value="${h(c.responsavelPadrao)}"></label></div>
+  <p class="mut">Os alertas cobrem validade da licença, validade do RT, previsão de virada e prazo de protocolo. Vão por notificação no Bitrix para o responsável da unidade (ou o padrão) e correm uma vez por hora; cada marco é avisado uma única vez.</p>
+  <div class="dr">${podeEditar ? '<button type="button" class="btn" id="sim">Simular avisos agora</button><button class="btn p">Salvar</button>' : ''}</div></form><div id="simr"></div>
+  ${podeEditar ? `<div class="box"><h2>Dados de demonstração</h2><p class="mut">Unidades fictícias para apresentar o processo ao cliente. Podem ser removidas a qualquer momento; não afetam dados reais.</p>${BOOT.demo ? '<button class="btn d" id="dd">Remover demonstração</button>' : '<button class="btn" id="dc">Carregar demonstração</button>'}</div>` : ''}`;
+  if (!podeEditar) return;
+  $('#fc').onsubmit = guarda(async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.marcos = f.marcos.split(/[,\s;]+/).filter(Boolean); await api('PUT', '/config', f); aviso('Configurações salvas.'); });
+  $('#sim').onclick = guarda(async () => { const r = await api('POST', '/avisar', { simular: true }); $('#simr').innerHTML = `<div class="box"><h2>Avisos que sairiam agora (${r.enviados.length})</h2>${r.enviados.length ? `<ul class="lst">${r.enviados.slice(0, 40).map(x => `<li>${h(x.msg)} ${x.responsavel ? '' : '<span class="sel b">sem responsável</span>'}</li>`).join('')}</ul>` : '<p class="mut">Nenhum aviso pendente.</p>'}</div>`; });
+  const d = $('#dc') || $('#dd'); d.onclick = guarda(async () => { if ($('#dd') && !confirm('Remover as unidades de demonstração (e títulos de medição ligados a elas)?')) return; await api($('#dd') ? 'DELETE' : 'POST', $('#dd') ? '/demo' : '/demo/carregar'); aviso('Pronto.'); config(); });
+});
+
+(async () => {
+  if (!NM.token) return NM.paraLogin();
+  try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
+    ME = j.usuario; podeEditar = ME.perfil !== 'consulta'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
+    const a = location.hash.slice(1); abrirAba(ABAS.some(x => x[0] === a) ? a : 'painel');
+  } catch { NM.paraLogin(); }
+})();
+</script>
+</body>
+</html>
