@@ -1,6 +1,6 @@
 # Financeiro Nutrimix (Bitrix24 + Asaas) — mapa do app
 
-Tela única em `/` (`public/financeiro.html`). Os links antigos `/?deal=ID`, `?company=` e `?contact=` (aba dentro da deal) redirecionam para o modo embutido: contrato + cobranças (funil 15) ou cobranças do cliente (funil 90).
+**Tela inicial (hub) em `/`** (`public/index.html`) com dois cartões: **Contas** (o financeiro, em `/financeiro.html`) e **Processos de negócios** (abre o módulo de processos do Bitrix24 em nova aba; destino padrão `https://<portal>/bizproc/processes/`, configurável em Contas → Configurações → Integrações). O app financeiro fica em `/financeiro.html`. Os links antigos `/?deal=ID`, `?company=` e `?contact=` (aba dentro da deal) redirecionam para o modo embutido: contrato + cobranças (funil 15) ou cobranças do cliente (funil 90).
 
 | Grupo | Menu | Para que serve |
 |---|---|---|

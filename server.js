@@ -167,7 +167,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(302, { Location: '/financeiro.html' + u.search }); return res.end();
     }
     if (req.method === 'GET') {
-      const f = path.join(__dirname, 'public', u.pathname === '/' || u.pathname === '/index.html' ? 'financeiro.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
+      const f = path.join(__dirname, 'public', u.pathname === '/' || u.pathname === '/index.html' ? 'index.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
       if (f.startsWith(path.join(__dirname, 'public') + path.sep) && fs.existsSync(f) && fs.statSync(f).isFile()) {
         res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
         return fs.createReadStream(f).pipe(res);

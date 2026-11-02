@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Financeiro</title>
+<title>Nutrimix · Contas</title>
 <link rel="icon" href="/_gw/icon">
 <style>
 :root{
@@ -24,8 +24,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,ui-sans-
 svg{display:block}.ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
 aside{background:var(--side);color:var(--sideink);padding:18px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
-.brand{display:flex;align-items:center;gap:10px;padding:4px 10px 16px;color:#fff;font-weight:750;font-size:16px;letter-spacing:-.01em}
-.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand2),#8a5cf0);display:grid;place-items:center;color:#fff}
+.brand{text-decoration:none;display:flex;align-items:center;gap:10px;padding:4px 10px 16px;color:#fff;font-weight:750;font-size:16px;letter-spacing:-.01em}
+.brand small{display:block;font-weight:500;font-size:11px;letter-spacing:.04em;color:var(--sidemut)}.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--brand2),#8a5cf0);display:grid;place-items:center;color:#fff}
 aside nav{display:flex;flex-direction:column;gap:2px}
 aside nav button{display:flex;align-items:center;gap:11px;border:0;background:transparent;color:var(--sideink);padding:9px 12px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;text-align:left}
 aside nav button:hover{background:var(--sidehi);color:#fff}aside nav button[aria-current=page]{background:var(--sidehi);color:#fff;box-shadow:inset 3px 0 0 var(--brand2)}
@@ -104,11 +104,12 @@ details summary{cursor:pointer;color:var(--brand);font-weight:600;padding:8px 0}
 </head>
 <body>
 <div class="app">
-<aside id="side"><div class="brand"><span class="logo"><svg class="ic" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></span>Financeiro</div><nav id="nav"></nav>
+<aside id="side"><a class="brand" href="/" title="Voltar ao início da Nutrimix"><span class="logo"><svg class="ic" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></span><span>Nutrimix<small>Contas</small></span></a><nav id="nav"></nav>
   <div class="sidefoot" id="foot"></div></aside>
 <div class="col">
   <div class="top"><button class="btn menu" id="menu" aria-label="Menu"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><h1 id="ttl">Painel</h1>
     <label class="inline" id="empWrap">Empresa <select id="emp" aria-label="Empresa"></select></label>
+    <a class="btn" href="/" title="Início da Nutrimix">‹ Início</a>
     <button class="btn" id="reload" title="Atualizar dados" aria-label="Atualizar dados"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg></button>
     </div>
   <main id="main"></main>
@@ -556,6 +557,7 @@ async function cfgIntegracoes(){const [st,wl]=await Promise.all([api0('GET','/ap
     $('#asTest').onclick=()=>act(async()=>{const r=await api0('POST','/api/settings/asaas/test',{apiKey:$('#asKey').value,env:env.value});toast(`Chave válida${r.nome?' · '+r.nome:''} · saldo ${brl(r.saldo)}`)});
     $('#asSave').onclick=()=>act(async()=>{const r=await api0('PUT','/api/settings/asaas',{apiKey:$('#asKey').value,env:env.value,confirmarProducao:$('#asProd').checked});toast(`Asaas configurado (${env.value==='production'?'produção':'sandbox'}) · saldo ${brl(r.saldo)}`)});
     const rm=$('#asRm');if(rm)rm.onclick=()=>confirm('Remover a chave padrão do Asaas?')&&act(()=>api0('DELETE','/api/settings/asaas'),'Chave removida');
+    $('#hubSave').onclick=()=>act(async()=>{await api('PUT','/config',{hubProcessosUrl:$('#hubUrl').value});await refreshB()},'Destino salvo');
     $('#verif').onclick=()=>act(async()=>{const r=await api0('POST','/api/settings/verificar');toast(r.camposCriados.length?`${r.camposCriados.length} campo(s) criado(s) no Bitrix`:'Campos e etapas do funil já estão corretos')});
     $('#syncEmp').onclick=()=>act(async()=>{const r=await api('POST','/empresas/sincronizar-campo');toast(`Campo “CR · Empresa” atualizado: ${r.opcoes.length} opção(ões)`)});
     $('#novoSplit').onclick=()=>ask('Recebedor do split',`${fld('nome','Nome*','text','','required maxlength="60"')}${fld('walletId','walletId do Asaas*','text','','required placeholder="00000000-0000-0000-0000-000000000000"')}`,v=>api0('POST','/api/carteiras',v).then(()=>toast('Recebedor cadastrado')));
@@ -572,6 +574,7 @@ async function cfgIntegracoes(){const [st,wl]=await Promise.all([api0('GET','/ap
      <div class="row"><button class="btn" id="asTest">Testar chave</button><button class="btn pri" id="asSave">Testar e salvar</button>${a.source==='painel'?'<button class="btn danger" id="asRm">Remover</button>':''}</div></div>`,'','Cobranças, Pix, boleto e cartão')}
   </div>
   ${card('Campos e etapas no Bitrix',`<div class="cb"><p style="margin-top:0" class="mut">O app cria no Bitrix os campos “CR · …” e as etapas do funil de cobranças (funil ${st.funil.categoria}). Rode se algo estiver faltando.</p><div class="row"><button class="btn" id="verif">Verificar e criar campos do funil</button><button class="btn" id="syncEmp">Atualizar campo “CR · Empresa”</button></div></div>`)}
+  ${card('Tela inicial: Processos de negócios',`<div class="cb"><p style="margin-top:0" class="mut">O segundo cartão da tela inicial abre este endereço em uma nova aba. Deixe em branco para usar o padrão do portal (<code>/bizproc/processes/</code>).</p><label>Endereço (https://…)<input id="hubUrl" type="text" value="${esc((B.config||{}).hubProcessosUrl||'')}" placeholder="https://seu-portal.bitrix24.com.br/bizproc/processes/" autocomplete="off" spellcheck="false"></label><div class="row" style="margin-top:12px"><button class="btn pri" id="hubSave">Salvar destino</button></div></div>`,'','Hub inicial do app')}
   ${card('Recebedores do split (Asaas)',table(['Nome','walletId',''],wl.map(w=>`<tr><td><b>${esc(w.nome)}</b></td><td><code>${esc(w.walletId)}</code></td><td class="num"><button class="btn sm danger" data-rmw="${esc(w.walletId)}" aria-label="Remover">✕</button></td></tr>`),empty('Nenhum recebedor','Cadastre parceiros para dividir uma cobrança (split). Na deal use o campo “CR · Split”.')),`<button class="btn pri" id="novoSplit">+ Recebedor</button>`,'Usado ao emitir cobranças com divisão de valor.')}`}
 
 async function cfgCobranca(){const st=await api0('GET','/api/settings'),c=st.config;
@@ -882,6 +885,7 @@ async function render(keepPage){const m=$('#main');if(BUSY)return;BUSY=true;cons
   }catch(e){m.innerHTML=`<div class="alert alta">${ic('alert')}<span>${esc(e.message)}</span></div>${/Bitrix24 não configurado/.test(e.message)?'<p class="mut">Abra <a href="#" onclick="goSub(\'config\',\'integracoes\');return false">Configurações → Integrações</a> e informe o webhook do Bitrix24.</p>':''}`}finally{BUSY=false}}
 (async()=>{try{Object.assign(B,await api('GET','/bootstrap'))}catch(e){toast(e.message,1)}
   if(EMBED){document.querySelector('aside').hidden=true;document.querySelector('.app').style.display='block';$('#empWrap').hidden=true;$('#menu').hidden=true;$('#reload').hidden=true;$('#ttl').textContent=DEAL?'Contrato e cobranças':'Cliente';render();return}
+  if(location.hash){const [t,u]=location.hash.slice(1).split(':');if(VIEWS[t]){TAB=t;if(u)VIEWS[t].sub=u}}
   fillEmp();$('#emp').onchange=e=>{EMP=e.target.value;ls.set('fin.emp',EMP);VIEWS.contratos.open=null;render()};$('#menu').onclick=()=>$('#side').classList.toggle('open');$('#reload').onclick=()=>render();drawNav();render()})();
 </script>
 </body>
