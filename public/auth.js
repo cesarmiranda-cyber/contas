@@ -5,6 +5,8 @@ const NM = {
   // volta para a tela de login, lembrando para onde ir depois
   paraLogin() { NM.token = ''; const v = location.pathname + location.search + location.hash; location.href = '/' + (v !== '/' ? '?voltar=' + encodeURIComponent(v) : ''); },
 };
+// Retorno do login pelo Bitrix24: o token chega no fragmento da URL (nunca vai ao servidor nem a logs) e é guardado.
+(() => { const m = /^#bx=([\w.-]+)$/.exec(location.hash); if (m) { NM.token = m[1]; history.replaceState(null, '', location.pathname + location.search); } })();
 async function nmFetch(url, o = {}) {
   const h = { ...(o.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(NM.token ? { Authorization: 'Bearer ' + NM.token } : {}) };
   const r = await fetch(url, { method: o.method || 'GET', headers: h, body: o.body !== undefined ? JSON.stringify(o.body) : undefined });

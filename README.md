@@ -98,3 +98,9 @@ Configurações → Demonstração carrega 2 empresas fictícias com histórico 
 - **Esteira de protocolos**: aguardando → enviado → reenviado → em análise → aguarda licença → deferido / desligado, com histórico e prazo.
 - **Medição mensal**: gera um título em A Receber por unidade ativa (valor da unidade ou padrão), uma vez por competência; pode ser desfeita enquanto os títulos estiverem em aberto.
 - Dados de demonstração fictícios em Configurações do BK.
+
+## Login com Bitrix24
+
+- Abrindo o app pelo menu do Bitrix24, o portal envia `AUTH_ID`/`DOMAIN` por POST; o servidor confirma o token no próprio portal (`user.current`, só para o domínio do webhook conectado) e abre a sessão.
+- Fora do Bitrix24, o botão "Entrar com Bitrix24" usa OAuth (tela de login do Bitrix24). Requer um aplicativo local no portal; Client ID/Secret em Configurações → Usuários e acessos, com a URL de retorno `<endereço do app>/auth/bitrix/callback`.
+- Em ambos os casos só entra quem o administrador liberou (Configurações → Usuários e acessos → Liberar usuário do Bitrix24), com um perfil. Usuário e senha ficam para o administrador.

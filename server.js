@@ -38,6 +38,8 @@ const asaas = createAsaasRouter({ base: asaasBase, clientFor: id => empresas.cli
 const svc = createService({ bitrix, asaas, store, empresas });
 const { createBkApi } = require('./lib/bkApi');
 const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR });
+const { createBitrixLogin } = require('./lib/bitrixLogin');
+const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
 const bkApi = createBkApi({ fin, empresas, bitrix, store, dir: DATA_DIR });
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
@@ -132,6 +134,18 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   for (const [k, v] of Object.entries(SEC)) res.setHeader(k, v);
   try {
+    // Login com Bitrix24 (rotas públicas: a validação é feita no próprio portal Bitrix24).
+    const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim() === 'http' ? 'http' : 'https', origem = `${proto}://${req.headers.host}`;
+    const paraApp = (r, extra = '') => { res.writeHead(303, { Location: `${extra}#bx=${r.token}`, 'Cache-Control': 'no-store' }); res.end(); };
+    const volta = (msg) => { res.writeHead(303, { Location: '/?bxerro=' + encodeURIComponent(String(msg).slice(0, 200)), 'Cache-Control': 'no-store' }); res.end(); };
+    if (req.method === 'GET' && u.pathname === '/auth/opcoes') return send(res, 200, { bitrix: bxLogin.oauthPronto() });
+    if (req.method === 'GET' && u.pathname === '/auth/bitrix/start') { try { res.writeHead(302, { Location: bxLogin.inicio(`${origem}/auth/bitrix/callback`), 'Cache-Control': 'no-store' }); return res.end(); } catch (e) { return volta(e.message); } }
+    if (req.method === 'GET' && u.pathname === '/auth/bitrix/callback') { try { return paraApp(await bxLogin.retorno({ code: u.searchParams.get('code'), state: u.searchParams.get('state') }), '/'); } catch (e) { return volta(e.message); } }
+    if (req.method === 'POST' && ['/', '/index.html', '/financeiro.html', '/processos.html', '/bk.html'].includes(u.pathname) && /^application\/x-www-form-urlencoded/i.test(req.headers['content-type'] || '')) {   // o Bitrix24 abre o app com POST
+      let raw = ''; for await (const c of req) { raw += c; if (raw.length > 20000) return volta('Pedido grande demais.'); }
+      const f = Object.fromEntries(new URLSearchParams(raw));
+      try { const alvo = u.pathname === '/' || u.pathname === '/index.html' ? (/[?&](deal|company|contact)=/.test(req.url) ? '/financeiro.html' : '/') : u.pathname; return paraApp(await bxLogin.porPlacement(f), alvo + u.search); } catch (e) { return volta(e.message); }
+    }
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
       const site = req.headers['sec-fetch-site'];
       if (site && !['same-origin', 'same-site', 'none'].includes(site)) return send(res, 403, { error: 'Pedido de outro site bloqueado.' });
@@ -150,6 +164,10 @@ const server = http.createServer(async (req, res) => {
         if (k === 'GET /api/auth/me') return send(res, 200, { usuario: auth.publico(g.user), perfis: auth.PERFIS });
         if (k === 'POST /api/auth/logout') { store.log('acesso', `Saída de ${g.user.usuario}`); return send(res, 200, { ok: true }); }
         if (k === 'POST /api/auth/trocar-senha') return send(res, 200, await auth.trocarSenha(g.user, await readBody(req, 10000)));
+        if (k === 'GET /api/auth/bitrix/usuarios') return send(res, 200, await bxLogin.usuariosBitrix());
+        if (k === 'POST /api/auth/bitrix/liberar') return send(res, 200, auth.liberarBitrix(await readBody(req, 10000)));
+        if (k === 'GET /api/auth/bitrix/config') return send(res, 200, bxLogin.config());
+        if (k === 'PUT /api/auth/bitrix/config') return send(res, 200, bxLogin.salvaConfig(await readBody(req, 10000)));
         if (k === 'GET /api/auth/usuarios') return send(res, 200, auth.listar());
         if (k === 'POST /api/auth/usuarios') return send(res, 200, await auth.criar(await readBody(req, 10000)));
         if (m && req.method === 'PUT') return send(res, 200, await auth.atualizar(m[1], await readBody(req, 10000), g.user));
@@ -208,7 +226,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Contas a Receber em :${PORT} · Asaas ${asaas.enabled ? asaas.env : 'DESLIGADO (configure em Configurações)'} · sync a cada ${SYNC_MIN} min`);
+  console.log(`Nutrimix em :${PORT} · Asaas ${asaas.enabled ? asaas.env : 'DESLIGADO (configure em Configurações)'} · sync a cada ${SYNC_MIN} min`);
   setTimeout(() => svc.sync().then(r => console.log('sync inicial', JSON.stringify(r))).catch(e => console.error(e)), 5000);
   setInterval(() => svc.sync().catch(e => console.error('sync', e.message)), SYNC_MIN * 60 * 1000);
   // Contratos (funil 15): avisa o responsável nos marcos de vencimento, 1x por hora (cada marco só uma vez por contrato).

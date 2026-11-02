@@ -51,7 +51,9 @@ footer{padding:16px;text-align:center;color:var(--mut);font-size:12.5px}
   <form class="cartao" id="fLogin" autocomplete="on" novalidate>
     <div class="marca"><b>N</b>Nutrimix</div>
     <h1>Acesso restrito</h1>
-    <p class="sub">Entre com o seu usuário e senha. O acesso é liberado pelo administrador.</p>
+    <p class="sub">Entre com a sua conta do Bitrix24. O acesso é liberado pelo administrador.</p>
+    <a class="btn" id="bBx" href="/auth/bitrix/start" hidden style="display:block;text-align:center;text-decoration:none;margin-bottom:6px">Entrar com Bitrix24</a>
+    <p class="nota" id="ou" hidden style="margin:10px 0">ou use o usuário e senha do administrador</p>
     <p class="erro" id="eLogin" role="alert" hidden></p>
     <label>Usuário<input id="usuario" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
     <label>Senha<span class="senha"><input id="senha" name="password" type="password" autocomplete="current-password" required><button type="button" class="link" id="ver" aria-label="Mostrar senha">Mostrar</button></span></label>
@@ -105,6 +107,10 @@ footer{padding:16px;text-align:center;color:var(--mut);font-size:12.5px}
 const $ = s => document.querySelector(s);
 const brk = v => { v = Number(v || 0); const a = Math.abs(v); return 'R$ ' + (a >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mi' : a >= 1e4 ? Math.round(v / 1e3) + ' mil' : v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); };
 const volta = () => { const v = new URLSearchParams(location.search).get('voltar'); return v && /^\/(?!\/)[\w\-./?=&%#:]*$/.test(v) ? v : ''; };   // só caminhos do próprio site
+(async () => {
+  const msg = new URLSearchParams(location.search).get('bxerro'); if (msg) { $('#eLogin').textContent = msg; $('#eLogin').hidden = false; history.replaceState(null, '', '/'); }
+  try { const o = await (await fetch('/auth/opcoes')).json(); if (o.bitrix) { $('#bBx').hidden = false; $('#bBx').style.display = 'block'; $('#ou').hidden = false; } } catch { /* só usuário e senha */ }
+})();
 const mostra = id => { for (const s of ['#vLogin', '#vSenha', '#vHub']) $(s).hidden = s !== id; };
 const sair = async () => { try { await nmFetch('/api/auth/logout', { method: 'POST', body: {} }); } catch { /* sai mesmo assim */ } NM.token = ''; mostra('#vLogin'); $('#senha').value = ''; $('#usuario').focus(); };
 $('#ver').onclick = () => { const i = $('#senha'), v = i.type === 'password'; i.type = v ? 'text' : 'password'; $('#ver').textContent = v ? 'Ocultar' : 'Mostrar'; };

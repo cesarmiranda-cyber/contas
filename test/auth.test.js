@@ -116,3 +116,19 @@ test('recuperação: novo ADMIN_RESET com novo hash redefine a senha do administ
   a = createAuth({ dir, env: { ADMIN_USER: 'admin', ADMIN_HASH: h2, ADMIN_RESET: 'r1' } });         // mesmo token: não repete
   assert.ok(a.listar()[0].ativo);
 });
+
+test('login pelo Bitrix24: só entra quem foi liberado; sem senha local; perfil e desativação valem', async () => {
+  const { auth } = await novo();
+  await assert.rejects(auth.entrarBitrix({ id: '7' }), /não tem acesso/);
+  const u = auth.liberarBitrix({ bitrixId: '7', nome: 'Ana Souza', perfil: 'consulta', email: 'ana@x.com' });
+  assert.equal(u.porBitrix, true); assert.equal(u.perfil, 'consulta');
+  assert.throws(() => auth.liberarBitrix({ bitrixId: '7', nome: 'Ana', perfil: 'consulta' }), /já foi liberado/);
+  const r = await auth.entrarBitrix({ id: '7' }); assert.ok(auth.valida(r.token));
+  assert.equal(req(auth, r.token, 'POST', '/api/fin/pagar').status, 403);           // consulta não escreve
+  await assert.rejects(auth.login({ usuario: 'bx7', senha: '' }, '1.1.1.1'), /inválidos/);   // não há senha local
+  await assert.rejects(auth.login({ usuario: 'bx7', senha: 'qualquer-Senha-1' }, '1.1.1.2'), /inválidos/);
+  const adm = auth.listar().find(x => x.perfil === 'admin');
+  await assert.rejects(auth.atualizar(u.id, { novaSenha: 'Nova-Senha-2026x' }, adm), /não usa senha/);
+  await auth.atualizar(u.id, { ativo: false }, adm);
+  assert.equal(auth.valida(r.token), null); await assert.rejects(auth.entrarBitrix({ id: '7' }), /não tem acesso/);
+});

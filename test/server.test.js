@@ -80,3 +80,10 @@ test('perfis na prática: administrador, financeiro e somente consulta', async (
   assert.equal((await chama('GET', '/api/fin/pagar', { token: lei })).status, 401);
   const eu = lista.find(x => x.usuario === 'admin'); assert.equal((await chama('PUT', `/api/auth/usuarios/${eu.id}`, { token: adm, corpo: { ativo: false } })).status, 400);
 });
+
+test('Bitrix24 abre o app por POST: sem portal conectado volta ao login com aviso, sem aceitar token', async () => {
+  const r = await fetch(`http://localhost:${PORT}/financeiro.html`, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Sec-Fetch-Site': 'cross-site' }, body: 'AUTH_ID=abcdefghijkl&DOMAIN=evil.example.com' });
+  assert.equal(r.status, 303); assert.match(r.headers.get('location'), /^\/\?bxerro=/); assert.doesNotMatch(r.headers.get('location'), /#bx=/);
+  const o = await (await fetch(`http://localhost:${PORT}/auth/opcoes`)).json(); assert.equal(o.bitrix, false);
+  const s = await fetch(`http://localhost:${PORT}/auth/bitrix/start`, { redirect: 'manual' }); assert.match(s.headers.get('location'), /bxerro/);
+});
