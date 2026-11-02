@@ -116,3 +116,11 @@ Configurações → Demonstração carrega 2 empresas fictícias com histórico 
 - **Vínculos do cliente**: cada cliente do cronograma liga *empresa* (`crm.company`), *contato* (`crm.contact` da empresa) e *negócio* (funil Assessoria Recorrente / RT); o contato vai no negócio criado pela sincronização.
 - **Lista de conferência mensal** (aba “Conferência mensal”): consultora, horas, frequência e semanas marcadas por estabelecimento e mês; carga inicial de maio a outubro/2026 em `seed/cron-conferencia.json` (fora do repositório). Cada linha abre/edita no painel lateral e leva ao cliente com os vínculos.
 - **Cumprimento**: “X” na lista de conferência = visita realizada. Previsto no mês = frequência combinada × semanas do mês (semanal: nº por semana × semanas; quinzenal: metade das semanas; mensal: 1); linhas sem frequência não entram na conta. Há resumo do mês e por consultora, e um aviso quando uma semana está marcada em quase todas as linhas.
+
+## Sincronização com o Bitrix24
+
+Com o webhook conectado, 1 minuto depois de subir e de hora em hora (`sincBitrix` em `server.js`), de forma idempotente:
+- **Cronograma** (`reconciliar`): liga clientes a empresas (nome igual, quase igual ou contido, e único), contato quando a empresa tem exatamente um, consultoras a usuários (primeiro nome), cria/reaproveita um negócio por cliente no funil Assessoria Recorrente / RT (entra em “Ativo”) e lê a etapa: Suspenso/Cancelado tira o cliente da agenda; voltar a Ativo recoloca.
+- **BK** (`sincronizarFunil`): liga unidades a empresas pelo CNPJ completo e único, cria/reaproveita um negócio por unidade no funil Regularização e mantém a etapa nos dois sentidos (app → Bitrix24 na hora; Bitrix24 → app na hora cheia, e o Bitrix24 vence quando os dois mudaram).
+- Nada é criado sem empresa vinculada, e empresas nunca são criadas sozinhas (só pelo botão “Criar empresa no Bitrix24”, que checa CNPJ/nome antes).
+- O funil de cobranças (categoria 90, motor antigo de cobrança) só roda se existir no portal; em portal sem ele, nada é criado.

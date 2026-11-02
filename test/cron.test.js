@@ -4,6 +4,7 @@ const fs = require('fs'), os = require('os'), path = require('path');
 const FER = require('../lib/feriados'), K = require('../lib/cron');
 const { createCronApi } = require('../lib/cronApi');
 const { createBxEmpresas, similar, chave } = require('../lib/bxEmpresas');
+const { createBxFunil } = require('../lib/bxFunil');
 const { createAuth, hashSenha } = require('../lib/auth');
 
 test('feriados: Páscoa, Carnaval, Corpus Christi, estaduais e municipais', () => {
@@ -47,15 +48,17 @@ test('nomes: similaridade de clientes e abreviações', () => {
 
 const fakeBitrix = () => {
   const empresas = [{ ID: '1', TITLE: 'Domus Food Service', UF_CNPJ: '11', UF_CID: 'Santos', UF_UF: 'SP' }, { ID: '2', TITLE: 'Sacolão Cupecê', UF_CID: '', UF_UF: '' }];
-  const calls = [];
-  return { enabled: true, base: 'https://portal.bitrix24.com.br/rest/1/x', calls, empresas,
+  const calls = [], deals = [];
+  return { enabled: true, deals, base: 'https://portal.bitrix24.com.br/rest/1/x', calls, empresas,
     async call(m, p) {
       calls.push([m, p]);
-      if (m === 'crm.company.userfield.list') return { result: [{ FIELD_NAME: 'UF_CNPJ', EDIT_FORM_LABEL: 'CNPJ' }, { FIELD_NAME: 'UF_CID', EDIT_FORM_LABEL: 'Cidade' }, { FIELD_NAME: 'UF_UF', EDIT_FORM_LABEL: 'Estado' }] };
+      if (m === 'crm.company.fields') return { result: { TITLE: { title: 'Nome' }, UF_CNPJ: { formLabel: 'CNPJ' }, UF_CID: { formLabel: 'Cidade' }, UF_UF: { formLabel: 'Estado' } } };
       if (m === 'crm.company.list') return { result: empresas };
       if (m === 'crm.contact.list') return { result: p.filter.COMPANY_ID === '1' ? [{ ID: '31', NAME: 'Ana', LAST_NAME: 'Lima', PHONE: [{ VALUE: '1199' }] }] : [{ ID: '41', NAME: 'A' }, { ID: '42', NAME: 'B' }] };
-      if (m === 'crm.deal.list') return { result: [] };
-      if (m === 'crm.deal.add') return { result: '900' + calls.length };
+      if (m === 'crm.status.list') return { result: [{ STATUS_ID: 'C6:NEW', NAME: 'Onboarding' }, { STATUS_ID: 'C6:PREPARATION', NAME: 'Ativo' }, { STATUS_ID: 'C6:LOSE', NAME: 'Suspenso' }] };
+      if (m === 'crm.deal.list') return { result: deals.filter(x => String(x.CATEGORY_ID) === String(p.filter.CATEGORY_ID)) };
+      if (m === 'crm.deal.add') { const id = '900' + calls.length; deals.push({ ID: id, ...p.fields, CLOSED: 'N' }); return { result: id }; }
+      if (m === 'crm.deal.update') { deals.find(x => x.ID === p.id).STAGE_ID = p.fields.STAGE_ID; return { result: true }; }
       if (m === 'user.get') return { result: [{ ID: '7', NAME: 'Mônica', LAST_NAME: 'Silva' }, { ID: '8', NAME: 'Iris', LAST_NAME: 'X' }] };
       return { result: true };
     } };
@@ -64,7 +67,7 @@ test('API do cronograma: cliente ← empresa do Bitrix24, consultora ← usuári
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json');
   fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica', 'Iris'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }, { nome: 'Sac. Cupecê', empresaBitrixId: '', sugestaoId: '2' }],
     visitas: ['2026-10-05', '2026-10-12', '2026-10-19'].flatMap(s => [{ data: FER.somaDias(s, 1), consultora: 'Mônica', cliente: 'Domus', min: 180 }, { data: FER.somaDias(s, 2), consultora: 'Iris', cliente: 'Sac. Cupecê', min: 120 }]) }));
-  const bitrix = fakeBitrix(), bx = createBxEmpresas({ bitrix }), api = createCronApi({ bitrix, bx, store: { log() {} }, dir, seedFile: seed });
+  const bitrix = fakeBitrix(), bx = createBxEmpresas({ bitrix }), api = createCronApi({ bitrix, bx, funil: createBxFunil({ bitrix }), store: { log() {} }, dir, seedFile: seed });
   const call = async (m, p, b, user) => { const u = new URL('http://x/api/cron' + p); const r = await api.handle(m, u.pathname, u, async () => b || {}, user); return r.json; };
   assert.equal(api.dados().visitas.length, 6); assert.equal(api.dados().modelos.length, 2);
   assert.equal((await call('POST', '/vincular-auto', {})).vinculados, 1);            // "Sac. Cupecê" = "Sacolão Cupecê"; "Domus" fica para vínculo manual
@@ -72,7 +75,7 @@ test('API do cronograma: cliente ← empresa do Bitrix24, consultora ← usuári
   assert.ok((await call('GET', `/clientes/${domus.id}/sugestoes`)).some(e => e.id === '1'));
   await assert.rejects(call('PUT', `/clientes/${domus.id}`, { empresaBitrixId: '999' }), /não encontrada/);
   const c1 = await call('PUT', `/clientes/${domus.id}`, { empresaBitrixId: '1' }); assert.equal(c1.cidade, 'Santos');
-  assert.equal((await call('POST', '/consultoras/auto', {})).ligadas, 2);
+  await call('POST', '/consultoras/auto', {}); assert.ok(api.dados().consultoras.every(c => c.bitrixId));   // já ligadas pela reconciliação (primeiro nome)
   const simul = await call('POST', '/funil/sincronizar', {}); assert.equal(simul.simulacao, true); assert.equal(simul.criar, 2); assert.equal(bitrix.calls.filter(c => c[0] === 'crm.deal.add').length, 0);
   assert.equal((await call('GET', `/clientes/${domus.id}/contatos`))[0].nome, 'Ana Lima');
   await assert.rejects(call('PUT', `/clientes/${domus.id}`, { contatoBitrixId: '99' }), /não pertence/);
@@ -80,6 +83,11 @@ test('API do cronograma: cliente ← empresa do Bitrix24, consultora ← usuári
   const real = await call('POST', '/funil/sincronizar', { simular: false }); assert.equal(real.criados, 2);
   const add = bitrix.calls.filter(c => c[0] === 'crm.deal.add'); assert.equal(add[0][1].fields.CATEGORY_ID, 6); assert.equal(add[0][1].fields.COMPANY_ID, '1'); assert.equal(add[0][1].fields.ASSIGNED_BY_ID, '7'); assert.equal(add.find(a => a[1].fields.COMPANY_ID === '1')[1].fields.CONTACT_ID, '31');
   assert.equal((await call('POST', '/funil/sincronizar', { simular: false })).criados, 0);      // não duplica
+  assert.equal(add[0][1].fields.STAGE_ID, 'C6:PREPARATION');                                     // cliente existente entra como "Ativo"
+  bitrix.deals.find(x => x.COMPANY_ID === '1').STAGE_ID = 'C6:LOSE';                              // alguém suspende no Bitrix24
+  const rec = await call('POST', '/reconciliar', { simular: false }); assert.equal(rec.desativados, 1); assert.equal(api.dados().clientes.find(c => c.empresaBitrixId === '1').ativo, false);
+  bitrix.deals.find(x => x.COMPANY_ID === '1').STAGE_ID = 'C6:PREPARATION';
+  assert.equal((await call('POST', '/reconciliar', { simular: false })).reativados, 1);
   const m = api.dados().consultoras[0], visita = await call('POST', '/visitas', { data: '2026-10-12', min: 60, consultora: m.id, clienteId: domus.id });
   const sem = await call('GET', '/semana?data=2026-10-12'); assert.equal(sem.comFeriado, 1);
   assert.equal(visita.feriado, 'Nossa Senhora Aparecida'); assert.equal(visita.sugestao, '2026-10-13');
@@ -107,7 +115,7 @@ test('lista de conferência: carga mensal ligada aos clientes, edição e histó
   const linha = (nome, c, sem) => ({ nome, consultoras: c, consultoraTxt: c[0] || '', horasTxt: '2h', min: 120, freqTxt: '1x por semana', freqTipo: 'semanal', freqN: 1, semanas: sem });
   fs.writeFileSync(seed, JSON.stringify({ meses: { '2026-09': { obsMes: ['obs set'], linhas: [linha('Askoll', ['Iris'], [true, false, false, false, false]), linha('Cliente Novo', ['Tais'], [false, false, false, false, false])] }, '2026-10': { obsMes: [], linhas: [linha('Askoll', ['Iris'], [false, true, false, false, true])] } },
     obsClientes: ['Askoll: só terça ou quinta;'], clientes: { 'Cliente Novo': { cidade: 'Santos', uf: 'SP' } } }));
-  const api = createCronApi({ bitrix, bx: createBxEmpresas({ bitrix }), store: { log() {} }, dir, confSeedFile: seed });
+  const api = createCronApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), store: { log() {} }, dir, confSeedFile: seed });
   const call = async (m, p, b) => { const u = new URL('http://x/api/cron' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
   assert.equal(api.dados().conferencia.length, 3); assert.ok(api.dados().consultoras.some(c => c.nome === 'Tais'));
   const meses = await call('GET', '/conferencia/meses'); assert.equal(meses[0].mes, '2026-10');

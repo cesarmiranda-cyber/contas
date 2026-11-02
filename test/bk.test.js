@@ -94,7 +94,7 @@ test('BK: unidade nasce de empresa do Bitrix24 (sem duplicar), vínculo por CNPJ
   const bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) { calls.push(m);
     if (m === 'crm.company.userfield.list') return { result: [{ FIELD_NAME: 'UF_C', EDIT_FORM_LABEL: 'CNPJ' }, { FIELD_NAME: 'UF_CID', EDIT_FORM_LABEL: 'Cidade' }, { FIELD_NAME: 'UF_UF', EDIT_FORM_LABEL: 'Estado' }] };
     if (m === 'crm.company.list') return { result: lista }; if (m === 'crm.company.add') { lista.push({ ID: '6', TITLE: p.fields.TITLE }); return { result: '6' }; } return { result: true }; } };
-  const api = createBkApi({ fin, bitrix, bx: createBxEmpresas({ bitrix }), store: { log() {} }, dir });
+  const api = createBkApi({ fin, bitrix, bx: createBxEmpresas({ bitrix }), funil: require('../lib/bxFunil').createBxFunil({ bitrix }), store: { log() {} }, dir });
   const call = async (m, p, b) => { const u = new URL('http://x' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
   await assert.rejects(call('POST', '/api/bk/unidades', { bkn: '1', nome: 'Loja 1' }), /cadastro do Bitrix24/);
   await assert.rejects(call('POST', '/api/bk/unidades', { bkn: '1', nome: 'Loja 1', empresaBitrixId: '99' }), /não encontrada/);
@@ -104,4 +104,29 @@ test('BK: unidade nasce de empresa do Bitrix24 (sem duplicar), vínculo por CNPJ
   const outra = (await call('GET', '/api/bk/unidades?q=Outra')).itens[0], s = await call('GET', `/api/bk/unidades/${outra.id}/sugestoes`); assert.ok(Array.isArray(s));
   const c = await call('POST', `/api/bk/unidades/${outra.id}/criar-empresa`, {}); assert.equal(c.empresaBitrixId, '6');
   const dup = (await call('POST', '/api/bk/unidades', { bkn: '9', nome: 'Zeta', cnpj: '13574594065484', empresaBitrixId: '5' })); const r = await call('POST', `/api/bk/unidades/${dup.id}/criar-empresa`, {}).catch(e => e); assert.match(String(r.message), /já está vinculada/);
+});
+
+
+test('BK ↔ funil Regularização: cria negócio por unidade com empresa, etapa nos dois sentidos, sem duplicar', async () => {
+  const { createBxEmpresas } = require('../lib/bxEmpresas'), { createBxFunil } = require('../lib/bxFunil');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-')), fin = createFinStore(dir), deals = [], calls = [];
+  const stages = [['C14:NEW', 'Diagnóstico'], ['C14:A', 'Plano de adequação'], ['C14:B', 'Protocolado'], ['C14:C', 'Aguardando vistoria'], ['C14:D', 'Exigências (loop)'], ['C14:E', 'Licença emitida'], ['C14:F', 'Cancelado']].map(([STATUS_ID, NAME]) => ({ STATUS_ID, NAME }));
+  const bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) { calls.push(m);
+    if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' } } };
+    if (m === 'crm.company.list') return { result: [{ ID: '5', TITLE: 'BK Anhaia', UF_C: '13.574.594/0654-84' }] };
+    if (m === 'crm.status.list') return { result: stages };
+    if (m === 'crm.deal.list') return { result: deals.slice() };
+    if (m === 'crm.deal.add') { const id = '70' + deals.length; deals.push({ ID: id, ...p.fields, CLOSED: 'N' }); return { result: id }; }
+    if (m === 'crm.deal.update') { deals.find(x => x.ID === p.id).STAGE_ID = p.fields.STAGE_ID; return { result: true }; } return { result: true }; } };
+  const api = createBkApi({ fin, bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  await call('POST', '/api/bk/importar', { csv: 'BKN;Unidade BK;CNPJ;Status da documentação\n7;Anhaia Mello;13574594065484;ENVIADO\n8;Outra;99999999000199;DEFERIDO\n' });
+  const sim = await api.sincronizarFunil({ simular: true }); assert.equal(sim.criados, 1); assert.equal(sim.vinculadasCnpj, 1); assert.equal(deals.length, 0);
+  const r = await api.sincronizarFunil({ simular: false }); assert.equal(r.criados, 1); assert.equal(deals[0].STAGE_ID, 'C14:B'); assert.equal(deals[0].COMPANY_ID, '5'); assert.equal(deals[0].CATEGORY_ID, 14);
+  assert.equal((await api.sincronizarFunil({ simular: false })).criados, 0);
+  const u = (await call('GET', '/api/bk/unidades?q=Anhaia')).itens[0];
+  await call('POST', `/api/bk/unidades/${u.id}/mover`, { etapa: 'deferido' }); await new Promise(r => setTimeout(r, 30)); assert.equal(deals[0].STAGE_ID, 'C14:E');   // app → Bitrix24 na hora
+  deals[0].STAGE_ID = 'C14:D';                                                                                                                 // Bitrix24 → app
+  const r2 = await api.sincronizarFunil({ simular: false }); assert.equal(r2.doBitrix, 1);
+  assert.equal((await call('GET', `/api/bk/unidades/${u.id}`)).etapa, 'reenviado'); assert.match((await call('GET', `/api/bk/unidades/${u.id}`)).historico[0].nota, /Bitrix24/);
 });

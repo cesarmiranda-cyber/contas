@@ -39,12 +39,13 @@ const svc = createService({ bitrix, asaas, store, empresas });
 const { createBkApi } = require('./lib/bkApi');
 const { createCronApi } = require('./lib/cronApi');
 const { createBxEmpresas } = require('./lib/bxEmpresas');
+const { createBxFunil } = require('./lib/bxFunil');
 const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR });
 const { createBitrixLogin } = require('./lib/bitrixLogin');
 const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
-const bx = createBxEmpresas({ bitrix });
-const cronApi = createCronApi({ bitrix, bx, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
-const bkApi = createBkApi({ fin, empresas, bitrix, bx, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
+const bx = createBxEmpresas({ bitrix }), funil = createBxFunil({ bitrix });
+const cronApi = createCronApi({ bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
+const bkApi = createBkApi({ fin, empresas, bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
@@ -240,6 +241,10 @@ server.listen(PORT, () => {
   // Contratos (funil 15): avisa o responsável nos marcos de vencimento, 1x por hora (cada marco só uma vez por contrato).
   const avisar = () => bitrix.enabled && finApi.avisarContratos().then(r => r.enviados.length && console.log('avisos de contrato', r.enviados.length)).catch(e => console.error('avisos', e.message));
   setTimeout(avisar, 30000); setInterval(avisar, 3600 * 1000);
+  // Sincronização com o Bitrix24 (empresas, contatos, usuários, funis e etapas): 1 min após subir e depois de hora em hora. Idempotente.
+  const sincBitrix = async () => { if (!bitrix.enabled) return; try { const r = await cronApi.reconciliar({ simular: false }); console.log('sync cronograma', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync cronograma', e.message); }
+    try { const r = await bkApi.sincronizarFunil({ simular: false }); console.log('sync BK', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync BK', e.message); } };
+  setTimeout(sincBitrix, 60000); setInterval(sincBitrix, 3600 * 1000);
   const avisarBk = () => bitrix.enabled && bkApi.avisar().then(r => r.enviados.length && console.log('avisos BK', r.enviados.length)).catch(e => console.error('avisos BK', e.message));
   setTimeout(avisarBk, 45000); setInterval(avisarBk, 3600 * 1000);
   const recorr = () => { try { const n = finApi.gerarRecorrenciasAgora(); if (n) console.log('recorrências geradas', n); } catch (e) { console.error('recorrências', e.message); } };
