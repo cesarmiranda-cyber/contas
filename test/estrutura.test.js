@@ -141,13 +141,3 @@ test('cobranças pagas do Bitrix/Asaas entram na conta Asaas da empresa (saldo e
   const ex = await call('GET', `/contas/${cx.id}/extrato`); assert.equal(ex.linhas.length, 1); assert.equal(ex.linhas[0].valor, 800);
   assert.equal(empresas.list().length, 1);
 });
-
-test('destino do card "Processos de negócios" da tela inicial: só https válido, sem credenciais', async () => {
-  const { call, fin } = api();
-  await call('PUT', '/config', { hubProcessosUrl: ' https://nutrimix.bitrix24.com.br/bizproc/processes/ ' });
-  assert.equal(fin.config.hubProcessosUrl, 'https://nutrimix.bitrix24.com.br/bizproc/processes/');
-  assert.equal((await call('GET', '/bootstrap')).config.hubProcessosUrl, 'https://nutrimix.bitrix24.com.br/bizproc/processes/');
-  for (const ruim of ['javascript:alert(1)', 'http://portal.com/x', 'https://u:p@portal.com/x', 'portal sem esquema', 'https://' + 'a'.repeat(300) + '.com']) await assert.rejects(call('PUT', '/config', { hubProcessosUrl: ruim }), /https/, ruim);
-  await call('PUT', '/config', { hubProcessosUrl: '' });
-  assert.equal(fin.config.hubProcessosUrl, '');                                              // vazio volta ao padrão
-});

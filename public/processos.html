@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrimix · Processos de negócios</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--bg:#f2f3f5;--surface:#fff;--ink:#16202e;--ink2:#46515f;--mut:#6b7684;--line:#d8dce2;--brand:#1c4a82;--brandbg:#e8eff8;--warn:#8a5a00;--warnbg:#fff3d6}
+@media(prefers-color-scheme:dark){:root{--bg:#10151c;--surface:#171e27;--ink:#eaeef3;--ink2:#b5bfcb;--mut:#8996a5;--line:#2a3441;--brand:#7fb0ee;--brandbg:#1b2a3d;--warn:#f0c46a;--warnbg:#3a2f12}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}[hidden]{display:none!important}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(16px,4vw,40px);height:60px;display:flex;align-items:center;gap:16px}
+.marca{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:var(--ink);text-decoration:none}.marca b{display:grid;place-items:center;width:30px;height:30px;border-radius:6px;background:var(--brand);color:#fff}
+.sp{flex:1}.user{font-size:13.5px;color:var(--ink2)}.user strong{color:var(--ink)}
+main{flex:1;width:100%;max-width:980px;margin:0 auto;padding:clamp(24px,5vh,48px) clamp(16px,4vw,40px)}
+.cam{font-size:13px;color:var(--mut);margin-bottom:10px}.cam a{color:var(--brand)}
+h1{margin:0 0 4px;font-size:26px;letter-spacing:-.02em;font-weight:650}.sub{margin:0 0 26px;color:var(--mut)}
+.lista{display:grid;gap:14px}
+.proc{display:grid;grid-template-columns:48px 1fr auto;gap:16px;align-items:start;padding:20px 22px;background:var(--surface);border:1px solid var(--line);border-radius:10px;text-decoration:none;color:inherit}
+a.proc:hover{border-color:var(--brand)}
+.ic{width:48px;height:48px;border-radius:8px;background:var(--brandbg);display:grid;place-items:center;font-weight:700;color:var(--brand);font-size:15px}
+.proc h2{margin:0 0 3px;font-size:17px;font-weight:650}.proc p{margin:0;color:var(--ink2);font-size:14px}
+.sel{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:650;white-space:nowrap}.sel.w{background:var(--warnbg);color:var(--warn)}.sel.o{background:var(--brandbg);color:var(--brand)}
+.vazio{margin-top:18px;padding:14px 16px;border:1px dashed var(--line);border-radius:10px;color:var(--mut);font-size:14px}
+@media(max-width:560px){.proc{grid-template-columns:40px 1fr}.proc .sel{grid-column:2}}
+</style>
+</head>
+<body>
+<header><a class="marca" href="/"><b>N</b>Nutrimix</a><span class="sp"></span><span class="user" id="user"></span></header>
+<main hidden id="conteudo">
+  <div class="cam"><a href="/">Início</a> › Processos de negócios</div>
+  <h1>Processos de negócios</h1>
+  <p class="sub">Operações da Nutri Mix para os seus clientes. Escolha um processo para acompanhar e executar.</p>
+  <div class="lista">
+    <div class="proc" id="bk" aria-label="Processo BK">
+      <span class="ic">BK</span>
+      <div><h2>BK — Licença sanitária e Responsável Técnico</h2><p>Controle das unidades Burger King: quem precisa de nutricionista RT, situação da documentação e da licença, previsão de virada do RT, visitas e pendências por unidade.</p></div>
+      <span class="sel w">Em desenho</span>
+    </div>
+  </div>
+  <p class="vazio">Novos processos serão adicionados aqui, cada um com a sua tela e o seu acompanhamento.</p>
+</main>
+<script src="/auth.js"></script>
+<script>
+(async () => {
+  if (!NM.token) return NM.paraLogin();
+  try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
+    document.getElementById('user').innerHTML = '<strong></strong> · ' + j.usuario.perfilNome; document.querySelector('#user strong').textContent = j.usuario.nome; document.getElementById('conteudo').hidden = false;
+  } catch { NM.paraLogin(); }
+})();
+</script>
+</body>
+</html>

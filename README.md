@@ -1,6 +1,6 @@
 # Financeiro Nutrimix (Bitrix24 + Asaas) — mapa do app
 
-**Tela inicial (hub) em `/`** (`public/index.html`) com dois cartões: **Contas** (o financeiro, em `/financeiro.html`) e **Processos de negócios** (abre o módulo de processos do Bitrix24 em nova aba; destino padrão `https://<portal>/bizproc/processes/`, configurável em Contas → Configurações → Integrações). O app financeiro fica em `/financeiro.html`. Os links antigos `/?deal=ID`, `?company=` e `?contact=` (aba dentro da deal) redirecionam para o modo embutido: contrato + cobranças (funil 15) ou cobranças do cliente (funil 90).
+**Tela inicial em `/`**: depois do login, dois cartões — **Contas** (o financeiro, em `/financeiro.html`) e **Processos de negócios** (`/processos.html`, lista de processos; o primeiro será o **BK**).
 
 | Grupo | Menu | Para que serve |
 |---|---|---|
@@ -79,3 +79,11 @@ As credenciais salvas pelo painel ficam em `DATA_DIR/secrets.json` (modo 0600), 
 
 ## Dados de demonstração
 Configurações → Demonstração carrega 2 empresas fictícias com histórico (todos os processos) e remove tudo depois. Nada vai ao Bitrix/Asaas; as empresas demo não entram no campo “CR · Empresa”.
+
+
+## Controle de acesso
+- **Nada é público**: toda a API exige login (só `/health` responde sem). As páginas HTML são apenas o código da tela; antes do login não mostram nem consultam dado algum.
+- Usuários e senhas do próprio app (`DATA_DIR/usuarios.json`, 0600). Senha com scrypt + sal; mínimo de 10 caracteres com letras e números; bloqueio de 15 min após 5 erros; limite de tentativas por IP; sessão assinada de 10 h (renova sozinha), derrubada na hora ao trocar a senha, desativar ou rebaixar o usuário.
+- **Perfis**: Administrador (tudo, inclusive usuários, integrações, chaves, empresas, configurações e atividades), Financeiro (opera; não administra) e Somente consulta (só lê). Gestão em Contas → Configurações → Usuários e acessos.
+- **Administrador inicial**: vem do ambiente do servidor — `ADMIN_USER` e `ADMIN_HASH` (hash scrypt, nunca a senha) — e é obrigado a trocar a senha no 1º acesso. Sem essas variáveis e sem usuários, ninguém entra. Recuperação: novo `ADMIN_HASH` + novo valor em `ADMIN_RESET` no deploy.
+- Para gerar o hash: `node -e "require('./lib/auth').hashSenha(process.argv[1]).then(console.log)" 'SenhaProvisoria123'`.

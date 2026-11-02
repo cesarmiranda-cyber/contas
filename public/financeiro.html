@@ -116,6 +116,7 @@ details summary{cursor:pointer;color:var(--brand);font-weight:600;padding:8px 0}
 </div></div>
 <dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
 <div id="toast" role="status" aria-live="polite"></div><div class="tip" id="tip"></div>
+<script src="/auth.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -126,8 +127,8 @@ const dt=d=>d?d.split('-').reverse().join('/'):'—';
 const mesNome=m=>['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+m.slice(5)-1]+'/'+m.slice(2,4);
 const ls={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}}};
 const P=new URLSearchParams(location.search), DEAL=P.get('deal'), EMBED=!!(DEAL||P.get('company')||P.get('contact'));
-let B={empresas:[],config:{},categorias:[],hoje:'',host:''}, EMP=ls.get('fin.emp')||'todas', TAB=ls.get('fin.tab')||'painel', BUSY=false, ST=null;
-async function api(m,u,b){const r=await fetch('/api/fin'+u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}
+let ME=null,B={empresas:[],config:{},categorias:[],hoje:'',host:''}, EMP=ls.get('fin.emp')||'todas', TAB=ls.get('fin.tab')||'painel', BUSY=false, ST=null;
+const api=(m,u,b)=>nmJson(m,'/api/fin'+u,b);
 const q=(x='')=>`?empresa=${encodeURIComponent(EMP)}${x}`;
 function toast(m,err){const t=$('#toast');t.textContent=m;t.style.background=err?'var(--bad)':'';t.style.color=err?'#fff':'';t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),4200)}
 const act=async(fn,ok)=>{try{await fn();if(ok)toast(ok);await render()}catch(e){toast(e.message,1)}};
@@ -187,7 +188,7 @@ const VIEWS={};
 function drawNav(){$('#nav').innerHTML=NAV.map(([k,l,i])=>k?`<button data-t="${k}" ${k===TAB?'aria-current="page"':''}>${ic(i)}${l}</button>`:`<div class="sep">${l}</div>`).join('');
   $('#nav').onclick=e=>{const b=e.target.closest('[data-t]');if(b)go(b.dataset.t)}}
 function go(t,open=null,sub=null){TAB=t;if(sub)VIEWS[t].sub=sub;VIEWS.contratos.open=open;ls.set('fin.tab',TAB);drawNav();$('#side').classList.remove('open');render()}
-function drawFoot(){const s=ST;$('#foot').innerHTML=(B.demo?'<span class="pill p-warn" style="align-self:flex-start">Modo demonstração</span>':'')+(s?`<span><i class="dotl ${s.bitrix.ok?'ok':'bad'}"></i>Bitrix24 ${s.bitrix.ok?'conectado':'desconectado'}</span><span><i class="dotl ${s.empresasAsaas?'ok':''}"></i>Asaas: ${s.empresasAsaas} empresa(s)</span>${s.bitrix.host?`<span style="opacity:.8">${esc(s.bitrix.host)}</span>`:''}`:'')}
+function drawFoot(){const s=ST;$('#foot').innerHTML=(ME?`<span style="color:#fff"><b>${esc(ME.nome)}</b><br><span style="opacity:.8">${esc(ME.perfilNome)}</span></span><span><a href="/" style="color:var(--sideink)">Trocar senha</a> · <a href="#" id="sairApp" style="color:var(--sideink)">Sair</a></span>`:'')+(B.demo?'<span class="pill p-warn" style="align-self:flex-start">Modo demonstração</span>':'')+(s?`<span><i class="dotl ${s.bitrix.ok?'ok':'bad'}"></i>Bitrix24 ${s.bitrix.ok?'conectado':'desconectado'}</span><span><i class="dotl ${s.empresasAsaas?'ok':''}"></i>Asaas: ${s.empresasAsaas} empresa(s)</span>${s.bitrix.host?`<span style="opacity:.8">${esc(s.bitrix.host)}</span>`:''}`:'')}
 
 /* ---------- paginação (todas as tabelas de lista) ---------- */
 const PG={};let PGON=false,PGIDX=0,PGBASE='';
@@ -520,7 +521,7 @@ const contaDialog=item=>cadDialog('contas',item);
    CADASTROS  : dados mestres que mudam pouco (empresas, contas, fornecedores, funcionários, produtos, categorias, centros)
    CONFIGURAÇÕES: regras do sistema (integrações, formas e condições de pagamento, cobrança, contratos, rotinas) e auditoria
    ===================================================================== */
-async function api0(m,u,b){const r=await fetch(u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j}
+const api0=(m,u,b)=>nmJson(m,u,b);
 async function hubView(V,subs,bodies){V.sub=subs.some(s=>s[0]===V.sub)?V.sub:subs[0][0];const html=await bodies[V.sub]();
   setTimeout(()=>onAll('[data-sub]','click',b=>{V.sub=b.dataset.sub;render()}));
   return `<div class="sub2 chips">${subs.map(([k,t])=>`<button class="chip" aria-pressed="${V.sub===k}" data-sub="${k}">${t}</button>`).join('')}</div>`+html}
@@ -557,7 +558,6 @@ async function cfgIntegracoes(){const [st,wl]=await Promise.all([api0('GET','/ap
     $('#asTest').onclick=()=>act(async()=>{const r=await api0('POST','/api/settings/asaas/test',{apiKey:$('#asKey').value,env:env.value});toast(`Chave válida${r.nome?' · '+r.nome:''} · saldo ${brl(r.saldo)}`)});
     $('#asSave').onclick=()=>act(async()=>{const r=await api0('PUT','/api/settings/asaas',{apiKey:$('#asKey').value,env:env.value,confirmarProducao:$('#asProd').checked});toast(`Asaas configurado (${env.value==='production'?'produção':'sandbox'}) · saldo ${brl(r.saldo)}`)});
     const rm=$('#asRm');if(rm)rm.onclick=()=>confirm('Remover a chave padrão do Asaas?')&&act(()=>api0('DELETE','/api/settings/asaas'),'Chave removida');
-    $('#hubSave').onclick=()=>act(async()=>{await api('PUT','/config',{hubProcessosUrl:$('#hubUrl').value});await refreshB()},'Destino salvo');
     $('#verif').onclick=()=>act(async()=>{const r=await api0('POST','/api/settings/verificar');toast(r.camposCriados.length?`${r.camposCriados.length} campo(s) criado(s) no Bitrix`:'Campos e etapas do funil já estão corretos')});
     $('#syncEmp').onclick=()=>act(async()=>{const r=await api('POST','/empresas/sincronizar-campo');toast(`Campo “CR · Empresa” atualizado: ${r.opcoes.length} opção(ões)`)});
     $('#novoSplit').onclick=()=>ask('Recebedor do split',`${fld('nome','Nome*','text','','required maxlength="60"')}${fld('walletId','walletId do Asaas*','text','','required placeholder="00000000-0000-0000-0000-000000000000"')}`,v=>api0('POST','/api/carteiras',v).then(()=>toast('Recebedor cadastrado')));
@@ -574,7 +574,6 @@ async function cfgIntegracoes(){const [st,wl]=await Promise.all([api0('GET','/ap
      <div class="row"><button class="btn" id="asTest">Testar chave</button><button class="btn pri" id="asSave">Testar e salvar</button>${a.source==='painel'?'<button class="btn danger" id="asRm">Remover</button>':''}</div></div>`,'','Cobranças, Pix, boleto e cartão')}
   </div>
   ${card('Campos e etapas no Bitrix',`<div class="cb"><p style="margin-top:0" class="mut">O app cria no Bitrix os campos “CR · …” e as etapas do funil de cobranças (funil ${st.funil.categoria}). Rode se algo estiver faltando.</p><div class="row"><button class="btn" id="verif">Verificar e criar campos do funil</button><button class="btn" id="syncEmp">Atualizar campo “CR · Empresa”</button></div></div>`)}
-  ${card('Tela inicial: Processos de negócios',`<div class="cb"><p style="margin-top:0" class="mut">O segundo cartão da tela inicial abre este endereço em uma nova aba. Deixe em branco para usar o padrão do portal (<code>/bizproc/processes/</code>).</p><label>Endereço (https://…)<input id="hubUrl" type="text" value="${esc((B.config||{}).hubProcessosUrl||'')}" placeholder="https://seu-portal.bitrix24.com.br/bizproc/processes/" autocomplete="off" spellcheck="false"></label><div class="row" style="margin-top:12px"><button class="btn pri" id="hubSave">Salvar destino</button></div></div>`,'','Hub inicial do app')}
   ${card('Recebedores do split (Asaas)',table(['Nome','walletId',''],wl.map(w=>`<tr><td><b>${esc(w.nome)}</b></td><td><code>${esc(w.walletId)}</code></td><td class="num"><button class="btn sm danger" data-rmw="${esc(w.walletId)}" aria-label="Remover">✕</button></td></tr>`),empty('Nenhum recebedor','Cadastre parceiros para dividir uma cobrança (split). Na deal use o campo “CR · Split”.')),`<button class="btn pri" id="novoSplit">+ Recebedor</button>`,'Usado ao emitir cobranças com divisão de valor.')}`}
 
 async function cfgCobranca(){const st=await api0('GET','/api/settings'),c=st.config;
@@ -597,8 +596,29 @@ function cfgRotinas(){setTimeout(()=>{$('#folhaAuto').onchange=e=>api('PUT','/co
    <ul class="mut" style="margin-bottom:0"><li>Contas fixas: o app gera sozinho os próximos 3 meses de cada recorrência ativa (de hora em hora).</li><li>Contratos: avisa o responsável nos marcos de vencimento (de hora em hora).</li><li>Cobranças: sincroniza com o Asaas a cada 10 minutos e confere pagamentos e vencimentos a cada 2.</li></ul></div>`)}
 async function cfgAtividades(){const l=await api('GET','/logs');
   return card('Atividades recentes (auditoria)',table(['Quando','Tipo','Descrição'],l.map(x=>`<tr><td style="white-space:nowrap">${new Date(x.at).toLocaleString('pt-BR')}</td><td><span class="pill ${x.type==='erro'?'p-bad':'p-mut'}">${esc(x.type)}</span></td><td>${esc(x.msg)}</td></tr>`),empty('Sem atividades registradas')),'','As 200 ações mais recentes: importações, baixas, cobranças, erros…')}
-VIEWS.config=async()=>{await refreshB();return hubView(VIEWS.config,[['integracoes','Integrações'],['pagamentos','Formas e condições de pagamento'],['cobranca','Cobrança e automações'],['contratos','Contratos'],['rotinas','Rotinas'],['atividades','Atividades'],['demo','Demonstração']],
-  {integracoes:cfgIntegracoes,pagamentos:async()=>cfgCad('formas')+cfgCad('condicoes'),cobranca:cfgCobranca,contratos:cfgContratosPanel,rotinas:async()=>cfgRotinas(),atividades:cfgAtividades,demo:cfgDemo})};
+
+/* ---------- usuários e acessos (administrador) ---------- */
+const senhaProvisoria=()=>{const A='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ',D='23456789',b=new Uint32Array(12);crypto.getRandomValues(b);let t=[...b].map((n,i)=>(i%3===2?D:A)[n%(i%3===2?D.length:A.length)]).join('');return t.slice(0,4)+'-'+t.slice(4,8)+'-'+t.slice(8)};
+const PERFIL_TXT={admin:'Tudo, inclusive usuários, integrações, chaves e configurações.',financeiro:'Lança, baixa, cobra e importa; não mexe em usuários, integrações, empresas nem configurações.',consulta:'Só vê: painéis, listas e relatórios. Não altera nada.'};
+function usuarioDialog(u){const novo=!u;
+  ask(novo?'Novo usuário':`Editar — ${u.nome}`,`${fld('nome','Nome*','text',u?u.nome:'','required maxlength="80"')}${novo?fld('usuario','Usuário (login)*','text','','required maxlength="40" autocapitalize="off" placeholder="ex.: maria.silva"'):`<label>Usuário (login)<input value="${esc(u.usuario)}" disabled></label>`}${fld('email','E-mail','email',u?u.email:'')}
+   <label>Perfil de acesso*<select name="perfil">${Object.entries({admin:'Administrador',financeiro:'Financeiro',consulta:'Somente consulta'}).map(([k,t])=>opt(k,t,u?u.perfil:'financeiro')).join('')}</select></label>
+   <p class="hint full" id="pfTxt" style="margin:0"></p>
+   <label class="full">${novo?'Senha provisória*':'Nova senha provisória (deixe em branco para não mudar)'}<div class="row"><input name="senha" id="uSenha" style="flex:1" autocomplete="off" ${novo?'required':''}><button type="button" class="btn" id="gerSenha">Gerar</button></div></label>
+   <p class="hint full" style="margin:0">A pessoa será obrigada a trocar essa senha no primeiro acesso. Passe a senha por um canal seguro.</p>
+   ${novo?'':chk('ativo','Acesso ativo',u.ativo)}${novo?'':chk('desbloquear','Desbloquear (se errou a senha várias vezes)',false)}`,
+  async v=>{if(novo)await api0('POST','/api/auth/usuarios',{nome:v.nome,usuario:v.usuario,email:v.email,perfil:v.perfil,senha:v.senha});
+    else await api0('PUT','/api/auth/usuarios/'+u.id,{nome:v.nome,email:v.email,perfil:v.perfil,ativo:!!v.ativo,...(v.senha?{novaSenha:v.senha}:{}),...(v.desbloquear?{desbloquear:true}:{})});
+    toast(novo?'Usuário criado':'Usuário atualizado')},'Salvar');
+  const tx=()=>{$('#pfTxt').textContent=PERFIL_TXT[g('perfil').value]};g('perfil').onchange=tx;tx();$('#gerSenha').onclick=()=>{$('#uSenha').value=senhaProvisoria();$('#uSenha').type='text'}}
+async function cfgUsuarios(){const l=await api0('GET','/api/auth/usuarios');
+  setTimeout(()=>{$('#novoUsr').onclick=()=>usuarioDialog();onAll('[data-usr]','click',b=>usuarioDialog(l.find(x=>x.id===b.dataset.usr)))});
+  return card('Usuários e acessos',table(['Nome','Usuário','Perfil','Situação','Último acesso',''],l.map(u=>`<tr style="${u.ativo?'':'opacity:.6'}"><td><b>${esc(u.nome)}</b>${u.email?`<span class="t2">${esc(u.email)}</span>`:''}</td><td><code>${esc(u.usuario)}</code></td><td>${esc(u.perfilNome)}</td><td>${u.ativo?(u.trocarSenha?'<span class="pill p-warn">Senha provisória</span>':'<span class="pill p-ok">Ativo</span>'):'<span class="pill p-mut">Desativado</span>'}</td><td>${u.ultimoAcesso?new Date(u.ultimoAcesso).toLocaleString('pt-BR'):'nunca'}</td><td class="num"><button class="btn sm" data-usr="${u.id}">Editar</button></td></tr>`),empty('Nenhum usuário')),`<button class="btn pri" id="novoUsr">+ Usuário</button>`,'Só quem tem usuário e senha entra no app. Tudo exige login.')+
+   card('O que cada perfil pode fazer',`<div class="cb"><dl class="dl">${Object.entries(PERFIL_TXT).map(([k,t])=>`<div><dt>${{admin:'Administrador',financeiro:'Financeiro',consulta:'Somente consulta'}[k]}</dt><dd style="font-weight:500">${t}</dd></div>`).join('')}</dl><p class="mut" style="margin-bottom:0">Senhas: mínimo de 10 caracteres com letras e números. Após 5 erros seguidos o usuário fica bloqueado por 15 minutos. Desativar um usuário derruba a sessão dele na hora.</p></div>`)}
+VIEWS.config=async()=>{await refreshB();const adm=ME&&ME.perfil==='admin';
+  const todas=[['integracoes','Integrações'],['pagamentos','Formas e condições de pagamento'],['cobranca','Cobrança e automações'],['contratos','Contratos'],['rotinas','Rotinas'],['usuarios','Usuários e acessos'],['atividades','Atividades'],['demo','Demonstração']];
+  return hubView(VIEWS.config,adm?todas:todas.filter(x=>x[0]==='pagamentos'),
+  {integracoes:cfgIntegracoes,pagamentos:async()=>cfgCad('formas')+cfgCad('condicoes'),cobranca:cfgCobranca,contratos:cfgContratosPanel,rotinas:async()=>cfgRotinas(),usuarios:cfgUsuarios,atividades:cfgAtividades,demo:cfgDemo})};
 
 /* ---------- contas fixas (recorrências) ---------- */
 VIEWS.fixas=async()=>{await refreshB();const h=await cfgRecorrencias();setTimeout(()=>{$('#fxPagar').onclick=()=>lancDialog('pagar',{semfim:true});$('#fxReceber').onclick=()=>lancDialog('receber',{semfim:true})});
@@ -608,7 +628,7 @@ const lerArquivo=f=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>
 const tam=n=>n>1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(n/1024))+' KB';
 async function anexosDialog(tipo,id){
   const l=(await api('GET','/'+tipo+q())).find(x=>x.id===id);if(!l)return toast('Lançamento não encontrado.',1);const a=l.anexos||[];
-  ask(`Anexos — ${l.descricao}`,`<div class="full">${a.length?`<ul class="list" style="border:1px solid var(--line);border-radius:10px">${a.map(x=>`<li><span>📎 <a href="/api/fin/anexos/${x.id}" download>${esc(x.nome)}</a><span class="t2">${tam(x.tamanho)} · ${dt(x.em.slice(0,10))}</span></span><button type="button" class="btn sm danger" data-axdel="${x.id}">Remover</button></li>`).join('')}</ul>`:'<div class="empty" style="padding:16px">Nenhum anexo. Guarde aqui o boleto, a nota fiscal ou o comprovante.</div>'}</div>
+  ask(`Anexos — ${l.descricao}`,`<div class="full">${a.length?`<ul class="list" style="border:1px solid var(--line);border-radius:10px">${a.map(x=>`<li><span>📎 <a href="#" data-dl="/api/fin/anexos/${x.id}" data-nome="${esc(x.nome)}">${esc(x.nome)}</a><span class="t2">${tam(x.tamanho)} · ${dt(x.em.slice(0,10))}</span></span><button type="button" class="btn sm danger" data-axdel="${x.id}">Remover</button></li>`).join('')}</ul>`:'<div class="empty" style="padding:16px">Nenhum anexo. Guarde aqui o boleto, a nota fiscal ou o comprovante.</div>'}</div>
    <label class="full">Adicionar arquivo (PDF, imagem, XML, planilha, Word, CSV ou TXT — até 8 MB)<input type="file" id="axFile" accept=".pdf,.png,.jpg,.jpeg,.webp,.xml,.txt,.csv,.doc,.docx,.xls,.xlsx"></label>`,async()=>{},'Fechar');
   $('#axFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;if(f.size>8*1024*1024)return toast('O arquivo passa de 8 MB.',1);
     try{await api('POST','/anexos',{tipo,lancId:id,nome:f.name,base64:await lerArquivo(f)});toast('Anexo enviado');$('#dlg').close();anexosDialog(tipo,id)}catch(x){toast(x.message,1)}};
@@ -708,7 +728,7 @@ function notaDialog(n){const url=n.anexos&&n.anexos[0]?`/api/fin/anexos/${n.anex
    <div class="full wrap">${table(['#','Item','>Qtd','>Custo unit.','>Total','Estoque'],n.itens.map(i=>`<tr><td>${i.n}</td><td>${esc(i.descricao)}<span class="t2">cód. ${esc(i.cProd)}</span></td><td class="num">${String(i.qtd).replace('.',',')} ${esc(i.un)}</td><td class="num">${brl(i.custoUnit)}</td><td class="num">${brl(i.custo)}</td><td>${i.estoque?'<span class="pill p-ok">Entrou</span>':'—'}</td></tr>`))}</div>
    <div class="full wrap">${n.titulosInfo.length?table(['Título','Vencimento','Situação','>Valor'],n.titulosInfo.map(t=>`<tr><td>${esc(t.parcela||'')} ${esc(t.parcelaTitulo||'')}</td><td>${dt(t.venc)}</td><td>${pl(t.status)}</td><td class="num"><b>${brl(t.valor)}</b></td></tr>`)):'<div class="hint">Nenhum título foi lançado para esta nota.</div>'}</div>
    ${n.avisos&&n.avisos.length?`<div class="alert media full" style="margin:0">${ic('alert')}<span>${n.avisos.map(esc).join('<br>')}</span></div>`:''}
-   <div class="row full">${url?`<a class="btn" href="${url}" download>Baixar XML original</a>`:''}${n.status==='lancada'?`<button type="button" class="btn danger" id="cancelaNota">Cancelar nota (estorna títulos e estoque)</button>`:''}</div>`,async()=>{},'Fechar',true);
+   <div class="row full">${url?`<a class="btn" href="#" data-dl="${url}" data-nome="nota.xml">Baixar XML original</a>`:''}${n.status==='lancada'?`<button type="button" class="btn danger" id="cancelaNota">Cancelar nota (estorna títulos e estoque)</button>`:''}</div>`,async()=>{},'Fechar',true);
   const c=$('#cancelaNota');if(c)c.onclick=async()=>{if(!confirm('Cancelar esta nota? Os títulos em aberto serão cancelados e a entrada no estoque estornada.'))return;try{await api('POST',`/notas/${n.id}/cancelar`);toast('Nota cancelada');$('#dlg').close();render()}catch(e){toast(e.message,1)}}}
 
 /* ---------- estoque ---------- */
@@ -856,7 +876,7 @@ VIEWS.relatorios=async()=>{await refreshB();const V=VIEWS.relatorios;const t=V.t
   const cs=(CAD_().contas||[]).filter(c=>c.ativa&&(EMP==='todas'||c.empresaId===EMP));if(!cs.some(c=>c.id===V.conta))V.conta=(cs[0]||{}).id||'';
   const params=`&tipo=${t}&de=${de}&ate=${ate}&regime=${rg}&conta=${V.conta||''}`;
   let r;try{r=await api('GET','/relatorio'+q(params))}catch(e){r={titulo:def[1],colunas:[],linhas:[],total:0,totalLabel:'',erro:e.message}}
-  setTimeout(()=>{['de','ate','rg','conta'].forEach(k=>{const el=$('#r_'+k);if(el)el.onchange=e=>{V[k]=e.target.value;render()}});onAll('[data-rep]','click',b=>{V.t=b.dataset.rep;render()});const c=$('#csv');if(c)c.href='/api/fin/relatorio'+q(params+'&formato=csv')});
+  setTimeout(()=>{['de','ate','rg','conta'].forEach(k=>{const el=$('#r_'+k);if(el)el.onchange=e=>{V[k]=e.target.value;render()}});onAll('[data-rep]','click',b=>{V.t=b.dataset.rep;render()});const c=$('#csv');if(c){c.href='#';c.dataset.dl='/api/fin/relatorio'+q(params+'&formato=csv');c.dataset.nome='relatorio.csv'}});
   const stat=['aberto','a_vencer','atrasado','pago','vencida','paga','aberta'];
   return `<div class="rep"><div class="repnav">${REPS.map(([g,l])=>`<div class="sep2">${g}</div>${l.map(x=>`<button class="repi" aria-current="${x[0]===t}" data-rep="${x[0]}"><b>${x[1]}</b><span>${x[2]}</span></button>`).join('')}`).join('')}</div>
   <div>${card(esc(r.titulo),r.erro?`<div class="alert alta" style="margin:16px">${ic('alert')}<span>${esc(r.erro)}</span></div>`:`${table(r.colunas.map((c,i)=>(typeof r.linhas[0]?.[i]==='number'?'>':'')+c),r.linhas.map(l=>`<tr ${/^(TOTAL|RESULTADO)/.test(l[1]||'')?'style="font-weight:750;background:var(--surface2)"':''}>${l.map((v,ci)=>typeof v==='number'?`<td class="num">${(r.num||[]).includes(ci)?String(v).replace('.',','):brl(v)}</td>`:/^\d{4}-\d\d-\d\d$/.test(v)?`<td>${dt(v)}</td>`:/^\d{4}-\d\d$/.test(v)?`<td>${mesNome(v)}</td>`:stat.includes(v)?`<td>${pl(v)}</td>`:`<td>${esc(v)}</td>`).join('')}</tr>`),empty('Sem dados neste relatório'))}<div class="cb" style="text-align:right;font-weight:750;border-top:1px solid var(--line)">${r.totalLabel}: ${brl(r.total)}</div>`,
@@ -883,10 +903,14 @@ async function render(keepPage){const m=$('#main');if(BUSY)return;BUSY=true;cons
     if(m.dataset.t!==TAB)m.innerHTML=SK;
     PGBASE=TAB+'/'+(VIEWS[TAB].sub||'');PGIDX=0;PGON=true;let h;try{h=await VIEWS[TAB]()}finally{PGON=false}m.innerHTML=h;m.dataset.t=TAB;scrollTo(0,scroll);
   }catch(e){m.innerHTML=`<div class="alert alta">${ic('alert')}<span>${esc(e.message)}</span></div>${/Bitrix24 não configurado/.test(e.message)?'<p class="mut">Abra <a href="#" onclick="goSub(\'config\',\'integracoes\');return false">Configurações → Integrações</a> e informe o webhook do Bitrix24.</p>':''}`}finally{BUSY=false}}
-(async()=>{try{Object.assign(B,await api('GET','/bootstrap'))}catch(e){toast(e.message,1)}
+(async()=>{if(!NM.token)return NM.paraLogin();try{ME=(await nmJson('GET','/api/auth/me')).usuario}catch{return}
+  try{Object.assign(B,await api('GET','/bootstrap'))}catch(e){toast(e.message,1)}
+  drawFoot();
   if(EMBED){document.querySelector('aside').hidden=true;document.querySelector('.app').style.display='block';$('#empWrap').hidden=true;$('#menu').hidden=true;$('#reload').hidden=true;$('#ttl').textContent=DEAL?'Contrato e cobranças':'Cliente';render();return}
   if(location.hash){const [t,u]=location.hash.slice(1).split(':');if(VIEWS[t]){TAB=t;if(u)VIEWS[t].sub=u}}
   fillEmp();$('#emp').onchange=e=>{EMP=e.target.value;ls.set('fin.emp',EMP);VIEWS.contratos.open=null;render()};$('#menu').onclick=()=>$('#side').classList.toggle('open');$('#reload').onclick=()=>render();drawNav();render()})();
+document.addEventListener('click',async e=>{if(e.target.id==='sairApp'){e.preventDefault();try{await nmFetch('/api/auth/logout',{method:'POST',body:{}})}catch{}NM.token='';location.href='/'}});
+document.addEventListener('click',e=>{const a=e.target.closest('[data-dl]');if(!a)return;e.preventDefault();nmBaixar(a.dataset.dl,a.dataset.nome).catch(x=>toast(x.message,1))});
 </script>
 </body>
 </html>

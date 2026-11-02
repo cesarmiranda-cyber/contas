@@ -5,6 +5,7 @@ const http = require('http'), fs = require('fs'), os = require('os'), path = req
 const { spawn } = require('child_process');
 const { checkKeyEnv, checkWebhook, hint, createSecrets } = require('../lib/secrets');
 const { createAsaas } = require('../lib/asaas');
+const { hashSenha } = require('../lib/auth');
 
 test('valida prefixo da chave por ambiente e o formato do webhook', () => {
   assert.match(checkKeyEnv('$aact_hmlg_abc', 'production'), /SANDBOX/);
@@ -49,10 +50,14 @@ test('tela de Configurações: testa, salva, nunca devolve a chave e permite rem
   const fakeBitrix = await listen((q, r) => { r.writeHead(200, { 'Content-Type': 'application/json' }); r.end(JSON.stringify(q.url.includes('profile') ? { result: { NAME: 'Cesar', LAST_NAME: 'Miranda', ADMIN: true } } : { result: [] })); });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'srv-'));
   const port = 20000 + Math.floor(Math.random() * 20000);
-  const child = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, PORT: String(port), DATA_DIR: dir, ASAAS_BASE_URL: `http://127.0.0.1:${fakeAsaas.address().port}`, BITRIX_WEBHOOK: '', ASAAS_API_KEY: '', SYNC_MINUTES: '600' } });
+  const child = spawn(process.execPath, ['server.js'], { cwd: path.join(__dirname, '..'), env: { ...process.env, ADMIN_USER: 'admin', ADMIN_HASH: await hashSenha('Inicial12345'), PORT: String(port), DATA_DIR: dir, ASAAS_BASE_URL: `http://127.0.0.1:${fakeAsaas.address().port}`, BITRIX_WEBHOOK: '', ASAAS_API_KEY: '', SYNC_MINUTES: '600' } });
   t.after(() => { child.kill(); fakeAsaas.close(); fakeBitrix.close(); });
   for (let i = 0; i < 50; i++) { try { await fetch(`http://127.0.0.1:${port}/health`); break; } catch { await new Promise(r => setTimeout(r, 100)); } }
-  const api = async (m, u, b) => { const r = await fetch(`http://127.0.0.1:${port}${u}`, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return { status: r.status, json: await r.json() }; };
+  let token = '';   // a API exige login: entra como administrador e troca a senha provisória
+  const api = async (m, u, b) => { const r = await fetch(`http://127.0.0.1:${port}${u}`, { method: m, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: b ? JSON.stringify(b) : undefined }); return { status: r.status, json: await r.json() }; };
+  assert.equal((await api('GET', '/api/settings')).status, 401);                                         // sem login nada responde
+  token = (await api('POST', '/api/auth/login', { usuario: 'admin', senha: 'Inicial12345' })).json.token;
+  token = (await api('POST', '/api/auth/trocar-senha', { atual: 'Inicial12345', nova: 'Senha-Nova-2026' })).json.token;
 
   let s = await api('GET', '/api/settings');
   assert.equal(s.json.asaas.configured, false); assert.equal(s.json.asaas.source, 'nenhuma');

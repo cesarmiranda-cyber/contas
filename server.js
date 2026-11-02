@@ -13,6 +13,7 @@ const { createFinStore } = require('./lib/finStore');
 const { createEmpresas } = require('./lib/empresas');
 const { createAsaasRouter } = require('./lib/asaasRouter');
 const { createFinApi } = require('./lib/finApi');
+const { createAuth } = require('./lib/auth');
 
 // .env opcional (a plataforma de deploy já injeta as variáveis no processo).
 try {
@@ -26,6 +27,7 @@ const PORT = +process.env.PORT || 3000;
 const SYNC_MIN = +process.env.SYNC_MINUTES || 10;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const store = createStore(DATA_DIR);
+const auth = createAuth({ dir: DATA_DIR, log: (t, m) => store.log(t, m) });
 const secrets = createSecrets(DATA_DIR);
 const bitrix = createBitrix('');
 const asaasBase = createAsaas({});
@@ -132,6 +134,25 @@ const server = http.createServer(async (req, res) => {
       const site = req.headers['sec-fetch-site'];
       if (site && !['same-origin', 'same-site', 'none'].includes(site)) return send(res, 403, { error: 'Pedido de outro site bloqueado.' });
       if (['POST', 'PUT', 'PATCH'].includes(req.method) && !/^application\/json\b/i.test(req.headers['content-type'] || '') && Number(req.headers['content-length'] || 0) > 0) return send(res, 415, { error: 'Envie o corpo como application/json.' });
+    }
+    // Controle de acesso: toda a API exige login (só /health e o próprio login são públicos).
+    if (u.pathname.startsWith('/api/')) {
+      const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?';
+      if (u.pathname === '/api/auth/login' && req.method === 'POST') return send(res, 200, await auth.login(await readBody(req, 10000), ip));
+      const g = auth.porteiro({ method: req.method, pathname: u.pathname, headers: req.headers });
+      if (!g.user) return send(res, g.status, g.body);
+      if (g.renova) res.setHeader('X-Auth-Token', g.renova);
+      req.user = g.user;
+      if (u.pathname.startsWith('/api/auth/')) {
+        const k = `${req.method} ${u.pathname}`, m = u.pathname.match(/^\/api\/auth\/usuarios\/([\w-]+)$/);
+        if (k === 'GET /api/auth/me') return send(res, 200, { usuario: auth.publico(g.user), perfis: auth.PERFIS });
+        if (k === 'POST /api/auth/logout') { store.log('acesso', `Saída de ${g.user.usuario}`); return send(res, 200, { ok: true }); }
+        if (k === 'POST /api/auth/trocar-senha') return send(res, 200, await auth.trocarSenha(g.user, await readBody(req, 10000)));
+        if (k === 'GET /api/auth/usuarios') return send(res, 200, auth.listar());
+        if (k === 'POST /api/auth/usuarios') return send(res, 200, await auth.criar(await readBody(req, 10000)));
+        if (m && req.method === 'PUT') return send(res, 200, await auth.atualizar(m[1], await readBody(req, 10000), g.user));
+        return send(res, 404, { error: 'não encontrado' });
+      }
     }
     if (u.pathname.startsWith('/api/fin/')) {
       const r = await finApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/fin/anexos' ? 12e6 : u.pathname === '/api/fin/conciliacao/importar' ? 3e6 : 1e6));
