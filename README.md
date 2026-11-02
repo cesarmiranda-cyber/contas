@@ -124,3 +124,11 @@ Com o webhook conectado, 1 minuto depois de subir e de hora em hora (`sincBitrix
 - **BK** (`sincronizarFunil`): liga unidades a empresas pelo CNPJ completo e único, cria/reaproveita um negócio por unidade no funil Regularização e mantém a etapa nos dois sentidos (app → Bitrix24 na hora; Bitrix24 → app na hora cheia, e o Bitrix24 vence quando os dois mudaram).
 - Nada é criado sem empresa vinculada, e empresas nunca são criadas sozinhas (só pelo botão “Criar empresa no Bitrix24”, que checa CNPJ/nome antes).
 - O funil de cobranças (categoria 90, motor antigo de cobrança) só roda se existir no portal; em portal sem ele, nada é criado.
+
+## Carteira de clientes (`/clientes.html`, API `/api/car/*`, dados em `carteira.json`)
+
+- Lê do Bitrix24 (de hora em hora): empresas (campo “Situação”: Cliente = ativo, Cancelado = inativo; e-mail, alvará, certificados), funil Contratos (tipo e vigência), Documentação (MBP/POP), Regularização (licença emitida) e Cursos (treinamento). O que a equipe marca na ficha tem prioridade.
+- **Clientes**: ativos (verde) e inativos (vermelho) em listas separadas, tipo de serviço (contrato de consultoria e assessoria, consultoria, assessoria, RT, PAT ou esporádico, com os serviços esporádicos), contrato em amarelo no último mês, definição de tipo em lote.
+- **Resumo de serviços**: clientes ativos de consultoria × treinamento, MBP e POP, alvará, licença de funcionamento, em verde/amarelo/vermelho.
+- **Contratos a vencer**: aviso no Bitrix24 ao responsável da empresa (30, 15, 7 dias, no dia e vencido, uma vez cada).
+- **E-mail marketing**: públicos ativos/inativos a partir do e-mail da empresa no Bitrix24, descadastro, exportação em CSV e campanhas com modelos; o envio ainda é feito na ferramenta de e-mail do cliente (SMTP/provedor a definir).

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrimix · Clientes</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--bg:#f2f3f5;--surface:#fff;--ink:#16202e;--ink2:#46515f;--mut:#6b7684;--line:#d8dce2;--brand:#1c4a82;--brandbg:#e8eff8;--ok:#1b6b3a;--okbg:#e2f4e8;--warn:#8a5a00;--warnbg:#fff3d6;--bad:#a1281f;--badbg:#fde8e6}
+@media(prefers-color-scheme:dark){:root{--bg:#10151c;--surface:#171e27;--ink:#eaeef3;--ink2:#b5bfcb;--mut:#8996a5;--line:#2a3441;--brand:#7fb0ee;--brandbg:#1b2a3d;--ok:#6fd49a;--okbg:#143324;--warn:#f0c46a;--warnbg:#3a2f12;--bad:#ff9a90;--badbg:#401c19}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}[hidden]{display:none!important}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);height:56px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5}
+.marca{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;color:var(--ink);text-decoration:none}.marca b{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;background:var(--brand);color:#fff}
+.sp{flex:1}.user{font-size:13px;color:var(--ink2)}
+nav{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);display:flex;gap:2px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 14px;font:inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+nav button[aria-selected=true]{color:var(--brand);border-color:var(--brand);font-weight:650}
+main{max-width:1240px;margin:0 auto;padding:20px clamp(12px,3vw,32px) 60px}
+h1{margin:0 0 2px;font-size:22px}.sub{margin:0 0 18px;color:var(--mut)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.k{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.k:hover{border-color:var(--brand)}.k small{display:block;color:var(--mut);font-size:12.5px}.k strong{font-size:26px;letter-spacing:-.02em}.k.bad strong{color:var(--bad)}.k.warn strong{color:var(--warn)}.k.ok strong{color:var(--ok)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}.box h2{margin:0 0 10px;font-size:15.5px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.bar i{display:block;height:10px;border-radius:5px;background:var(--brand);min-width:2px}.bar span:first-child{width:150px;color:var(--ink2)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th{text-align:left;font-weight:600;color:var(--mut);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}tr.cl{cursor:pointer}tr.cl:hover td{background:var(--brandbg)}
+.tw{overflow-x:auto}
+.sel{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--brandbg);color:var(--brand)}
+.sel.ok{background:var(--okbg);color:var(--ok)}.sel.w{background:var(--warnbg);color:var(--warn)}.sel.b{background:var(--badbg);color:var(--bad)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px;max-width:100%}
+.btn{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:7px 14px;cursor:pointer}.btn:hover{border-color:var(--brand)}
+.btn.p{background:var(--brand);border-color:var(--brand);color:#fff}[data-t=dark] .btn.p,.btn.p{color:#fff}.btn.d{color:var(--bad)}
+@media(prefers-color-scheme:dark){.btn.p{color:#0b1420}}
+.pag{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;color:var(--mut)}
+.col{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}.cx{flex:0 0 255px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+.cx h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between}.ct{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:pointer}.ct:hover{border-color:var(--brand)}.ct small{color:var(--mut);display:block}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:20px;width:min(720px,94vw);max-height:92vh}dialog::backdrop{background:#0008}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
+.msg{padding:9px 12px;border-radius:8px;margin:0 0 12px;background:var(--brandbg);color:var(--brand)}.msg.e{background:var(--badbg);color:var(--bad)}
+.fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin:6px 0 4px}
+.st{position:relative;background:var(--surface);border:1px solid var(--line);padding:12px 14px 14px;margin-right:-1px}
+.st:first-child{border-radius:10px 0 0 10px}.st:last-child{border-radius:0 10px 10px 0;margin-right:0}
+.st b.n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:12.5px;margin-right:6px}
+.st h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center}.st p{margin:4px 0;font-size:13px;color:var(--ink2)}.st .q{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
+.st.end{border-color:var(--ok)}.st.alt{border-style:dashed}
+.rq{border-collapse:collapse}.rq td{vertical-align:top}
+.gv-bk{position:fixed;inset:0;background:#0007;z-index:20}
+#gav{position:fixed;top:0;right:0;bottom:0;width:min(580px,100vw);background:var(--surface);color:var(--ink);border-left:1px solid var(--line);z-index:21;overflow:auto;padding:18px 20px 28px;box-shadow:-8px 0 30px #0004}
+#gav .top{display:flex;gap:8px;align-items:center;margin-bottom:10px}#gav .top .sp{flex:1}
+.lk{display:flex;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13.5px}.lk:hover{border-color:var(--brand);background:var(--brandbg)}
+.sug{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;z-index:6;max-height:320px;overflow:auto;box-shadow:0 8px 24px #0003;margin-top:2px}
+.sug .lk{border:0;border-radius:0;margin:0;border-bottom:1px solid var(--line)}
+.cl2{cursor:pointer}.bar.cl2:hover b,.bar.cl2:hover span:first-child{color:var(--brand)}
+.ct[draggable=true]{cursor:grab}.ct.arr{opacity:.4}.cx.alvo{outline:2px dashed var(--brand);background:var(--brandbg)}
+.col{min-height:60vh}.cx{min-height:120px}
+.lst{margin:0;padding-left:18px;color:var(--ink2)}.mut{color:var(--mut)}.dr{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.gr{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:980px}
+.gr th{background:var(--surface);border:1px solid var(--line);padding:8px;font-size:12.5px;text-align:center}
+.gr th small{display:block;color:var(--mut);font-weight:400}.gr th.fer{background:var(--warnbg);color:var(--warn)}
+.gr td{border:1px solid var(--line);vertical-align:top;padding:6px;background:var(--surface);height:96px}
+.gr td.nm{width:118px;background:var(--bg);font-weight:650;font-size:13.5px}.gr td.nm small{display:block;font-weight:400;color:var(--mut)}
+.gr td.alvo{outline:2px dashed var(--brand);outline-offset:-2px;background:var(--brandbg)}
+.vc{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:6px;background:var(--surface);color:var(--ink);padding:4px 6px;margin-bottom:4px;cursor:grab}
+.vc:hover{border-color:var(--brand)}.vc.realizada{border-left-color:var(--ok);opacity:.85}.vc.remarcada,.vc.cancelada,.vc.faltou{border-left-color:var(--mut);opacity:.6;text-decoration:line-through}
+.vc.fer{border-left-color:var(--bad);background:var(--badbg)}.vc small{color:var(--mut);display:block}.vc .w{color:var(--bad);font-weight:600}
+.segb{display:inline-flex;gap:0}.segb .btn{border-radius:0;margin-left:-1px}.segb .btn:first-child{border-radius:7px 0 0 7px;margin-left:0}.segb .btn:last-child{border-radius:0 7px 7px 0}
+.mes{width:100%;table-layout:fixed;border-collapse:collapse;min-width:900px}.mes th{padding:6px;font-size:12.5px;border:1px solid var(--line);background:var(--surface)}
+.mes td{vertical-align:top;height:118px;border:1px solid var(--line);padding:4px;background:var(--surface)}.mes td.fora{background:var(--bg);opacity:.55}.mes td.fds{background:var(--bg)}.mes td.fer{background:var(--warnbg)}
+.mes .dn{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:2px}.mes .dn a{color:var(--ink);text-decoration:none}.mes .mais{font-size:11.5px;color:var(--brand)}.w2{display:block;color:var(--warn);font-size:11px}
+.vc.mini{font-size:11.5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;background:var(--brandbg);color:var(--brand)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:var(--mut)}.dot.a{background:var(--ok)}.dot.i{background:var(--bad)}
+.cel{display:inline-block;min-width:92px;text-align:center;padding:3px 10px;border-radius:6px;font-size:12.5px;font-weight:650;cursor:pointer;border:0;font-family:inherit}
+.cel.sim{background:var(--okbg);color:var(--ok)}.cel.nao{background:var(--badbg);color:var(--bad)}.cel.andamento{background:var(--warnbg);color:var(--warn)}
+tr.venc td{background:var(--warnbg)}.chips span{display:inline-block;margin:1px 3px 1px 0;padding:1px 8px;border-radius:99px;font-size:11.5px;background:var(--brandbg);color:var(--brand)}
+.subt{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}.subt button{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:99px;padding:5px 14px;font:inherit;cursor:pointer}.subt button[aria-pressed=true]{background:var(--brand);color:#fff;border-color:var(--brand)}
+</style>
+</head>
+<body>
+<header><a class="marca" href="/"><b>N</b>Nutrimix</a><span class="mut">/ <a href="/processos.html" style="color:inherit">Processos</a> / Carteira de clientes</span><span class="sp"></span><span class="user" id="user"></span></header>
+<nav role="tablist" id="abas"></nav>
+<main hidden id="app"><div id="msg"></div><div id="tela"></div></main>
+<div class="gv-bk" id="gbk" hidden></div><aside id="gav" hidden aria-label="Detalhes" role="dialog"></aside>
+<script src="/auth.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const api = (m, u, b) => nmJson(m, '/api/car' + u, b);
+const dt = s => s ? s.split('-').reverse().join('/') : '—';
+const brl = v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const ABAS = [['clientes', 'Clientes'], ['resumo', 'Resumo de serviços'], ['vencimentos', 'Contratos a vencer'], ['email', 'E-mail marketing'], ['processo', 'Como funciona']];
+const ITENS = { treinamento: 'Treinamento', mbpPop: 'Manual de Boas Práticas e POP', alvara: 'Alvará da vigilância', licenca: 'Licença de funcionamento' };
+const TXT = { sim: 'Sim', nao: 'Não', andamento: 'Em andamento' };
+let ME = {}, BOOT = {}, aba = 'clientes', podeEditar = false, podeAdmin = false, CL = { aba: 'ativos', q: '', tipo: '', venc: false, page: 1 }, RS = { q: '', pendencia: false }, VD = 60;
+function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
+const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
+function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#gbk').hidden = false; $('#gav').scrollTop = 0; $('#gav').querySelectorAll('[data-x]').forEach(b => b.onclick = gavFecha); }
+function gavFecha() { $('#gav').hidden = true; $('#gbk').hidden = true; $('#gav').innerHTML = ''; }
+$('#gbk').onclick = gavFecha; addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gav').hidden) gavFecha(); });
+const topo = () => '<div class="top"><span class="sp"></span><button class="btn" data-x aria-label="Fechar">✕</button></div>';
+const recarrega = () => ({ clientes, resumo, vencimentos, email, processo })[aba]();
+async function boot() { BOOT = await api('GET', '/bootstrap'); }
+function abrirAba(a) {
+  aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
+  $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ clientes, resumo, vencimentos, email, processo })[a]();
+}
+const bxCli = id => `https://${BOOT.host}/crm/company/details/${id}/`;
+const badgeContrato = s => s.estado === 'sem' ? '<span class="mut">—</span>' : s.estado === 'vencido' ? `<span class="sel b">vencido há ${-s.dias} d</span>` : s.estado === 'vencendo' ? `<span class="sel w">vence em ${s.dias} d</span>` : `<span class="sel ok">até ${dt(s.fim)}</span>`;
+
+// ---------- Clientes ----------
+const clientes = guarda(async () => {
+  await boot(); const l = await api('GET', '/clientes?' + new URLSearchParams({ ...CL, venc: CL.venc ? '1' : '0' }));
+  const sub = [['ativos', `Ativos (${BOOT.ativos})`], ['inativos', `Inativos (${BOOT.inativos})`], ['prospectos', `Prospectos (${BOOT.prospectos})`], ['todos', `Todos (${BOOT.total})`]];
+  $('#tela').innerHTML = `<h1>Carteira de clientes</h1><p class="sub"><span class="dot a"></span>ativo · <span class="dot i"></span>inativo. Os dados vêm do cadastro de empresas do Bitrix24 (campo “Situação”), e o que você marcar aqui tem prioridade. ${BOOT.sincEm ? 'Última leitura do Bitrix24: ' + new Date(BOOT.sincEm).toLocaleString('pt-BR') + '.' : ''}</p>
+  ${!BOOT.bitrixOn ? '<p class="msg e">Conecte o webhook do Bitrix24 em Contas → Configurações → Integrações para trazer os clientes.</p>' : !BOOT.total ? '<p class="msg">Nenhum cliente carregado ainda.' + (podeAdmin ? ' Use “Atualizar do Bitrix24”.' : '') + '</p>' : ''}
+  <div class="subt">${sub.map(([k, n]) => `<button data-s="${k}" aria-pressed="${CL.aba === k}">${n}</button>`).join('')}</div>
+  <div class="tools"><input id="cq" type="search" placeholder="Buscar cliente, razão social ou CNPJ" value="${h(CL.q)}" style="flex:1;min-width:220px"><select id="ct"><option value="">Todos os tipos de serviço</option>${Object.entries(BOOT.tipos).map(([k, n]) => `<option value="${k}" ${k === CL.tipo ? 'selected' : ''}>${h(n)}</option>`).join('')}<option value="sem" ${CL.tipo === 'sem' ? 'selected' : ''}>Sem tipo definido</option></select>
+  <label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="cv" ${CL.venc ? 'checked' : ''}> contrato vencendo</label>${podeAdmin ? '<button class="btn" id="csinc">Atualizar do Bitrix24</button>' : ''}</div>
+  ${podeEditar ? `<div class="tools" id="lote" hidden><b id="ln"></b><select id="lt"><option value="">Definir tipo de serviço…</option>${Object.entries(BOOT.tipos).map(([k, n]) => `<option value="${k}">${h(n)}</option>`).join('')}</select><button class="btn p" id="lap">Aplicar aos selecionados</button></div>` : ''}
+  <div class="box tw"><table><tr>${podeEditar ? '<th><input type="checkbox" id="sa" aria-label="Marcar todos"></th>' : ''}<th>Situação</th><th>Cliente</th><th>Tipo de serviço</th><th>Contrato</th><th>E-mail</th></tr>${l.itens.map(c => `<tr class="cl ${['vencendo', 'vencido'].includes(c.contratoSituacao.estado) && c.ativo ? 'venc' : ''}" data-id="${h(c.empresaId)}">${podeEditar ? `<td><input type="checkbox" class="sel1" value="${h(c.empresaId)}"></td>` : ''}<td><span class="dot ${c.ativo === true ? 'a' : c.ativo === false ? 'i' : ''}"></span>${c.ativo === true ? 'Ativo' : c.ativo === false ? 'Inativo' : 'Prospecto'}${c.ativoManual !== null ? ' <small class="mut">(manual)</small>' : ''}</td>
+  <td><b>${h(c.nome)}</b>${c.cidade ? `<small class="mut" style="display:block">${h(c.cidade)}${c.uf ? '/' + h(c.uf) : ''}</small>` : ''}</td><td>${c.tipo ? h(c.tipoNome) : '<span class="mut">não definido</span>'}${c.esporadicos.length ? `<div class="chips">${c.esporadicos.map(x => `<span>${h(x)}</span>`).join('')}</div>` : ''}</td><td>${badgeContrato(c.contratoSituacao)}</td><td>${c.email ? h(c.email) + (c.optOut ? ' <small class="mut">(descadastrado)</small>' : '') : '<span class="mut">sem e-mail</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="mut">Nenhum cliente nesta lista.</td></tr>'}</table>
+  <div class="pag"><button class="btn" id="pa" ${l.pagina <= 1 ? 'disabled' : ''}>‹</button> página ${l.pagina} de ${l.paginas} · ${l.total} <button class="btn" id="pn" ${l.pagina >= l.paginas ? 'disabled' : ''}>›</button></div></div>`;
+  $('#tela').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { CL.aba = b.dataset.s; CL.page = 1; clientes(); });
+  let t; $('#cq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { CL.q = e.target.value; CL.page = 1; await clientes(); const i = $('#cq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  $('#ct').onchange = e => { CL.tipo = e.target.value; CL.page = 1; clientes(); }; $('#cv').onchange = e => { CL.venc = e.target.checked; CL.page = 1; clientes(); }; $('#pa').onclick = () => { CL.page--; clientes(); }; $('#pn').onclick = () => { CL.page++; clientes(); };
+  $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = e => { if (e.target.closest('input')) return; clienteDrawer(r.dataset.id); });
+  if (podeEditar) { const marcados = () => [...$('#tela').querySelectorAll('.sel1:checked')].map(x => x.value), mostra = () => { const n = marcados().length; $('#lote').hidden = !n; $('#ln').textContent = n + ' selecionado(s)'; };
+    $('#tela').querySelectorAll('.sel1').forEach(c => c.onchange = mostra); $('#sa').onchange = e => { $('#tela').querySelectorAll('.sel1').forEach(c => c.checked = e.target.checked); mostra(); };
+    $('#lap').onclick = guarda(async () => { const t = $('#lt').value; if (!t) return aviso('Escolha o tipo de serviço.', true); const r = await api('POST', '/clientes/lote', { ids: marcados(), tipo: t }); aviso(`${r.atualizados} cliente(s) atualizados.`); clientes(); }); }
+  if (podeAdmin && $('#csinc')) $('#csinc').onclick = guarda(async () => { aviso('Lendo o Bitrix24…'); const r = await api('POST', '/sincronizar', {}); aviso(`${r.empresas} empresa(s) lidas, ${r.novos} nova(s), ${r.comEmail} com e-mail.`); clientes(); });
+});
+const clienteDrawer = guarda(async id => {
+  const c = await api('GET', '/clientes/' + id), ed = podeEditar, op = (k, t, s) => `<option value="${h(k)}" ${k === s ? 'selected' : ''}>${h(t)}</option>`;
+  gav(`${topo()}<h2 style="margin:0">${h(c.nome)}</h2><p class="mut" style="margin:0 0 12px">${c.razao ? h(c.razao) + ' · ' : ''}${c.cnpj ? 'CNPJ ' + h(c.cnpj) + ' · ' : ''}<a href="${h(bxCli(c.empresaId))}" target="_blank" rel="noopener">abrir no Bitrix24</a></p>
+  <form id="fc"><div id="fe"></div><div class="f">
+  <label>Situação<select name="ativoManual" ${ed ? '' : 'disabled'}><option value="auto" ${c.ativoManual === null ? 'selected' : ''}>Automática (Bitrix24: ${h(c.situacao || 'sem situação')})</option><option value="1" ${c.ativoManual === true ? 'selected' : ''}>Ativo</option><option value="0" ${c.ativoManual === false ? 'selected' : ''}>Inativo</option></select></label>
+  <label>Tipo de serviço<select name="tipo" ${ed ? '' : 'disabled'}><option value="">— não definido —</option>${Object.entries(BOOT.tipos).map(([k, n]) => op(k, n, c.tipo)).join('')}</select></label>
+  <label class="w">Serviços esporádicos (cliente esporádico)<span>${BOOT.esporadicos.map((x, i) => `<label style="display:inline-flex;gap:5px;margin-right:12px"><input type="checkbox" name="esp" value="${h(x)}" ${c.esporadicos.includes(x) ? 'checked' : ''} ${ed ? '' : 'disabled'}> ${h(x)}</label>`).join('')}</span></label>
+  <label>Início do contrato<input type="date" name="inicio" value="${h(c.contrato.inicio)}" ${ed ? '' : 'disabled'}></label><label>Fim do contrato<input type="date" name="fim" value="${h(c.contrato.fim)}" ${ed ? '' : 'disabled'}></label><label>Valor mensal (R$)<input type="number" step="0.01" min="0" name="valor" value="${c.contrato.valor == null ? '' : h(c.contrato.valor)}" ${ed ? '' : 'disabled'}></label>
+  ${Object.entries(ITENS).map(([k, n]) => `<label>${n}<select name="i_${k}" ${ed ? '' : 'disabled'}><option value="">Automático (${h(TXT[c.auto[k] || 'nao'])}${c.auto[k] ? ', do Bitrix24' : ', sem registro'})</option>${(k === 'mbpPop' ? ['sim', 'andamento', 'nao'] : ['sim', 'nao']).map(v => op(v, TXT[v], c.manual[k])).join('')}</select></label>`).join('')}
+  <label>Validade do alvará<input type="date" name="alvaraValidade" value="${h(c.alvaraValidade || '')}" ${ed ? '' : 'disabled'}></label>
+  <label class="w"><span><input type="checkbox" name="optOut" ${c.optOut ? 'checked' : ''} ${ed ? '' : 'disabled'}> Não receber e-mail marketing (descadastrado)</span><small class="mut">E-mail do cadastro: ${h(c.email) || 'nenhum'}. Para trocar o e-mail, edite a empresa no Bitrix24.</small></label>
+  <label class="w">Observação<textarea name="obs" rows="2" ${ed ? '' : 'disabled'}>${h(c.obs || '')}</textarea></label></div>${ed ? '<div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div>' : ''}</form>`);
+  if (ed) $('#fc').onsubmit = async e => { e.preventDefault(); const f = new FormData(e.target), g = k => f.get(k) || '';
+    const manual = {}; for (const k of Object.keys(ITENS)) manual[k] = g('i_' + k);
+    const b = { ativoManual: g('ativoManual') === 'auto' ? null : g('ativoManual') === '1', tipo: g('tipo'), esporadicos: f.getAll('esp'), contrato: { inicio: g('inicio'), fim: g('fim'), valor: g('valor'), dealId: c.contrato.dealId }, manual, alvaraValidade: g('alvaraValidade'), optOut: f.get('optOut') === 'on', obs: g('obs') };
+    try { await api('PUT', '/clientes/' + id, b); gavFecha(); recarrega(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+});
+
+// ---------- Resumo de serviços ----------
+const resumo = guarda(async () => {
+  await boot(); const r = await api('GET', '/resumo?' + new URLSearchParams({ q: RS.q, pendencia: RS.pendencia ? '1' : '0' }));
+  const cel = (c, k) => { const x = c.itens[k]; return `<button class="cel ${x.valor}" data-id="${h(c.empresaId)}" title="${h(ITENS[k])}: ${TXT[x.valor]} (${x.origem})">${TXT[x.valor]}</button>`; };
+  $('#tela').innerHTML = `<h1>Resumo de serviços dos clientes de consultoria</h1><p class="sub">Clientes <b>ativos</b> com contrato de consultoria, assessoria ou os dois: o que já foi executado (verde) e o que falta (vermelho). Amarelo é “em andamento”. Clique numa cor para ver e ajustar.</p>
+  <div class="cards"><div class="k"><small>Clientes</small><strong>${r.total}</strong></div><div class="k ok"><small>Com tudo em dia</small><strong>${r.completos}</strong></div>${Object.entries(ITENS).map(([k, n]) => `<div class="k"><small>${n}</small><strong>${r.porItem[k]}</strong><small>de ${r.total} com “Sim”</small></div>`).join('')}</div>
+  <div class="tools"><input id="rq" type="search" placeholder="Buscar cliente" value="${h(RS.q)}" style="min-width:220px"><label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="rp" ${RS.pendencia ? 'checked' : ''}> só com pendência</label></div>
+  <div class="box tw"><table><tr><th>Cliente</th><th>Treinamento</th><th>Manual de Boas Práticas e POP</th><th>Alvará da vigilância</th><th>Licença de funcionamento</th></tr>${r.itens.map(c => `<tr><td><b>${h(c.nome)}</b><small class="mut" style="display:block">${h(c.tipoNome)} · ${badgeContrato(c.contratoSituacao).replace(/<[^>]+>/g, '')}</small></td>${Object.keys(ITENS).map(k => `<td>${cel(c, k)}</td>`).join('')}</tr>`).join('') || '<tr><td colspan="5" class="mut">Nenhum cliente. Defina o tipo de serviço dos clientes ativos na aba Clientes.</td></tr>'}</table></div>
+  <p class="mut">Treinamento, MBP/POP e alvará são lidos do Bitrix24 quando existem (funis Cursos, Documentação e Regularização, e campos da empresa). A licença de funcionamento é sempre marcada à mão.</p>`;
+  let t; $('#rq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { RS.q = e.target.value; await resumo(); const i = $('#rq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  $('#rp').onchange = e => { RS.pendencia = e.target.checked; resumo(); };
+  $('#tela').querySelectorAll('.cel').forEach(b => b.onclick = () => clienteDrawer(b.dataset.id));
+});
+
+// ---------- Contratos a vencer ----------
+const vencimentos = guarda(async () => {
+  await boot(); const l = await api('GET', '/vencimentos?dias=' + VD);
+  $('#tela').innerHTML = `<h1>Contratos a vencer</h1><p class="sub">Durante o <b>último mês</b> do contrato o cliente fica marcado na lista (linha amarela) e o responsável pela empresa no Bitrix24 recebe aviso faltando 30, 15 e 7 dias, no dia e depois de vencer.</p>
+  <div class="tools"><select id="vd">${[30, 60, 90, 180, 365].map(n => `<option value="${n}" ${n === VD ? 'selected' : ''}>Próximos ${n} dias</option>`).join('')}</select>${podeAdmin ? '<button class="btn" id="vsim">Simular avisos agora</button><button class="btn p" id="venv">Enviar avisos pendentes</button>' : ''}</div><div id="vr"></div>
+  <div class="box tw"><table><tr><th>Cliente</th><th>Tipo</th><th>Vence em</th><th>Situação</th><th style="text-align:right">Valor mensal</th></tr>${l.map(c => `<tr class="cl ${c.estado !== 'ok' ? 'venc' : ''}" data-id="${h(c.empresaId)}"><td><b>${h(c.nome)}</b></td><td>${h(c.tipoNome) || '—'}</td><td>${dt(c.fim)}</td><td>${c.estado === 'vencido' ? `<span class="sel b">vencido há ${-c.dias} d</span>` : `<span class="sel ${c.estado === 'vencendo' ? 'w' : 'ok'}">em ${c.dias} d</span>`}</td><td style="text-align:right">${brl(c.valor)}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">Nenhum contrato vencendo neste período. As datas vêm do funil Contratos do Bitrix24 ou do cadastro do cliente.</td></tr>'}</table></div>`;
+  $('#vd').onchange = e => { VD = Number(e.target.value); vencimentos(); }; $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = () => clienteDrawer(r.dataset.id));
+  if (podeAdmin) { const run = guarda(async sim => { const r = await api('POST', '/avisar', { simular: sim }); $('#vr').innerHTML = `<div class="box"><h2>${sim ? 'Avisos que sairiam agora' : 'Avisos enviados'} (${r.enviados.length})</h2>${r.enviados.length ? `<ul class="lst">${r.enviados.map(x => `<li>${h(x.msg)}</li>`).join('')}</ul>` : '<p class="mut">Nenhum aviso pendente.</p>'}${r.erros.length ? `<p class="msg e">${h(r.erros.slice(0, 3).join('; '))}</p>` : ''}</div>`; });
+    $('#vsim').onclick = () => run(true); $('#venv').onclick = () => { if (confirm('Enviar agora os avisos pendentes no Bitrix24?')) run(false); }; }
+});
+
+// ---------- E-mail marketing ----------
+const MODELOS = { ativos: [['Novidades da legislação', 'Novidades que impactam o seu negócio', 'Olá!\n\nSeparamos as principais novidades da legislação sanitária e de alimentos que podem afetar a sua operação, e o que fazer para estar em dia.\n\n[escreva aqui os destaques]\n\nQualquer dúvida, é só falar com a nossa equipe.\n\nEquipe Nutri Mix'], ['Institucional / marca', 'Novidades da Nutri Mix', 'Olá!\n\nQueremos compartilhar com você o que há de novo na Nutri Mix: novos serviços, conteúdos e a forma como podemos apoiar ainda mais o seu estabelecimento.\n\n[escreva aqui]\n\nEquipe Nutri Mix']],
+  inativos: [['Reconquista (remarketing)', 'Sentimos a sua falta', 'Olá!\n\nFaz um tempo que não trabalhamos juntos e gostaríamos de saber como estão as boas práticas e a regularização do seu estabelecimento.\n\nTemos novidades e condições especiais para retomar o acompanhamento com a Nutri Mix.\n\nResponda este e-mail e conversamos.\n\nEquipe Nutri Mix'], ['Marca / conteúdo', 'Conteúdo útil para o seu negócio', 'Olá!\n\nSeparamos um conteúdo sobre segurança dos alimentos e regularização que pode ajudar o seu negócio.\n\n[escreva aqui]\n\nEquipe Nutri Mix']] };
+const email = guarda(async () => {
+  await boot(); const [pub, camp] = await Promise.all([api('GET', '/email/publicos'), api('GET', '/email/campanhas')]);
+  $('#tela').innerHTML = `<h1>E-mail marketing</h1><p class="sub">Os destinatários vêm do e-mail da empresa no Bitrix24: cliente novo cadastrado lá entra na lista sozinho (depois da próxima leitura, de hora em hora). Quem pediu para sair não recebe.</p>
+  <div class="cards">${pub.map(p => `<div class="k"><small>${h(p.nome)}</small><strong>${p.destinatarios}</strong><small>${p.semEmail} sem e-mail no cadastro · ${p.descadastrados} descadastrado(s)</small><div class="dr" style="justify-content:flex-start;margin-top:8px"><button class="btn" data-exp="${p.publico}">Exportar lista (CSV)</button></div></div>`).join('')}</div>
+  <div class="tools"><b>Campanhas</b><span class="sp"></span>${podeEditar ? '<button class="btn p" id="cnova">Nova campanha</button>' : ''}</div>
+  <div class="box tw"><table><tr><th>Campanha</th><th>Público</th><th>Assunto</th><th>Situação</th><th>Destinatários</th></tr>${camp.map(c => `<tr class="cl" data-id="${h(c.id)}"><td><b>${h(c.nome)}</b></td><td>${c.publico === 'ativos' ? 'Ativos' : 'Inativos'}</td><td>${h(c.assunto)}</td><td><span class="sel ${c.status === 'enviada' ? 'ok' : 'w'}">${c.status === 'enviada' ? 'enviada em ' + dt(c.enviadaEm) : 'rascunho'}</span></td><td>${c.total}</td></tr>`).join('') || '<tr><td colspan="5" class="mut">Nenhuma campanha ainda.</td></tr>'}</table></div>
+  <p class="mut">O envio é feito pela sua ferramenta de e-mail (exporte a lista e cole a mensagem) e aqui você registra como enviada. O envio direto pelo sistema depende de definirmos o provedor de e-mail.</p>`;
+  $('#tela').querySelectorAll('[data-exp]').forEach(b => b.onclick = guarda(() => nmBaixar('/api/car/email/exportar?publico=' + b.dataset.exp, `emails-${b.dataset.exp}.csv`)));
+  $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = () => campForm(camp.find(x => x.id === r.dataset.id)));
+  if (podeEditar) $('#cnova').onclick = () => campForm(null);
+});
+function campForm(c) {
+  const novo = !c, env = c && c.status === 'enviada', op = (k, t, s) => `<option value="${k}" ${k === s ? 'selected' : ''}>${t}</option>`; c = c || { publico: 'ativos', nome: '', assunto: '', corpo: '' };
+  gav(`${topo()}<h2 style="margin:0 0 12px">${novo ? 'Nova campanha' : h(c.nome)}</h2><form id="fm"><div id="fe"></div><div class="f"><label>Nome interno<input name="nome" value="${h(c.nome)}" required ${env ? 'disabled' : ''}></label><label>Público<select name="publico" ${env ? 'disabled' : ''}>${op('ativos', 'Clientes ativos', c.publico)}${op('inativos', 'Clientes inativos', c.publico)}</select></label>
+  ${env ? '' : `<label class="w">Modelos<span id="mod"></span></label>`}<label class="w">Assunto<input name="assunto" value="${h(c.assunto)}" required ${env ? 'disabled' : ''}></label><label class="w">Mensagem<textarea name="corpo" rows="10" required ${env ? 'disabled' : ''}>${h(c.corpo)}</textarea></label></div>
+  <div class="dr">${!novo && !env ? '<button type="button" class="btn d" id="cdel">Excluir</button><button type="button" class="btn" id="cenv">Marcar como enviada</button>' : ''}${env ? '' : '<button class="btn p">Salvar</button>'}<button type="button" class="btn" data-x>Fechar</button></div></form>`);
+  if (!env) { const m = () => MODELOS[$('#fm [name=publico]').value]; const draw = () => { $('#mod').innerHTML = m().map(([n], i) => `<button type="button" class="btn" data-m="${i}" style="margin-right:6px">${h(n)}</button>`).join(''); $('#mod').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const x = m()[b.dataset.m]; $('#fm [name=nome]').value = $('#fm [name=nome]').value || x[0]; $('#fm [name=assunto]').value = x[1]; $('#fm [name=corpo]').value = x[2]; }); }; draw(); $('#fm [name=publico]').onchange = draw; }
+  $('#fm').onsubmit = async e => { e.preventDefault(); try { await api(novo ? 'POST' : 'PUT', '/email/campanhas' + (novo ? '' : '/' + c.id), Object.fromEntries(new FormData(e.target))); gavFecha(); email(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+  if (!novo && !env) { $('#cdel').onclick = guarda(async () => { if (!confirm('Excluir esta campanha?')) return; await api('DELETE', '/email/campanhas/' + c.id); gavFecha(); email(); }); $('#cenv').onclick = guarda(async () => { if (!confirm('Registrar como enviada? Confirme só depois de enviar pela sua ferramenta de e-mail.')) return; await api('POST', `/email/campanhas/${c.id}/enviada`, {}); gavFecha(); email(); }); }
+}
+
+// ---------- Como funciona ----------
+const processo = guarda(async () => {
+  await boot();
+  $('#tela').innerHTML = `<h1>Como funciona a Carteira de clientes</h1><p class="sub">Uma visão única da carteira, alimentada pelo Bitrix24.</p>
+  <div class="grid2"><div class="box"><h2>De onde vem cada informação</h2><ul class="lst"><li><b>Ativo ou inativo:</b> campo “Situação” da empresa no Bitrix24 (Cliente = ativo, Cancelado = inativo). Você pode corrigir à mão.</li><li><b>Tipo de serviço e contrato:</b> funil Contratos do Bitrix24 (tipo e vigência) ou o que você marcar na ficha.</li><li><b>Treinamento:</b> certificados de treinamento da empresa ou negócio ganho no funil Cursos.</li><li><b>MBP e POP:</b> funil Documentação (Entregue = Sim; outras etapas = Em andamento).</li><li><b>Alvará:</b> campos de alvará da empresa ou licença emitida no funil Regularização.</li><li><b>Licença de funcionamento:</b> marcada à mão.</li><li><b>E-mail:</b> e-mail da empresa no Bitrix24.</li></ul></div>
+  <div class="box"><h2>Como usar</h2><ol class="lst"><li><b>Clientes:</b> ativos em verde, inativos em vermelho em lista separada. Defina o tipo de serviço de cada um.</li><li><b>Resumo de serviços:</b> tabela de cores dos clientes de consultoria para ver o que falta executar.</li><li><b>Contratos a vencer:</b> acompanhe o último mês de cada contrato e os avisos ao responsável.</li><li><b>E-mail marketing:</b> monte campanhas para ativos (novidades, marca) e inativos (reconquista).</li></ol></div></div>`;
+});
+
+(async () => {
+  if (!NM.token) return NM.paraLogin();
+  try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
+    ME = j.usuario; podeEditar = ME.perfil === 'admin' || ME.perfil === 'financeiro'; podeAdmin = ME.perfil === 'admin'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
+    const a = location.hash.slice(1); abrirAba(ABAS.some(x => x[0] === a) ? a : 'clientes');
+  } catch { NM.paraLogin(); }
+})();
+</script>
+</body>
+</html>
