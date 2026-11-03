@@ -96,6 +96,10 @@ test('API do cronograma: cliente ← empresa do Bitrix24, consultora ← usuári
   assert.equal(visita.feriado, 'Nossa Senhora Aparecida'); assert.equal(visita.sugestao, '2026-10-13');
   assert.equal((await call('POST', '/semana/remarcar-feriados', { data: '2026-10-12' })).remarcadas, 1);
   assert.equal((await call('GET', '/semana?data=2026-10-12')).comFeriado, 0);
+  const rem = await call('POST', `/visitas/${visita.id}/remarcar`, { data: '2026-10-20' }); assert.equal(rem.status, 'agendada'); assert.equal(rem.data, '2026-10-20'); assert.equal(api.dados().visitas.find(x => x.id === visita.id).status, 'remarcada');
+  await assert.rejects(call('POST', `/visitas/${rem.id}/remarcar`, { data: '2026-10-20' }), /diferente/);
+  assert.equal((await call('POST', '/visitas/lote', { ids: [rem.id], status: 'realizada' })).atualizadas, 1); assert.equal((await call('POST', '/visitas/lote', { ids: [rem.id], status: 'realizada' })).atualizadas, 0);
+  await assert.rejects(call('POST', '/visitas/lote', { ids: [rem.id], status: 'xx' }), /inválida/);
   const g = await call('POST', '/semana/gerar', { data: '2026-10-26', semanas: 1 }); assert.ok(g.criadas >= 1);
   const outra = { perfil: 'operacional', bitrixId: '8' };   // Iris
   await assert.rejects(call('PUT', `/visitas/${visita.id}`, { status: 'realizada' }, outra), /própria/);
