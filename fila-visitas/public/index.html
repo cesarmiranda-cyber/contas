@@ -293,7 +293,8 @@ const salvaVP = () => { try { localStorage.setItem('fv.vp', JSON.stringify({ vie
 try { Object.assign(F, JSON.parse(localStorage.getItem('fv.f') || '{}')); } catch {}
 const salvaF = () => { try { localStorage.setItem('fv.f', JSON.stringify({ seg: F.seg, tipo: F.tipo, classe: F.classe })); } catch {} };
 const VQ = { page: 1, size: 20 };
-const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VP.view === 'kanban' ? Math.max(VQ.size, 50) : VQ.size, q: F.q || '', status: VP.view === 'kanban' && foco === 'abertas' ? 'todas' : foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, ramo: F.ramo, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
+const KQ = { por: 30 };                     // visitas por coluna no Kanban
+const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VP.view === 'kanban' ? KQ.por : VQ.size, kanban: VP.view === 'kanban' ? '1' : '', q: F.q || '', status: VP.view === 'kanban' && foco === 'abertas' ? 'todas' : foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, ramo: F.ramo, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
 let reqVisitas = 0;
 async function carregaVisitas() {
   const n = ++reqVisitas;
@@ -341,7 +342,7 @@ function lista() {
         <div class="seg2"><button data-vw="cards" class="${VP.view === 'cards' ? 'on' : ''}" title="Cartões">▦ Cartões</button><button data-vw="tabela" class="${VP.view === 'tabela' ? 'on' : ''}" title="Tabela">☰ Tabela</button><button data-vw="kanban" class="${VP.view === 'kanban' ? 'on' : ''}" title="Kanban">▥ Kanban</button></div>
         <button class="btn sm" id="vcsv">Exportar CSV</button></div></div>
     ${corpo}
-    ${dados.total > 0 ? `<div class="pager"><div class="pg-i">Itens por página <select id="psz">${VP.view === 'kanban' ? opt([[50, '50'], [100, '100'], [200, '200']], Math.max(VQ.size, 50)) : opt([[10, '10'], [20, '20'], [50, '50'], [100, '100']], VQ.size)}</select></div>
+    ${dados.total > 0 && VP.view !== 'kanban' ? `<div class="pager"><div class="pg-i">Itens por página <select id="psz">${VP.view === 'kanban' ? opt([[50, '50'], [100, '100'], [200, '200']], Math.max(VQ.size, 50)) : opt([[10, '10'], [20, '20'], [50, '50'], [100, '100']], VQ.size)}</select></div>
       <div class="pg-b"><button data-p="1" ${dados.pagina <= 1 ? 'disabled' : ''} title="Primeira">«</button><button data-p="${dados.pagina - 1}" ${dados.pagina <= 1 ? 'disabled' : ''}>‹ Anterior</button>
       ${janela.map(n => `<button data-p="${n}" class="${n === dados.pagina ? 'on' : ''}">${n}</button>`).join('')}
       <button data-p="${dados.pagina + 1}" ${dados.pagina >= dados.paginas ? 'disabled' : ''}>Próxima ›</button><button data-p="${dados.paginas}" ${dados.pagina >= dados.paginas ? 'disabled' : ''} title="Última">»</button></div></div>` : ''}`;
@@ -399,9 +400,9 @@ function kanban(v, verEquipe) {
   const g = gruposKanban(v);
   const cols = KCOLS.filter(([k]) => g[k].length || ['atrasada', 'dia', 'aguardando', 'finalizado'].includes(k) && (foco === 'abertas' || foco === 'todas' || foco === k));
   return `<div class="kb">${cols.map(([k, t, cor]) => {
-    const n = g[k].reduce((a, x) => a + x.length, 0);
-    return `<section class="kcol" data-kcol="${k}" style="--kc:${cor}"><header><b>${t}</b><span class="kn" title="${g[k].length} empresa(s)">${n}</span></header>
-      <div class="kbody">${g[k].map(grp => cartaoKanban(grp, k, verEquipe)).join('') || '<div class="kvazio">Solte aqui</div>'}</div></section>`;
+    const n = g[k].reduce((a, x) => a + x.length, 0), tot = (dados.colunas && dados.colunas[k]) ?? n;
+    return `<section class="kcol" data-kcol="${k}" style="--kc:${cor}"><header><b>${t}</b><span class="kn" title="${g[k].length} empresa(s) nesta tela">${tot}</span></header>
+      <div class="kbody">${g[k].map(grp => cartaoKanban(grp, k, verEquipe)).join('') || '<div class="kvazio">Solte aqui</div>'}${tot > n ? `<button class="btn sm" data-kmais="1">Mostrando ${n} de ${tot} · ver mais</button>` : ''}</div></section>`;
   }).join('')}</div><div class="hint" style="margin:8px 2px">Arraste um cartão: para <b>Encerrado</b> abre o registro da visita; para <b>Aguardando visita</b> abre a alteração de data. As colunas Atrasada e Dia da visita seguem a data programada. Clique na empresa para abrir e editar o agrupamento.</div>`;
 }
 function cartaoKanban(grp, col, verEquipe) {
@@ -426,6 +427,7 @@ function aviso(msg, erro) {
   el.textContent = msg; el.className = 'on' + (erro ? ' erro' : ''); clearTimeout(aviso.t); aviso.t = setTimeout(() => { el.className = ''; }, 5200);
 }
 function ligaKanban() {
+  document.querySelectorAll('[data-kmais]').forEach(b => b.onclick = () => { KQ.por += 30; refaz(); });
   document.querySelectorAll('[data-ktg]').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.ktg, c = b.closest('.kc'), box = c.querySelector('.kc-i'); const abrir = !KABERTOS.has(k); abrir ? KABERTOS.add(k) : KABERTOS.delete(k); box.hidden = !abrir; b.textContent = abrir ? 'Recolher ▴' : 'Ver linhas ▾'; });
   document.querySelectorAll('[data-kg]').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); abreGrupo(b.dataset.kg); });
   let arrastando = null;                                           // { ids: [..], col }

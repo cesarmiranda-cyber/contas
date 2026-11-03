@@ -989,8 +989,13 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       classe: (a, b) => String(a.c.classe).localeCompare(String(b.c.classe)), responsavel: (a, b) => String(nomesResp.get(+a.c.responsavel)).localeCompare(String(nomesResp.get(+b.c.responsavel))),
     };
     sel.sort((a, b) => (chaves[ord] || chaves.data)(a, b) * (+dir || 1));
-    const total = sel.length, paginas = Math.max(1, Math.ceil(total / size)), pagina = Math.min(Math.max(1, +p.page || 1), paginas);
-    const fatia = sel.slice((pagina - 1) * size, pagina * size);
+    const total = sel.length;
+    let paginas = Math.max(1, Math.ceil(total / size)), pagina = Math.min(Math.max(1, +p.page || 1), paginas), fatia, colunas = null;
+    if (p.kanban) {                                    // Kanban: as primeiras `size` visitas de CADA coluna (senão as atrasadas ocupam a página toda)
+      colunas = {}; fatia = [];
+      for (const sit of ['atrasada', 'dia', 'aguardando', 'finalizado', 'naorealizada']) { const g = sel.filter(l => l.situacao === sit); colunas[sit] = g.length; fatia.push(...g.slice(0, size)); }
+      paginas = 1; pagina = 1;
+    } else fatia = sel.slice((pagina - 1) * size, pagina * size);
     // 5) só a página busca empresa/nomes
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
     const visitas = await mapaPar(fatia, 6, async l => {
@@ -1008,7 +1013,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         equipe, reprogramacoes: store.historico.filter(x => x.card === c.id && !x.tipo).length,
         urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     });
-    return { hoje: h, bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || leves.some(l => +l.c.responsavel !== +uid) ? 'equipe' : 'minhas'), total, pagina, paginas, tamanho: size, counts, opcoes, visitas };
+    return { hoje: h, bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || leves.some(l => +l.c.responsavel !== +uid) ? 'equipe' : 'minhas'), total, pagina, paginas, tamanho: size, colunas, counts, opcoes, visitas };
   }
   // Dados em nível de linha para o dashboard (a tela agrega e filtra). Respeita a visibilidade de quem consulta.
   const cacheDash = new Map();

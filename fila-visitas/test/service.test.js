@@ -610,3 +610,14 @@ test('lista: Responsável vem do campo da empresa (cargo) e o colaborador do cam
   assert.ok(v, 'quem está no campo da empresa vê a visita');
   assert.equal(v.responsavel, 10, 'responsável = Supervisor Responsável do cadastro');
 });
+
+test('kanban: traz as primeiras visitas de cada coluna e o total por coluna', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const todos = cards(w);
+  todos.forEach((c, i) => { c.ufCrm_data = i === 0 ? '2026-05-10' : '2026-04-01'; c.closedate = c.ufCrm_data; });   // 1 de hoje, o resto atrasado
+  const r = await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'abertas', page: 1, size: 1, kanban: true });
+  assert.equal(r.colunas.dia, 1); assert.ok(r.colunas.atrasada >= 2);
+  assert.ok(r.visitas.some(v => v.situacao === 'dia'), 'coluna "dia" aparece mesmo com muitas atrasadas');
+  assert.equal(r.visitas.filter(v => v.situacao === 'atrasada').length, 1, 'limite por coluna');
+});
