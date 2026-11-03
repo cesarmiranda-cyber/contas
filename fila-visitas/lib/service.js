@@ -175,8 +175,16 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   // ---------- cache curto (deixa as telas rápidas); qualquer escrita limpa ----------
+  // map com limite de simultâneas, mantendo a ordem
+  const mapaPar = async (lista, n, fn) => { const out = new Array(lista.length); let i = 0; await Promise.all(Array.from({ length: Math.min(n, lista.length) }, async () => { while (i < lista.length) { const k = i++; out[k] = await fn(lista[k], k); } })); return out; };
+  const voando = new Map();
   const memoria = new Map();
-  const memo = async (chave, ttl, fn) => { const c = memoria.get(chave); if (c && Date.now() - c.em < ttl) return c.v; const v = await fn(); memoria.set(chave, { em: Date.now(), v }); return v; };
+  const memo = async (chave, ttl, fn) => {
+    const c = memoria.get(chave); if (c && Date.now() - c.em < ttl) return c.v;
+    if (voando.has(chave)) return voando.get(chave);                      // a mesma consulta em andamento é compartilhada
+    const p = (async () => { const v = await fn(); memoria.set(chave, { em: Date.now(), v }); return v; })().finally(() => voando.delete(chave));
+    voando.set(chave, p); return p;
+  };
   // Mostra o último resultado na hora e atualiza em segundo plano quando passou do prazo (a tela não espera o Bitrix).
   const atualizando = new Set();
   const memoSWR = async (chave, ttl, fn) => {
@@ -985,8 +993,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const fatia = sel.slice((pagina - 1) * size, pagina * size);
     // 5) só a página busca empresa/nomes
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
-    const visitas = [];
-    for (const l of fatia) {
+    const visitas = await mapaPar(fatia, 6, async l => {
       const { it, c, reg } = l;
       const emp = await empresaCurta(c.empresaId);
       const sg = emp?.segs?.[c.segmento] || {};
@@ -994,13 +1001,13 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       for (const k of ['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor']) if (sg[k]) equipe[k] = await nomeDe(sg[k]);
       if (emp && (JSON.stringify(reg.equipe) !== JSON.stringify(equipeIds(sg)) || reg.ramo !== (emp.ramo || ''))) store.setCard(it.id, { ...reg, empresaId: c.empresaId, empresa: emp.nome, seg: c.segmento, cargo: c.cargo, equipe: equipeIds(sg), ramo: emp.ramo || '' });
       const tipoEmp = await memo(`tipo:${c.empresaId}`, 300e3, () => tipoDaEmpresa(emp));
-      visitas.push({ ...c, segmentoEmpresa: await nomeRamo(emp?.ramo), tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
+      return ({ ...c, segmentoEmpresa: await nomeRamo(emp?.ramo), tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
         encerradoEm: l.fechado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null, dias: !l.fechado && c.data ? R.dayDiff(h, c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, h) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
         altMin: R.addDays(h, 1), altMax: R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || h.slice(0, 7)),
         equipe, reprogramacoes: store.historico.filter(x => x.card === c.id && !x.tipo).length,
         urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
-    }
+    });
     return { hoje: h, bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || leves.some(l => +l.c.responsavel !== +uid) ? 'equipe' : 'minhas'), total, pagina, paginas, tamanho: size, counts, opcoes, visitas };
   }
   // Dados em nível de linha para o dashboard (a tela agrega e filtra). Respeita a visibilidade de quem consulta.

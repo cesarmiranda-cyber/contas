@@ -40,6 +40,20 @@ h2 em{font-style:normal;background:var(--line);color:var(--ink2);border-radius:9
 .item:last-child{border-bottom:0}.item:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cy)}
 .item:before{width:6px}.item.atrasada{background:color-mix(in srgb,var(--red) 9%,var(--sf))}.item.dia{background:color-mix(in srgb,#f5a623 16%,var(--sf))}
 .item.atrasada:before{background:var(--red)}.item.dia:before{background:#f5a623}
+
+.kb{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(290px,1fr);gap:12px;overflow-x:auto;align-items:start;padding-bottom:8px}
+.kcol{background:#f1f4f9;border-radius:14px;border-top:4px solid var(--kc);min-width:290px;display:flex;flex-direction:column;max-height:calc(100vh - 230px)}
+.kcol.alvo{outline:2px dashed var(--kc);background:color-mix(in srgb,var(--kc) 10%,#f1f4f9)}
+.kcol header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:14px}.kn{background:var(--kc);color:#fff;border-radius:999px;padding:1px 9px;font-size:12px;font-weight:700}
+.kbody{overflow-y:auto;padding:0 8px 8px;display:flex;flex-direction:column;gap:8px}.kvazio{color:#94a3b8;text-align:center;padding:18px 0;font-size:13px}
+.kc{background:#fff;border:1px solid var(--line);border-left:4px solid var(--kc,#cbd5e1);border-radius:10px;padding:10px 12px;cursor:grab;box-shadow:0 1px 2px rgba(15,23,42,.06)}.kc.arrasta,.ki.arrasta{opacity:.45}
+.kc.atrasada{border-left-color:#D93A3A}.kc.dia{border-left-color:#F5A623}.kc.aguardando{border-left-color:#2066b0}.kc.finalizado{border-left-color:#16a34a}.kc.naorealizada{border-left-color:#94a3b8}
+.kc-h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.kc-n{font-weight:700;font-size:14px;line-height:1.25;color:inherit;text-decoration:none}.kc-n:hover{color:var(--brand);text-decoration:underline}
+.kc-m{color:#64748b;font-size:12px;margin-top:2px}.kc-l{margin:6px 0;display:flex;flex-wrap:wrap;gap:4px}.kc-d{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600}.kp{font-size:12px;font-weight:600;color:#64748b}
+.kc.atrasada .kp{color:#D93A3A}.kc.dia .kp{color:#b45309}.kc-r{font-size:12px;color:#475569;margin-top:4px}.kc-a{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.kc-i{margin-top:8px;border-top:1px solid var(--line);padding-top:6px;display:flex;flex-direction:column;gap:6px}.ki{display:flex;align-items:center;gap:6px;flex-wrap:wrap;cursor:grab;font-size:12px}.kic{flex:1;min-width:70px}.kid{font-weight:600}
+#kaviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s;z-index:99}#kaviso.on{opacity:1}#kaviso.erro{background:#b91c1c}
+.kg-eq{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .lin{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#e8eef6;color:#1e3a5f}.lin-motores{background:#dbeafe;color:#1e40af}.lin-pecas{background:#dcfce7;color:#166534}.lin-servicos{background:#fef3c7;color:#92400e}.lin-novosnegocios{background:#f3e8ff;color:#6b21a8}tr[hidden]{display:none}tr.gh{cursor:pointer}tr.gh td{padding:10px 8px}tr.gh .chev{display:inline-block;width:22px;font-size:16px;color:var(--brand)}tr.gh{background:#fff;border-top:2px solid var(--line)}tr.gh.t-atrasada{background:#fdeeee}tr.gh.t-dia{background:#fdf1dd}tr.gh .gm{margin-left:12px;display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center}tr.gc td:first-child{padding-left:30px}tr.rep td{border-top-color:transparent}tr.rep .hint{padding-left:6px}
 .emp{font-weight:700;font-size:15px;line-height:1.25}
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}.tag{font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--sf2);border:1px solid var(--line);color:var(--ink2)}.tag.seg{background:var(--brandbg);border-color:transparent;color:var(--brand)}
@@ -279,7 +293,7 @@ const salvaVP = () => { try { localStorage.setItem('fv.vp', JSON.stringify({ vie
 try { Object.assign(F, JSON.parse(localStorage.getItem('fv.f') || '{}')); } catch {}
 const salvaF = () => { try { localStorage.setItem('fv.f', JSON.stringify({ seg: F.seg, tipo: F.tipo, classe: F.classe })); } catch {} };
 const VQ = { page: 1, size: 20 };
-const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VQ.size, q: F.q || '', status: foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, ramo: F.ramo, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
+const consultaVisitas = (extra = {}) => new URLSearchParams(Object.entries({ escopo: 'auto', page: VQ.page, size: VP.view === 'kanban' ? Math.max(VQ.size, 50) : VQ.size, q: F.q || '', status: VP.view === 'kanban' && foco === 'abertas' ? 'todas' : foco, per: VD.per, de: VD.de, ate: VD.ate, seg: F.seg, ramo: F.ramo, tipo: F.tipo, classe: F.classe, resp: F.resp, vend: F.vend, ord: VP.ord, dir: VP.dir, ...extra }).filter(([, v]) => v !== '' && v != null)).toString();
 let reqVisitas = 0;
 async function carregaVisitas() {
   const n = ++reqVisitas;
@@ -294,7 +308,7 @@ function lista() {
   const v = dados.visitas, c = dados.counts, op = dados.opcoes, verEquipe = dados.visao !== 'minhas';
   const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${String(cur) === String(a) ? 'selected' : ''}>${esc(b)}</option>`).join('');
   const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Em aberto · próximas'], ['finalizado', 'Encerradas'], ['naorealizada', 'Não realizadas']];
-  const corpo = !v.length ? '<div class="vazio">Nenhuma visita neste filtro.</div>' : VP.view === 'tabela' ? tabelaVisitas(v, verEquipe) : grupos.map(([k, t]) => {
+  const corpo = !v.length ? '<div class="vazio">Nenhuma visita neste filtro.</div>' : VP.view === 'kanban' ? kanban(v, verEquipe) : VP.view === 'tabela' ? tabelaVisitas(v, verEquipe) : grupos.map(([k, t]) => {
     const g = v.filter(x => x.situacao === k);
     return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list cards">${g.map(linha).join('')}</div>` : '';
   }).join('');
@@ -324,10 +338,10 @@ function lista() {
     </div>
     <div class="bar2"><span class="hint">${dados.total ? `${de}–${ate} de ${dados.total}` : '0'} visita(s)${filtrado ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
       <div class="bar2r"><label class="sl2">Ordenar<select id="fo">${opt([['data', 'Situação e data'], ['prazo', 'Data programada'], ['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : [])], VP.ord)}</select></label>
-        <div class="seg2"><button data-vw="cards" class="${VP.view === 'cards' ? 'on' : ''}" title="Cartões">▦ Cartões</button><button data-vw="tabela" class="${VP.view === 'tabela' ? 'on' : ''}" title="Tabela">☰ Tabela</button></div>
+        <div class="seg2"><button data-vw="cards" class="${VP.view === 'cards' ? 'on' : ''}" title="Cartões">▦ Cartões</button><button data-vw="tabela" class="${VP.view === 'tabela' ? 'on' : ''}" title="Tabela">☰ Tabela</button><button data-vw="kanban" class="${VP.view === 'kanban' ? 'on' : ''}" title="Kanban">▥ Kanban</button></div>
         <button class="btn sm" id="vcsv">Exportar CSV</button></div></div>
     ${corpo}
-    ${dados.total > 0 ? `<div class="pager"><div class="pg-i">Itens por página <select id="psz">${opt([[10, '10'], [20, '20'], [50, '50'], [100, '100']], VQ.size)}</select></div>
+    ${dados.total > 0 ? `<div class="pager"><div class="pg-i">Itens por página <select id="psz">${VP.view === 'kanban' ? opt([[50, '50'], [100, '100'], [200, '200']], Math.max(VQ.size, 50)) : opt([[10, '10'], [20, '20'], [50, '50'], [100, '100']], VQ.size)}</select></div>
       <div class="pg-b"><button data-p="1" ${dados.pagina <= 1 ? 'disabled' : ''} title="Primeira">«</button><button data-p="${dados.pagina - 1}" ${dados.pagina <= 1 ? 'disabled' : ''}>‹ Anterior</button>
       ${janela.map(n => `<button data-p="${n}" class="${n === dados.pagina ? 'on' : ''}">${n}</button>`).join('')}
       <button data-p="${dados.pagina + 1}" ${dados.pagina >= dados.paginas ? 'disabled' : ''}>Próxima ›</button><button data-p="${dados.paginas}" ${dados.pagina >= dados.paginas ? 'disabled' : ''} title="Última">»</button></div></div>` : ''}`;
@@ -364,6 +378,121 @@ function lista() {
   };
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
+  if (VP.view === 'kanban') ligaKanban();
+}
+
+// ---- Kanban: colunas = situação da visita; cada empresa vira um cartão agrupado com as suas linhas ----
+const KCOLS = [['atrasada', 'Atrasada', '#D93A3A'], ['dia', 'Dia da visita', '#F5A623'], ['aguardando', 'Aguardando visita', '#2066b0'], ['finalizado', 'Encerrado', '#16a34a'], ['naorealizada', 'Não realizada', '#94a3b8']];
+const KABERTOS = new Set();                 // cartões de empresa expandidos
+const prazoTxt = c => c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
+function gruposKanban(v) {                   // { coluna: [ [visitas da mesma empresa] ] }
+  const out = {};
+  for (const [k] of KCOLS) {
+    const mapa = new Map();
+    for (const c of v.filter(x => x.situacao === k)) { const id = c.empresaId || `s${c.id}`; (mapa.get(id) || mapa.set(id, []).get(id)).push(c); }
+    out[k] = [...mapa.values()];
+  }
+  return out;
+}
+function kanban(v, verEquipe) {
+  if (!v.length) return '<div class="vazio">Nenhuma visita neste filtro.</div>';
+  const g = gruposKanban(v);
+  const cols = KCOLS.filter(([k]) => g[k].length || ['atrasada', 'dia', 'aguardando', 'finalizado'].includes(k) && (foco === 'abertas' || foco === 'todas' || foco === k));
+  return `<div class="kb">${cols.map(([k, t, cor]) => {
+    const n = g[k].reduce((a, x) => a + x.length, 0);
+    return `<section class="kcol" data-kcol="${k}" style="--kc:${cor}"><header><b>${t}</b><span class="kn" title="${g[k].length} empresa(s)">${n}</span></header>
+      <div class="kbody">${g[k].map(grp => cartaoKanban(grp, k, verEquipe)).join('') || '<div class="kvazio">Solte aqui</div>'}</div></section>`;
+  }).join('')}</div><div class="hint" style="margin:8px 2px">Arraste um cartão: para <b>Encerrado</b> abre o registro da visita; para <b>Aguardando visita</b> abre a alteração de data. As colunas Atrasada e Dia da visita seguem a data programada. Clique na empresa para abrir e editar o agrupamento.</div>`;
+}
+function cartaoKanban(grp, col, verEquipe) {
+  const c0 = grp[0], key = `${col}|${c0.empresaId || c0.id}`, aberto = KABERTOS.has(key);
+  const ids = grp.map(x => x.id), datas = grp.map(x => x.data).filter(Boolean).sort();
+  const linhas = [...new Set(grp.map(x => x.segmento))];
+  const resp = [...new Set(grp.map(x => x.responsavelNome).filter(Boolean))];
+  const abertas = col === 'atrasada' || col === 'dia' || col === 'aguardando';
+  const linhaItem = x => `<div class="ki" draggable="true" data-kid="${x.id}" data-kcol="${col}"><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span><span class="kic">${esc(x.cargo)}${x.classe ? ' · ' + esc(x.classe) : ''}</span><span class="kid">${fmt(x.data)}</span>
+      ${abertas ? `<button class="btn sm pri" data-reg="${x.id}">Registrar</button><button class="btn sm" data-rep="${x.id}">Alterar</button>` : ''}</div>`;
+  return `<article class="kc ${col}" draggable="true" data-kkey="${esc(key)}" data-ids="${ids.join(',')}" data-kcol="${col}">
+    <div class="kc-h"><a href="#" class="kc-n" data-kg="${esc(key)}">${esc(c0.empresa)}</a>${grp.length > 1 ? `<span class="tag">${grp.length} visitas</span>` : ''}</div>
+    <div class="kc-m">${esc([c0.segmentoEmpresa, c0.tipoEmpresa].filter(Boolean).join(' · '))}</div>
+    <div class="kc-l">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join(' ')}</div>
+    <div class="kc-d"><span>${datas.length ? fmt(datas[0]) : '—'}</span><span class="kp">${prazoTxt(grp.slice().sort((a, b) => (a.data || '9').localeCompare(b.data || '9'))[0])}</span></div>
+    ${verEquipe && resp.length ? `<div class="kc-r">${esc(resp.slice(0, 2).join(', '))}${resp.length > 2 ? ` +${resp.length - 2}` : ''}</div>` : ''}
+    <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : ''}</div>
+    ${grp.length > 1 ? `<div class="kc-i" ${aberto ? '' : 'hidden'}>${grp.map(linhaItem).join('')}</div>` : ''}</article>`;
+}
+function aviso(msg, erro) {
+  let el = $('#kaviso'); if (!el) { el = document.createElement('div'); el.id = 'kaviso'; document.body.appendChild(el); }
+  el.textContent = msg; el.className = 'on' + (erro ? ' erro' : ''); clearTimeout(aviso.t); aviso.t = setTimeout(() => { el.className = ''; }, 5200);
+}
+function ligaKanban() {
+  document.querySelectorAll('[data-ktg]').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.ktg, c = b.closest('.kc'), box = c.querySelector('.kc-i'); const abrir = !KABERTOS.has(k); abrir ? KABERTOS.add(k) : KABERTOS.delete(k); box.hidden = !abrir; b.textContent = abrir ? 'Recolher ▴' : 'Ver linhas ▾'; });
+  document.querySelectorAll('[data-kg]').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); abreGrupo(b.dataset.kg); });
+  let arrastando = null;                                           // { ids: [..], col }
+  document.querySelectorAll('.kc, .ki').forEach(el => {
+    el.ondragstart = e => {
+      e.stopPropagation();
+      arrastando = el.classList.contains('ki') ? { ids: [+el.dataset.kid], col: el.dataset.kcol } : { ids: el.dataset.ids.split(',').map(Number), col: el.dataset.kcol };
+      el.classList.add('arrasta'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', arrastando.ids.join(',')); } catch {}
+    };
+    el.ondragend = () => { el.classList.remove('arrasta'); document.querySelectorAll('.kcol.alvo').forEach(c => c.classList.remove('alvo')); arrastando = null; };
+  });
+  document.querySelectorAll('.kcol').forEach(col => {
+    col.ondragover = e => { if (!arrastando) return; e.preventDefault(); col.classList.add('alvo'); };
+    col.ondragleave = e => { if (!col.contains(e.relatedTarget)) col.classList.remove('alvo'); };
+    col.ondrop = e => { e.preventDefault(); col.classList.remove('alvo'); if (arrastando) moveKanban(arrastando.ids, arrastando.col, col.dataset.kcol); arrastando = null; };
+  });
+}
+// Mover um cartão: Encerrado = registrar a visita; Aguardando = alterar a data; as demais colunas dependem da data.
+function moveKanban(ids, de, para) {
+  if (de === para) return;
+  if (de === 'finalizado' || de === 'naorealizada') return aviso('Visitas encerradas ou não realizadas não podem ser movidas.', true);
+  if (para === 'finalizado') return ids.length === 1 ? registrar(ids[0]) : abreGrupoIds(ids, 'Registre a visita de cada linha para encerrar o grupo.');
+  if (para === 'aguardando') return ids.length === 1 ? reagendarVisita(ids[0]) : reagendarGrupo(ids);
+  if (para === 'naorealizada') return aviso('A visita vira "Não realizada" sozinha quando o mês termina sem registro.', true);
+  aviso(`A coluna "${para === 'dia' ? 'Dia da visita' : 'Atrasada'}" é definida pela data programada. Para mudar a data, solte em "Aguardando visita" (Alterar visita).`, true);
+}
+function abreGrupo(key) {
+  const [col, emp] = key.split('|');
+  const grp = dados.visitas.filter(x => String(x.empresaId || x.id) === emp);
+  abreGrupoIds(grp.map(x => x.id), '');
+}
+function abreGrupoIds(ids, nota) {
+  const grp = ids.map(achar).filter(Boolean); if (!grp.length) return;
+  const c0 = grp[0], aberta = x => x.situacao === 'atrasada' || x.situacao === 'dia' || x.situacao === 'aguardando';
+  const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
+  const eq = [['vendedor', 'Vendedor'], ['supervisor', 'Supervisor'], ['coordenador', 'Coordenador'], ['gerente', 'Gerente'], ['diretor', 'Diretor']].filter(([k]) => c0.equipe && c0.equipe[k]).map(([k, t]) => `<span class="tag" title="${t}">${t}: ${esc(c0.equipe[k])}</span>`).join(' ');
+  const abertas = grp.filter(aberta);
+  modal(`<div class="sh-h"><h3>${c0.urlEmpresa ? `<a href="${esc(c0.urlEmpresa)}" target="_top">${esc(c0.empresa)}</a>` : esc(c0.empresa)}</h3>
+      <div class="chips">${c0.segmentoEmpresa ? `<span class="tag emp">${esc(c0.segmentoEmpresa)}</span>` : ''}${c0.tipoEmpresa ? `<span class="tag">${esc(c0.tipoEmpresa)}</span>` : ''}<span class="tag">${grp.length} visita(s)</span></div></div>
+    <div class="sh-b">${nota ? `<div class="info">${esc(nota)}</div>` : ''}${eq ? `<div class="kg-eq">${eq}</div>` : ''}
+      <div class="tw"><table><tr><th>Linha</th><th>Cargo</th><th>Classe</th><th>Responsável</th><th>Última visita</th><th>Programada</th><th>Prazo</th><th></th></tr>${grp.map(x => `<tr><td><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span></td><td>${esc(x.cargo)}</td><td>${esc(x.classe)}</td><td>${esc(x.responsavelNome)}</td><td>${x.ultima ? fmt(x.ultima) : '—'}</td><td>${fmt(x.data)}</td><td><span class="pl2" style="background:${pl[x.situacao][0]};color:${pl[x.situacao][1]}">${prazoTxt(x)}</span></td>
+        <td style="white-space:nowrap">${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
+    <div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button>${abertas.length > 1 ? '<button class="btn" id="gall">Alterar a data de todas</button>' : ''}</div>`);
+  document.querySelectorAll('[data-greg]').forEach(b => b.onclick = () => registrar(+b.dataset.greg));
+  document.querySelectorAll('[data-grep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.grep));
+  if ($('#gall')) $('#gall').onclick = () => reagendarGrupo(abertas.map(x => x.id));
+}
+// Alterar a data de várias visitas da mesma empresa de uma vez (mesmas regras: do dia seguinte em diante, dentro do mês, motivo obrigatório).
+function reagendarGrupo(ids) {
+  const grp = ids.map(achar).filter(Boolean); if (!grp.length) return;
+  const hojeIso = (dados && dados.hoje) || new Date().toISOString().slice(0, 10);
+  const soma = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const min = grp.map(x => x.altMin || soma(hojeIso, 1)).sort().pop(), max = grp.map(x => x.altMax).filter(Boolean).sort()[0] || min;
+  const [y, m] = max.slice(0, 7).split('-'), semDia = min > max;
+  modal(`<div class="sh-h"><h3>Alterar visitas</h3><div class="chips"><span class="tag seg">${esc(grp[0].empresa)}</span>${grp.map(x => `<span class="tag">${esc(x.segmento)} · ${esc(x.cargo)}</span>`).join('')}</div></div>
+    <div class="sh-b"><div class="info">A mesma data e o mesmo motivo valem para as ${grp.length} visitas. Só <b>do dia seguinte em diante</b> e <b>dentro do mês ${m}/${y}</b>.</div>
+    ${semDia ? '<div class="err on">Não há dias disponíveis no mês para todas as visitas juntas. Altere uma a uma.</div>' : `<div class="fld"><label>Nova data <i>*</i> <span class="hint">(${fmt(min)} a ${fmt(max)})</span></label><input type="date" id="nd" min="${min}" max="${max}" value="${min}"></div>
+    <div class="fld"><label>Motivo <i>*</i></label><textarea id="mo" placeholder="Por que as visitas mudam de data?"></textarea></div>`}<div class="err" id="er"></div></div>
+    <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button>${semDia ? '' : '<button class="btn pri" id="ok">Alterar visitas</button>'}</div>`);
+  if (semDia) return;
+  $('#ok').onclick = async () => {
+    $('#ok').disabled = true; $('#er').classList.remove('on');
+    const falhas = [];
+    for (const x of grp) { try { await api(`/api/cards/${x.id}/reprogramar`, { method: 'POST', body: { nova: $('#nd').value, motivo: $('#mo').value } }); } catch (e) { falhas.push(`${x.segmento} · ${x.cargo}: ${e.message}`); } }
+    if (!falhas.length) { fecha(); carrega(); return; }
+    $('#er').textContent = falhas.join(' | '); $('#er').classList.add('on'); $('#ok').disabled = false; carregaVisitas();
+  };
 }
 const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
