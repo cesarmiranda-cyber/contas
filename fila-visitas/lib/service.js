@@ -656,6 +656,33 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     }
     return { marcadas };
   }
+  // Prévia (só leitura) de "encerrar a fila atual e começar um novo ciclo": para cada card aberto calcula a data que o card teria
+  // se fosse recriado hoje pelas regras (mesma conta da sincronização). Não escreve nada no Bitrix.
+  async function previaNovoCiclo() {
+    const h = hoje(), cfg = store.config;
+    const abertos = await cardsAbertos();
+    const cs = []; for (const it of abertos) cs.push(await dadosCard(it));
+    const ids = [...new Set(cs.map(c => c.empresaId).filter(Boolean))];
+    const emps = new Map(); { let i = 0; await Promise.all(Array.from({ length: 6 }, async () => { while (i < ids.length) { const id = ids[i++]; emps.set(id, await lerEmpresa(id).catch(() => null)); } })); }
+    const atual = { atrasada: 0, dia: 0, aguardando: 0 }, novo = { atrasada: 0, dia: 0, aguardando: 0 }, porCargo = {}, semRegra = {}, exemplos = [];
+    const pend = []; let mesmaData = 0;
+    for (const c of cs) {
+      atual[R.etapaPara(c.data, h)]++;
+      const emp = emps.get(c.empresaId), sg = emp?.segs?.[c.segmento] || {};
+      const classe = sg.classe || c.classe, resp = sg[String(c.cargo).toLowerCase()];
+      const n = R.intervalo(cfg, c.cargo, classe);
+      const linha = { empresa: c.empresa, segmento: c.segmento, cargo: c.cargo, classe, ultima: sg.ultima || null, proxima: sg.proxima || null, atual: c.data };
+      if (!emp || !resp || n === null) { const m = !emp ? 'empresa não encontrada' : !resp ? 'sem responsável no cargo' : 'classe inválida'; semRegra[m] = (semRegra[m] || 0) + 1; if (pend.length < 8) pend.push({ ...linha, motivo: m }); continue; }
+      const primeira = c.cargo === 'Vendedor' && !sg.ultima;
+      const calc = primeira ? h : R.dataProgramada(cfg, { cargo: c.cargo, classe, ultima: sg.ultima, hoje: h });
+      const data = (c.cargo === 'Vendedor' && sg.ultima && sg.proxima) ? sg.proxima : calc;
+      const sit = R.etapaPara(data, h); novo[sit]++;
+      (porCargo[c.cargo] ||= { atrasada: 0, dia: 0, aguardando: 0 })[sit]++;
+      if (data === c.data) mesmaData++;
+      if (exemplos.length < 12 && sit === 'atrasada') exemplos.push({ ...linha, nova: data });
+    }
+    return { hoje: h, abertos: cs.length, empresas: ids.length, atual, novo, porCargo, semRegra, mesmaData, pendentes: pend, exemplosAtrasados: exemplos };
+  }
   // Rede de segurança: acha empresas com Vendedor preenchido que ainda não têm card aberto no segmento (edição perdida, carga em massa)
   // e gera a fila delas. Não depende da data de alteração do cadastro. Reprocessa cada empresa no máximo a cada 6 h.
   async function reconciliarCadastros({ limite = 60 } = {}) {
@@ -1137,6 +1164,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, aquecer, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, aquecer, previaNovoCiclo, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

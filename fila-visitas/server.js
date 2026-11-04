@@ -207,6 +207,7 @@ server.listen(PORT, () => {
     } catch (e) { console.error('oport:', e.message); }
   }, 2000);
   if (bitrix.enabled && process.env.SYNC_RECENTES) setTimeout(() => svc.sincronizarTodas({ desde: new Date(Date.now() - (+process.env.SYNC_RECENTES) * 3600e3).toISOString() }).then(r => console.log('sync-recentes', JSON.stringify(r.map(e => ({ empresa: e.empresa, criados: (e.criados || []).length, atualizados: (e.atualizados || []).length, pendencias: e.pendencias, erro: e.erro }))))).catch(e => console.error('sync-recentes:', e.message)), 7000);
+  if (bitrix.enabled && process.env.DIAG_CICLO) setTimeout(async () => { try { const r = await svc.previaNovoCiclo(); const j = JSON.stringify(r); for (let i = 0; i < j.length; i += 1500) console.log('previa-ciclo', j.slice(i, i + 1500)); } catch (e) { console.error('previa-ciclo:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_EMPRESA) setTimeout(async () => {
     try {
       const { map } = await svc.campos(true);
