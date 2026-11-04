@@ -74,7 +74,7 @@ const api = (m, u, b) => nmJson(m, '/api/bk' + u, b);
 const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = s => s ? s.split('-').reverse().join('/') : '—';
 const ABAS = [['painel', 'Painel'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações'], ['processo', 'Como funciona']];
-let ME = {}, BOOT = {}, aba = 'painel', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false;
+let ME = {}, BOOT = {}, aba = 'painel', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false, podeAdmin = false;
 const NIV = { vencido: 'b', critico: 'b', atencao: 'w', ok: 'ok' };
 function aviso(t, erro) { const m = $('#msg'); m.innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
 const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
@@ -325,7 +325,7 @@ const config = guarda(async () => {
 (async () => {
   if (!NM.token) return NM.paraLogin();
   try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
-    ME = j.usuario; podeEditar = ME.perfil !== 'consulta'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
+    ME = j.usuario; podeEditar = ME.perfil === 'admin' || ME.perfil === 'financeiro'; podeAdmin = ME.perfil === 'admin'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
     const a = location.hash.slice(1); abrirAba(ABAS.some(x => x[0] === a) ? a : 'painel');
   } catch { NM.paraLogin(); }
 })();
