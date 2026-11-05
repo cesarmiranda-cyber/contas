@@ -551,7 +551,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (!map.visita.resultado && String(resultado || '').trim().length < 3 && !form.campos.some(c => c.obrigatorio)) faltam.push('Resultado / observações');
     if (faltam.length) throw erro(`Preencha: ${faltam.join(', ')}.`, 422);
     const agora = clock();
-    const quando = dataHora ? new Date(dataHora) : agora;
+    const quando = dataHora ? R.parseBR(dataHora) : agora;
     if (isNaN(quando)) throw erro('Data/hora inválida.');
     const dia = R.todayBR(quando);
     const ant = R.antecipada(dia, card.data);
@@ -872,7 +872,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   async function corrigirVisita(id, { uid, dataHora, motivo }) {
     if (!isAdmin(uid)) throw erro('Apenas administradores podem corrigir registros de visita.', 403);
     if (String(motivo || '').trim().length < 3) throw erro('Informe o motivo da correção.');
-    const novo = new Date(dataHora);
+    const novo = R.parseBR(dataHora);
     if (isNaN(novo)) throw erro('Data/hora inválida.');
     const { map } = await campos();
     const campo = map.visita.dataHora || 'begindate';

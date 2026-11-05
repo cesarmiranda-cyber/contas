@@ -47,3 +47,11 @@ test('alteração da data: só do dia seguinte em diante e dentro do mês da vis
   assert.equal(R.mesLimite('2026-06-10', '2026-05-02'), '2026-06');
   assert.equal(R.ultimoDiaDoMes('2026-02'), '2026-02-28');
 });
+
+test('data/hora sem fuso é horário de Brasília', () => {
+  const R = require('../lib/rules');
+  assert.equal(R.parseBR('2026-11-05T14:30').toISOString(), '2026-11-05T17:30:00.000Z');
+  assert.equal(R.parseBR('2026-11-05 14:30').toISOString(), '2026-11-05T17:30:00.000Z');
+  assert.equal(R.parseBR('2026-11-05T20:30:00Z').toISOString(), '2026-11-05T20:30:00.000Z');
+  assert.equal(R.todayBR(R.parseBR('2026-11-05T23:30')), '2026-11-05');       // 23h30 em Brasília ainda é dia 05
+});

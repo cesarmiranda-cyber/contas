@@ -573,7 +573,10 @@ const modal = html => { $('#sheet').innerHTML = html; $('#m').classList.add('on'
 const fecha = () => $('#m').classList.remove('on');
 $('#m').onclick = e => { if (e.target.id === 'm') fecha(); };
 const achar = id => dados.visitas.find(x => x.id === id);
-const localDT = iso => { const d = iso ? new Date(iso) : new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+const TZ = 'America/Sao_Paulo';                                   // tudo no app é horário de Brasília, seja qual for o fuso do navegador
+const dhBR = v => new Date(v).toLocaleString('pt-BR', { timeZone: TZ });
+const hmBR = v => new Date(v).toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+const localDT = iso => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(iso ? new Date(iso) : new Date()).map(x => [x.type, x.value])); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`; };
 
 // ---- Registrar visita: o formulário é montado com os campos do SPA 1032, agrupados por assunto ----
 const GRUPOS = [
@@ -724,7 +727,7 @@ function hist(d) {
     <div class="two"><div class="panel"><h2>Por vendedor</h2>${barras(porAutor, 'quem')}</div><div class="panel"><h2>Por motivo</h2>${barras(porMotivo, 'motivo')}</div></div>
     ${porSeg.length > 1 ? `<div class="panel" style="margin-top:12px"><h2>Por segmento</h2>${barras(porSeg, 'seg')}</div>` : ''}
     <h2>Histórico <em>${h.length}</em></h2>
-    <div class="tw"><table><tr><th>Quando</th><th>Empresa</th><th>De → Para</th><th>Motivo</th><th>Quem</th><th>Ações</th></tr>${h.map(x => `<tr><td>${new Date(x.at).toLocaleString('pt-BR')}</td><td><b>${esc(x.empresa)}</b><div class="hint">${esc(x.segmento)} · ${esc(x.cargo)}</div>${link(x)}</td><td>${fmt(x.anterior)} → <b>${fmt(x.nova)}</b><div class="hint">${dias(x) > 0 ? '+' : ''}${dias(x)} dia(s)</div></td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td><td style="white-space:nowrap">${abre(x) ? `<button class="btn sm pri" data-reg="${x.card}">Registrar visita</button> <button class="btn sm" data-rep="${x.card}">Alterar visita</button>` : '<span class="hint">Visita já realizada</span>'}</td></tr>`).join('') || '<tr><td colspan=6 class="hint">Nenhuma alteração neste filtro.</td></tr>'}</table></div>`;
+    <div class="tw"><table><tr><th>Quando</th><th>Empresa</th><th>De → Para</th><th>Motivo</th><th>Quem</th><th>Ações</th></tr>${h.map(x => `<tr><td>${dhBR(x.at)}</td><td><b>${esc(x.empresa)}</b><div class="hint">${esc(x.segmento)} · ${esc(x.cargo)}</div>${link(x)}</td><td>${fmt(x.anterior)} → <b>${fmt(x.nova)}</b><div class="hint">${dias(x) > 0 ? '+' : ''}${dias(x)} dia(s)</div></td><td>${esc(x.motivo)}</td><td>${esc(x.autorNome)}</td><td style="white-space:nowrap">${abre(x) ? `<button class="btn sm pri" data-reg="${x.card}">Registrar visita</button> <button class="btn sm" data-rep="${x.card}">Alterar visita</button>` : '<span class="hint">Visita já realizada</span>'}</td></tr>`).join('') || '<tr><td colspan=6 class="hint">Nenhuma alteração neste filtro.</td></tr>'}</table></div>`;
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = async () => { const id = +b.dataset.rep; const r = await api(`/api/visitas?escopo=auto&page=1&size=1&status=abertas&cardId=${id}`); dados = { hoje: r.hoje, visitas: r.visitas }; reagendarVisita(id); });
   $('#hm').onchange = e => { HF.mes = e.target.value; hist(d); };
@@ -734,13 +737,13 @@ function hist(d) {
   document.querySelectorAll('[data-hf]').forEach(b => b.onclick = () => { const k = b.dataset.hf; HF[k] = HF[k] === b.dataset.v ? '' : b.dataset.v; hist(d); });
   $('#hc').onclick = () => {
     const q = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
-    const csv = ['Quando;Empresa;Segmento;Cargo;Data anterior;Nova data;Dias;Motivo;Quem', ...h.map(x => [new Date(x.at).toLocaleString('pt-BR'), x.empresa, x.segmento, x.cargo, fmt(x.anterior), fmt(x.nova), dias(x), x.motivo, x.autorNome].map(q).join(';'))].join('\n');
+    const csv = ['Quando;Empresa;Segmento;Cargo;Data anterior;Nova data;Dias;Motivo;Quem', ...h.map(x => [dhBR(x.at), x.empresa, x.segmento, x.cargo, fmt(x.anterior), fmt(x.nova), dias(x), x.motivo, x.autorNome].map(q).join(';'))].join('\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = `reprogramacoes-${HF.mes || 'todas'}.csv`; a.click();
   };
 }
 function auditoriaHTML(d) {
-  return `<h2>Edições bloqueadas <em>${d.bloqueios.length}</em></h2><div class="tw"><table><tr><th>Quando</th><th>O quê</th><th>Tentou</th><th>Restaurado</th></tr>${d.bloqueios.map(b => `<tr><td>${new Date(b.at).toLocaleString('pt-BR')}</td><td>${b.tipo === 'visita-data' ? 'Data da visita #' + b.visita : 'Data programada do card #' + b.card}</td><td>${esc(b.tentou)}</td><td>${esc(b.original)}</td></tr>`).join('') || '<tr><td colspan=4 class="hint">Nenhuma.</td></tr>'}</table></div>
-    <h2>Log de ações automáticas</h2><div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>O que aconteceu</th></tr>${d.log.map(l => `<tr><td>${new Date(l.at).toLocaleString('pt-BR')}</td><td>${esc(l.tipo)}</td><td>${esc(l.msg)}</td></tr>`).join('')}</table></div>`;
+  return `<h2>Edições bloqueadas <em>${d.bloqueios.length}</em></h2><div class="tw"><table><tr><th>Quando</th><th>O quê</th><th>Tentou</th><th>Restaurado</th></tr>${d.bloqueios.map(b => `<tr><td>${dhBR(b.at)}</td><td>${b.tipo === 'visita-data' ? 'Data da visita #' + b.visita : 'Data programada do card #' + b.card}</td><td>${esc(b.tentou)}</td><td>${esc(b.original)}</td></tr>`).join('') || '<tr><td colspan=4 class="hint">Nenhuma.</td></tr>'}</table></div>
+    <h2>Log de ações automáticas</h2><div class="tw"><table><tr><th>Quando</th><th>Tipo</th><th>O que aconteceu</th></tr>${d.log.map(l => `<tr><td>${dhBR(l.at)}</td><td>${esc(l.tipo)}</td><td>${esc(l.msg)}</td></tr>`).join('')}</table></div>`;
 }
 async function cfg(d) {
   const c = d.config;
@@ -1033,7 +1036,7 @@ function paginaReg() {
      ${vz('Antecipada x programada', rosca([{ nome: 'Antecipadas', valor: antBase.filter(x => x.antecipada).length, cor: PBI[0], val: 'true' }, { nome: 'Na data / depois', valor: antBase.filter(x => !x.antecipada).length, cor: PBI[1], val: 'false' }], 'ant'))}</div>
    <div class="g3">${vz('Visitas por segmento', hbar(segs, { keys: ['seg'] }))}${vz('Visitas por vendedor', hbar(porVend, { keys: ['resp'] }))}${vz('Visitas por cargo', rosca(contar(vo(['cargo']), x => x.cargo).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] })), 'cargo'))}</div>
    ${detalhe(det, [
-    { h: 'Quando', txt: r => new Date(r.quando).toLocaleString('pt-BR'), ord: r => r.quando }, { h: 'Empresa', txt: r => r.empresa || '—', html: r => lk(urlE(r.empresaId), r.empresa || '—') }, { h: 'Vendedor', txt: r => r.respNome },
+    { h: 'Quando', txt: r => dhBR(r.quando), ord: r => r.quando }, { h: 'Empresa', txt: r => r.empresa || '—', html: r => lk(urlE(r.empresaId), r.empresa || '—') }, { h: 'Vendedor', txt: r => r.respNome },
     { h: 'Segmento', txt: r => r.segmento }, { h: 'Cargo', txt: r => r.cargo || '—' }, { h: 'Programada', txt: r => (r.programada || '').split('-').reverse().join('/'), ord: r => r.programada || '' },
     { h: 'Prazo', txt: r => r.desvio === null ? '—' : r.desvio < 0 ? `${-r.desvio} dia(s) antes` : r.desvio === 0 ? 'No dia' : `${r.desvio} dia(s) depois`, ord: r => r.desvio ?? 0, html: r => r.desvio === null ? '—' : r.desvio < 0 ? `<b style="color:#059669">${-r.desvio} d antes</b>` : r.desvio === 0 ? 'No dia' : `<b style="color:${COR.atrasada}">${r.desvio} d depois</b>` }], 'registro-de-visitas')}`;
 }
@@ -1044,7 +1047,7 @@ function paginaRep() {
   return `<div class="g4">${kpi('Visitas alteradas', nf(r.length), `últimos ${DB.f.meses} meses`, '#0f172a')}${kpi('Vendedores que alteraramam', nf(new Set(r.map(x => x.quem)).size), '', PBI[0])}${kpi('Adiamento médio', (mediaD > 0 ? '+' : '') + mediaD + ' dias', '', COR.atrasada)}${kpi('Motivo mais comum', esc(contar(r, x => x.motivo)[0]?.[0] || '—'), '', PBI[3])}</div>
    <div class="g2w">${vz('Visitas alteradas por mês', colunas(mm.map(mesCurto), mm, [{ nome: 'Visitas alteradas', cor: PBI[3], valores: mm.map(m => ro(['mes']).filter(x => x.at.slice(0, 7) === m).length) }], 'mes'))}${vz('Por segmento', rosca(contar(ro(['seg']), x => x.segmento).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] })), 'seg'))}</div>
    <div class="g2">${vz('Por motivo', hbar(contar(ro(['motivo']), x => x.motivo).slice(0, 8), { cor: PBI[3], keys: ['motivo'] }))}${vz('Por vendedor', hbar(contar(ro(['quem']), x => x.quem).slice(0, 8), { cor: PBI[1], keys: ['quem'] }))}</div>
-   ${detalhe(det, [{ h: 'Quando', txt: x => new Date(x.at).toLocaleString('pt-BR'), ord: x => x.at }, { h: 'Empresa', txt: x => x.empresa || '—', html: x => lk(urlE(x.empresaId), x.empresa || '—') }, { h: 'Segmento', txt: x => x.segmento }, { h: 'Cargo', txt: x => x.cargo },
+   ${detalhe(det, [{ h: 'Quando', txt: x => dhBR(x.at), ord: x => x.at }, { h: 'Empresa', txt: x => x.empresa || '—', html: x => lk(urlE(x.empresaId), x.empresa || '—') }, { h: 'Segmento', txt: x => x.segmento }, { h: 'Cargo', txt: x => x.cargo },
     { h: 'Adiado', txt: x => `${x.dias > 0 ? '+' : ''}${x.dias} dia(s)`, ord: x => x.dias }, { h: 'Motivo', txt: x => x.motivo }, { h: 'Quem', txt: x => x.quem }, { h: 'Card', txt: () => 'Abrir', html: x => lk(urlC(x.card), 'Abrir card') }], 'reprogramacoes')}`;
 }
 function dashDesenha() {
@@ -1062,7 +1065,7 @@ function dashDesenha() {
   document.body.classList.add('wide');
   const scrollY = window.scrollY;
   $('#main').innerHTML = `<div class="pbi">
-    <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${new Date(d.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · <a href="#" id="s_r2">atualizar</a></span></div>
+    <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${hmBR(d.geradoEm)} · <a href="#" id="s_r2">atualizar</a></span></div>
       <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend)}${sel('s_ra', 'Segmento da empresa', [['', 'Todos'], ...ramos.map(x => [x, x])], f.ramo)}${sel('s_s', 'Linha', [['', 'Todas'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
     <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Visitas alteradas']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
     ${chips ? `<div class="chips-bar"><span>Filtros aplicados:</span>${chips}</div>` : '<div class="chips-bar dica">Dica: clique em qualquer barra, fatia, coluna ou indicador para filtrar a página e ver os registros abaixo.</div>'}

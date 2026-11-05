@@ -32,6 +32,12 @@ const DEFAULT_CONFIG = {
 const pad = n => String(n).padStart(2, '0');
 const isoDate = s => (/^\d{4}-\d{2}-\d{2}/.test(String(s || '')) ? String(s).slice(0, 10) : null);
 function todayBR(now = new Date()) { return now.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); }
+// Texto de data/hora sem fuso (ex.: "2026-11-05T14:30" do campo da tela) é horário de Brasília (UTC-03:00, sem horário de verão).
+function parseBR(v) {
+  const t = String(v || '').trim();
+  if (!t) return new Date(NaN);
+  return new Date(/(Z|[+-]\d{2}:?\d{2})$/.test(t) || !/T|\d:\d/.test(t) ? t : t.replace(' ', 'T') + (t.length <= 16 ? ':00' : '') + '-03:00');
+}
 function hourBR(now = new Date()) { return +now.toLocaleString('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }) % 24; }
 function addDays(iso, n) {
   const d = new Date(iso + 'T12:00:00Z');
@@ -113,6 +119,6 @@ const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLow
 const chaveFila = (empresaId, seg, cargo) => `${empresaId}|${norm(seg)}|${norm(cargo)}`;
 
 module.exports = {
-  primeiraVisitaData, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
+  primeiraVisitaData, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, parseBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
   mesLimite, ultimoDiaDoMes, brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
 };
