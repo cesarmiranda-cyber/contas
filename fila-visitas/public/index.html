@@ -287,6 +287,24 @@ body.wide main{padding-top:12px}
   nav{flex-wrap:nowrap;overflow-x:auto}
   .bar2{flex-wrap:wrap;gap:6px}
 }
+
+/* ---- Dashboard mais compacto: telas até 1700px (laptops, Windows com escala) ---- */
+@media(max-width:1700px){
+  .pbi-top{padding:10px 14px;margin-bottom:8px;border-radius:12px;gap:8px}
+  .pbi-t b{font-size:16px}.pbi-t span{font-size:12px}
+  .pbi-s{grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:6px 8px}
+  .pbi .sl{font-size:10px;gap:2px}.pbi .sl select,.pbi .sl input{padding:5px 22px 5px 10px;font-size:12px;min-width:0;width:100%}
+  .sl-x{align-self:end;white-space:nowrap}
+  .pbi-pg{margin-bottom:8px;border-radius:10px}.pbi-pg button{padding:6px 14px;font-size:12.5px}
+  .pbi-cv{gap:10px}.g4,.g3,.g5,.g2,.g2w{gap:10px}
+  .g5{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .vz{padding:10px 14px 12px;border-radius:12px;min-height:0}.vz h3{font-size:13px;margin-bottom:8px}
+  .kp{padding:12px 14px 10px}.kv{font-size:26px}.kl{font-size:12px;margin-top:2px}.ks{font-size:11px}
+  .kic{right:10px;top:10px;width:28px;height:28px;border-radius:9px;font-size:14px}
+  .hr,.hb{font-size:12px}
+  svg.col{max-height:260px}
+  .tw table{font-size:12px}
+}
 </style>
 </head>
 <body>
@@ -1013,7 +1031,7 @@ function hstack(linhas, series, keyLinha) { // clicar no nome filtra a linha; cl
     return `<div class="hr"><span class="hl"><span ${sa([keyLinha], [l.rot])}>${esc(l.rot)}</span></span><span class="ht" style="background:transparent"><span class="stk" style="width:${Math.max(3, tot / m * 100)}%">${series.map(s => (l.valores[s.k] || 0) ? `<i ${sa([keyLinha, s.sel], [l.rot, s.k])} title="${esc(l.rot)} · ${esc(s.nome)}: ${l.valores[s.k]}" style="flex:${l.valores[s.k]};background:${s.cor};color:#fff">${l.valores[s.k]}</i>` : '').join('')}</span></span><b>${nf(tot)}</b></div>`; }).join('')}</div><div class="lg">${series.map(s => `<span ${sa([s.sel], [s.k])}><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('')}</div>`;
 }
 function colunas(rotulos, valoresChave, series, selKey) { // empilhadas, com rótulos, linha de média e clique na coluna
-  const W = 760, H = 300, L = 38, B = 34, T = 22, n = rotulos.length;
+  const W = 1000, H = 300, L = 38, B = 34, T = 22, n = rotulos.length;
   const tot = rotulos.map((_, i) => series.reduce((a, s) => a + (s.valores[i] || 0), 0)), m = Math.max(...tot, 1);
   if (!tot.some(Boolean)) return vazioViz();
   const passo = (W - L) / n, bw = Math.min(70, passo * .6);
@@ -1088,7 +1106,7 @@ function paginaFila() {
   const cl = aoutros(['classe']);
   const dets = [...F.cards].sort((a, b) => (a.situacao === 'atrasada' ? -1 : 0) - (b.situacao === 'atrasada' ? -1 : 0) || (a.dias ?? 9e9) - (b.dias ?? 9e9));
   const SO = { atrasada: 0, dia: 1, aguardando: 2, finalizado: 3, naorealizada: 4 };
-  return `<div class="g5">${kpi('Visitas em aberto', nf(ab.length), 'fila total (clique para ver todas)', '#6366f1', ['situacao'], ['__todas'], null, '◷')}${kpi('Atrasadas', nf(atr.length), `${pct(atr.length, ab.length)}% da fila`, COR.atrasada, ['situacao'], ['atrasada'], null, '!')}${kpi('Visitas hoje', nf(hoje.length), '', '#d97706', ['situacao'], ['dia'], null, '★')}${kpi('Próximos 7 dias', nf(p7), `${nf(prox.length)} no prazo no total`, COR.aguardando, ['situacao'], ['aguardando'], null, '→')}${kpi('Não realizadas', nf(F.cards.filter(c => c.situacao === 'naorealizada').length), 'perdidas por não registrar no mês', '#64748b', ['situacao'], ['naorealizada'], null, '✕')}${kpi('Atraso médio', mediaAtr ? mediaAtr + ' dias' : '—', atr.length ? `maior: ${Math.max(...atr.map(c => -c.dias))} dias` : 'nenhuma atrasada', mediaAtr ? COR.atrasada : '#64748b', null, null, null, '⏱')}</div>
+  return `<div class="g5">${kpi('Visitas em aberto', nf(ab.length), 'fila total (clique para ver todas)', '#6366f1', ['situacao'], ['__todas'], null, '◷')}${kpi('Atrasadas', nf(atr.length), `${pct(atr.length, ab.length)}% da fila`, COR.atrasada, ['situacao'], ['atrasada'], null, '!')}${kpi('Visitas hoje', nf(hoje.length), '', '#d97706', ['situacao'], ['dia'], null, '★')}${kpi('Próximos 7 dias', nf(p7), `${nf(prox.length)} no prazo no total`, COR.aguardando, ['situacao'], ['aguardando'], null, '→')}${kpi('Não realizadas', nf(F.cards.filter(c => c.situacao === 'naorealizada').length), 'perdidas por não registrar no mês', '#64748b', ['situacao'], ['naorealizada'], null, '✕')}${kpi('Atraso médio', mediaAtr ? mediaAtr + (mediaAtr === 1 ? ' dia' : ' dias') : '—', atr.length ? `maior: ${Math.max(...atr.map(c => -c.dias))} ${Math.max(...atr.map(c => -c.dias)) === 1 ? 'dia' : 'dias'}` : 'nenhuma atrasada', mediaAtr ? COR.atrasada : '#64748b', null, null, null, '⏱')}</div>
    <div class="g3">${vz('Situação da fila', rosca([{ nome: 'Atrasadas', valor: aoutros(['situacao']).filter(c => c.situacao === 'atrasada').length, cor: COR.atrasada, val: 'atrasada' }, { nome: 'Hoje', valor: aoutros(['situacao']).filter(c => c.situacao === 'dia').length, cor: COR.dia, val: 'dia' }, { nome: 'No prazo', valor: aoutros(['situacao']).filter(c => c.situacao === 'aguardando').length, cor: COR.aguardando, val: 'aguardando' }], 'situacao'))}
      ${vz('Fila por segmento', hstack(linhas('seg', segs, c => c.segmento), ser, 'seg'))}
      ${vz('Fila por cargo', hstack(linhas('cargo', ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'], c => c.cargo), ser, 'cargo'))}</div>
