@@ -28,6 +28,7 @@ if os.environ.get("DIAG_EMP_RAW"): env["DIAG_EMP_RAW"] = os.environ["DIAG_EMP_RA
 if os.environ.get("DIAG_VEND"): env["DIAG_VEND"] = os.environ["DIAG_VEND"]
 if os.environ.get("DIAG_PROX"): env["DIAG_PROX"] = os.environ["DIAG_PROX"]
 if os.environ.get("NOVO_CICLO"): env["NOVO_CICLO"] = "1"
+if os.environ.get("DIAG_CAMPOS36"): env["DIAG_CAMPOS36"] = "1"
 if os.environ.get("DIAG_CICLO"): env["DIAG_CICLO"] = "1"
 if os.environ.get("DIAG_FILTRO"): env["DIAG_FILTRO"] = os.environ["DIAG_FILTRO"]
 if os.environ.get("EVENT_TOKEN"): env["EVENT_TOKEN"] = os.environ["EVENT_TOKEN"]

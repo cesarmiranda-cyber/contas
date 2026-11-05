@@ -1217,7 +1217,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const alvo = []; const pilha = deps.filter(d => +d.UF_HEAD === +uid).map(d => +d.ID);
       while (pilha.length) { const x = pilha.pop(); alvo.push(x); pilha.push(...filhos(x)); }
       if (alvo.length) {
-        const us = (await bitrix.call('user.get', { filter: { UF_DEPARTMENT: alvo, ACTIVE: true } })).result || [];
+        const us = await todosUsuarios({ UF_DEPARTMENT: alvo, ACTIVE: true });
         us.forEach(u => ids.add(+u.ID));
       }
     } catch (e) { store.log('aviso', `Equipe de ${uid}: ${e.message}`); }
@@ -1227,8 +1227,19 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const deps = (await bitrix.call('department.get', {})).result || [];
     return deps.map(d => ({ id: +d.ID, nome: String(d.NAME || '').trim(), pai: +d.PARENT || null, chefe: +d.UF_HEAD || null }));
   }
+  // user.get devolve 50 por chamada: percorre todas as páginas (senão a lista de usuários e as equipes ficam cortadas)
+  async function todosUsuarios(filter) {
+    const out = []; let start = 0;
+    for (;;) {
+      const r = await bitrix.call('user.get', { filter, start });
+      out.push(...(r.result || []));
+      if (r.next === undefined || r.next === null) break;
+      start = r.next;
+    }
+    return out;
+  }
   async function usuarios() {
-    const r = (await bitrix.call('user.get', { filter: { ACTIVE: true } })).result || [];
+    const r = await todosUsuarios({ ACTIVE: true });
     return r.map(u => ({ id: +u.ID, nome: `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || `#${u.ID}` })).sort((a, b) => a.nome.localeCompare(b.nome));
   }
   async function visitasRegistradas(limit = 50) {

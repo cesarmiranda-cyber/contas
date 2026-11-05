@@ -210,6 +210,7 @@ server.listen(PORT, () => {
   }, 2000);
   if (bitrix.enabled && process.env.SYNC_RECENTES) setTimeout(() => svc.sincronizarTodas({ desde: new Date(Date.now() - (+process.env.SYNC_RECENTES) * 3600e3).toISOString() }).then(r => console.log('sync-recentes', JSON.stringify(r.map(e => ({ empresa: e.empresa, criados: (e.criados || []).length, atualizados: (e.atualizados || []).length, pendencias: e.pendencias, erro: e.erro }))))).catch(e => console.error('sync-recentes:', e.message)), 7000);
   if (bitrix.enabled && process.env.NOVO_CICLO) setTimeout(() => svc.novoCiclo().then(r => console.log('novo-ciclo fim', r.fase)).catch(e => console.error('novo-ciclo:', e.message)), 4000);
+  if (bitrix.enabled && process.env.DIAG_CAMPOS36) setTimeout(async () => { try { const f = (await bitrix.call('crm.item.fields', { entityTypeId: 1036 })).result?.fields || {}; console.log('diag36', JSON.stringify(Object.entries(f).filter(([k, d]) => /observ|assigned|created|accomp|users|resp/i.test(k + JSON.stringify(d.title || '')) ).map(([k, d]) => [k, d.type, d.isMultiple, d.title]))); } catch (e) { console.error('diag36:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_CICLO) setTimeout(async () => { try { const r = await svc.previaNovoCiclo(); const j = JSON.stringify(r); for (let i = 0; i < j.length; i += 1500) console.log('previa-ciclo', j.slice(i, i + 1500)); } catch (e) { console.error('previa-ciclo:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_EMPRESA) setTimeout(async () => {
     try {
