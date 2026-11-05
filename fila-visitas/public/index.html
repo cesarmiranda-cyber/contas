@@ -255,6 +255,18 @@ body.wide main{padding-top:12px}
   .stats.s5{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
   .tw table{font-size:12px}
 }
+
+/* Kanban: cartão mais limpo */
+.kc{padding:10px 12px}.kc-h{align-items:flex-start}.kc-n{overflow-wrap:anywhere}
+.kn2{flex:none;min-width:22px;height:22px;border-radius:99px;background:#e8eef6;color:#1e3a5f;font-size:12px;font-weight:700;display:grid;place-items:center}
+.kc-l{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px}
+.kc-d{display:flex;justify-content:flex-start;align-items:baseline;gap:8px;font-size:13px;margin:2px 0 0;line-height:1.3}.kc-d b{font-weight:700}
+.kc-r{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569;margin-top:4px;line-height:1.2}.kc-r i{width:20px;height:20px;border-radius:50%;background:#e8eef6;color:#1e3a5f;font-style:normal;font-size:9.5px;font-weight:700;display:grid;place-items:center;flex:none}.kc-r em{font-style:normal;color:#94a3b8}
+.kc-a{display:flex;gap:6px;margin-top:8px}.kc-a .btn{flex:1;justify-content:center}
+.kc-i{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px;display:flex;flex-direction:column;gap:2px}
+.ki{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f4f8;font-size:12px}.ki:last-child{border-bottom:0}
+.ki .kid{font-weight:600;color:#334155}.ki .kia{display:flex;gap:4px;white-space:nowrap}.ki .kia .btn{min-height:26px;padding:2px 8px;font-size:12px}.ki .kia .btn:not(.pri){width:28px;padding:2px 0;font-size:14px}
+.kcol .kbody>.btn{margin-top:2px}
 </style>
 </head>
 <body>
@@ -441,18 +453,18 @@ function kanban(v, verEquipe) {
 }
 function cartaoKanban(grp, col, verEquipe) {
   const c0 = grp[0], key = `${col}|${c0.empresaId || c0.id}`, aberto = KABERTOS.has(key);
-  const ids = grp.map(x => x.id), datas = grp.map(x => x.data).filter(Boolean).sort();
+  const ids = grp.map(x => x.id), pior = grp.slice().sort((a, b) => (a.data || '9').localeCompare(b.data || '9'))[0];
   const linhas = [...new Set(grp.map(x => x.segmento))];
   const resp = [...new Set(grp.map(x => x.responsavelNome).filter(Boolean))];
   const abertas = col === 'atrasada' || col === 'dia' || col === 'aguardando';
-  const linhaItem = x => `<div class="ki" draggable="true" data-kid="${x.id}" data-kcol="${col}"><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span><span class="kic">${esc(x.cargo)}${x.classe ? ' · ' + esc(x.classe) : ''}</span><span class="kid">${fmt(x.data)}</span>
-      ${abertas ? `<button class="btn sm pri" data-reg="${x.id}">Registrar</button><button class="btn sm" data-rep="${x.id}">Alterar</button>` : ''}</div>`;
+  const linhaItem = x => `<div class="ki" draggable="true" data-kid="${x.id}" data-kcol="${col}"><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span><span class="kid" title="${esc(prazoTxt(x))}">${fmt(x.data)}</span>
+      <span class="kia">${abertas ? `<button class="btn sm pri" data-reg="${x.id}" title="Registrar visita">Registrar</button><button class="btn sm" data-rep="${x.id}" title="Alterar visita (nova data)">↻</button>` : ''}</span></div>`;
   return `<article class="kc ${col}" draggable="true" data-kkey="${esc(key)}" data-ids="${ids.join(',')}" data-kcol="${col}">
-    <div class="kc-h"><a href="#" class="kc-n" data-kg="${esc(key)}">${esc(c0.empresa)}</a>${grp.length > 1 ? `<span class="tag">${grp.length} visitas</span>` : ''}</div>
+    <div class="kc-h"><a href="#" class="kc-n" data-kg="${esc(key)}" title="Abrir agrupamento">${esc(c0.empresa)}</a>${grp.length > 1 ? `<span class="kn2" title="${grp.length} visitas">${grp.length}</span>` : ''}</div>
     <div class="kc-m">${esc([c0.segmentoEmpresa, c0.tipoEmpresa].filter(Boolean).join(' · '))}</div>
-    <div class="kc-l">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join(' ')}</div>
-    <div class="kc-d"><span>${datas.length ? fmt(datas[0]) : '—'}</span><span class="kp">${prazoTxt(grp.slice().sort((a, b) => (a.data || '9').localeCompare(b.data || '9'))[0])}</span></div>
-    ${verEquipe && resp.length ? `<div class="kc-r">${esc(resp.slice(0, 2).join(', '))}${resp.length > 2 ? ` +${resp.length - 2}` : ''}</div>` : ''}
+    <div class="kc-l">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join('')}</div>
+    <div class="kc-d"><b>${fmt(pior.data)}</b><span class="kp">${prazoTxt(pior)}</span></div>
+    ${verEquipe && resp.length ? `<div class="kc-r" title="${esc(resp.join(', '))}"><i>${esc(ini(resp[0]))}</i>${esc(resp[0])}${resp.length > 1 ? ` <em>+${resp.length - 1}</em>` : ''}</div>` : ''}
     <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : ''}</div>
     ${grp.length > 1 ? `<div class="kc-i" ${aberto ? '' : 'hidden'}>${grp.map(linhaItem).join('')}</div>` : ''}</article>`;
 }
