@@ -827,6 +827,14 @@ async function cfg(d) {
     <div class="fld"><label>Hora do job diário (Brasília)</label><input id="hj" type="number" min="0" max="23" value="${c.horaJob}"></div>
     <label><input type="checkbox" id="ta" style="width:auto" ${c.tarefaAtiva ? 'checked' : ''}> Criar tarefa "Realizar Visita" (prazo em horas úteis)</label>
     <div class="fld"><label>Horas úteis do prazo</label><input id="th" type="number" min="1" value="${c.tarefaHorasUteis}"></div>
+    <div class="sec"><h4>Quem enxerga as visitas</h4>
+      <label style="display:block;margin:4px 0"><input type="radio" name="vis" value="app" style="width:auto" ${c.visibilidade !== 'bitrix' ? 'checked' : ''}> <b>Regras do app</b>: a pessoa vê as visitas em que está no cadastro da empresa, e o chefe do departamento vê as da equipe. As permissões do Bitrix continuam limitando.</label>
+      <label style="display:block;margin:4px 0"><input type="radio" name="vis" value="bitrix" style="width:auto" ${c.visibilidade === 'bitrix' ? 'checked' : ''}> <b>Papéis e departamentos do Bitrix</b>: o app mostra exatamente o que o Bitrix libera para a pessoa (Vendedor “só os seus”, Supervisor “departamento”, etc.). Configure os papéis no Bitrix antes de ativar e confira abaixo em “Ver como”.</label>
+      <div class="hint">Sem a sessão da pessoa (por exemplo, fora do Bitrix) o app volta às regras dele, por segurança.</div>
+      <h4 style="margin:14px 0 6px">Estrutura de departamentos do Bitrix</h4><div id="deptree" class="hint">Carregando…</div>
+      <h4 style="margin:14px 0 6px">Ver como</h4>
+      <div class="fld"><select id="vc_u"><option value="">Escolha uma pessoa…</option>${users.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')}</select></div>
+      <div id="vc_out" class="hint">Mostra quantas visitas a pessoa enxerga pelas regras do app. O recorte dos papéis do Bitrix só se aplica com a sessão dela.</div></div>
     <div class="sec"><h4>Quem gera card na fila</h4>
       <div class="hint" style="margin-bottom:6px">Por padrão só o <b>Vendedor</b> gera a visita: os demais cargos da empresa (Supervisor, Coordenador, Gerente, Diretor) enxergam o mesmo card e qualquer um pode registrar, sem duplicar. Ative um cargo abaixo para gerar um card <b>próprio</b> para ele, seguindo o intervalo do cargo. A mudança vale para as próximas sincronizações; cards já existentes não são removidos.</div>
       <label style="display:block"><input type="checkbox" checked disabled style="width:auto"> Vendedor (sempre)</label>
@@ -861,7 +869,7 @@ async function cfg(d) {
   $('#sv').onclick = async () => {
     const intervalos = {}; document.querySelectorAll('[data-i]').forEach(i => { const [g, k] = i.dataset.i.split('.'); (intervalos[g] ||= {})[k] = +i.value; });
     try {
-      await api('/api/config', { method: 'PUT', body: { cargosFila: [...document.querySelectorAll('[data-cf]:checked')].map(x => x.dataset.cf), ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, respeitarBitrix: $('#rb').checked, motoresDatas: $('#md').value, verTudo: lVt, admins: lAd } });
+      await api('/api/config', { method: 'PUT', body: { visibilidade: (document.querySelector('[name=vis]:checked') || {}).value || 'app', cargosFila: [...document.querySelectorAll('[data-cf]:checked')].map(x => x.dataset.cf), ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, respeitarBitrix: $('#rb').checked, motoresDatas: $('#md').value, verTudo: lVt, admins: lAd } });
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
   };
@@ -885,6 +893,19 @@ async function cfg(d) {
       alvo.querySelectorAll('[data-x]').forEach(a => a.onclick = e => { e.preventDefault(); lista.splice(lista.indexOf(+a.dataset.x), 1); draw(); });
       alvo.querySelector('input').onchange = e => { const u2 = users.find(x => x.nome === e.target.value); if (u2 && !lista.includes(u2.id)) lista.push(u2.id); draw(); }; };
     draw(); return lista;
+  };
+  api('/api/departamentos').then(({ departamentos: ds }) => {
+    const filhos = pai => ds.filter(d => (d.pai || null) === pai).sort((a, b) => a.nome.localeCompare(b.nome));
+    const linhas = (pai, nv) => filhos(pai).map(d => `<tr><td style="padding-left:${8 + nv * 18}px">${nv ? '↳ ' : ''}<b>${esc(d.nome)}</b></td><td>${d.chefeNome ? esc(d.chefeNome) : '<span class="hint">sem chefe</span>'}</td><td>${d.pessoas}</td></tr>${linhas(d.id, nv + 1)}`).join('');
+    $('#deptree').innerHTML = `<div class="tw"><table><tr><th>Departamento</th><th>Chefe</th><th>Pessoas</th></tr>${linhas(null, 0) || linhas(0, 0)}</table></div>`;
+  }).catch(e => { $('#deptree').textContent = e.message; });
+  $('#vc_u').onchange = async e => {
+    if (!e.target.value) return;
+    $('#vc_out').textContent = 'Calculando…';
+    try {
+      const r = await api('/api/ver-como?usuario=' + e.target.value);
+      $('#vc_out').innerHTML = `<b>${esc(r.nome)}</b> enxerga <b>${r.total}</b> visita(s) em aberto (${r.visao === 'tudo' ? 'visão de todos' : r.visao === 'equipe' ? 'visão de equipe' : 'só as suas'}) · atrasadas ${r.counts.atrasada} · hoje ${r.counts.dia} · próximas ${r.counts.aguardando}.${r.empresas.length ? '<br>' + r.empresas.map(x => `${esc(x.nome)} (${x.visitas})`).join(' · ') : ''}`;
+    } catch (er) { $('#vc_out').textContent = er.message; }
   };
   const lVt = pick('#pk_vt', c.verTudo || [], 'Ninguém além do chefe do departamento'), lAd = pick('#pk_ad', c.admins || [], 'Nenhum administrador');
   const lCfg = pick('#pk_cfg', c.acessoConfig || []), lDash = pick('#pk_dash', c.acessoDashboard || []);

@@ -64,6 +64,7 @@ const routes = {
     exige();
     const g = k => u.searchParams.get(k) || '';
     if (g('page')) return svc.listarVisitasPag({ uid: id.uid, bearer: id.bearer, escopo: g('escopo') || 'auto', page: +g('page'), size: +g('size') || 20, kanban: g('kanban') === '1', q: g('q'), status: g('status') || 'abertas', per: g('per'), de: g('de'), ate: g('ate'), seg: g('seg'), tipo: g('tipo'), classe: g('classe'), resp: g('resp'), vend: g('vend'), ramo: g('ramo'), ord: g('ord') || 'data', dir: +g('dir') || 1, cardId: g('cardId'), soIds: g('soIds') === '1' }); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto', bearer: id.bearer, encerradas: u.searchParams.get('encerradas') === '1' }); },
+  'GET /api/ver-como': async (u, __, id) => { exigeConfig(id); exige(); const alvo = +u.searchParams.get('usuario'); if (!alvo) throw Object.assign(new Error('Escolha um usuário.'), { status: 400 }); return svc.verComo(alvo); },
   'GET /api/departamentos': async (_, __, id) => { exigeConfig(id); exige(); return { departamentos: await svc.departamentos() }; },
   'GET /api/ramos': async (_, __, id) => { exigeConfig(id); exige(); return { ramos: await svc.listaRamos() }; },
   'GET /api/historico': async (_, __, id) => { let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ } return { reprogramacoes: id.uid ? await svc.historicoVisivel(id.uid, id.bearer) : [], base }; },
@@ -92,6 +93,7 @@ const routes = {
     if (b.tipoPorRamo && typeof b.tipoPorRamo === 'object') { p.tipoPorRamo = {}; for (const [k, t] of Object.entries(b.tipoPorRamo)) if (['Industrial', 'Marítimo', ''].includes(t) && /^[\w-]+$/.test(k)) p.tipoPorRamo[k] = t; }
     for (const k of ['acessoConfig', 'acessoDashboard']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
     if (p.acessoConfig && p.acessoConfig.length && id.uid && !p.acessoConfig.includes(+id.uid)) p.acessoConfig.push(+id.uid); // evita se trancar para fora
+    if (['app', 'bitrix'].includes(b.visibilidade)) p.visibilidade = b.visibilidade;
     if (Array.isArray(b.cargosFila)) p.cargosFila = ['Vendedor', ...R.CARGOS.filter(c => c !== 'Vendedor' && b.cargosFila.includes(c))];
     if (Array.isArray(b.verTudo)) p.verTudo = b.verTudo.map(Number).filter(Boolean);
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);

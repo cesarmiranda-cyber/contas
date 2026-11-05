@@ -917,6 +917,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
 
   // Permissões do Bitrix prevalecem: se o usuário não pode ver o registro no Bitrix, o app também não mostra.
   const respeitaBitrix = () => store.config.respeitarBitrix !== false;
+  // Modo 'bitrix': quem vê o quê vem dos papéis/departamentos do Bitrix (o app só soma o que o Bitrix liberou). Sem a sessão do usuário cai nas regras do app.
+  const modoBitrix = permitidos => store.config.visibilidade === 'bitrix' && !!permitidos;
   async function permitidosBitrix(bearer, etype) {
     if (!acesso || !bearer || !respeitaBitrix()) return null;
     return acesso.ids(bearer, etype);
@@ -1008,7 +1010,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const size = Math.max(1, Math.min(+p.size || 20, 5000));
     const { map } = await campos();
     const permitidos = await permitidosBitrix(bearer, F.ETYPE.fila);
-    const todos = escopo === 'todas' || (escopo === 'auto' && await enxergaTudo(uid));
+    const todos = escopo === 'todas' || (escopo === 'auto' && (modoBitrix(permitidos) || await enxergaTudo(uid)));
     const time = escopo === 'auto' && !todos ? await memo(`equipe:${uid}`, 60e3, () => equipeDe(uid)) : new Set([+uid]);
     const abertosL = await memoSWR('cards-abertos', 15e3, () => cardsAbertos());
     const fechadosL = await memoSWR('cards-fechados', 60e3, () => {
@@ -1134,10 +1136,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const trabalho = (async () => {
       const b = baseDash || await baseDashboard();
       const uid = p.uid, bearer = p.bearer || null;
-      const todos = await enxergaTudo(uid);
+      const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
+      const todos = modoBitrix(permCards) || await enxergaTudo(uid);
       const time = todos ? null : await equipeDe(uid);
       const visivelPor = (resp, eq) => todos || +resp === +uid || (time && time.has(+resp)) || Object.values(eq || {}).map(Number).includes(+uid);
-      const permCards = await permitidosBitrix(bearer, F.ETYPE.fila), permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
       const cards = b.cards.filter(c => (!permCards || permCards.has(+c.id)) && visivelPor(c.resp, c._eq)).map(({ _eq, ...c }) => c);
       const visitas = b.visitas.filter(x => (!permVis || permVis.has(+x.id)) && (todos || visivelPor(x.resp, null)));
       const reprog = b.reprog.filter(x => todos || [x._a, x._r].some(r => r && (+r === +uid || (time && time.has(+r))))).map(({ _a, _r, ...x }) => x);
@@ -1205,7 +1207,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   async function historicoVisivel(uid, bearer = null) {
     const perm = await permitidosBitrix(bearer, F.ETYPE.fila);
     const todos = store.historico.filter(h => !perm || !h.card || perm.has(+h.card));
-    if (await enxergaTudo(uid)) return todos;
+    if (modoBitrix(perm) || await enxergaTudo(uid)) return todos;
     const time = await equipeDe(uid);
     return todos.filter(h => time.has(+h.autor) || time.has(+h.responsavel));
   }
@@ -1225,7 +1227,17 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   async function departamentos() {
     const deps = (await bitrix.call('department.get', {})).result || [];
-    return deps.map(d => ({ id: +d.ID, nome: String(d.NAME || '').trim(), pai: +d.PARENT || null, chefe: +d.UF_HEAD || null }));
+    const us = await todosUsuarios({ ACTIVE: true });
+    const nome = u => `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || `#${u.ID}`;
+    const porId = new Map(us.map(u => [+u.ID, nome(u)])), cont = new Map();
+    for (const u of us) for (const d of [].concat(u.UF_DEPARTMENT || [])) cont.set(+d, (cont.get(+d) || 0) + 1);
+    return deps.map(d => ({ id: +d.ID, nome: String(d.NAME || '').trim(), pai: +d.PARENT || null, chefe: +d.UF_HEAD || null, chefeNome: porId.get(+d.UF_HEAD) || '', pessoas: cont.get(+d.ID) || 0 }));
+  }
+  // "Ver como": o que um usuário enxerga pelas regras do app (sem a sessão dele não dá para aplicar o recorte do Bitrix).
+  async function verComo(uid) {
+    const r = await listarVisitasPag({ uid: +uid, bearer: null, escopo: 'auto', status: 'abertas', page: 1, size: 1000 });
+    const nomes = new Map(); for (const v of r.visitas) nomes.set(v.empresa, (nomes.get(v.empresa) || 0) + 1);
+    return { usuario: +uid, nome: await nomeUsuario(+uid), visao: r.visao, total: r.total, counts: r.counts, empresas: [...nomes.entries()].slice(0, 15).map(([nome, n]) => ({ nome, visitas: n })), modo: store.config.visibilidade || 'app' };
   }
   // user.get devolve 50 por chamada: percorre todas as páginas (senão a lista de usuários e as equipes ficam cortadas)
   async function todosUsuarios(filter) {
@@ -1247,6 +1259,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, aquecer, previaNovoCiclo, novoCiclo, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, verComo, aquecer, previaNovoCiclo, novoCiclo, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

@@ -662,3 +662,20 @@ test('novo ciclo: remove os cards abertos (com tarefa encerrada), recria só o c
   const de = await svc.novoCiclo();                                          // segunda chamada não repete
   assert.equal(de.fase, 'concluido'); assert.equal(cards(w).length, 6);
 });
+
+test('visibilidade pelo Bitrix: com a sessão do usuário vale o que o Bitrix liberou (sem as regras de equipe do app); sem sessão volta ao app', async () => {
+  const { w, store } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  const permitido = new Set();
+  const acesso = { ids: async (bearer, et) => (bearer ? (et === 1036 ? permitido : new Set()) : null) };
+  const svc = createService({ bitrix: { call: w.call }, store, acesso, clock: () => NOW });
+  await svc.sincronizarEmpresa(1);
+  const id = cards(w)[0].id;
+  assert.equal((await svc.listarVisitasPag({ uid: 555, bearer: 'sessao', escopo: 'auto', status: 'todas', page: 1 })).visitas.length, 0, 'modo app: estranho não vê');
+  store.setConfig({ visibilidade: 'bitrix' }); permitido.add(id);
+  assert.equal((await svc.listarVisitasPag({ uid: 555, bearer: 'sessao', escopo: 'auto', status: 'todas', page: 1 })).visitas.length, 1, 'modo bitrix: o que o Bitrix liberou aparece');
+  permitido.clear();
+  assert.equal((await svc.listarVisitasPag({ uid: 10, bearer: 'sessao', escopo: 'auto', status: 'todas', page: 1 })).visitas.length, 0, 'o Bitrix negou: nem o vendedor vê');
+  assert.equal((await svc.listarVisitasPag({ uid: 555, escopo: 'auto', status: 'todas', page: 1 })).visitas.length, 0, 'sem sessão: regras do app');
+  const vc = await svc.verComo(20);
+  assert.equal(vc.total, 1);
+});
