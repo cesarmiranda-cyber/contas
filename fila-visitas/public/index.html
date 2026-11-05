@@ -276,6 +276,17 @@ body.wide main{padding-top:12px}
 }
 
 @media(max-width:700px){.head .wrap{flex-wrap:wrap}nav{width:100%;flex:none}.stats.s5{grid-template-columns:1fr 1fr}}
+
+.fxb{display:none}
+@media(max-width:700px){
+  .fxb{display:inline-flex;align-items:center}
+  .filters:not(.open) select,.filters:not(.open) input[type=date]{display:none}
+  .filters:not(.open){grid-template-columns:1fr}
+  .seg2 button[data-vw=tabela]{display:none}
+  .stats.s5{display:flex;overflow-x:auto;scrollbar-width:none;gap:8px}.stats.s5 .stat{flex:0 0 138px}
+  nav{flex-wrap:nowrap;overflow-x:auto}
+  .bar2{flex-wrap:wrap;gap:6px}
+}
 </style>
 </head>
 <body>
@@ -363,7 +374,7 @@ function lista() {
   const v = dados.visitas, c = dados.counts, op = dados.opcoes, verEquipe = dados.visao !== 'minhas';
   const opt = (arr, cur) => arr.map(([a, b]) => `<option value="${esc(a)}" ${String(cur) === String(a) ? 'selected' : ''}>${esc(b)}</option>`).join('');
   const grupos = [['atrasada', 'Atrasadas'], ['dia', 'Hoje'], ['aguardando', 'Em aberto · próximas'], ['finalizado', 'Encerradas'], ['naorealizada', 'Não realizadas']];
-  const corpo = !v.length ? '<div class="vazio">Nenhuma visita neste filtro.</div>' : VP.view === 'kanban' ? kanban(v, verEquipe) : VP.view === 'tabela' ? tabelaVisitas(v, verEquipe) : grupos.map(([k, t]) => {
+  const corpo = !v.length ? '<div class="vazio">Nenhuma visita neste filtro.</div>' : VP.view === 'kanban' ? kanban(v, verEquipe) : (VP.view === 'tabela' && !CELULAR()) ? tabelaVisitas(v, verEquipe) : grupos.map(([k, t]) => {
     const g = v.filter(x => x.situacao === k);
     return g.length ? `<h2>${t} <em>${g.length}</em></h2><div class="list cards">${g.map(linha).join('')}</div>` : '';
   }).join('');
@@ -379,7 +390,7 @@ function lista() {
       <button class="stat gray ${foco === 'naorealizada' ? 'on' : ''}" data-f="naorealizada"><i>✕</i><div><b>${c.naorealizada}</b><span>Não realizadas</span></div></button>
     </div>
     ${verEquipe ? `<div class="info">${dados.visao === 'tudo' ? 'Você está vendo as visitas de <b>todos</b>.' : 'Você está vendo as visitas da <b>sua equipe</b>.'}${dados.bitrix ? ' Aplicadas também as suas permissões do Bitrix24.' : ''}</div>` : ''}
-    <div class="filters">
+    <div class="filters ${FX.aberto ? 'open' : ''}">
       <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
       <select id="fst" title="Status">${opt([['abertas', 'Status: Em aberto'], ['atrasada', 'Status: Atrasadas'], ['dia', 'Status: Hoje'], ['finalizado', 'Status: Encerradas'], ['naorealizada', 'Status: Não realizadas'], ['todas', 'Status: Todas']], foco)}</select>
       <select id="fdt" title="Data programada">${opt([['', 'Data: qualquer'], ['hoje', 'Data: hoje'], ['semana', 'Data: esta semana'], ['mes', 'Data: este mês'], ['custom', 'Data: personalizado']], VD.per)}</select>
@@ -391,7 +402,7 @@ function lista() {
       <select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>
       <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
     </div>
-    <div class="bar2"><span class="hint">${dados.total ? `${de}–${ate} de ${dados.total}` : '0'} visita(s)${filtrado ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
+    <div class="bar2"><button class="btn sm fxb" id="fxb">${FX.aberto ? 'Ocultar filtros' : 'Filtros'}${filtrado ? ' •' : ''}</button><span class="hint">${dados.total ? `${de}–${ate} de ${dados.total}` : '0'} visita(s)${filtrado ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
       <div class="bar2r"><label class="sl2">Ordenar<select id="fo">${opt([['data', 'Situação e data'], ['prazo', 'Data programada'], ['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : [])], VP.ord)}</select></label>
         <div class="seg2"><button data-vw="cards" class="${VP.view === 'cards' ? 'on' : ''}" title="Cartões">▦ Cartões</button><button data-vw="tabela" class="${VP.view === 'tabela' ? 'on' : ''}" title="Tabela">☰ Tabela</button><button data-vw="kanban" class="${VP.view === 'kanban' ? 'on' : ''}" title="Kanban">▥ Kanban</button></div>
         <button class="btn sm" id="vcsv">Exportar CSV</button></div></div>
@@ -400,6 +411,7 @@ function lista() {
       <div class="pg-b"><button data-p="1" ${dados.pagina <= 1 ? 'disabled' : ''} title="Primeira">«</button><button data-p="${dados.pagina - 1}" ${dados.pagina <= 1 ? 'disabled' : ''}>‹ Anterior</button>
       ${janela.map(n => `<button data-p="${n}" class="${n === dados.pagina ? 'on' : ''}">${n}</button>`).join('')}
       <button data-p="${dados.pagina + 1}" ${dados.pagina >= dados.paginas ? 'disabled' : ''}>Próxima ›</button><button data-p="${dados.paginas}" ${dados.pagina >= dados.paginas ? 'disabled' : ''} title="Última">»</button></div></div>` : ''}`;
+  $('#fxb').onclick = () => { FX.aberto = !FX.aberto; document.querySelector('.filters').classList.toggle('open', FX.aberto); $('#fxb').textContent = FX.aberto ? 'Ocultar filtros' : 'Filtros' + (filtrado ? ' •' : ''); };
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { foco = foco === b.dataset.f ? 'abertas' : b.dataset.f; refaz(); });
   const q = $('#fq'); q.oninput = () => { F.q = q.value; clearTimeout(tDebounce); tDebounce = setTimeout(async () => { const p = q.selectionStart; await refaz(); const n = $('#fq'); if (n) { n.focus(); n.setSelectionRange(p, p); } }, 350); };
   $('#fst').onchange = e => { foco = e.target.value; refaz(); };
@@ -578,6 +590,8 @@ function participantes(id) {
   };
   desenha();
 }
+const CELULAR = () => window.matchMedia('(max-width:700px)').matches;     // no celular a tabela não cabe: vira cartões
+const FX = { aberto: false };                                              // filtros recolhidos no celular
 const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
 function tabelaVisitas(v, verEquipe) {
