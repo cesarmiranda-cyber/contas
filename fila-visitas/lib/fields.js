@@ -78,6 +78,7 @@ async function descobrir(bitrix, cfg) {
   // etapas "fechadas": qualquer card nelas não é mais uma visita em aberto
   const sucesso = st.filter(s => s.SEMANTICS === 'S').map(s => s.STATUS_ID);
   etapas.concluidas = [...new Set([etapas.finalizado, ...sucesso].filter(Boolean))];
+  etapas.removido = (st.find(s => s.SEMANTICS === 'F') || {}).STATUS_ID || null;
   etapas.fechadas = [...new Set([...etapas.concluidas, etapas.naoRealizada, ...st.filter(s => s.SEMANTICS === 'F').map(s => s.STATUS_ID)].filter(Boolean))];
   etapas.abertas = st.map(s => s.STATUS_ID).filter(x => !etapas.fechadas.includes(x)); // o Bitrix não aceita "não está em" com lista: filtra pelas abertas
   if (!etapas.aguardando && st[0]) etapas.aguardando = st[0].STATUS_ID;

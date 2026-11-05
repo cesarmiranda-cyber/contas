@@ -9,7 +9,7 @@ const { createWorld } = require('./world');
 const NOW = new Date('2026-05-10T15:00:00Z'); // 10/05/2026 12h BRT
 function setup(extra = {}) {
   const w = createWorld(); w.now = () => NOW;
-  const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'fv-')));
+  const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'fv-'))); store.setConfig({ visitaUnica: false, ...(extra.__cfg || {}) });
   const svc = createService({ bitrix: { call: w.call }, store, clock: () => NOW });
   w.empresa(1, 'Acme Marítima', { UF_CRM_MOT_CLASSE: '1', UF_CRM_MOT_VENDEDOR: '10', UF_CRM_MOT_SUPERVISOR: '10', UF_CRM_MOT_COORDENADOR: '10', UF_CRM_MOT_GERENTE: '20', UF_CRM_MOT_ULTIMA: '2026-04-20', ...extra });
   return { w, store, svc };
@@ -567,26 +567,50 @@ test('campo "Anexo" de texto é escondido quando existe um campo de arquivo de v
   assert.equal(f.campos.find(c => c.key === 'ufCrm_anexos').tipo, 'arquivo');
 });
 
-test('empresa nunca visitada (sem Última Visita): a primeira visita do Vendedor entra na fila para hoje; cargos acima seguem o intervalo', async () => {
-  const { w, svc } = setup({ UF_CRM_MOT_ULTIMA: '' });                      // hoje = 10/05/2026, classe A
+test('empresa nunca visitada (sem Última Visita): a primeira visita do Vendedor vai para a semana seguinte; cargos acima seguem o intervalo', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_ULTIMA: '' });                      // hoje = domingo 10/05/2026, classe A
   const r = await svc.sincronizarEmpresa(1);
   assert.equal(r.criados.length, 5);
   const vend = cards(w).find(c => c.title.endsWith('| Vendedor')), sup = cards(w).find(c => c.title.endsWith('| Supervisor'));
-  assert.equal(vend.ufCrm_data, '2026-05-10'); assert.equal(vend.stageId, w.stages.dia);
+  assert.equal(vend.ufCrm_data, '2026-05-11', 'segunda-feira da semana seguinte, nunca hoje'); assert.equal(vend.stageId, w.stages.aguardando);
   assert.equal(sup.ufCrm_data, '2026-07-09', 'supervisor: hoje + 60 dias (classe A)');
 });
 
-test('primeira visita criada com a regra antiga (data futura, sem Última Visita, nunca alterada) é puxada para hoje; se já foi alterada pelo vendedor, fica como está', async () => {
+test('primeira visita: espalha pelos dias da semana seguinte (segunda a sexta) e não é puxada para hoje depois', async () => {
+  const R = require('../lib/rules');
+  assert.equal(R.primeiraVisitaData('2026-11-05', 0), '2026-11-09');          // quinta -> segunda seguinte
+  assert.equal(R.primeiraVisitaData('2026-11-05', 4), '2026-11-13');          // sexta
+  assert.equal(R.primeiraVisitaData('2026-11-05', 5), '2026-11-09');          // volta à segunda
+  assert.equal(R.primeiraVisitaData('2026-11-09', 0), '2026-11-16');          // segunda -> segunda da semana que vem
   const { w, svc } = setup({ UF_CRM_MOT_ULTIMA: '' });
   await svc.sincronizarEmpresa(1);
   const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
-  vend.ufCrm_data = '2026-08-08'; vend.stageId = w.stages.aguardando;        // como nasceria antes: hoje + intervalo
   await svc.sincronizarEmpresa(1);
-  assert.equal(vend.ufCrm_data, '2026-05-10');
-  vend.ufCrm_data = '2026-05-25';                                             // vendedor alterou a data pelo app
-  await svc.reprogramar(vend.id, { uid: 10, nova: '2026-05-28', motivo: 'Cliente pediu' });
+  assert.equal(vend.ufCrm_data, '2026-05-11');
+});
+
+test('visita única: só o card do Vendedor é gerado; supervisor, coordenador e gerente acompanham o mesmo registro e o enxergam', async () => {
+  const { w, svc } = setup({ __cfg: { visitaUnica: true } });
+  const r = await svc.sincronizarEmpresa(1);
+  assert.equal(r.criados.length, 1);
+  assert.equal(cards(w).length, 1); assert.ok(cards(w)[0].title.endsWith('| Vendedor'));
+  const sup = await svc.listarVisitasPag({ uid: 20, escopo: 'auto', status: 'todas', page: 1 });      // 20 = gerente no cadastro
+  assert.equal(sup.visitas.length, 1, 'quem está em qualquer cargo da empresa enxerga a mesma visita');
+  const estranho = await svc.listarVisitasPag({ uid: 777, escopo: 'auto', status: 'todas', page: 1 });
+  assert.equal(estranho.visitas.length, 0);
+});
+
+test('participantes extras: quem é adicionado à visita passa a enxergá-la', async () => {
+  const { w, svc } = setup({ __cfg: { visitaUnica: true } });
   await svc.sincronizarEmpresa(1);
-  assert.equal(vend.ufCrm_data, '2026-05-28', 'data escolhida pelo vendedor é respeitada');
+  const id = cards(w)[0].id;
+  assert.equal((await svc.listarVisitasPag({ uid: 555, escopo: 'auto', status: 'todas', page: 1 })).visitas.length, 0);
+  await svc.definirParticipantes(id, { uid: 10, ids: [555] });
+  const r = await svc.listarVisitasPag({ uid: 555, escopo: 'auto', status: 'todas', page: 1 });
+  assert.equal(r.visitas.length, 1);
+  assert.deepEqual(r.visitas[0].participantes.map(x => x.id), [555]);
+  await svc.definirParticipantes(id, { uid: 10, ids: [] });
+  assert.equal((await svc.listarVisitasPag({ uid: 555, escopo: 'auto', status: 'todas', page: 1 })).visitas.length, 0);
 });
 
 test('reconciliação de cadastros: empresa com Vendedor e Classe sem card (edição perdida) ganha a fila sem depender da data de alteração', async () => {
@@ -620,4 +644,21 @@ test('kanban: traz as primeiras visitas de cada coluna e o total por coluna', as
   assert.equal(r.colunas.dia, 1); assert.ok(r.colunas.atrasada >= 2);
   assert.ok(r.visitas.some(v => v.situacao === 'dia'), 'coluna "dia" aparece mesmo com muitas atrasadas');
   assert.equal(r.visitas.filter(v => v.situacao === 'atrasada').length, 1, 'limite por coluna');
+});
+
+test('novo ciclo: remove os cards abertos (com tarefa encerrada), recria só o card do Vendedor e não mexe em Última/Próxima Visita; é retomável', async () => {
+  const { w, svc, store } = setup();
+  await svc.sincronizarEmpresa(1);                                           // fila antiga: 5 cards (um por cargo)
+  const antigos = cards(w).map(c => c.id);
+  assert.equal(antigos.length, 5);
+  store.setConfig({ visitaUnica: true, ativo: true });
+  const ultimaAntes = w.companies[1].UF_CRM_MOT_ULTIMA, proximaAntes = w.companies[1].UF_CRM_MOT_PROXIMA;
+  const r = await svc.novoCiclo();
+  assert.equal(r.fase, 'concluido'); assert.equal(r.removidos.length, 5); assert.equal(r.criados, 1);
+  for (const id of antigos) assert.equal(w.items[1036][id].stageId, w.stages.removido, 'card antigo foi para Removido');
+  const novos = cards(w).filter(c => !antigos.includes(c.id));
+  assert.equal(novos.length, 1); assert.ok(novos[0].title.endsWith('| Vendedor'));
+  assert.equal(w.companies[1].UF_CRM_MOT_ULTIMA, ultimaAntes); assert.equal(w.companies[1].UF_CRM_MOT_PROXIMA, proximaAntes, 'cadastro intacto');
+  const de = await svc.novoCiclo();                                          // segunda chamada não repete
+  assert.equal(de.fase, 'concluido'); assert.equal(cards(w).length, 6);
 });

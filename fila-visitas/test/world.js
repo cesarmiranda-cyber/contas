@@ -8,9 +8,9 @@ function createWorld() {
     companyFields[`UF_CRM_${s.slice(0, 3).toUpperCase()}_${k.toUpperCase()}`] = { formLabel: `[${s}] ${l}`, type: k === 'Classe' ? 'enumeration' : 'string', items: k === 'Classe' ? [{ ID: '1', VALUE: 'A' }, { ID: '2', VALUE: 'B' }, { ID: '3', VALUE: 'C' }] : undefined };
   }
   w.companyFields = companyFields;
-  const stages = [{ STATUS_ID: 'DT1036_1:NEW', NAME: 'Aguardando' }, { STATUS_ID: 'DT1036_1:DIA', NAME: 'Dia da Visita' }, { STATUS_ID: 'DT1036_1:LATE', NAME: 'Atrasada' }, { STATUS_ID: 'DT1036_1:DONE', NAME: 'Finalizado' }];
+  const stages = [{ STATUS_ID: 'DT1036_1:NEW', NAME: 'Aguardando' }, { STATUS_ID: 'DT1036_1:DIA', NAME: 'Dia da Visita' }, { STATUS_ID: 'DT1036_1:LATE', NAME: 'Atrasada' }, { STATUS_ID: 'DT1036_1:DONE', NAME: 'Finalizado' }, { STATUS_ID: 'DT1036_1:FAIL', NAME: 'Removido', SEMANTICS: 'F' }];
   w.stageList = stages;
-  w.stages = { aguardando: 'DT1036_1:NEW', dia: 'DT1036_1:DIA', atrasada: 'DT1036_1:LATE', finalizado: 'DT1036_1:DONE' };
+  w.stages = { aguardando: 'DT1036_1:NEW', dia: 'DT1036_1:DIA', atrasada: 'DT1036_1:LATE', finalizado: 'DT1036_1:DONE', removido: 'DT1036_1:FAIL' };
   const match = (it, filter = {}) => Object.entries(filter).every(([k, v]) => {
     if (Array.isArray(v)) return k.startsWith('!') ? !v.includes(it[k.slice(1)]) : v.includes(it[k]);
     if (k.startsWith('!') && v === '') return !!it[k.slice(1)] && it[k.slice(1)] !== '0';

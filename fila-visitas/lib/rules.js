@@ -24,6 +24,7 @@ const DEFAULT_CONFIG = {
   admins: [],                  // ids que podem corrigir registros de visita
   mapaManual: {},              // sobrescritas do mapeamento de campos
   sweepSegundos: 30,
+  visitaUnica: true,           // uma visita por empresa+linha (do Vendedor): supervisor, coordenador, gerente e diretor acompanham o mesmo registro
   hierarquiaAuto: false,       // preenche Supervisor/Coordenador/Gerente/Diretor vazios pela estrutura da empresa
   ativo: false,                // trava de segurança: o app só escreve no Bitrix depois que um admin ativa
 };
@@ -36,6 +37,11 @@ function addDays(iso, n) {
   const d = new Date(iso + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
+}
+// Primeira visita de empresa nunca visitada: vai para a SEMANA SEGUINTE (segunda a sexta), distribuída por `n` para não juntar tudo no mesmo dia.
+function primeiraVisitaData(hojeIso, n = 0) {
+  const dow = ((new Date(hojeIso + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1;   // 1 = segunda ... 7 = domingo
+  return addDays(hojeIso, 8 - dow + (Math.abs(n) % 5));
 }
 const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z')) / 864e5);
 const sameMonth = (a, b) => !!a && !!b && a.slice(0, 7) === b.slice(0, 7);
@@ -107,6 +113,6 @@ const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLow
 const chaveFila = (empresaId, seg, cargo) => `${empresaId}|${norm(seg)}|${norm(cargo)}`;
 
 module.exports = {
-  SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
+  primeiraVisitaData, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
   mesLimite, ultimoDiaDoMes, brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
 };

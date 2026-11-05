@@ -379,6 +379,7 @@ function lista() {
   };
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
+  document.querySelectorAll('[data-part]').forEach(b => b.onclick = e => { e.preventDefault(); participantes(+b.dataset.part); });
   if (VP.view === 'kanban') ligaKanban();
 }
 
@@ -469,10 +470,11 @@ function abreGrupoIds(ids, nota) {
       <div class="chips">${c0.segmentoEmpresa ? `<span class="tag emp">${esc(c0.segmentoEmpresa)}</span>` : ''}${c0.tipoEmpresa ? `<span class="tag">${esc(c0.tipoEmpresa)}</span>` : ''}<span class="tag">${grp.length} visita(s)</span></div></div>
     <div class="sh-b">${nota ? `<div class="info">${esc(nota)}</div>` : ''}${eq ? `<div class="kg-eq">${eq}</div>` : ''}
       <div class="tw"><table><tr><th>Linha</th><th>Cargo</th><th>Classe</th><th>Responsável</th><th>Última visita</th><th>Programada</th><th>Prazo</th><th></th></tr>${grp.map(x => `<tr><td><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span></td><td>${esc(x.cargo)}</td><td>${esc(x.classe)}</td><td>${esc(x.responsavelNome)}</td><td>${x.ultima ? fmt(x.ultima) : '—'}</td><td>${fmt(x.data)}</td><td><span class="pl2" style="background:${pl[x.situacao][0]};color:${pl[x.situacao][1]}">${prazoTxt(x)}</span></td>
-        <td style="white-space:nowrap">${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
+        <td style="white-space:nowrap">${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button>${abertas.length > 1 ? '<button class="btn" id="gall">Alterar a data de todas</button>' : ''}</div>`);
   document.querySelectorAll('[data-greg]').forEach(b => b.onclick = () => registrar(+b.dataset.greg));
   document.querySelectorAll('[data-grep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.grep));
+  document.querySelectorAll('[data-gpart]').forEach(b => b.onclick = () => participantes(+b.dataset.gpart));
   if ($('#gall')) $('#gall').onclick = () => reagendarGrupo(abertas.map(x => x.id));
 }
 // Alterar a data de várias visitas da mesma empresa de uma vez (mesmas regras: do dia seguinte em diante, dentro do mês, motivo obrigatório).
@@ -495,6 +497,32 @@ function reagendarGrupo(ids) {
     if (!falhas.length) { fecha(); carrega(); return; }
     $('#er').textContent = falhas.join(' | '); $('#er').classList.add('on'); $('#ok').disabled = false; carregaVisitas();
   };
+}
+
+// ---- Participantes: quem acompanha a visita (equipe do cadastro da empresa + extras adicionados aqui). Qualquer um registra, sem duplicar. ----
+function participantes(id) {
+  const c = achar(id); if (!c) return;
+  let extras = (c.participantes || []).map(x => ({ id: x.id, nome: x.nome }));
+  const nomeDe = uid => (users.find(u => +u.id === +uid) || {}).nome || `Usuário ${uid}`;
+  const eq = [['vendedor', 'Vendedor'], ['supervisor', 'Supervisor'], ['coordenador', 'Coordenador'], ['gerente', 'Gerente'], ['diretor', 'Diretor']].filter(([k]) => c.equipe && c.equipe[k]);
+  const desenha = () => {
+    modal(`<div class="sh-h"><h3>Participantes da visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">Programada: ${fmt(c.data)}</span></div></div>
+      <div class="sh-b"><div class="info">A visita é <b>uma só</b>: qualquer participante pode registrá-la e ela não é duplicada. A equipe vem do cadastro da empresa; aqui você pode adicionar mais pessoas.</div>
+        <h4 style="margin:12px 0 6px">Equipe do cadastro da empresa</h4><div class="kg-eq">${eq.map(([k, t]) => `<span class="tag">${t}: ${esc(c.equipe[k])}</span>`).join('') || '<span class="hint">Nenhuma pessoa preenchida.</span>'}</div>
+        <h4 style="margin:12px 0 6px">Adicionados nesta visita</h4>
+        <div class="kg-eq">${extras.map(x => `<span class="tag">${esc(x.nome)} <a href="#" data-rm="${x.id}" title="Remover">✕</a></span>`).join('') || '<span class="hint">Ninguém adicionado.</span>'}</div>
+        <div class="fld" style="margin-top:12px"><label>Adicionar pessoa</label><select id="pp"><option value="">Escolha…</option>${users.filter(u => !extras.some(x => +x.id === +u.id)).map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')}</select></div>
+        <div class="err" id="er"></div></div>
+      <div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button><button class="btn pri" id="ok">Salvar participantes</button></div>`);
+    $('#pp').onchange = e => { if (e.target.value) { extras.push({ id: +e.target.value, nome: nomeDe(e.target.value) }); desenha(); } };
+    document.querySelectorAll('[data-rm]').forEach(a => a.onclick = e => { e.preventDefault(); extras = extras.filter(x => +x.id !== +a.dataset.rm); desenha(); });
+    $('#ok').onclick = async () => {
+      $('#ok').disabled = true;
+      try { await api(`/api/cards/${id}/participantes`, { method: 'POST', body: { ids: extras.map(x => x.id) } }); fecha(); carregaVisitas(); }
+      catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; }
+    };
+  };
+  desenha();
 }
 const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
@@ -529,16 +557,17 @@ function linha(c) {
   const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
   const eq = [['vendedor', 'Vendedor'], ['supervisor', 'Supervisor'], ['coordenador', 'Coordenador'], ['gerente', 'Gerente'], ['diretor', 'Diretor']].filter(([k]) => c.equipe && c.equipe[k])
     .map(([k, t]) => `<span class="pp ${c.cargo.toLowerCase() === k ? 'me' : ''}" title="${t}"><i>${esc(ini(c.equipe[k]))}</i><span><small>${t}</small>${esc(c.equipe[k])}</span></span>`).join('');
+  const extras = (c.participantes || []).map(x => `<span class="pp" title="Participante adicionado"><i>${esc(ini(x.nome))}</i><span><small>Participante</small>${esc(x.nome)}</span></span>`).join('');
   return `<div class="item ${c.situacao}">
     <div class="main">
       <div class="emp">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</div>
       <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.segmentoEmpresa ? `<span class="tag emp" title="Segmento da empresa">${esc(c.segmentoEmpresa)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
       <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null && c.diasDesdeUltima !== undefined ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${dados.visao !== 'minhas' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
-      ${eq ? `<div class="pessoas">${eq}</div>` : ''}
+      ${eq || extras ? `<div class="pessoas">${eq}${extras}</div>` : ''}
     </div>
     <div class="due"><small>Programada</small><b>${fmt(c.data)}</b><span>${q}</span></div>
     <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
-      <div class="links">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
+      <div class="links">${c.situacao !== 'finalizado' && c.situacao !== 'naorealizada' ? `<a href="#" data-part="${c.id}">Participantes${(c.participantes || []).length ? ` (${c.participantes.length})` : ''}</a>` : ''}${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
 }
 const modal = html => { $('#sheet').innerHTML = html; $('#m').classList.add('on'); };
 const fecha = () => $('#m').classList.remove('on');

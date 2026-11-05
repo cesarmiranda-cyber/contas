@@ -140,12 +140,13 @@ const server = http.createServer(async (req, res) => {
     }
     const mf = u.pathname.match(/^\/api\/cards\/(\d+)\/form$/);
     if (mf && req.method === 'GET') { exige(); { const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); } return send(res, 200, await svc.camposVisita(+mf[1])); }
-    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar)$/);
+    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes)$/);
     if (m && req.method === 'POST') {
       exige();
       const id = await quem(req, u), b = await readBody(req, m[2] === 'registrar' ? 36e6 : 1e6);
       if (!(await svc.podeVerCard(id.bearer, +m[1]))) throw nega('Você não tem permissão no Bitrix24 para este registro.');
       const uid = id.verificado ? id.uid : +(b.uid || id.uid) || null;
+      if (m[2] === 'participantes') return send(res, 200, await svc.definirParticipantes(+m[1], { ids: b.ids, uid, bearer: id.bearer }));
       return send(res, 200, m[2] === 'registrar' ? await svc.registrarVisita(+m[1], { ...b, uid }) : await svc.reprogramar(+m[1], { ...b, uid }));
     }
     if (req.method === 'GET') {
@@ -207,6 +208,7 @@ server.listen(PORT, () => {
     } catch (e) { console.error('oport:', e.message); }
   }, 2000);
   if (bitrix.enabled && process.env.SYNC_RECENTES) setTimeout(() => svc.sincronizarTodas({ desde: new Date(Date.now() - (+process.env.SYNC_RECENTES) * 3600e3).toISOString() }).then(r => console.log('sync-recentes', JSON.stringify(r.map(e => ({ empresa: e.empresa, criados: (e.criados || []).length, atualizados: (e.atualizados || []).length, pendencias: e.pendencias, erro: e.erro }))))).catch(e => console.error('sync-recentes:', e.message)), 7000);
+  if (bitrix.enabled && process.env.NOVO_CICLO) setTimeout(() => svc.novoCiclo().then(r => console.log('novo-ciclo fim', r.fase)).catch(e => console.error('novo-ciclo:', e.message)), 4000);
   if (bitrix.enabled && process.env.DIAG_CICLO) setTimeout(async () => { try { const r = await svc.previaNovoCiclo(); const j = JSON.stringify(r); for (let i = 0; i < j.length; i += 1500) console.log('previa-ciclo', j.slice(i, i + 1500)); } catch (e) { console.error('previa-ciclo:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_EMPRESA) setTimeout(async () => {
     try {

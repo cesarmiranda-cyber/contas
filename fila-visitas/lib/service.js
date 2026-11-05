@@ -299,7 +299,13 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return atual;
   }
   const sincronizarEmpresa = (id, op) => comTrava(`empresa:${id}`, async () => { const r = await sincronizarEmpresaSemTrava(id, op); if ((r.criados || []).length || (r.atualizados || []).length) envelhece(); return r; });
-  async function sincronizarEmpresaSemTrava(id, { forcar = false } = {}) {
+  // Rodízio por vendedor (0..4): espalha as primeiras visitas pelos dias da semana seguinte.
+  function proximoRodizio(vendedor) {
+    const m = { ...(store.job('rodizio') || {}) }, n = m[vendedor] || 0;
+    m[vendedor] = n + 1; store.setJob('rodizio', m);
+    return n;
+  }
+  async function sincronizarEmpresaSemTrava(id, { forcar = false, semProxima = false } = {}) {
     const cfg = store.config;
     const emp = await lerEmpresa(id);
     if (!emp) return { empresa: id, erro: 'Empresa não encontrada' };
@@ -327,7 +333,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const s = emp.segs[seg];
       if (!s.vendedor && !s.supervisor && !s.coordenador && !s.gerente && !s.classe) continue; // segmento não usado
       if (!s.diretor) s.diretor = await diretorDe(s.gerente);
-      for (const cargo of R.CARGOS) {
+      for (const cargo of (cfg.visitaUnica ? ['Vendedor'] : R.CARGOS)) {
         const resp = s[cargo.toLowerCase()];
         const k = `${seg}|${cargo}`;
         snapNovo[k] = { classe: s.classe, resp, ultima: s.ultima };
@@ -341,7 +347,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         // Empresa nunca visitada (sem Última Visita): a primeira visita do Vendedor já entra na fila para HOJE.
         // Com Última Visita: Última + intervalo da classe. Cargos acima do Vendedor sempre seguem o intervalo.
         const primeira = cargo === 'Vendedor' && !s.ultima;
-        const calc = primeira ? hoje() : R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
+        const calc = primeira ? R.primeiraVisitaData(hoje(), proximoRodizio(resp)) : R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
         // Empresa que já tem Última e Próxima Visita: o card do Vendedor NASCE na data da Próxima Visita (sem partir de uma visita nova).
         const dataNova = (cargo === 'Vendedor' && s.ultima && s.proxima) ? s.proxima : calc;
         const existente = abertos.get(chave);
@@ -355,11 +361,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         }
         store.setChave(chave, existente.id);
         { const reg = store.card(existente.id) || {}, eq = equipeIds(s); if (JSON.stringify(reg.equipe) !== JSON.stringify(eq) || reg.ramo !== (emp.ramo || '')) store.setCard(existente.id, { ...reg, empresaId: id, empresa: emp.nome, seg, cargo, equipe: eq, ramo: emp.ramo || '' }); }
-        if (primeira && existente.data && existente.data > hoje() && existente.stageId !== undefined && !store.historico.some(x => x.card === existente.id && !x.tipo)) {
-          if (await atualizarCard(existente, { data: hoje() }, 'primeira visita da empresa vai para hoje')) { res.atualizados.push(existente.id); continue; }
-        }
         const ant = snapAnt[k] || {};
-        const mudouData = forcar || ant.classe !== s.classe || ant.ultima !== s.ultima;
+        const mudouData = !primeira && (forcar || ant.classe !== s.classe || ant.ultima !== s.ultima);
         const mudouResp = forcar || ant.resp !== resp || existente.responsavel !== resp;
         if (mudouData || mudouResp) {
           const ok = await atualizarCard(existente, { data: mudouData ? calc : null, responsavel: mudouResp ? resp : null, classe: s.classe },
@@ -367,7 +370,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
           if (ok) res.atualizados.push(existente.id);
         }
       }
-      if (cfg.atualizarProxima) await gravarProxima(emp, seg).catch(e => store.log('aviso', `Próxima visita ${emp.nome}/${seg}: ${e.message}`));
+      if (cfg.atualizarProxima && !semProxima) await gravarProxima(emp, seg).catch(e => store.log('aviso', `Próxima visita ${emp.nome}/${seg}: ${e.message}`));
     }
     store.setSnapEmpresa(id, snapNovo);
     if (res.pendencias.length) store.log('pendencia', `Empresa ${emp.nome}: ${res.pendencias.join('; ')}`, { empresa: id });
@@ -656,6 +659,73 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     }
     return { marcadas };
   }
+  // Participantes extras de uma visita (além da equipe do cadastro da empresa): passam a enxergar e a poder registrar a visita.
+  async function definirParticipantes(cardId, { uid, ids = [], bearer = null }) {
+    if (!uid) throw erro('Usuário não identificado.', 401);
+    if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    const reg = store.card(cardId) || {};
+    const novos = [...new Set((ids || []).map(Number).filter(Boolean))].slice(0, 20);
+    const antes = new Set(reg.participantes || []);
+    store.setCard(cardId, { ...reg, participantes: novos });
+    invalida();
+    for (const u of novos.filter(x => !antes.has(x))) await notificar(u, `Você foi adicionado à visita "${card.titulo}" (programada para ${R.fmtBR(card.data)}). Qualquer participante pode registrá-la.`).catch(() => {});
+    store.log('participantes', `Participantes da visita ${cardId}: ${novos.join(', ') || 'nenhum'}`, { card: +cardId, autor: uid });
+    return { participantes: novos };
+  }
+  // Novo ciclo: encerra (move para Removido, com comentário) todos os cards abertos no momento da execução, encerra as tarefas ligadas
+  // e gera de novo a fila pelas regras. Não grava Última nem Próxima Visita no cadastro das empresas. Retomável: se o servidor
+  // reiniciar no meio, continua de onde parou (a lista de cards antigos fica gravada) e não repete o que já foi feito.
+  let cicloRodando = false;
+  async function novoCiclo() {
+    let job = store.job('novoCiclo');
+    if (job && job.fase === 'concluido') return job;
+    if (cicloRodando) return { emAndamento: true, ...job };
+    if (!store.config.ativo) throw erro('O app está desativado (Configurações → ativar).', 409);
+    const { map } = await campos();
+    if (!map.etapas.removido) throw erro('Não encontrei a etapa "Removido" no kanban da Fila.', 500);
+    cicloRodando = true;
+    try {
+      if (!job) {
+        const abertos = await cardsAbertos();
+        const empresas = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))];
+        job = { fase: 'removendo', inicio: new Date().toISOString(), ids: abertos.map(it => +it.id), removidos: [], empresas, criadas: [], criados: 0, erros: [] };
+        store.setJob('novoCiclo', job);
+        store.log('novo-ciclo', `Novo ciclo iniciado: ${job.ids.length} card(s) abertos de ${empresas.length} empresa(s)`);
+      }
+      const salva = () => store.setJob('novoCiclo', job);
+      if (job.fase === 'removendo') {
+        const feitos = new Set(job.removidos);
+        const pendentes = (await cardsAbertos()).filter(it => job.ids.includes(+it.id) && !feitos.has(+it.id));
+        await mapaPar(pendentes, 3, async it => {
+          try {
+            const c = await dadosCard(it);
+            await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: c.id, fields: { stageId: map.etapas.removido } });
+            if (store.chave(R.chaveFila(c.empresaId, c.segmento, c.cargo)) === c.id) store.setChave(R.chaveFila(c.empresaId, c.segmento, c.cargo), null);
+            await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: c.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: 'Fila encerrada para início de um novo ciclo de visitas. Nenhuma visita foi realizada neste card; a visita foi recriada conforme as regras (visita única por empresa e linha, com a equipe acompanhando o mesmo registro).' } }).catch(() => {});
+            await encerrarTarefas(c.id, 'Fila encerrada para início de novo ciclo.');
+            job.removidos.push(c.id);
+            if (job.removidos.length % 40 === 0) { salva(); console.log(`novo-ciclo removidos ${job.removidos.length}/${job.ids.length}`); }
+          } catch (e) { job.erros.push(`remover ${it.id}: ${e.message}`.slice(0, 160)); }
+        });
+        job.fase = 'criando'; salva(); invalida();
+        console.log(`novo-ciclo removidos ${job.removidos.length}/${job.ids.length}`);
+      }
+      if (job.fase === 'criando') {
+        const feitas = new Set(job.criadas);
+        for (const id of job.empresas.filter(e => !feitas.has(e))) {
+          try { const r = await sincronizarEmpresa(id, { semProxima: true }); job.criados += (r.criados || []).length; job.criadas.push(id); }
+          catch (e) { job.erros.push(`criar empresa ${id}: ${e.message}`.slice(0, 160)); job.criadas.push(id); }
+          if (job.criadas.length % 10 === 0) { salva(); console.log(`novo-ciclo empresas ${job.criadas.length}/${job.empresas.length} cards-novos=${job.criados}`); }
+        }
+        job.fase = 'concluido'; job.fim = new Date().toISOString(); salva(); invalida();
+        store.log('novo-ciclo', `Novo ciclo concluído: ${job.removidos.length} card(s) removidos, ${job.criados} criados, ${job.erros.length} erro(s)`);
+        console.log('novo-ciclo concluido', JSON.stringify({ removidos: job.removidos.length, criados: job.criados, erros: job.erros.slice(0, 5) }));
+      }
+      return job;
+    } finally { cicloRodando = false; }
+  }
   // Prévia (só leitura) de "encerrar a fila atual e começar um novo ciclo": para cada card aberto calcula a data que o card teria
   // se fosse recriado hoje pelas regras (mesma conta da sincronização). Não escreve nada no Bitrix.
   async function previaNovoCiclo() {
@@ -824,6 +894,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
   async function varrer() {
     if (!store.config.ativo) return { pausado: true };
+    if (cicloRodando) return { pulado: true, ciclo: true };
     if (rodando) return { pulado: true };
     rodando = true;
     const inicio = new Date(Date.now() - 5 * 60e3).toISOString();
@@ -956,6 +1027,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const c = await dadosCard(it), reg = store.card(it.id) || {};
       let eq = reg.equipe;
       if (!eq) { const e = await empresaCurta(c.empresaId); eq = e ? equipeIds(e.segs?.[c.segmento]) : null; }
+      if ((reg.participantes || []).length) eq = { ...(eq || {}), ...Object.fromEntries(reg.participantes.map((u, i) => ['extra' + i, u])) };
       const doCampo = eq && eq[String(c.cargo || '').toLowerCase()];
       if (doCampo) c.responsavel = +doCampo;
       const propria = +c.responsavel === +uid;
@@ -964,7 +1036,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         if (escopo === 'auto' && !time.has(+c.responsavel) && !Object.values(eq || {}).map(Number).includes(+uid)) continue;
       }
       const situacao = fechado ? (it.stageId === map.etapas.naoRealizada ? 'naorealizada' : 'finalizado') : R.etapaPara(c.data, h);
-      leves.push({ it, c, reg, fechado, situacao, vendId: (eq || {}).vendedor || null });
+      leves.push({ it, c, reg, fechado, situacao, vendId: (eq || {}).vendedor || null, part: reg.participantes || [] });
     }
     // 2) contadores e opções (sobre tudo o que o usuário pode ver)
     const counts = { abertas: 0, atrasada: 0, dia: 0, aguardando: 0, finalizado: 0, naorealizada: 0 };
@@ -1037,7 +1109,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         encerradoEm: l.fechado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null, dias: !l.fechado && c.data ? R.dayDiff(h, c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, h) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
         altMin: R.addDays(h, 1), altMax: R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || h.slice(0, 7)),
-        equipe, reprogramacoes: store.historico.filter(x => x.card === c.id && !x.tipo).length,
+        equipe, participantes: await Promise.all((l.part || []).map(async id => ({ id, nome: await nomeDe(id) }))), reprogramacoes: store.historico.filter(x => x.card === c.id && !x.tipo).length,
         urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     });
     return { hoje: h, bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || leves.some(l => +l.c.responsavel !== +uid) ? 'equipe' : 'minhas'), total, pagina, paginas, tamanho: size, colunas, counts, opcoes, visitas };
@@ -1097,7 +1169,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     for (const [lista, finalizado, naoRealizada] of [[abertos, false, false], [fin, true, false], [naoReal, false, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
       const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
-      cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel), _eq: reg.equipe || null,
+      cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel), _eq: { ...(reg.equipe || {}), ...Object.fromEntries((reg.participantes || []).map((u, i) => ['extra' + i, u])) },
         data: d.data, situacao: naoRealizada ? 'naorealizada' : finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
     // registros de visita
@@ -1164,6 +1236,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, aquecer, previaNovoCiclo, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, aquecer, previaNovoCiclo, novoCiclo, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };
