@@ -92,6 +92,7 @@ const routes = {
     if (b.tipoPorRamo && typeof b.tipoPorRamo === 'object') { p.tipoPorRamo = {}; for (const [k, t] of Object.entries(b.tipoPorRamo)) if (['Industrial', 'Marítimo', ''].includes(t) && /^[\w-]+$/.test(k)) p.tipoPorRamo[k] = t; }
     for (const k of ['acessoConfig', 'acessoDashboard']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
     if (p.acessoConfig && p.acessoConfig.length && id.uid && !p.acessoConfig.includes(+id.uid)) p.acessoConfig.push(+id.uid); // evita se trancar para fora
+    if (Array.isArray(b.cargosFila)) p.cargosFila = ['Vendedor', ...R.CARGOS.filter(c => c !== 'Vendedor' && b.cargosFila.includes(c))];
     if (Array.isArray(b.verTudo)) p.verTudo = b.verTudo.map(Number).filter(Boolean);
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);
     if (b.mapaManual && typeof b.mapaManual === 'object') p.mapaManual = b.mapaManual;

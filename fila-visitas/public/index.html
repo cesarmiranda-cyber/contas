@@ -756,6 +756,10 @@ async function cfg(d) {
     <div class="fld"><label>Hora do job diário (Brasília)</label><input id="hj" type="number" min="0" max="23" value="${c.horaJob}"></div>
     <label><input type="checkbox" id="ta" style="width:auto" ${c.tarefaAtiva ? 'checked' : ''}> Criar tarefa "Realizar Visita" (prazo em horas úteis)</label>
     <div class="fld"><label>Horas úteis do prazo</label><input id="th" type="number" min="1" value="${c.tarefaHorasUteis}"></div>
+    <div class="sec"><h4>Quem gera card na fila</h4>
+      <div class="hint" style="margin-bottom:6px">Por padrão só o <b>Vendedor</b> gera a visita: os demais cargos da empresa (Supervisor, Coordenador, Gerente, Diretor) enxergam o mesmo card e qualquer um pode registrar, sem duplicar. Ative um cargo abaixo para gerar um card <b>próprio</b> para ele, seguindo o intervalo do cargo. A mudança vale para as próximas sincronizações; cards já existentes não são removidos.</div>
+      <label style="display:block"><input type="checkbox" checked disabled style="width:auto"> Vendedor (sempre)</label>
+      ${['Supervisor', 'Coordenador', 'Gerente', 'Diretor'].map(k => `<label style="display:block"><input type="checkbox" data-cf="${k}" style="width:auto" ${(c.cargosFila || []).includes(k) ? 'checked' : ''}> Gerar card próprio para ${k}</label>`).join('')}</div>
  <label><input type="checkbox" id="ha" style="width:auto" ${c.hierarquiaAuto ? 'checked' : ''}> Preencher Supervisor, Coordenador, Gerente e Diretor vazios pela estrutura da empresa (a partir do departamento do Vendedor)</label>
     <label><input type="checkbox" id="ap" style="width:auto" ${c.atualizarProxima ? 'checked' : ''}> Gravar "Próxima Visita" do segmento na empresa</label>
     <div class="fld"><label>Motores: qual par de datas é o oficial?</label><select id="md"><option value="secao" ${c.motoresDatas === 'secao' ? 'selected' : ''}>Campos da seção (Próxima/Última Visita)</option><option value="extra" ${c.motoresDatas === 'extra' ? 'selected' : ''}>Campos extras (Data Próxima Visita / Última Visita)</option></select></div>
@@ -786,7 +790,7 @@ async function cfg(d) {
   $('#sv').onclick = async () => {
     const intervalos = {}; document.querySelectorAll('[data-i]').forEach(i => { const [g, k] = i.dataset.i.split('.'); (intervalos[g] ||= {})[k] = +i.value; });
     try {
-      await api('/api/config', { method: 'PUT', body: { ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, respeitarBitrix: $('#rb').checked, motoresDatas: $('#md').value, verTudo: $('#vt').value.split(',').map(s => +s.trim()).filter(Boolean), admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
+      await api('/api/config', { method: 'PUT', body: { cargosFila: [...document.querySelectorAll('[data-cf]:checked')].map(x => x.dataset.cf), ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, respeitarBitrix: $('#rb').checked, motoresDatas: $('#md').value, verTudo: $('#vt').value.split(',').map(s => +s.trim()).filter(Boolean), admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
   };

@@ -9,7 +9,7 @@ const { createWorld } = require('./world');
 const NOW = new Date('2026-05-10T15:00:00Z'); // 10/05/2026 12h BRT
 function setup(extra = {}) {
   const w = createWorld(); w.now = () => NOW;
-  const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'fv-'))); store.setConfig({ visitaUnica: false, ...(extra.__cfg || {}) });
+  const store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'fv-'))); store.setConfig({ cargosFila: ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'], ...(extra.__cfg || {}) });
   const svc = createService({ bitrix: { call: w.call }, store, clock: () => NOW });
   w.empresa(1, 'Acme Marítima', { UF_CRM_MOT_CLASSE: '1', UF_CRM_MOT_VENDEDOR: '10', UF_CRM_MOT_SUPERVISOR: '10', UF_CRM_MOT_COORDENADOR: '10', UF_CRM_MOT_GERENTE: '20', UF_CRM_MOT_ULTIMA: '2026-04-20', ...extra });
   return { w, store, svc };
@@ -590,7 +590,7 @@ test('primeira visita: espalha pelos dias da semana seguinte (segunda a sexta) e
 });
 
 test('visita única: só o card do Vendedor é gerado; supervisor, coordenador e gerente acompanham o mesmo registro e o enxergam', async () => {
-  const { w, svc } = setup({ __cfg: { visitaUnica: true } });
+  const { w, svc } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
   const r = await svc.sincronizarEmpresa(1);
   assert.equal(r.criados.length, 1);
   assert.equal(cards(w).length, 1); assert.ok(cards(w)[0].title.endsWith('| Vendedor'));
@@ -601,7 +601,7 @@ test('visita única: só o card do Vendedor é gerado; supervisor, coordenador e
 });
 
 test('participantes extras: quem é adicionado à visita passa a enxergá-la', async () => {
-  const { w, svc } = setup({ __cfg: { visitaUnica: true } });
+  const { w, svc } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
   await svc.sincronizarEmpresa(1);
   const id = cards(w)[0].id;
   assert.equal((await svc.listarVisitasPag({ uid: 555, escopo: 'auto', status: 'todas', page: 1 })).visitas.length, 0);
@@ -651,7 +651,7 @@ test('novo ciclo: remove os cards abertos (com tarefa encerrada), recria só o c
   await svc.sincronizarEmpresa(1);                                           // fila antiga: 5 cards (um por cargo)
   const antigos = cards(w).map(c => c.id);
   assert.equal(antigos.length, 5);
-  store.setConfig({ visitaUnica: true, ativo: true });
+  store.setConfig({ cargosFila: ['Vendedor'], ativo: true });
   const ultimaAntes = w.companies[1].UF_CRM_MOT_ULTIMA, proximaAntes = w.companies[1].UF_CRM_MOT_PROXIMA;
   const r = await svc.novoCiclo();
   assert.equal(r.fase, 'concluido'); assert.equal(r.removidos.length, 5); assert.equal(r.criados, 1);

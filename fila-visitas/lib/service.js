@@ -333,7 +333,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const s = emp.segs[seg];
       if (!s.vendedor && !s.supervisor && !s.coordenador && !s.gerente && !s.classe) continue; // segmento não usado
       if (!s.diretor) s.diretor = await diretorDe(s.gerente);
-      for (const cargo of (cfg.visitaUnica ? ['Vendedor'] : R.CARGOS)) {
+      for (const cargo of R.CARGOS.filter(x => x === 'Vendedor' || (cfg.cargosFila || []).includes(x))) {
         const resp = s[cargo.toLowerCase()];
         const k = `${seg}|${cargo}`;
         snapNovo[k] = { classe: s.classe, resp, ultima: s.ultima };

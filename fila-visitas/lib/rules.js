@@ -24,7 +24,7 @@ const DEFAULT_CONFIG = {
   admins: [],                  // ids que podem corrigir registros de visita
   mapaManual: {},              // sobrescritas do mapeamento de campos
   sweepSegundos: 30,
-  visitaUnica: true,           // uma visita por empresa+linha (do Vendedor): supervisor, coordenador, gerente e diretor acompanham o mesmo registro
+  cargosFila: ['Vendedor'],    // cargos que geram card próprio. Só o Vendedor por padrão: os demais acompanham o mesmo registro (ligue aqui para gerar um card por cargo)
   hierarquiaAuto: false,       // preenche Supervisor/Coordenador/Gerente/Diretor vazios pela estrutura da empresa
   ativo: false,                // trava de segurança: o app só escreve no Bitrix depois que um admin ativa
 };
