@@ -800,8 +800,8 @@ async function cfg(d) {
     <label><input type="checkbox" id="ap" style="width:auto" ${c.atualizarProxima ? 'checked' : ''}> Gravar "Próxima Visita" do segmento na empresa</label>
     <div class="fld"><label>Motores: qual par de datas é o oficial?</label><select id="md"><option value="secao" ${c.motoresDatas === 'secao' ? 'selected' : ''}>Campos da seção (Próxima/Última Visita)</option><option value="extra" ${c.motoresDatas === 'extra' ? 'selected' : ''}>Campos extras (Data Próxima Visita / Última Visita)</option></select></div>
     <label><input type="checkbox" id="rb" style="width:auto" ${c.respeitarBitrix !== false ? 'checked' : ''}> <b>Respeitar as permissões do Bitrix24</b> — o usuário só vê aqui os registros que o Bitrix24 também permite ver (recomendado)</label>
-    <div class="fld"><label>Quem enxerga todas as visitas (IDs de usuário). O chefe do departamento raiz já enxerga tudo.</label><input id="vt" value="${(c.verTudo || []).join(',')}"></div>
-    <div class="fld"><label>Administradores (IDs de usuário, separados por vírgula)</label><input id="ad" value="${(c.admins || []).join(',')}"></div>
+    <div class="fld"><label>Quem enxerga todas as visitas. O chefe do departamento raiz já enxerga tudo.</label><div id="pk_vt"></div></div>
+    <div class="fld"><label>Administradores (podem corrigir registros e preparar o Bitrix)</label><div id="pk_ad"></div></div>
     <div class="err" id="er"></div><button class="btn pri" id="sv">Salvar configuração</button></div>
     <h2>Campos descobertos no Bitrix24</h2>${campos.erro ? `<div class="err on">${esc(campos.erro)}</div>` : `
       ${(() => { const f = campos.faltando.filter(x => !/usando/.test(x)), i = campos.faltando.filter(x => /usando/.test(x)); return (f.length ? `<div class="err on">Faltando: ${f.map(esc).join(' · ')}</div>` : '<div class="ok">Etapas e campos principais encontrados.</div>') + (i.length ? `<div class="info">Usando padrão do Bitrix (funciona, mas dá para criar o campo próprio): ${i.map(esc).join(' · ')}</div>` : ''); })()}
@@ -826,7 +826,7 @@ async function cfg(d) {
   $('#sv').onclick = async () => {
     const intervalos = {}; document.querySelectorAll('[data-i]').forEach(i => { const [g, k] = i.dataset.i.split('.'); (intervalos[g] ||= {})[k] = +i.value; });
     try {
-      await api('/api/config', { method: 'PUT', body: { cargosFila: [...document.querySelectorAll('[data-cf]:checked')].map(x => x.dataset.cf), ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, respeitarBitrix: $('#rb').checked, motoresDatas: $('#md').value, verTudo: $('#vt').value.split(',').map(s => +s.trim()).filter(Boolean), admins: $('#ad').value.split(',').map(s => +s.trim()).filter(Boolean) } });
+      await api('/api/config', { method: 'PUT', body: { cargosFila: [...document.querySelectorAll('[data-cf]:checked')].map(x => x.dataset.cf), ativo: $('#at').checked, intervalos, horaJob: +$('#hj').value, tarefaAtiva: $('#ta').checked, tarefaHorasUteis: +$('#th').value, atualizarProxima: $('#ap').checked, hierarquiaAuto: $('#ha').checked, respeitarBitrix: $('#rb').checked, motoresDatas: $('#md').value, verTudo: lVt, admins: lAd } });
       $('#out').textContent = 'Configuração salva.';
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); }
   };
@@ -844,13 +844,14 @@ async function cfg(d) {
     const tipoPorRamo = {}; document.querySelectorAll('[data-ra]').forEach(s => { tipoPorRamo[s.dataset.ra] = s.value; });
     try { await api('/api/config', { method: 'PUT', body: { tipoPorRamo } }); $('#rout').textContent = 'Tipos salvos.'; } catch (e) { $('#rout').textContent = e.message; }
   };
-  const pick = (el, sel) => {
+  const pick = (el, sel, vazio = 'Todos') => {
     const alvo = $(el); const lista = [...sel];
-    const draw = () => { alvo.innerHTML = `<div class="chips">${lista.map(id => `<span class="tag seg">${esc((users.find(x => x.id === id) || {}).nome || '#' + id)} <a href="#" data-x="${id}" style="color:inherit;text-decoration:none">✕</a></span>`).join('') || '<span class="hint">Todos</span>'}</div><input list="dl_${el.slice(1)}" placeholder="Adicionar usuário…" style="margin-top:8px"><datalist id="dl_${el.slice(1)}">${users.map(x => `<option value="${esc(x.nome)}">`).join('')}</datalist>`;
+    const draw = () => { alvo.innerHTML = `<div class="chips">${lista.map(id => `<span class="tag seg">${esc((users.find(x => x.id === id) || {}).nome || '#' + id)} <a href="#" data-x="${id}" style="color:inherit;text-decoration:none">✕</a></span>`).join('') || `<span class="hint">${vazio}</span>`}</div><input list="dl_${el.slice(1)}" placeholder="Adicionar usuário…" style="margin-top:8px"><datalist id="dl_${el.slice(1)}">${users.map(x => `<option value="${esc(x.nome)}">`).join('')}</datalist>`;
       alvo.querySelectorAll('[data-x]').forEach(a => a.onclick = e => { e.preventDefault(); lista.splice(lista.indexOf(+a.dataset.x), 1); draw(); });
       alvo.querySelector('input').onchange = e => { const u2 = users.find(x => x.nome === e.target.value); if (u2 && !lista.includes(u2.id)) lista.push(u2.id); draw(); }; };
     draw(); return lista;
   };
+  const lVt = pick('#pk_vt', c.verTudo || [], 'Ninguém além do chefe do departamento'), lAd = pick('#pk_ad', c.admins || [], 'Nenhum administrador');
   const lCfg = pick('#pk_cfg', c.acessoConfig || []), lDash = pick('#pk_dash', c.acessoDashboard || []);
   $('#sac').onclick = async () => { try { await api('/api/config', { method: 'PUT', body: { acessoConfig: lCfg, acessoDashboard: lDash } }); eu = await api('/api/eu'); montaAbas(); $('#acout').textContent = 'Acessos salvos.'; } catch (e) { $('#acout').textContent = e.message; } };
   api('/api/log').then(d => { $('#aud').innerHTML = auditoriaHTML(d); }).catch(e => { $('#aud').textContent = e.message; });
