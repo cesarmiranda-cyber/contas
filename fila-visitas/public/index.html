@@ -267,6 +267,15 @@ body.wide main{padding-top:12px}
 .ki{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f4f8;font-size:12px}.ki:last-child{border-bottom:0}
 .ki .kid{font-weight:600;color:#334155}.ki .kia{display:flex;gap:4px;white-space:nowrap}.ki .kia .btn{min-height:26px;padding:2px 8px;font-size:12px}.ki .kia .btn:not(.pri){width:28px;padding:2px 0;font-size:14px}
 .kcol .kbody>.btn{margin-top:2px}
+
+/* Kanban em telas estreitas (celular / app do Bitrix): colunas quase da largura da tela e linhas que quebram sem cortar botões */
+.ki{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}.ki .kid{flex:1;min-width:70px}.ki .kia{margin-left:auto}
+@media(max-width:600px){
+  .kb{grid-auto-columns:88vw;scroll-snap-type:x mandatory;gap:10px}.kcol{min-width:0;scroll-snap-align:start;max-height:none}
+  .ki .kia .btn{min-height:30px}.ki .kia .btn:not(.pri){width:34px}
+}
+
+@media(max-width:700px){.head .wrap{flex-wrap:wrap}nav{width:100%;flex:none}.stats.s5{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
