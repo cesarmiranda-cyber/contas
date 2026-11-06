@@ -679,3 +679,17 @@ test('visibilidade pelo Bitrix: com a sessão do usuário vale o que o Bitrix li
   const vc = await svc.verComo(20);
   assert.equal(vc.total, 1);
 });
+
+test('ver o registro: mostra o que o consultor lançou (resultado, campos, quem e quando) a partir do card encerrado', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  await svc.registrarVisita(vend.id, { uid: 10, resultado: 'Orçamento enviado ao cliente' });
+  const r = await svc.registroVisita(vend.id);
+  assert.equal(r.registros.length, 1);
+  const reg = r.registros[0];
+  assert.ok(reg.titulo.startsWith('Acme'));
+  assert.ok(reg.campos.some(c => /Orçamento enviado/.test(c.texto || '')), 'o resultado digitado aparece');
+  assert.ok(reg.por !== undefined);
+  assert.equal(r.card.empresa, 'Acme Marítima');
+});

@@ -479,6 +479,60 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null };
   }
 
+  // O que o consultor lançou: os registros de visita (SPA 1032) ligados ao card, com todos os campos preenchidos, quem registrou e os anexos.
+  async function registroVisita(cardId, { bearer = null } = {}) {
+    if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
+    const { map, meta } = await campos();
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    const v = map.visita;
+    const defs = (await bitrix.call('crm.item.fields', { entityTypeId: F.ETYPE.visita })).result?.fields || {};
+    let itens = [];
+    if (v.filaId) itens = (await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, filter: { [v.filaId]: String(cardId) }, select: ['*', 'uf*'], order: { id: 'asc' } })).result?.items || [];
+    if (!itens.length && card.empresaId) {          // visita lançada direto no Bitrix, sem o ID da fila: acha pela empresa e pela linha
+      const todos = (await bitrix.call('crm.item.list', { entityTypeId: F.ETYPE.visita, filter: { companyId: card.empresaId }, select: ['*', 'uf*'], order: { id: 'desc' } })).result?.items || [];
+      itens = todos.filter(it => !v.segmento || R.norm(F.decode(meta, v.segmento, it[v.segmento])) === R.norm(card.segmento)).slice(0, 3);
+    }
+    const permVis = await permitidosBitrix(bearer, F.ETYPE.visita);
+    if (permVis) itens = itens.filter(it => permVis.has(+it.id));
+    let base = ''; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
+    const arq = x => {
+      const lista = (Array.isArray(x) ? x : [x]).filter(Boolean);
+      return lista.map(a => {
+        if (typeof a === 'object') { const u = a.urlMachine || a.url || ''; return { nome: a.name || a.fileName || a.title || `arquivo ${a.id || ''}`.trim(), url: u ? (/^https?:/.test(u) ? u : base + u) : '' }; }
+        return { nome: `arquivo ${a}`, url: '' };
+      });
+    };
+    const nomeUsuarioCache = new Map();
+    const quem = async id => { if (!id) return ''; if (!nomeUsuarioCache.has(id)) nomeUsuarioCache.set(id, await nomeUsuario(+id)); return nomeUsuarioCache.get(id); };
+    const ocultos = new Set([v.filaId].filter(Boolean));
+    const registros = [];
+    for (const it of itens) {
+      const campos_ = [];
+      for (const [k, d] of Object.entries(defs)) {
+        if (!k.startsWith('ufCrm') || ocultos.has(k)) continue;
+        const val = it[k];
+        if (val === undefined || val === null || val === '' || (Array.isArray(val) && !val.length) || val === false) continue;
+        const titulo = d.title || d.formLabel || k;
+        if (d.type === 'file') { const a = arq(val); if (a.length) campos_.push({ key: k, titulo, tipo: 'arquivo', arquivos: a }); continue; }
+        let texto;
+        if ((d.items || []).length) {
+          const nomes = new Map(d.items.map(i => [String(i.ID ?? i.id), String(i.VALUE ?? i.value ?? '')]));
+          texto = [].concat(val).map(x => nomes.get(String(x)) || String(x)).join(', ');
+        } else if (d.type === 'boolean') texto = (val === 'Y' || val === true || val === '1' || val === 1) ? 'Sim' : 'Não';
+        else if (d.type === 'datetime') texto = R.fmtBR(R.todayBR(new Date(val))) + ' ' + new Date(val).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+        else if (d.type === 'date') texto = R.fmtBR(R.isoDate(val));
+        else texto = [].concat(val).map(x => (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(', ');
+        if (texto === '') continue;
+        campos_.push({ key: k, titulo, tipo: d.type, texto, destaque: k === v.resultado });
+      }
+      campos_.sort((a, b) => (!!b.destaque - !!a.destaque));
+      registros.push({ id: +it.id, titulo: it.title || '', quando: it[v.dataHora || 'begindate'] || it.createdTime || null, criadoEm: it.createdTime || null,
+        por: await quem(+it.assignedById || +it.createdBy), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
+    }
+    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data }, registros };
+  }
+
   // ---------- registrar visita ----------
   // Depois de uma visita (registrada pelo app ou direto no Bitrix): finaliza o card, cria o próximo e atualiza o cadastro
   // da empresa (Última e Próxima Visita do segmento) — desde que o segmento tenha Vendedor e Classe preenchidos.
@@ -1259,6 +1313,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, verComo, aquecer, previaNovoCiclo, novoCiclo, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

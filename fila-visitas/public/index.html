@@ -305,6 +305,10 @@ body.wide main{padding-top:12px}
   svg.col{max-height:260px}
   .tw table{font-size:12px}
 }
+
+.rg{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;background:var(--sf)}.rg-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin-bottom:8px}
+.rg-f{padding:7px 0;border-top:1px solid #eef2f6}.rg-f:first-of-type{border-top:0}.rg-f label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;margin-bottom:2px}
+.rg-t{white-space:pre-wrap;overflow-wrap:anywhere}.rg-f.dest{background:#f0f7ff;margin:0 -8px;padding:8px;border-radius:8px;border-top:0}.rg-f a{color:var(--brand)}
 </style>
 </head>
 <body>
@@ -464,6 +468,7 @@ function lista() {
   document.querySelectorAll('[data-reg]').forEach(b => b.onclick = () => registrar(+b.dataset.reg));
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
   document.querySelectorAll('[data-part]').forEach(b => b.onclick = e => { e.preventDefault(); participantes(+b.dataset.part); });
+  document.querySelectorAll('[data-ver]').forEach(b => b.onclick = e => { e.stopPropagation(); verRegistro(+b.dataset.ver); });
   if (VP.view === 'kanban') ligaKanban();
 }
 
@@ -497,14 +502,14 @@ function cartaoKanban(grp, col, verEquipe) {
   const resp = [...new Set(grp.map(x => x.responsavelNome).filter(Boolean))];
   const abertas = col === 'atrasada' || col === 'dia' || col === 'aguardando';
   const linhaItem = x => `<div class="ki" draggable="true" data-kid="${x.id}" data-kcol="${col}"><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span><span class="kid" title="${esc(prazoTxt(x))}">${fmt(x.data)}</span>
-      <span class="kia">${abertas ? `<button class="btn sm pri" data-reg="${x.id}" title="Registrar visita">Registrar</button><button class="btn sm" data-rep="${x.id}" title="Alterar visita (nova data)">↻</button>` : ''}</span></div>`;
+      <span class="kia">${col === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${abertas ? `<button class="btn sm pri" data-reg="${x.id}" title="Registrar visita">Registrar</button><button class="btn sm" data-rep="${x.id}" title="Alterar visita (nova data)">↻</button>` : ''}</span></div>`;
   return `<article class="kc ${col}" draggable="true" data-kkey="${esc(key)}" data-ids="${ids.join(',')}" data-kcol="${col}">
     <div class="kc-h"><a href="#" class="kc-n" data-kg="${esc(key)}" title="Abrir agrupamento">${esc(c0.empresa)}</a>${grp.length > 1 ? `<span class="kn2" title="${grp.length} visitas">${grp.length}</span>` : ''}</div>
     <div class="kc-m">${esc([c0.segmentoEmpresa, c0.tipoEmpresa].filter(Boolean).join(' · '))}</div>
     <div class="kc-l">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join('')}</div>
     <div class="kc-d"><b>${fmt(pior.data)}</b><span class="kp">${prazoTxt(pior)}</span></div>
     ${verEquipe && resp.length ? `<div class="kc-r" title="${esc(resp.join(', '))}"><i>${esc(ini(resp[0]))}</i>${esc(resp[0])}${resp.length > 1 ? ` <em>+${resp.length - 1}</em>` : ''}</div>` : ''}
-    <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : ''}</div>
+    <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : col === 'finalizado' ? `<button class="btn sm pri" data-ver="${c0.id}">Ver registro</button>` : ''}</div>
     ${grp.length > 1 ? `<div class="kc-i" ${aberto ? '' : 'hidden'}>${grp.map(linhaItem).join('')}</div>` : ''}</article>`;
 }
 function aviso(msg, erro) {
@@ -554,11 +559,12 @@ function abreGrupoIds(ids, nota) {
       <div class="chips">${c0.segmentoEmpresa ? `<span class="tag emp">${esc(c0.segmentoEmpresa)}</span>` : ''}${c0.tipoEmpresa ? `<span class="tag">${esc(c0.tipoEmpresa)}</span>` : ''}<span class="tag">${grp.length} visita(s)</span></div></div>
     <div class="sh-b">${nota ? `<div class="info">${esc(nota)}</div>` : ''}${eq ? `<div class="kg-eq">${eq}</div>` : ''}
       <div class="tw"><table><tr><th>Linha</th><th>Cargo</th><th>Classe</th><th>Responsável</th><th>Última visita</th><th>Programada</th><th>Prazo</th><th></th></tr>${grp.map(x => `<tr><td><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span></td><td>${esc(x.cargo)}</td><td>${esc(x.classe)}</td><td>${esc(x.responsavelNome)}</td><td>${x.ultima ? fmt(x.ultima) : '—'}</td><td>${fmt(x.data)}</td><td><span class="pl2" style="background:${pl[x.situacao][0]};color:${pl[x.situacao][1]}">${prazoTxt(x)}</span></td>
-        <td style="white-space:nowrap">${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
+        <td style="white-space:nowrap">${x.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button>${abertas.length > 1 ? '<button class="btn" id="gall">Alterar a data de todas</button>' : ''}</div>`);
   document.querySelectorAll('[data-greg]').forEach(b => b.onclick = () => registrar(+b.dataset.greg));
   document.querySelectorAll('[data-grep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.grep));
   document.querySelectorAll('[data-gpart]').forEach(b => b.onclick = () => participantes(+b.dataset.gpart));
+  document.querySelectorAll('#sheet [data-ver]').forEach(b => b.onclick = () => verRegistro(+b.dataset.ver));
   if ($('#gall')) $('#gall').onclick = () => reagendarGrupo(abertas.map(x => x.id));
 }
 // Alterar a data de várias visitas da mesma empresa de uma vez (mesmas regras: do dia seguinte em diante, dentro do mês, motivo obrigatório).
@@ -610,6 +616,21 @@ function participantes(id) {
 }
 const CELULAR = () => window.matchMedia('(max-width:700px)').matches;     // no celular a tabela não cabe: vira cartões
 const FX = { aberto: false };                                              // filtros recolhidos no celular
+
+// ---- Ver o registro: o que o consultor lançou na visita (campos, resultado, anexos) ----
+async function verRegistro(id) {
+  modal('<div class="sh-b"><div class="vazio">Carregando o registro…</div></div>');
+  let r;
+  try { r = await api(`/api/cards/${id}/registro`); }
+  catch (e) { modal(`<div class="sh-b"><div class="err on">${esc(e.message)}</div></div><div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button></div>`); return; }
+  const c = r.card;
+  const corpo = r.registros.length ? r.registros.map(g => `<div class="rg">
+      <div class="rg-h"><b>${esc(g.titulo || 'Registro de visita')}</b><span class="hint">${g.quando ? esc(dhBR(g.quando)) : ''}${g.por ? ' · por ' + esc(g.por) : ''}</span>${g.urlRegistro ? ` <a href="${esc(g.urlRegistro)}" target="_top" class="hint">abrir no Bitrix</a>` : ''}</div>
+      ${g.campos.length ? g.campos.map(f => `<div class="rg-f ${f.destaque ? 'dest' : ''}"><label>${esc(f.titulo)}</label>${f.tipo === 'arquivo' ? `<div>${f.arquivos.map(a => a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.nome)}</a>` : `📎 ${esc(a.nome)}`).join('<br>')}</div>` : `<div class="rg-t">${esc(f.texto)}</div>`}</div>`).join('') : '<div class="hint">Nenhum campo preenchido neste registro.</div>'}
+    </div>`).join('') : '<div class="info">Não encontrei um registro de visita ligado a este card. Se a visita foi lançada direto no Bitrix, abra o card para ver.</div>';
+  modal(`<div class="sh-h"><h3>Registro da visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span></div></div>
+    <div class="sh-b">${corpo}</div><div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button></div>`);
+}
 const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
 function tabelaVisitas(v, verEquipe) {
@@ -617,7 +638,7 @@ function tabelaVisitas(v, verEquipe) {
   const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
   const linhaTab = (c, filha) => {
     const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`;
+    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${c.id}">Ver registro</button>` : c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`;
   };
   const grupos = [];                                                  // linhas seguidas da mesma empresa viram um grupo recolhível
   for (const c of v) { const g = grupos[grupos.length - 1]; if (g && c.empresaId && g[0].empresaId === c.empresaId) g.push(c); else grupos.push([c]); }
@@ -652,7 +673,7 @@ function linha(c) {
       ${eq || extras ? `<div class="pessoas">${eq}${extras}</div>` : ''}
     </div>
     <div class="due"><small>Programada</small><b>${fmt(c.data)}</b><span>${q}</span></div>
-    <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
+    <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>${c.situacao === 'finalizado' ? `<div class="acts"><button class="btn pri" data-ver="${c.id}">Ver registro</button></div>` : ''}` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
       <div class="links">${c.situacao !== 'finalizado' && c.situacao !== 'naorealizada' ? `<a href="#" data-part="${c.id}">Participantes${(c.participantes || []).length ? ` (${c.participantes.length})` : ''}</a>` : ''}${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
 }
 const modal = html => { $('#sheet').innerHTML = html; $('#m').classList.add('on'); };

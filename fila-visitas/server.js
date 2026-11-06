@@ -143,6 +143,8 @@ const server = http.createServer(async (req, res) => {
     }
     const mf = u.pathname.match(/^\/api\/cards\/(\d+)\/form$/);
     if (mf && req.method === 'GET') { exige(); { const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); } return send(res, 200, await svc.camposVisita(+mf[1])); }
+    const mr = u.pathname.match(/^\/api\/cards\/(\d+)\/registro$/);
+    if (mr && req.method === 'GET') { exige(); const idr = await quem(req, u); return send(res, 200, await svc.registroVisita(+mr[1], { bearer: idr.bearer })); }
     let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes)$/);
     if (m && req.method === 'POST') {
       exige();
