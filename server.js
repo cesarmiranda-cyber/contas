@@ -49,12 +49,12 @@ const inter = createBancoInter({ secrets }), autentique = createAutentique({ sec
 const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR, inter });
 const { createBitrixLogin } = require('./lib/bitrixLogin');
 const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
-const bx = createBxEmpresas({ bitrix }), funil = createBxFunil({ bitrix });
+const bx = createBxEmpresas({ bitrix }), funil = createBxFunil({ bitrix }), cnpjApi = require('./lib/cnpj').createCnpj();
 const cronApi = createCronApi({ bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
-const carApi = createCarteiraApi({ bitrix, bx, funil, store, dir: DATA_DIR, areasDe: u => auth.areasDe(u), autentique });
+const carApi = createCarteiraApi({ bitrix, bx, funil, cnpjApi, store, dir: DATA_DIR, areasDe: u => auth.areasDe(u), autentique });
 const bkApiRef = {};
-const demApi = createDemandasApi({ bitrix, bx, funil, bk: { unidades: () => (bkApiRef.v ? bkApiRef.v.unidades() : []) }, store, dir: DATA_DIR });
-const bkApi = createBkApi({ fin, empresas, bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
+const demApi = createDemandasApi({ bitrix, bx, funil, fin, bk: { unidades: () => (bkApiRef.v ? bkApiRef.v.unidades() : []) }, store, dir: DATA_DIR });
+const bkApi = createBkApi({ fin, empresas, bitrix, bx, funil, cnpjApi, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
 bkApiRef.v = bkApi;
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente

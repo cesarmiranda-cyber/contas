@@ -56,6 +56,7 @@ const fakeBitrix = () => {
       if (m === 'crm.company.list') return { result: empresas };
       if (m === 'crm.contact.list') return { result: p.filter.COMPANY_ID === '1' ? [{ ID: '31', NAME: 'Ana', LAST_NAME: 'Lima', PHONE: [{ VALUE: '1199' }] }] : [{ ID: '41', NAME: 'A' }, { ID: '42', NAME: 'B' }] };
       if (m === 'crm.status.list') return { result: [{ STATUS_ID: 'C6:NEW', NAME: 'Onboarding' }, { STATUS_ID: 'C6:PREPARATION', NAME: 'Ativo' }, { STATUS_ID: 'C6:LOSE', NAME: 'Suspenso' }] };
+      if (m === 'crm.company.add') { empresas.push({ ID: String(100 + empresas.length), TITLE: p.fields.TITLE, UF_CID: p.fields.UF_CID || '' }); return { result: String(100 + empresas.length - 1) }; }
       if (m === 'crm.deal.list') return { result: deals.filter(x => String(x.CATEGORY_ID) === String(p.filter.CATEGORY_ID)) };
       if (m === 'crm.deal.add') { const id = '900' + calls.length; deals.push({ ID: id, ...p.fields, CLOSED: 'N' }); return { result: id }; }
       if (m === 'crm.deal.update') { deals.find(x => x.ID === p.id).STAGE_ID = p.fields.STAGE_ID; return { result: true }; }
@@ -142,4 +143,32 @@ test('lista de conferência: carga mensal ligada aos clientes, edição e histó
   assert.equal(api.dados().clientes.find(c => c.nome === 'Cliente Novo').cidade, 'Santos');
   const auth = createAuth({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), env: { ADMIN_USER: 'a', ADMIN_HASH: await hashSenha('Inicial12345') } });
   assert.equal(auth.permite('operacional', 'GET', '/api/cron/conferencia'), true); assert.equal(auth.permite('operacional', 'PUT', '/api/cron/conferencia/x'), false); assert.equal(auth.permite('financeiro', 'PUT', '/api/cron/conferencia/x'), true);
+});
+
+test('conferência: o X acompanha as visitas realizadas (marca, desmarca, cria a linha do mês)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xc-')), bitrix = { enabled: false };
+  fs.writeFileSync(path.join(dir, 'cron.json'), JSON.stringify({ consultoras: [{ id: 'c1', nome: 'Iris', bitrixId: '' }], clientes: [{ id: 'k1', nome: 'Askoll', cidade: 'São Paulo', uf: 'SP', freqTxt: '1x por semana', horasTxt: '2h' }], visitas: [], modelos: [], feriadosCustom: [], conferencia: [{ id: 'cf1', mes: '2026-10', clienteId: 'k1', estabelecimento: 'Askoll', consultoras: ['c1'], horasTxt: '2h', freqTxt: '1x por semana', freqTipo: 'semanal', freqN: 1, semanas: [false, false, false, false, false], obs: '' }], confMeses: {}, confGeral: { obsClientes: [] }, config: { funilId: 6 } }));
+  const api = createCronApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/cron' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, null)).json; };
+  assert.deepEqual(K.indiceSemana('2026-10-01'), { mes: '2026-10', i: 0 }); assert.deepEqual(K.indiceSemana('2026-10-20'), { mes: '2026-10', i: 3 }); assert.equal(K.indiceSemana('2026-10-30').i, 4);
+  assert.deepEqual(K.freqDeTexto('15x15'), ['quinzenal', 1]); assert.deepEqual(K.freqDeTexto('2x por semana'), ['semanal', 2]); assert.deepEqual(K.freqDeTexto('1x por mês'), ['mensal', 1]);
+  const v1 = await call('POST', '/visitas', { data: '2026-10-20', min: 120, consultora: 'c1', clienteId: 'k1' }); assert.deepEqual(api.dados().conferencia[0].semanas, [false, false, false, false, false]);   // agendada não marca
+  await call('PUT', `/visitas/${v1.id}`, { status: 'realizada' }); assert.deepEqual(api.dados().conferencia[0].semanas, [false, false, false, true, false]);
+  await call('PUT', `/visitas/${v1.id}`, { status: 'agendada' }); assert.deepEqual(api.dados().conferencia[0].semanas, [false, false, false, false, false]);   // voltou: desmarca
+  const v2 = await call('POST', '/visitas', { data: '2026-11-04', min: 60, consultora: 'c1', clienteId: 'k1' }); await call('POST', '/visitas/lote', { ids: [v2.id], status: 'realizada' });
+  const nov = api.dados().conferencia.find(x => x.mes === '2026-11'); assert.ok(nov); assert.equal(nov.semanas[0], true); assert.equal(nov.freqTipo, 'semanal');   // cria a linha do mês
+  await call('DELETE', `/visitas/${v2.id}`); assert.equal(api.dados().conferencia.find(x => x.mes === '2026-11').semanas[0], false);
+});
+
+test('empresas pendentes: vincula igual, não cria quando há parecida, cria o resto sem duplicar e em lotes', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ep-')), bitrix = fakeBitrix();
+  fs.writeFileSync(path.join(dir, 'cron.json'), JSON.stringify({ consultoras: [], visitas: [], modelos: [], feriadosCustom: [], conferencia: [], confMeses: {}, confGeral: { obsClientes: [] }, config: { funilId: 6 },
+    clientes: [{ id: 'a', nome: 'Domus Food Service' }, { id: 'b', nome: 'Sacolão Cupecê' }, { id: 'c', nome: 'Pizzaria Nova Estrela', cidade: 'Santos', uf: 'SP' }, { id: 'd', nome: 'Cantina Vó Maria' }, { id: 'e', nome: 'Inativo Ltda', ativo: false }] }));
+  const api = createCronApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/cron' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, null)).json; };
+  const sim = await call('POST', '/empresas/criar-pendentes', {}); assert.equal(sim.simulacao, true); assert.deepEqual([sim.vincular, sim.criar, sim.comSugestao], [2, 2, 0]); assert.equal(bitrix.calls.filter(c => c[0] === 'crm.company.add').length, 0);
+  const r1 = await call('POST', '/empresas/criar-pendentes', { simular: false, lote: 2 }); assert.equal(r1.restantes, 2);   // lote de 2 por chamada
+  const r2 = await call('POST', '/empresas/criar-pendentes', { simular: false, lote: 5 }); assert.equal(r2.restantes, 0);
+  const cl = api.dados().clientes; assert.equal(cl.find(c => c.id === 'a').empresaBitrixId, '1'); assert.equal(cl.find(c => c.id === 'b').empresaBitrixId, '2'); assert.ok(cl.find(c => c.id === 'c').empresaBitrixId.length >= 3); assert.ok(cl.find(c => c.id === 'd').empresaBitrixId); assert.equal(cl.find(c => c.id === 'e').empresaBitrixId, undefined);
+  assert.equal(bitrix.calls.filter(c => c[0] === 'crm.company.add').length, 2); assert.equal((await call('POST', '/empresas/criar-pendentes', { simular: false })).criadas, 0);   // idempotente
 });

@@ -145,3 +145,10 @@ Multas (funil 8), Rotulagem (12), Manuais e documentação (4), Solicitações (
 - **Banco Inter (`lib/bancoInter.js`)**: OAuth2 client_credentials + certificado de cliente (mTLS), credenciais em `secrets.json`. Valida o par .crt/.key e mostra a validade (o Inter emite por 1 ano). Hoje: extrato e saldo; “Buscar no Banco Inter” na Conciliação traz o extrato do período para a conta escolhida, sem duplicar. Endereços e escopos seguem a documentação pública do Inter, **ainda não testados contra o banco real**: o “Testar conexão” devolve a resposta do banco para ajustar.
 - **Itaú**: extrato por arquivo OFX ou **camt.053** (ISO 20022) pelo mesmo importador da Conciliação. API do Itaú depende de credenciamento do CNPJ; não implementada.
 - **Autentique (`lib/autentique.js`)**: API GraphQL v2 (Bearer). Na ficha do cliente (área “contratos”) envia o PDF para assinatura, acompanha de hora em hora e, quando todos assinam, comenta no negócio e leva o contrato à etapa “Contrato assinado”. Também **não testada contra a API real**.
+
+## Automação de cobrança, conferência e cadastros
+
+- **Serviço pontual 50/50** (rotulagem, manuais, suplementos): no negócio, “Gerar cobrança 50/50” cria duas contas a receber ligadas ao negócio (entrada e final). O negócio só sai da primeira etapa com a entrada paga e só chega a “Entregue” com o final pago; o administrador pode liberar com motivo registrado. A empresa que fatura é configurada em `/api/dem/config` (`empresaFaturaId`).
+- **X da conferência mensal** acompanha as visitas: marcar visita como realizada marca a semana (e cria a linha do mês se faltar); voltar a situação desmarca.
+- **Empresas pendentes no Bitrix24** (cronograma e BK, só administrador): simulação com contagens, confirmação, e criação em lotes; nunca cria quando existe empresa igual (só vincula) e, no cronograma, nunca quando há empresa parecida (decisão humana). BK completa a razão social pela Receita (BrasilAPI).
+- **Completar cadastros pelo CNPJ** (Carteira de clientes): preenche só razão social, cidade e estado vazios das empresas com CNPJ válido.

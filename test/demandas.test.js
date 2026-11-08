@@ -5,6 +5,7 @@ const { createDemandasApi } = require('../lib/demandasApi');
 const { createBxEmpresas } = require('../lib/bxEmpresas');
 const { createBxFunil } = require('../lib/bxFunil');
 const { createAuth, hashSenha } = require('../lib/auth');
+const { createFinStore } = require('../lib/finStore');
 const R = require('../lib/rules');
 const F = require('../lib/feriados');
 
@@ -67,4 +68,26 @@ test('áreas: cada pessoa só abre o que foi liberado; contratos ficam restritos
   assert.throws(() => auth.liberarBitrix({ bitrixId: '8', nome: 'Bia', perfil: 'consulta', areas: ['inexistente'] }), /Área inválida/);
   assert.equal(auth.areasDe({ perfil: 'consulta' }).includes('contratos'), false); assert.equal(auth.areasDe({ perfil: 'financeiro' }).includes('contratos'), true);   // antigos: padrão por perfil
   assert.equal(auth.permite('operacional', 'POST', '/api/dem/rotulagem/negocios'), true); assert.equal(auth.permite('operacional', 'POST', '/api/dem/solicitacoes/entrada/token'), false); assert.equal(auth.permite('financeiro', 'POST', '/api/dem/avisar'), false);
+});
+
+test('serviço pontual: cobrança 50/50 em Contas a receber trava o início e a entrega até o pagamento', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-')), bitrix = fake(), fin = createFinStore(dir); fin.empresas.add({ id: 'e1', nome: 'Nutri Mix', ativa: true });
+  const api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, fin, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  const n = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Molho', empresaId: '5' });
+  await assert.rejects(call('POST', '/solicitacoes/negocios/1/cobranca', { valor: 100 }), /não usa cobrança/); await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 1000 }), /empresa que vai faturar/);
+  await call('PUT', '/config', { empresaFaturaId: 'e1' }); await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 1 }), /valor total/);
+  const c = await call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 1001, vencEntrada: '2026-11-10' });
+  assert.equal(c.cobranca.entrada.valor, 500.5); assert.equal(c.cobranca.final.valor, 500.5); assert.equal(fin.receber.all().length, 2); assert.equal(fin.receber.all()[0].demandaId, n.id); assert.equal(fin.receber.all()[0].venc, '2026-11-10');
+  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 5 }), /já tem cobrança/);
+  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:B' }), /entrada de 50%/);                 // não sai da 1ª etapa sem a entrada
+  const ent = fin.receber.get(c.cobranca.entrada.id); fin.receber.put({ ...ent, status: 'pago', pagoEm: '2026-11-10' });
+  assert.equal((await call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:A' })).etapa, 'C12:A');
+  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:W' }), /50% finais/);                       // não entrega sem o final
+  await call('POST', `/rotulagem/negocios/${n.id}/liberar`, { qual: 'final', motivo: 'Cliente antigo, combinado por escrito' }); assert.equal((await call('GET', `/rotulagem/negocios/${n.id}`)).cobranca.liberacoes.length, 1);
+  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/liberar`, { qual: 'final', motivo: 'x' }), /motivo/); assert.equal((await call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:W' })).etapa, 'C12:W');
+  await assert.rejects(call('DELETE', `/rotulagem/negocios/${n.id}/cobranca`), /já paga/);
+  const q = await call('GET', '/rotulagem/quadro'); assert.equal(q.negocios[0].cobranca.entradaPaga, true); assert.equal(q.negocios[0].cobranca.finalPaga, false);
+  const auth = createAuth({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), env: { ADMIN_USER: 'a', ADMIN_HASH: await hashSenha('Inicial12345') } });
+  assert.equal(auth.permite('operacional', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), false); assert.equal(auth.permite('financeiro', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), false); assert.equal(auth.permite('admin', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), true); assert.equal(auth.permite('financeiro', 'POST', '/api/dem/rotulagem/negocios/9/cobranca'), true);
 });

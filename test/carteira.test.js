@@ -82,3 +82,16 @@ test('carteira: contrato enviado para assinatura, andamento atualizado e negóci
   assert.equal((await api.atualizarAssinaturas()).atualizadas, 0); estado.v = 'assinado'; assert.equal((await api.atualizarAssinaturas()).atualizadas, 1);
   assert.deepEqual(moved, [['50', 'C15:S']]); assert.equal((await call('GET', '/clientes/1')).assinaturas[0].estado, 'assinado'); assert.equal((await api.atualizarAssinaturas()).atualizadas, 0);
 });
+
+test('CNPJ: validação, consulta da Receita e preenchimento só de campos vazios', async () => {
+  const { createCnpj, cnpjValido } = require('../lib/cnpj'); assert.equal(cnpjValido('11.222.333/0001-81'), true); assert.equal(cnpjValido('11222333000182'), false); assert.equal(cnpjValido('11111111111111'), false);
+  const cn = createCnpj({ fetchFn: async url => url.endsWith('11222333000181') ? { status: 200, ok: true, json: async () => ({ razao_social: 'EXEMPLO LTDA', municipio: 'SÃO PAULO', uf: 'sp', cep: '01001-000', bairro: 'SE' }) } : url.endsWith('11444777000161') ? { status: 429, ok: false } : { status: 404, ok: false } });
+  const r = await cn.consultar('11222333000181'); assert.equal(r.cidade, 'São Paulo'); assert.equal(r.uf, 'SP'); assert.equal(r.cep, '01001000'); await assert.rejects(cn.consultar('11444777000161'), /Muitas consultas/); await assert.rejects(cn.consultar('11222333000182'), /inválido/);
+  const upd = [], bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) { if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' }, UF_R: { formLabel: 'Razão Social' }, UF_CID: { formLabel: 'Cidade' }, UF_UF: { formLabel: 'Estado' } } };
+    if (m === 'crm.company.list') return { result: [{ ID: '1', TITLE: 'A', UF_C: '11.222.333/0001-81', UF_CID: 'Campinas' }, { ID: '2', TITLE: 'B', UF_C: '11222333000181', UF_R: 'X', UF_CID: 'Y', UF_UF: 'MG' }, { ID: '3', TITLE: 'C', UF_C: '99999999999999' }] };
+    if (m === 'crm.company.update') { upd.push(p); return { result: true }; } return { result: true }; } };
+  const api = createCarteiraApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), cnpjApi: cn, store: { log() {} }, dir: fs.mkdtempSync(path.join(os.tmpdir(), 'ca-')) });
+  const call = async (b) => { const u = new URL('http://x/api/car/completar-cnpj'); return (await api.handle('POST', u.pathname, u, async () => b, {})).json; };
+  const sim = await call({}); assert.equal(sim.pendentes, 1); assert.equal(sim.itens[0].falta, 'razão social, estado'); assert.equal(upd.length, 0);   // "C" tem CNPJ inválido; "B" já está completa
+  const r2 = await call({ simular: false }); assert.equal(r2.completas, 1, JSON.stringify(r2)); assert.deepEqual(upd[0].fields, { UF_R: 'EXEMPLO LTDA', UF_UF: 'SP' });   // a cidade (Campinas) não é sobrescrita
+});

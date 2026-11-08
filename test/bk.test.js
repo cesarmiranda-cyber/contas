@@ -130,3 +130,19 @@ test('BK ↔ funil Regularização: cria negócio por unidade com empresa, etapa
   const r2 = await api.sincronizarFunil({ simular: false }); assert.equal(r2.doBitrix, 1);
   assert.equal((await call('GET', `/api/bk/unidades/${u.id}`)).etapa, 'reenviado'); assert.match((await call('GET', `/api/bk/unidades/${u.id}`)).historico[0].nota, /Bitrix24/);
 });
+
+test('BK: cria no Bitrix24 as empresas das unidades (CNPJ igual só vincula; completa pela Receita), em lotes', async () => {
+  const { createBxEmpresas } = require('../lib/bxEmpresas'), { createBxFunil } = require('../lib/bxFunil'), { createCnpj } = require('../lib/cnpj');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-')), fin = createFinStore(dir), lista = [{ ID: '5', TITLE: 'BK Anhaia', UF_C: '13.574.594/0654-84' }], adds = [];
+  const bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) {
+    if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' }, UF_R: { formLabel: 'Razão Social' }, UF_CID: { formLabel: 'Cidade' }, UF_UF: { formLabel: 'Estado' }, UF_CEP: { formLabel: 'CEP' } } };
+    if (m === 'crm.company.list') return { result: lista }; if (m === 'crm.company.add') { adds.push(p.fields); lista.push({ ID: String(50 + adds.length), TITLE: p.fields.TITLE, UF_C: p.fields.UF_C }); return { result: String(50 + adds.length) }; } return { result: true }; } };
+  const cnpjApi = createCnpj({ fetchFn: async url => url.endsWith('11222333000181') ? { status: 200, ok: true, json: async () => ({ razao_social: 'OUTRA COMERCIO LTDA', municipio: 'SANTOS', uf: 'SP', cep: '11000000', bairro: 'CENTRO', descricao_tipo_de_logradouro: 'RUA', logradouro: 'DAS FLORES' }) } : { status: 404, ok: false } });
+  const api = createBkApi({ fin, bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), cnpjApi, store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  await call('POST', '/api/bk/importar', { csv: 'BKN;Unidade BK;CNPJ;Cidade\n7;Anhaia Mello;13574594065484;São Paulo\n8;Outra Loja;11222333000181;\n9;Sem CNPJ;;Curitiba\n' });
+  const sim = await call('POST', '/api/bk/empresas/criar-pendentes', {}); assert.deepEqual([sim.vincular, sim.criar, sim.semCnpj], [1, 2, 1]); assert.equal(adds.length, 0);
+  const r = await call('POST', '/api/bk/empresas/criar-pendentes', { simular: false, lote: 2 }); assert.equal(r.restantes, 1); assert.equal(adds.length, 1); assert.equal(adds[0].UF_R, 'OUTRA COMERCIO LTDA'); assert.equal(adds[0].UF_CEP, '11000000'); assert.equal(adds[0].UF_C, '11.222.333/0001-81');
+  const r2 = await call('POST', '/api/bk/empresas/criar-pendentes', { simular: false, lote: 5 }); assert.equal(r2.restantes, 0); assert.equal(adds.length, 2);
+  const us = (await call('GET', '/api/bk/unidades?pp=100')).itens; assert.ok(us.every(u => u.empresaBitrixId)); assert.equal(us.find(u => u.bkn === '7').empresaBitrixId, '5');
+});
