@@ -132,3 +132,10 @@ Com o webhook conectado, 1 minuto depois de subir e de hora em hora (`sincBitrix
 - **Resumo de serviços**: clientes ativos de consultoria × treinamento, MBP e POP, alvará, licença de funcionamento, em verde/amarelo/vermelho.
 - **Contratos a vencer**: aviso no Bitrix24 ao responsável da empresa (30, 15, 7 dias, no dia e vencido, uma vez cada).
 - **E-mail marketing**: públicos ativos/inativos a partir do e-mail da empresa no Bitrix24, descadastro, exportação em CSV e campanhas com modelos; o envio ainda é feito na ferramenta de e-mail do cliente (SMTP/provedor a definir).
+
+## Processos por funil (`/demandas.html#<processo>`, API `/api/dem/*`, dados em `demandas.json`)
+
+Multas (funil 8), Rotulagem (12), Manuais e documentação (4), Solicitações (17) e Suplementos (funil a informar depois de criado). Quadro de etapas do Bitrix24 com arrastar; prazo = data de conclusão do negócio; checklist por processo; aprovações com histórico (rotulagem exige aprovação interna de duas pessoas diferentes antes de “Aprovação do cliente”; reprovar zera); links de pastas; notas; alertas de prazo ao responsável (hora em hora, uma vez por marco).
+- **Entrada de solicitações por e-mail**: `POST /entrada/email` com cabeçalho `X-Entrada-Token` (token gerado na tela, guardado só como hash). Um script (Google Apps Script, fornecido na tela) envia cada e-mail sem que a senha da caixa fique no sistema. O BKN no assunto/texto liga a solicitação à unidade e à empresa; não duplica por `messageId`.
+- **Áreas por pessoa** (`areas` do usuário): contas, bk, cronograma, clientes, contratos, marketing, multas, rotulagem, manuais, solicitações, suplementos. Quem não tem a área “contratos” não vê valor, vigência nem proposta na Carteira.
+- **Oportunidade comercial** a partir de uma visita: cria negócio no funil Comercial B2B (categoria 0) com empresa, contato e consultora.

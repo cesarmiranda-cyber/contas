@@ -41,13 +41,17 @@ const { createCronApi } = require('./lib/cronApi');
 const { createBxEmpresas } = require('./lib/bxEmpresas');
 const { createBxFunil } = require('./lib/bxFunil');
 const { createCarteiraApi } = require('./lib/carteiraApi');
+const { createDemandasApi } = require('./lib/demandasApi');
 const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR });
 const { createBitrixLogin } = require('./lib/bitrixLogin');
 const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
 const bx = createBxEmpresas({ bitrix }), funil = createBxFunil({ bitrix });
 const cronApi = createCronApi({ bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
-const carApi = createCarteiraApi({ bitrix, bx, funil, store, dir: DATA_DIR });
+const carApi = createCarteiraApi({ bitrix, bx, funil, store, dir: DATA_DIR, areasDe: u => auth.areasDe(u) });
+const bkApiRef = {};
+const demApi = createDemandasApi({ bitrix, bx, funil, bk: { unidades: () => (bkApiRef.v ? bkApiRef.v.unidades() : []) }, store, dir: DATA_DIR });
 const bkApi = createBkApi({ fin, empresas, bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
+bkApiRef.v = bkApi;
 const settings = createSettingsApi({ secrets, asaas: asaasBase, bitrix, store, svc });
 settings.apply(); // credenciais do painel (se houver) ou das variáveis de ambiente
 
@@ -145,10 +149,14 @@ const server = http.createServer(async (req, res) => {
     const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim() === 'http' ? 'http' : 'https', origem = `${proto}://${req.headers.host}`;
     const paraApp = (r, extra = '') => { res.writeHead(303, { Location: `${extra}#bx=${r.token}`, 'Cache-Control': 'no-store' }); res.end(); };
     const volta = (msg) => { res.writeHead(303, { Location: '/?bxerro=' + encodeURIComponent(String(msg).slice(0, 200)), 'Cache-Control': 'no-store' }); res.end(); };
+    if (req.method === 'POST' && u.pathname === '/entrada/email') {   // automação (ex.: Google Apps Script) envia o e-mail já lido; autenticada por token, sem senha de e-mail no sistema
+      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
+      return send(res, 200, await demApi.entradaEmail(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
+    }
     if (req.method === 'GET' && u.pathname === '/auth/opcoes') return send(res, 200, { bitrix: bxLogin.oauthPronto() });
     if (req.method === 'GET' && u.pathname === '/auth/bitrix/start') { try { res.writeHead(302, { Location: bxLogin.inicio(`${origem}/auth/bitrix/callback`), 'Cache-Control': 'no-store' }); return res.end(); } catch (e) { return volta(e.message); } }
     if (req.method === 'GET' && u.pathname === '/auth/bitrix/callback') { try { return paraApp(await bxLogin.retorno({ code: u.searchParams.get('code'), state: u.searchParams.get('state') }), '/'); } catch (e) { return volta(e.message); } }
-    if (req.method === 'POST' && ['/', '/index.html', '/financeiro.html', '/processos.html', '/bk.html', '/cronograma.html', '/clientes.html'].includes(u.pathname) && /^application\/x-www-form-urlencoded/i.test(req.headers['content-type'] || '')) {   // o Bitrix24 abre o app com POST
+    if (req.method === 'POST' && ['/', '/index.html', '/financeiro.html', '/processos.html', '/bk.html', '/cronograma.html', '/clientes.html', '/demandas.html'].includes(u.pathname) && /^application\/x-www-form-urlencoded/i.test(req.headers['content-type'] || '')) {   // o Bitrix24 abre o app com POST
       let raw = ''; for await (const c of req) { raw += c; if (raw.length > 20000) return volta('Pedido grande demais.'); }
       const f = Object.fromEntries(new URLSearchParams(raw));
       try { const alvo = u.pathname === '/' || u.pathname === '/index.html' ? (/[?&](deal|company|contact)=/.test(req.url) ? '/financeiro.html' : '/') : u.pathname; return paraApp(await bxLogin.porPlacement(f), alvo + u.search); } catch (e) { return volta(e.message); }
@@ -168,7 +176,7 @@ const server = http.createServer(async (req, res) => {
       req.user = g.user;
       if (u.pathname.startsWith('/api/auth/')) {
         const k = `${req.method} ${u.pathname}`, m = u.pathname.match(/^\/api\/auth\/usuarios\/([\w-]+)$/);
-        if (k === 'GET /api/auth/me') return send(res, 200, { usuario: auth.publico(g.user), perfis: auth.PERFIS });
+        if (k === 'GET /api/auth/me') return send(res, 200, { usuario: auth.publico(g.user), perfis: auth.PERFIS, areas: auth.AREAS });
         if (k === 'POST /api/auth/logout') { store.log('acesso', `Saída de ${g.user.usuario}`); return send(res, 200, { ok: true }); }
         if (k === 'POST /api/auth/trocar-senha') return send(res, 200, await auth.trocarSenha(g.user, await readBody(req, 10000)));
         if (k === 'GET /api/auth/bitrix/usuarios') return send(res, 200, await bxLogin.usuariosBitrix());
@@ -196,6 +204,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (u.pathname.startsWith('/api/bk/')) {
       const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : 1e6));
+      return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
+    }
+    if (u.pathname.startsWith('/api/dem/')) {
+      const r = await demApi.handle(req.method, u.pathname, u, () => readBody(req, 1e6), req.user);
       return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
     }
     if (u.pathname.startsWith('/api/car/')) {
@@ -252,6 +264,7 @@ server.listen(PORT, () => {
   // Sincronização com o Bitrix24 (empresas, contatos, usuários, funis e etapas): 1 min após subir e depois de hora em hora. Idempotente.
   const sincBitrix = async () => { if (!bitrix.enabled) return; try { const r = await cronApi.reconciliar({ simular: false }); console.log('sync cronograma', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync cronograma', e.message); }
     try { const r = await carApi.sincronizar(); console.log('sync carteira', JSON.stringify(r)); const a = await carApi.avisar(); if (a.enviados.length) console.log('avisos de contrato (carteira)', a.enviados.length); } catch (e) { console.error('sync carteira', e.message); }
+    try { const a = await demApi.avisar(); if (a.enviados.length) console.log('avisos de prazo (processos)', a.enviados.length); } catch (e) { console.error('avisos processos', e.message); }
     try { const r = await bkApi.sincronizarFunil({ simular: false }); console.log('sync BK', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync BK', e.message); } };
   setTimeout(sincBitrix, 60000); setInterval(sincBitrix, 3600 * 1000);
   const avisarBk = () => bitrix.enabled && bkApi.avisar().then(r => r.enviados.length && console.log('avisos BK', r.enviados.length)).catch(e => console.error('avisos BK', e.message));

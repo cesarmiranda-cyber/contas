@@ -122,8 +122,8 @@ async function entrou(u) {
   const v = volta(); if (v) { location.replace(v); return; }
   $('#uNome').textContent = u.nome; $('#uPerfil').textContent = u.perfilNome; $('#ola').textContent = 'Olá, ' + u.nome.split(' ')[0];
   mostra('#vHub');
-  $('#tileContas').hidden = u.perfil === 'operacional';
-  if (u.perfil === 'operacional') return;
+  $('#tileContas').hidden = !(u.areas || []).includes('contas');
+  if (!(u.areas || []).includes('contas')) return;
   try { const b = await nmJson('GET', '/api/fin/bootstrap', null, { semRedirect: true }); $('#faixaDemo').hidden = !b.demo; } catch { /* sem dado */ }
   try { const r = await nmJson('GET', '/api/fin/resumo?empresa=todas', null, { semRedirect: true }); $('#resumoContas').textContent = `A receber ${brk(r.aReceber)} · A pagar ${brk(r.aPagar)}`; } catch { /* mantém o texto padrão */ }
 }

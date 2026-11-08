@@ -232,8 +232,9 @@ async function visitaDrawer(v) {
   ${v.feriado ? `<div class="box" style="border-color:var(--bad)"><b>Feriado na cidade do cliente:</b> ${h(v.feriado)}.${v.sugestao ? ` Sugestão: ${dt(v.sugestao)}.` : ''}${podeEditar && v.sugestao ? ` <button class="btn" id="vs">Remarcar para ${dm(v.sugestao)}</button>` : ''}</div>` : ''}
   <div class="f"><label>Cliente<b style="color:var(--ink)">${h(v.clienteNome)}</b></label><label>Cidade<b style="color:var(--ink)">${c ? h(c.cidade || 'não informada (usando São Paulo/SP)') + (c.uf ? '/' + h(c.uf) : '') : '—'}</b></label>
   ${vinculos(c)}${v.obs ? `<label class="w">Observação<span style="color:var(--ink)">${h(v.obs)}</span></label>` : ''}</div>
-  ${podeEditar ? `<div class="dr"><button class="btn d" id="vx">Excluir</button><button class="btn" id="vr">Marcar realizada</button><button class="btn p" id="ve">Editar</button></div>` : ''}`);
+  ${podeEditar ? `<div class="dr"><button class="btn d" id="vx">Excluir</button><button class="btn" id="vo" title="Cria um negócio no funil Comercial B2B a partir desta visita">Criar oportunidade</button><button class="btn" id="vr">Marcar realizada</button><button class="btn p" id="ve">Editar</button></div>` : ''}`);
   if (podeEditar) { $('#ve').onclick = () => visitaForm(v); $('#vx').onclick = guarda(async () => { if (!confirm('Excluir esta visita?')) return; await api('DELETE', '/visitas/' + id); gavFecha(); semana(); });
+    $('#vo').onclick = guarda(async () => { const t = prompt('Qual é a oportunidade? (ex.: rótulos fora do contrato de consultoria)'); if (!t) return; const d2 = prompt('Detalhes (opcional):') || ''; const r = await api('POST', `/visitas/${id}/oportunidade`, { titulo: t, detalhes: d2 }); gavFecha(); aviso(`Oportunidade criada no funil Comercial B2B (negócio #${r.dealId}).`); semana(); });
     $('#vr').onclick = guarda(async () => { await api('PUT', '/visitas/' + id, { status: 'realizada' }); gavFecha(); semana(); });
     if ($('#vs')) $('#vs').onclick = guarda(async () => { await api('POST', `/visitas/${id}/mover`, { data: v.sugestao }); gavFecha(); semana(); }); }
 }

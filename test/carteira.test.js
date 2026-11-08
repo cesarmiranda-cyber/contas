@@ -37,7 +37,7 @@ const bitrixFake = () => {
     if (m === 'im.notify.personal.add') { notif.push(p); return { result: 1 }; } return { result: true }; } };
 };
 test('carteira: lê o Bitrix24 (situação, contrato, MBP/POP, alvará, treinamento), ativos antes dos inativos, resumo e alertas', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ca-')), bitrix = bitrixFake(), api = createCarteiraApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), store: { log() {} }, dir });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ca-')), bitrix = bitrixFake(), api = createCarteiraApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), store: { log() {} }, dir, areasDe: u => u.areas || ['contratos'] });
   const call = async (m, p, b, user) => { const u = new URL('http://x/api/car' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
   const r = await api.sincronizar(); assert.equal(r.empresas, 4); assert.equal(api.dados().clientes.length, 3);   // a própria Nutri Mix fica de fora
   const bo = await call('GET', '/bootstrap'); assert.equal(bo.ativos, 2); assert.equal(bo.inativos, 1);
@@ -55,6 +55,11 @@ test('carteira: lê o Bitrix24 (situação, contrato, MBP/POP, alvará, treiname
   await call('PUT', '/clientes/1', { contrato: { inicio: '2025-01-01', fim: require('../lib/feriados').somaDias(R.todayBR(), 6) } });   // vence em 6 dias
   const env = await call('POST', '/avisar', { simular: false }); assert.equal(env.enviados.length, 1); assert.equal(bitrix.notif[0].USER_ID, '10'); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 0);   // uma vez por marco
   assert.equal((await call('GET', '/vencimentos?dias=30'))[0].nome, 'Restaurante A');
+  const semAcesso = { areas: ['clientes'] };   // sem a área "contratos": vê o estado, nunca valor, datas nem proposta
+  const rest = (await call('GET', '/clientes?aba=ativos', null, semAcesso)).itens.find(c => c.empresaId === '1'); assert.equal(rest.contrato.valor, null); assert.equal(rest.contrato.fim, ''); assert.equal(rest.contratoRestrito, true); assert.equal(rest.contratoSituacao.fim, undefined); assert.equal(rest.contratoSituacao.estado, 'vencendo');
+  assert.equal((await call('GET', '/clientes/1', null, semAcesso)).contrato.valor, null); assert.equal((await call('GET', '/clientes/1', null, { areas: ['contratos'] })).contrato.fim.length, 10);
+  await assert.rejects(call('GET', '/vencimentos?dias=30', null, semAcesso), /contratos/); await assert.rejects(call('PUT', '/clientes/1', { contrato: { fim: '2030-01-01' } }, semAcesso), /contratos/);
+  assert.ok(Array.isArray((await call('GET', '/resumo', null, semAcesso)).itens));
   const pub = await call('GET', '/email/publicos'); assert.equal(pub[0].destinatarios, 1); assert.equal(pub[0].semEmail, 1); assert.equal(pub[1].destinatarios, 1);   // Mercado C sem e-mail; Padaria B inativa
   await call('PUT', '/clientes/1', { optOut: true }); assert.equal((await call('GET', '/email/publicos'))[0].destinatarios, 0);
   const csv = await call('GET', '/email/exportar?publico=inativos'); assert.match(csv.__csv, /b@x\.com/);

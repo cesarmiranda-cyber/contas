@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrimix · Processos</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--bg:#f2f3f5;--surface:#fff;--ink:#16202e;--ink2:#46515f;--mut:#6b7684;--line:#d8dce2;--brand:#1c4a82;--brandbg:#e8eff8;--ok:#1b6b3a;--okbg:#e2f4e8;--warn:#8a5a00;--warnbg:#fff3d6;--bad:#a1281f;--badbg:#fde8e6}
+@media(prefers-color-scheme:dark){:root{--bg:#10151c;--surface:#171e27;--ink:#eaeef3;--ink2:#b5bfcb;--mut:#8996a5;--line:#2a3441;--brand:#7fb0ee;--brandbg:#1b2a3d;--ok:#6fd49a;--okbg:#143324;--warn:#f0c46a;--warnbg:#3a2f12;--bad:#ff9a90;--badbg:#401c19}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}[hidden]{display:none!important}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);height:56px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:5}
+.marca{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;color:var(--ink);text-decoration:none}.marca b{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;background:var(--brand);color:#fff}
+.sp{flex:1}.user{font-size:13px;color:var(--ink2)}
+nav{background:var(--surface);border-bottom:1px solid var(--line);padding:0 clamp(12px,3vw,32px);display:flex;gap:2px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 14px;font:inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+nav button[aria-selected=true]{color:var(--brand);border-color:var(--brand);font-weight:650}
+main{max-width:1240px;margin:0 auto;padding:20px clamp(12px,3vw,32px) 60px}
+h1{margin:0 0 2px;font-size:22px}.sub{margin:0 0 18px;color:var(--mut)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.k{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.k:hover{border-color:var(--brand)}.k small{display:block;color:var(--mut);font-size:12.5px}.k strong{font-size:26px;letter-spacing:-.02em}.k.bad strong{color:var(--bad)}.k.warn strong{color:var(--warn)}.k.ok strong{color:var(--ok)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}.box h2{margin:0 0 10px;font-size:15.5px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.bar i{display:block;height:10px;border-radius:5px;background:var(--brand);min-width:2px}.bar span:first-child{width:150px;color:var(--ink2)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}th{text-align:left;font-weight:600;color:var(--mut);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}tr.cl{cursor:pointer}tr.cl:hover td{background:var(--brandbg)}
+.tw{overflow-x:auto}
+.sel{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap;background:var(--brandbg);color:var(--brand)}
+.sel.ok{background:var(--okbg);color:var(--ok)}.sel.w{background:var(--warnbg);color:var(--warn)}.sel.b{background:var(--badbg);color:var(--bad)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:7px 10px;max-width:100%}
+.btn{font:inherit;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:7px;padding:7px 14px;cursor:pointer}.btn:hover{border-color:var(--brand)}
+.btn.p{background:var(--brand);border-color:var(--brand);color:#fff}[data-t=dark] .btn.p,.btn.p{color:#fff}.btn.d{color:var(--bad)}
+@media(prefers-color-scheme:dark){.btn.p{color:#0b1420}}
+.pag{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;color:var(--mut)}
+.col{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}.cx{flex:0 0 255px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+.cx h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between}.ct{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:pointer}.ct:hover{border-color:var(--brand)}.ct small{color:var(--mut);display:block}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:20px;width:min(720px,94vw);max-height:92vh}dialog::backdrop{background:#0008}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
+.msg{padding:9px 12px;border-radius:8px;margin:0 0 12px;background:var(--brandbg);color:var(--brand)}.msg.e{background:var(--badbg);color:var(--bad)}
+.fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin:6px 0 4px}
+.st{position:relative;background:var(--surface);border:1px solid var(--line);padding:12px 14px 14px;margin-right:-1px}
+.st:first-child{border-radius:10px 0 0 10px}.st:last-child{border-radius:0 10px 10px 0;margin-right:0}
+.st b.n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:12.5px;margin-right:6px}
+.st h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center}.st p{margin:4px 0;font-size:13px;color:var(--ink2)}.st .q{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-top:8px}
+.st.end{border-color:var(--ok)}.st.alt{border-style:dashed}
+.rq{border-collapse:collapse}.rq td{vertical-align:top}
+.gv-bk{position:fixed;inset:0;background:#0007;z-index:20}
+#gav{position:fixed;top:0;right:0;bottom:0;width:min(580px,100vw);background:var(--surface);color:var(--ink);border-left:1px solid var(--line);z-index:21;overflow:auto;padding:18px 20px 28px;box-shadow:-8px 0 30px #0004}
+#gav .top{display:flex;gap:8px;align-items:center;margin-bottom:10px}#gav .top .sp{flex:1}
+.lk{display:flex;justify-content:space-between;gap:8px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13.5px}.lk:hover{border-color:var(--brand);background:var(--brandbg)}
+.sug{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;z-index:6;max-height:320px;overflow:auto;box-shadow:0 8px 24px #0003;margin-top:2px}
+.sug .lk{border:0;border-radius:0;margin:0;border-bottom:1px solid var(--line)}
+.cl2{cursor:pointer}.bar.cl2:hover b,.bar.cl2:hover span:first-child{color:var(--brand)}
+.ct[draggable=true]{cursor:grab}.ct.arr{opacity:.4}.cx.alvo{outline:2px dashed var(--brand);background:var(--brandbg)}
+.col{min-height:60vh}.cx{min-height:120px}
+.lst{margin:0;padding-left:18px;color:var(--ink2)}.mut{color:var(--mut)}.dr{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.gr{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:980px}
+.gr th{background:var(--surface);border:1px solid var(--line);padding:8px;font-size:12.5px;text-align:center}
+.gr th small{display:block;color:var(--mut);font-weight:400}.gr th.fer{background:var(--warnbg);color:var(--warn)}
+.gr td{border:1px solid var(--line);vertical-align:top;padding:6px;background:var(--surface);height:96px}
+.gr td.nm{width:118px;background:var(--bg);font-weight:650;font-size:13.5px}.gr td.nm small{display:block;font-weight:400;color:var(--mut)}
+.gr td.alvo{outline:2px dashed var(--brand);outline-offset:-2px;background:var(--brandbg)}
+.vc{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:6px;background:var(--surface);color:var(--ink);padding:4px 6px;margin-bottom:4px;cursor:grab}
+.vc:hover{border-color:var(--brand)}.vc.realizada{border-left-color:var(--ok);opacity:.85}.vc.remarcada,.vc.cancelada,.vc.faltou{border-left-color:var(--mut);opacity:.6;text-decoration:line-through}
+.vc.fer{border-left-color:var(--bad);background:var(--badbg)}.vc small{color:var(--mut);display:block}.vc .w{color:var(--bad);font-weight:600}
+.ct.arr{opacity:.4}.cx.alvo{outline:2px dashed var(--brand);background:var(--brandbg)}.col{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start;min-height:60vh}.cx{flex:0 0 260px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;min-height:140px}.cx h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between}
+.ct{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:pointer}.ct[draggable=true]{cursor:grab}.ct:hover{border-color:var(--brand)}.ct.fer{border-left:4px solid var(--bad)}.ct small{color:var(--mut);display:block}.ct small.w{color:var(--bad);font-weight:600}.ct .acoes{display:flex;gap:6px;margin-top:8px}.ct .acoes .btn{padding:4px 10px;font-size:12.5px}
+.segb{display:inline-flex;gap:0}.segb .btn{border-radius:0;margin-left:-1px}.segb .btn:first-child{border-radius:7px 0 0 7px;margin-left:0}.segb .btn:last-child{border-radius:0 7px 7px 0}
+.mes{width:100%;table-layout:fixed;border-collapse:collapse;min-width:900px}.mes th{padding:6px;font-size:12.5px;border:1px solid var(--line);background:var(--surface)}
+.mes td{vertical-align:top;height:118px;border:1px solid var(--line);padding:4px;background:var(--surface)}.mes td.fora{background:var(--bg);opacity:.55}.mes td.fds{background:var(--bg)}.mes td.fer{background:var(--warnbg)}
+.mes .dn{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:2px}.mes .dn a{color:var(--ink);text-decoration:none}.mes .mais{font-size:11.5px;color:var(--brand)}.w2{display:block;color:var(--warn);font-size:11px}
+.vc.mini{font-size:11.5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;background:var(--brandbg);color:var(--brand)}
+.prz{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:650}.prz.ok{background:var(--okbg);color:var(--ok)}.prz.vencendo{background:var(--warnbg);color:var(--warn)}.prz.vencido{background:var(--badbg);color:var(--bad)}
+.ck{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--line)}.ck small{color:var(--mut)}.hist li{margin-bottom:4px}
+pre.cod{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;overflow:auto;max-height:260px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header><a class="marca" href="/"><b>N</b>Nutrimix</a><span class="mut">/ <a href="/processos.html" style="color:inherit">Processos</a> / <span id="pnome">…</span></span><span class="sp"></span><span class="user" id="user"></span></header>
+<main hidden id="app"><div id="msg"></div><div id="tela"></div></main>
+<div class="gv-bk" id="gbk" hidden></div><aside id="gav" hidden aria-label="Detalhes" role="dialog"></aside>
+<script src="/auth.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const api = (m, u, b) => nmJson(m, '/api/dem' + u, b);
+const dt = s => s ? s.split('-').reverse().join('/') : '—';
+let ME = {}, AREAS = {}, K = '', Q = null, FIL = { q: '', resp: '', atraso: false }, podeEditar = false, podeAdmin = false;
+const AREA_DE = { multas: 'multas', rotulagem: 'rotulagem', manuais: 'manuais', solicitacoes: 'solicitacoes', suplementos: 'suplementos' };
+function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
+const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
+function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#gbk').hidden = false; $('#gav').scrollTop = 0; $('#gav').querySelectorAll('[data-x]').forEach(b => b.onclick = gavFecha); }
+function gavFecha() { $('#gav').hidden = true; $('#gbk').hidden = true; $('#gav').innerHTML = ''; }
+$('#gbk').onclick = gavFecha; addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gav').hidden) gavFecha(); });
+const topo = () => '<div class="top"><span class="sp"></span><button class="btn" data-x aria-label="Fechar">✕</button></div>';
+const prz = n => !n.prazo ? '' : `<span class="prz ${n.situacao.estado}">${n.situacao.estado === 'vencido' ? 'vencido há ' + -n.situacao.dias + ' d' : n.situacao.dias === 0 ? 'hoje' : dt(n.prazo)}</span>`;
+
+const quadro = guarda(async () => {
+  const fl = await api('GET', '/funis'), meus = fl.filter(f => (ME.areas || []).includes(AREA_DE[f.chave]));
+  $('#pnome').textContent = (fl.find(f => f.chave === K) || {}).nome || 'Processos';
+  if (!meus.some(f => f.chave === K)) { $('#tela').innerHTML = '<h1>Sem acesso a esta área</h1><p class="sub">Peça ao administrador para liberar.</p>'; return; }
+  const f = fl.find(x => x.chave === K);
+  if (!f.cat) { $('#tela').innerHTML = `<h1>${h(f.nome)}</h1><div class="box"><h2>Funil ainda não criado</h2><p>Este processo usa um funil do Bitrix24 que ainda não existe. As etapas e o passo a passo dependem do material que a equipe técnica vai enviar.</p>${podeAdmin ? `<p>Quando o funil estiver criado, informe o número dele (aparece no endereço do Bitrix24):</p><div class="tools"><input id="scat" inputmode="numeric" placeholder="ex.: 18"><button class="btn p" id="ssv">Salvar</button></div>` : ''}</div>`;
+    if (podeAdmin) $('#ssv').onclick = guarda(async () => { await api('PUT', '/suplementos/config', { suplementosCat: $('#scat').value }); quadro(); }); return; }
+  Q = await api('GET', `/${K}/quadro`);
+  const ok = n => (!FIL.q || `${n.titulo} ${n.empresaNome}`.toLowerCase().includes(FIL.q.toLowerCase())) && (!FIL.resp || n.responsavel === FIL.resp) && (!FIL.atraso || n.situacao.estado === 'vencido');
+  const lista = Q.negocios.filter(ok), fim = e => ['S', 'F'].includes(e.semantica);
+  $('#tela').innerHTML = `<h1>${h(Q.nome)}</h1><p class="sub">${Q.negocios.length} negócio(s) no funil do Bitrix24. Arraste para mudar de etapa; clique para abrir checklist, aprovações, prazo e notas.${Q.dupla ? ` <b>Dupla checagem:</b> antes de “${h(Q.dupla)}” são exigidas aprovações internas de duas pessoas diferentes.` : ''}</p>
+  <div class="tools"><select id="fp">${meus.map(x => `<option value="${x.chave}" ${x.chave === K ? 'selected' : ''}>${h(x.nome)}</option>`).join('')}</select><input id="fq" type="search" placeholder="Buscar título ou cliente" value="${h(FIL.q)}" style="min-width:200px">
+  <select id="fr"><option value="">Todos os responsáveis</option>${Q.usuarios.map(u => `<option value="${h(u.id)}" ${u.id === FIL.resp ? 'selected' : ''}>${h(u.nome)}</option>`).join('')}</select><label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="fa" ${FIL.atraso ? 'checked' : ''}> só prazo vencido</label>
+  ${podeEditar ? '<button class="btn p" id="fn">Novo</button>' : ''}${K === 'solicitacoes' && podeAdmin ? '<button class="btn" id="fe">Entrada por e-mail</button>' : ''}</div>
+  <div class="col">${Q.etapas.map(e => { const l = lista.filter(n => n.etapa === e.id); return `<div class="cx" data-e="${h(e.id)}"><h3>${h(e.nome)} <span class="sel ${fim(e) ? 'ok' : ''}">${l.length}</span></h3>${l.map(n => `<div class="ct" data-id="${h(n.id)}" ${podeEditar ? 'draggable="true"' : ''}><b>${h(n.titulo)}</b><small>${h(n.empresaNome) || 'sem empresa'}${n.responsavelNome ? ' · ' + h(n.responsavelNome) : ''}</small>${n.bkn ? `<small>BKN ${h(n.bkn)}${n.origem === 'email' ? ' · por e-mail' : ''}</small>` : ''}<span>${prz(n)}${n.checklist.total ? ` <small style="display:inline">✓ ${n.checklist.feitos}/${n.checklist.total}</small>` : ''}${n.aprovacoes ? ` <small style="display:inline">👍 ${n.aprovacoes}</small>` : ''}</span></div>`).join('') || '<p class="mut" style="font-size:13px">Vazio</p>'}</div>`; }).join('')}</div>`;
+  $('#fp').onchange = e => { K = e.target.value; location.hash = K; FIL = { q: '', resp: '', atraso: false }; quadro(); };
+  let t; $('#fq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { FIL.q = e.target.value; await quadro(); const i = $('#fq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 350); };
+  $('#fr').onchange = e => { FIL.resp = e.target.value; quadro(); }; $('#fa').onchange = e => { FIL.atraso = e.target.checked; quadro(); };
+  $('#tela').querySelectorAll('.ct').forEach(c => { c.onclick = () => abre(c.dataset.id);
+    c.ondragstart = e => { e.dataTransfer.setData('text/plain', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => c.classList.add('arr'), 0); }; c.ondragend = () => { c.classList.remove('arr'); $('#tela').querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); }; });
+  if (podeEditar) { $('#tela').querySelectorAll('.cx').forEach(x => { x.ondragover = e => { e.preventDefault(); x.classList.add('alvo'); }; x.ondragleave = ev => { if (!x.contains(ev.relatedTarget)) x.classList.remove('alvo'); };
+      x.ondrop = guarda(async e => { e.preventDefault(); x.classList.remove('alvo'); const id = e.dataTransfer.getData('text/plain'), n = Q.negocios.find(y => y.id === id); if (!n || n.etapa === x.dataset.e) return; await api('POST', `/${K}/negocios/${id}/mover`, { etapa: x.dataset.e }); quadro(); }); });
+    $('#fn').onclick = () => novo(); }
+  if ($('#fe')) $('#fe').onclick = entradaEmail;
+});
+const abre = guarda(async id => {
+  const n = await api('GET', `/${K}/negocios/${id}`), ed = podeEditar, nomeU = u => (Q.usuarios.find(x => x.id === u) || {}).nome || '';
+  const aprov = (n.aprovacoes || []).slice().reverse();
+  gav(`${topo()}<h2 style="margin:0">${h(n.titulo)}</h2><p class="mut" style="margin:0 0 12px">Etapa: <b>${h(n.etapaNome)}</b> · <a href="${h(n.url)}" target="_blank" rel="noopener">abrir no Bitrix24</a>${n.empresaId ? ` · <a href="https://${h(Q.host)}/crm/company/details/${h(n.empresaId)}/" target="_blank" rel="noopener">empresa</a>` : ''}${n.bkn ? ` · BKN ${h(n.bkn)}` : ''}</p>
+  <form id="fd" class="box"><div class="f"><label class="w">Título<input name="titulo" value="${h(n.titulo)}" ${ed ? '' : 'disabled'}></label><label>${h(Q.prazoRotulo)}<input type="date" name="prazo" value="${h(n.prazo)}" ${ed ? '' : 'disabled'}></label><label>Responsável<select name="responsavel" ${ed ? '' : 'disabled'}><option value="">—</option>${Q.usuarios.map(u => `<option value="${h(u.id)}" ${u.id === n.responsavel ? 'selected' : ''}>${h(u.nome)}</option>`).join('')}</select></label></div>${ed ? '<div class="dr"><button class="btn p">Salvar</button></div>' : ''}</form>
+  <div class="box"><h2>Checklist (${n.checklist.filter(c => c.ok).length}/${n.checklist.length})</h2>${n.checklist.map((c, i) => `<div class="ck"><input type="checkbox" data-ck="${i}" ${c.ok ? 'checked' : ''} ${ed ? '' : 'disabled'}><span style="flex:1">${h(c.t)}${c.ok ? `<small style="display:block">${h(c.por)} · ${new Date(c.em).toLocaleString('pt-BR')}</small>` : ''}</span>${ed ? `<button class="btn" data-rm="${i}" aria-label="Remover">✕</button>` : ''}</div>`).join('')}${ed ? '<div class="tools" style="margin-top:8px"><input id="cki" placeholder="Novo item" style="flex:1"><button class="btn" id="cka">Adicionar</button></div>' : ''}</div>
+  <div class="box"><h2>Aprovações${n.dupla ? ` — dupla checagem antes de “${h(n.dupla)}”: <span class="sel ${n.aprovadoresValidos >= 2 ? 'ok' : 'w'}">${n.aprovadoresValidos} de 2</span>` : ''}</h2>${ed ? '<div class="tools"><input id="apn" placeholder="Observação (obrigatória ao reprovar)" style="flex:1"><button class="btn p" id="apa">Aprovar</button><button class="btn d" id="apr">Reprovar</button></div>' : ''}
+  <ul class="lst hist">${aprov.map(a => `<li><b>${a.decisao === 'aprovado' ? '✅ Aprovado' : '❌ Reprovado'}</b> por ${h(a.nome)} · ${new Date(a.em).toLocaleString('pt-BR')}${a.nota ? ' — ' + h(a.nota) : ''}</li>`).join('') || '<li class="mut">Nenhuma aprovação registrada.</li>'}</ul></div>
+  <div class="box"><h2>Links e pastas</h2><ul class="lst">${n.links.map((l, i) => `<li><a href="${h(l.url)}" target="_blank" rel="noopener">${h(l.nome)}</a>${ed ? ` <button class="btn" data-rl="${i}">✕</button>` : ''}</li>`).join('') || '<li class="mut">Nenhum.</li>'}</ul>${ed ? '<div class="tools"><input id="ln" placeholder="Nome" style="width:140px"><input id="lu" placeholder="https://… (pasta do Drive, documento)" style="flex:1"><button class="btn" id="la">Adicionar</button></div>' : ''}</div>
+  <div class="box"><h2>Histórico e notas</h2>${ed ? '<div class="tools"><input id="nt" placeholder="Nova nota" style="flex:1"><button class="btn" id="na">Adicionar</button></div>' : ''}<ul class="lst hist">${n.notas.slice().reverse().map(x => `<li>${new Date(x.em).toLocaleString('pt-BR')} · ${h(x.por)} — ${h(x.t)}</li>`).join('') || '<li class="mut">Sem registros.</li>'}</ul>${n.comentarios ? `<h2 style="margin-top:12px">Texto original</h2><pre class="cod">${h(n.comentarios)}</pre>` : ''}</div>`);
+  const rec = async () => { await abre(id); quadro(); }, run = f => guarda(async (...a) => { await f(...a); await rec(); });
+  if (ed) { $('#fd').onsubmit = run(async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); await api('PUT', `/${K}/negocios/${id}`, f); });
+    $('#gav').querySelectorAll('[data-ck]').forEach(c => c.onchange = run(() => api('PUT', `/${K}/negocios/${id}/checklist/${c.dataset.ck}`, { ok: c.checked })));
+    $('#gav').querySelectorAll('[data-rm]').forEach(b => b.onclick = run(() => api('DELETE', `/${K}/negocios/${id}/checklist/${b.dataset.rm}`)));
+    $('#cka').onclick = run(() => api('POST', `/${K}/negocios/${id}/checklist`, { texto: $('#cki').value }));
+    $('#apa').onclick = run(() => api('POST', `/${K}/negocios/${id}/aprovacao`, { decisao: 'aprovado', nota: $('#apn').value }));
+    $('#apr').onclick = run(async () => { if (!$('#apn').value.trim()) throw new Error('Explique o motivo da reprovação.'); await api('POST', `/${K}/negocios/${id}/aprovacao`, { decisao: 'reprovado', nota: $('#apn').value }); });
+    $('#la').onclick = run(() => api('POST', `/${K}/negocios/${id}/link`, { nome: $('#ln').value, url: $('#lu').value })); $('#gav').querySelectorAll('[data-rl]').forEach(b => b.onclick = run(() => api('DELETE', `/${K}/negocios/${id}/link/${b.dataset.rl}`)));
+    $('#na').onclick = run(() => api('POST', `/${K}/negocios/${id}/nota`, { texto: $('#nt').value })); }
+});
+function novo() {
+  gav(`${topo()}<h2 style="margin:0 0 12px">Novo — ${h(Q.nome)}</h2><form id="fnv"><div id="fe"></div><div class="f"><label class="w">Título *<input name="titulo" required></label><label>${h(Q.prazoRotulo)}<input type="date" name="prazo"></label><label>Responsável<select name="responsavel"><option value="">—</option>${Q.usuarios.map(u => `<option value="${h(u.id)}">${h(u.nome)}</option>`).join('')}</select></label>
+  <label class="w">Empresa (cadastro do Bitrix24)<input id="eq" type="search" autocomplete="off" placeholder="Buscar por nome ou CNPJ"><input type="hidden" name="empresaId"></label><div class="sug" id="er" hidden style="position:static"></div></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Criar no funil</button></div></form>`);
+  let t; $('#eq').oninput = e => { clearTimeout(t); const v = e.target.value.trim(); $('#fnv [name=empresaId]').value = ''; if (v.length < 2) { $('#er').hidden = true; return; }
+    t = setTimeout(guarda(async () => { const l = await api('GET', '/empresas?q=' + encodeURIComponent(v)).catch(() => []); $('#er').hidden = false; $('#er').innerHTML = l.map(x => `<div class="lk" data-e="${h(x.id)}" data-n="${h(x.nome)}"><span><b>${h(x.nome)}</b><br><small class="mut">${h(x.cidade)}${x.cnpj ? ' · ' + h(x.cnpj) : ''}</small></span></div>`).join('') || '<div class="lk mut">Nada encontrado.</div>'; $('#er').querySelectorAll('[data-e]').forEach(y => y.onclick = () => { $('#fnv [name=empresaId]').value = y.dataset.e; $('#eq').value = y.dataset.n; $('#er').hidden = true; }); }), 300); };
+  $('#fnv').onsubmit = async e => { e.preventDefault(); try { const n = await api('POST', `/${K}/negocios`, Object.fromEntries(new FormData(e.target))); gavFecha(); await quadro(); abre(n.id); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+}
+const SCRIPT = (url) => `// Google Apps Script — cole em script.google.com, na conta de e-mail que recebe os pedidos.
+// 1) Crie o rótulo "Nutrimix" no Gmail e um filtro que aplique esse rótulo aos e-mails de solicitações.
+// 2) Em Propriedades do script, crie TOKEN com o código gerado no sistema. 3) Crie um acionador de tempo (a cada 5 minutos) para enviarSolicitacoes.
+function enviarSolicitacoes() {
+  const token = PropertiesService.getScriptProperties().getProperty('TOKEN');
+  const rotulo = GmailApp.getUserLabelByName('Nutrimix'), enviado = GmailApp.getUserLabelByName('Nutrimix-enviado') || GmailApp.createLabel('Nutrimix-enviado');
+  rotulo.getThreads(0, 20).forEach(t => {
+    if (t.getLabels().some(l => l.getName() === 'Nutrimix-enviado')) return;
+    t.getMessages().forEach(m => UrlFetchApp.fetch('${url}/entrada/email', { method: 'post', contentType: 'application/json', headers: { 'X-Entrada-Token': token },
+      payload: JSON.stringify({ de: m.getFrom(), assunto: m.getSubject(), texto: m.getPlainBody(), messageId: m.getId(), data: m.getDate() }) }));
+    t.addLabel(enviado);
+  });
+}`;
+const entradaEmail = guarda(async () => {
+  const s = await api('GET', '/solicitacoes/entrada/estado');
+  gav(`${topo()}<h2 style="margin:0 0 6px">Entrada de solicitações por e-mail</h2><p class="mut" style="margin:0 0 12px">${s.ativa ? `Ativa. ${s.recebidos} e-mail(s) já viraram solicitação.` : 'Ainda não ativada.'} Cada e-mail vira um negócio no funil de Solicitações; o código BKN no assunto ou no texto liga a solicitação à unidade e à empresa.</p>
+  <div class="box"><h2>Como ligar (sem compartilhar senha de e-mail)</h2><p>Um pequeno script na própria caixa de e-mail envia cada mensagem ao sistema usando um código secreto. Gerar um novo código desativa o anterior.</p><button class="btn p" id="gt">${s.ativa ? 'Gerar novo código' : 'Ativar e gerar código'}</button><div id="tk"></div></div>`);
+  $('#gt').onclick = guarda(async () => { if (s.ativa && !confirm('Gerar um novo código desativa o atual. Continuar?')) return; const r = await api('POST', '/solicitacoes/entrada/token', {});
+    $('#tk').innerHTML = `<p class="msg">Código (aparece só agora — guarde-o): <b style="user-select:all;word-break:break-all">${h(r.token)}</b></p><p>Script para colar no Google Apps Script:</p><pre class="cod">${h(SCRIPT(location.origin))}</pre>`; });
+});
+
+(async () => {
+  if (!NM.token) return NM.paraLogin();
+  try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
+    ME = j.usuario; AREAS = j.areas || {}; podeEditar = ME.perfil !== 'consulta'; podeAdmin = ME.perfil === 'admin'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
+    K = location.hash.slice(1) || 'multas'; quadro();
+  } catch { NM.paraLogin(); }
+})();
+</script>
+</body>
+</html>
