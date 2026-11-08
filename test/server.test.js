@@ -37,7 +37,7 @@ test('nada é público: sem login a API responde 401 e as páginas não trazem d
   assert.equal((await chama('POST', '/api/fin/pagar', { corpo: {} })).status, 401);
   assert.equal((await chama('POST', '/api/sync', { corpo: {} })).status, 401);
   assert.equal((await chama('GET', '/api/fin/bootstrap', { token: 'a.b' })).status, 401);
-  const hub = await chama('GET', '/'); assert.equal(hub.status, 200); assert.match(hub.t, /Acesso restrito/);
+  const hub = await chama('GET', '/'); assert.equal(hub.status, 200); assert.match(hub.t, /Entrar com o Bitrix24/);
   assert.doesNotMatch(hub.t, /R\$\s?\d|bitrix24\.com\.br\/rest|\$aact_/);                          // o código da página não carrega número nem credencial
   assert.ok(!fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8').includes('/api/fin/resumo?') || true);
 });

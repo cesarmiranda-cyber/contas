@@ -48,17 +48,25 @@ footer{padding:16px;text-align:center;color:var(--mut);font-size:12.5px}
 <body>
 <!-- Antes do login esta página não mostra nem consulta dado algum. -->
 <section id="vLogin" class="entrada" hidden>
-  <form class="cartao" id="fLogin" autocomplete="on" novalidate>
+  <form class="cartao" id="fBx" novalidate>
     <div class="marca"><b>N</b>Nutrimix</div>
-    <h1>Acesso restrito</h1>
-    <p class="sub">Entre com a sua conta do Bitrix24. O acesso é liberado pelo administrador.</p>
+    <h1>Entrar com o Bitrix24</h1>
+    <p class="sub">Use a sua conta do Bitrix24. Enviamos um código para as suas notificações no Bitrix24, que vale por 10 minutos. O acesso é liberado pelo administrador.</p>
     <a class="btn" id="bBx" href="/auth/bitrix/start" hidden style="display:block;text-align:center;text-decoration:none;margin-bottom:6px">Entrar com Bitrix24</a>
-    <p class="nota" id="ou" hidden style="margin:10px 0">ou use o usuário e senha do administrador</p>
+    <p class="nota" id="ou" hidden style="margin:10px 0">ou receba um código</p>
+    <p class="erro" id="eBx" role="alert" hidden></p>
+    <div id="passoEmail"><label>E-mail da sua conta do Bitrix24<input id="bxEmail" type="email" name="email" autocomplete="email" autocapitalize="off" spellcheck="false" required></label><button class="btn" id="bxEnviar">Enviar código</button></div>
+    <div id="passoCodigo" hidden><p class="nota" id="bxInfo" style="text-align:left"></p><label>Código de 6 dígitos<input id="bxCod" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000"></label><button class="btn" id="bxEntrar">Entrar</button><p class="nota"><button type="button" class="link" id="bxVoltar">Usar outro e-mail</button></p></div>
+    <p class="nota">Abrindo o app pelo menu do Bitrix24, a entrada é automática. Sem acesso? Fale com o administrador do sistema.</p>
+  </form>
+  <form class="cartao" id="fLogin" autocomplete="on" novalidate hidden>
+    <div class="marca"><b>N</b>Nutrimix</div>
+    <h1>Acesso do administrador</h1>
+    <p class="sub">Entrada de emergência com usuário e senha, para quando o Bitrix24 estiver fora do ar.</p>
     <p class="erro" id="eLogin" role="alert" hidden></p>
     <label>Usuário<input id="usuario" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
     <label>Senha<span class="senha"><input id="senha" name="password" type="password" autocomplete="current-password" required><button type="button" class="link" id="ver" aria-label="Mostrar senha">Mostrar</button></span></label>
     <button class="btn" id="bLogin">Entrar</button>
-    <p class="nota">Sem acesso ou esqueceu a senha? Fale com o administrador do sistema.</p>
   </form>
 </section>
 
@@ -108,11 +116,13 @@ const $ = s => document.querySelector(s);
 const brk = v => { v = Number(v || 0); const a = Math.abs(v); return 'R$ ' + (a >= 1e6 ? (v / 1e6).toFixed(1).replace('.', ',') + ' mi' : a >= 1e4 ? Math.round(v / 1e3) + ' mil' : v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); };
 const volta = () => { const v = new URLSearchParams(location.search).get('voltar'); return v && /^\/(?!\/)[\w\-./?=&%#:]*$/.test(v) ? v : ''; };   // só caminhos do próprio site
 (async () => {
-  const msg = new URLSearchParams(location.search).get('bxerro'); if (msg) { $('#eLogin').textContent = msg; $('#eLogin').hidden = false; history.replaceState(null, '', '/'); }
+  const q = new URLSearchParams(location.search), msg = q.get('bxerro'); if (msg) { $('#eBx').textContent = msg; $('#eBx').hidden = false; history.replaceState(null, '', '/'); }
+  if (q.get('acesso') === 'senha') { $('#fBx').hidden = true; $('#fLogin').hidden = false; }   // entrada de emergência, sem link visível
   try { const o = await (await fetch('/auth/opcoes')).json(); if (o.bitrix) { $('#bBx').hidden = false; $('#bBx').style.display = 'block'; $('#ou').hidden = false; } } catch { /* só usuário e senha */ }
 })();
 const mostra = id => { for (const s of ['#vLogin', '#vSenha', '#vHub']) $(s).hidden = s !== id; };
-const sair = async () => { try { await nmFetch('/api/auth/logout', { method: 'POST', body: {} }); } catch { /* sai mesmo assim */ } NM.token = ''; mostra('#vLogin'); $('#senha').value = ''; $('#usuario').focus(); };
+const focaLogin = () => ($('#fBx').hidden ? $('#usuario') : $('#bxEmail')).focus();
+const sair = async () => { try { await nmFetch('/api/auth/logout', { method: 'POST', body: {} }); } catch { /* sai mesmo assim */ } NM.token = ''; mostra('#vLogin'); $('#senha').value = ''; $('#passoCodigo').hidden = true; $('#passoEmail').hidden = false; $('#bxCod').value = ''; focaLogin(); };
 $('#ver').onclick = () => { const i = $('#senha'), v = i.type === 'password'; i.type = v ? 'text' : 'password'; $('#ver').textContent = v ? 'Ocultar' : 'Mostrar'; };
 $('#sair1').onclick = $('#sair2').onclick = sair;
 $('#trocar').onclick = () => { $('#sAtual').value = $('#sNova').value = $('#sNova2').value = ''; $('#eSenha').hidden = true; mostra('#vSenha'); $('#sAtual').focus(); };
@@ -122,11 +132,24 @@ async function entrou(u) {
   const v = volta(); if (v) { location.replace(v); return; }
   $('#uNome').textContent = u.nome; $('#uPerfil').textContent = u.perfilNome; $('#ola').textContent = 'Olá, ' + u.nome.split(' ')[0];
   mostra('#vHub');
+  $('#trocar').hidden = !!u.porBitrix;   // quem entra pelo Bitrix24 não tem senha própria
   $('#tileContas').hidden = !(u.areas || []).includes('contas');
   if (!(u.areas || []).includes('contas')) return;
   try { const b = await nmJson('GET', '/api/fin/bootstrap', null, { semRedirect: true }); $('#faixaDemo').hidden = !b.demo; } catch { /* sem dado */ }
   try { const r = await nmJson('GET', '/api/fin/resumo?empresa=todas', null, { semRedirect: true }); $('#resumoContas').textContent = `A receber ${brk(r.aReceber)} · A pagar ${brk(r.aPagar)}`; } catch { /* mantém o texto padrão */ }
 }
+const bxErro = t => { $('#eBx').textContent = t; $('#eBx').hidden = !t; };
+$('#fBx').onsubmit = async e => {
+  e.preventDefault(); bxErro('');
+  const codigoVisivel = !$('#passoCodigo').hidden, btn = codigoVisivel ? $('#bxEntrar') : $('#bxEnviar'); btn.disabled = true;
+  try {
+    if (!codigoVisivel) { const r = await nmFetch('/auth/bitrix/codigo', { method: 'POST', body: { email: $('#bxEmail').value } }), j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Não foi possível enviar o código.');
+      $('#passoEmail').hidden = true; $('#passoCodigo').hidden = false; $('#bxInfo').textContent = j.mensagem || ''; $('#bxCod').focus(); }
+    else { const r = await nmFetch('/auth/bitrix/codigo/confirmar', { method: 'POST', body: { email: $('#bxEmail').value, codigo: $('#bxCod').value } }), j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Código inválido.');
+      NM.token = j.token; $('#bxCod').value = ''; await entrou(j.usuario); }
+  } catch (x) { bxErro(x.message); } finally { btn.disabled = false; }
+};
+$('#bxVoltar').onclick = () => { $('#passoCodigo').hidden = true; $('#passoEmail').hidden = false; $('#bxCod').value = ''; bxErro(''); $('#bxEmail').focus(); };
 $('#fLogin').onsubmit = async e => {
   e.preventDefault(); const er = $('#eLogin'); er.hidden = true; $('#bLogin').disabled = true;
   try { const r = await nmFetch('/api/auth/login', { method: 'POST', body: { usuario: $('#usuario').value, senha: $('#senha').value } }), j = await r.json().catch(() => ({}));
@@ -144,9 +167,9 @@ $('#fSenha').onsubmit = async e => {
   } catch (x) { er.textContent = x.message; er.hidden = false; } finally { $('#bSenha').disabled = false; }
 };
 (async () => {
-  if (!NM.token) { mostra('#vLogin'); $('#usuario').focus(); return; }
+  if (!NM.token) { mostra('#vLogin'); focaLogin(); return; }
   try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; await entrou(j.usuario); }
-  catch { NM.token = ''; mostra('#vLogin'); $('#usuario').focus(); }
+  catch { NM.token = ''; mostra('#vLogin'); focaLogin(); }
 })();
 </script>
 </body>

@@ -157,6 +157,16 @@ const server = http.createServer(async (req, res) => {
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
       return send(res, 200, await demApi.entradaEmail(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
     }
+    if (req.method === 'POST' && u.pathname === '/auth/bitrix/codigo') {
+      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
+      const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?', b = await readBody(req, 5000);
+      return send(res, 200, await bxLogin.pedirCodigo(b.email, ip));
+    }
+    if (req.method === 'POST' && u.pathname === '/auth/bitrix/codigo/confirmar') {
+      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
+      const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?', b = await readBody(req, 5000);
+      return send(res, 200, await bxLogin.confirmarCodigo(b.email, b.codigo, ip));
+    }
     if (req.method === 'GET' && u.pathname === '/auth/opcoes') return send(res, 200, { bitrix: bxLogin.oauthPronto() });
     if (req.method === 'GET' && u.pathname === '/auth/bitrix/start') { try { res.writeHead(302, { Location: bxLogin.inicio(`${origem}/auth/bitrix/callback`), 'Cache-Control': 'no-store' }); return res.end(); } catch (e) { return volta(e.message); } }
     if (req.method === 'GET' && u.pathname === '/auth/bitrix/callback') { try { return paraApp(await bxLogin.retorno({ code: u.searchParams.get('code'), state: u.searchParams.get('state') }), '/'); } catch (e) { return volta(e.message); } }
