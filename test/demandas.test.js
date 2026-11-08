@@ -39,7 +39,7 @@ test('processos por funil: quadro, prazo, checklist, dupla checagem, alertas e e
   assert.equal(bitrix.deals[0].CLOSEDATE, F.somaDias(R.todayBR(), 2));
   await call('POST', '/multas/negocios/M1/mover', { etapa: 'm6' }); assert.equal(bitrix.deals[0].STAGE_ID, 'C12:W'); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 0);   // resolvida não alerta
   // rotulagem: passo a passo com regras
-  const r = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Granola', empresaId: '5' }); assert.equal(r.checklist.length, 8); assert.equal(r.etapa, 'r1'); assert.equal(r.documentos.length, 6);
+  const r = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Granola', empresaId: '5' }); assert.equal(r.checklist.length, 10); assert.equal(r.etapa, 'r1'); assert.equal(r.documentos.length, 7);
   await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r4' }), /Enquadramento regulatório/);   // precisa definir o enquadramento antes do relatório
   await assert.rejects(call('PUT', `/rotulagem/negocios/${r.id}/campos`, { enquadramento: 'qualquer coisa' }), /Valor inválido/);
   const camp = (await call('GET', `/rotulagem/negocios/${r.id}`)).campos.find(c => c.k === 'enquadramento'); await call('PUT', `/rotulagem/negocios/${r.id}/campos`, { enquadramento: camp.opcoes[1] });
