@@ -6,6 +6,7 @@ const { createBxEmpresas } = require('../lib/bxEmpresas');
 const { createBxFunil } = require('../lib/bxFunil');
 const { createAuth, hashSenha } = require('../lib/auth');
 const { createFinStore } = require('../lib/finStore');
+const IA = require('../lib/conferenciaIa');
 const R = require('../lib/rules');
 const F = require('../lib/feriados');
 
@@ -13,6 +14,7 @@ const fake = () => {
   const deals = [], notif = [];
   const est = { 8: [['C8:NEW', 'Aviso recebido', ''], ['C8:A', 'Plano de ação', ''], ['C8:W', 'Resolvido', 'S']], 12: [['C12:A', 'Cálculo nutricional', ''], ['C12:B', 'Layout do rótulo', ''], ['C12:C', 'Aprovação do cliente', ''], ['C12:W', 'Entregue', 'S']], 17: [['C17:N', 'Solicitação recebida', ''], ['C17:D', 'Entregue / Concluído', 'S']] };
   return { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', deals, notif, async call(m, p) {
+    if (m === 'crm.deal.fields') return { result: { UF_PROD: { formLabel: 'Nome do Produto' }, UF_ING: { formLabel: 'Ingredientes e quantidades (g)' }, UF_GLU: { formLabel: 'Contaminação cruzada com Glúten?', items: [{ ID: '1', VALUE: 'Sim' }, { ID: '2', VALUE: 'Não' }] }, UF_SAC: { formLabel: 'SAC' } } };
     if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' } } };
     if (m === 'crm.company.list') return { result: [{ ID: '5', TITLE: 'BK Anhaia' }] };
     if (m === 'user.get') return { result: [{ ID: '10', NAME: 'Suporte', LAST_NAME: 'X' }, { ID: '11', NAME: 'Ana', LAST_NAME: 'Y' }] };
@@ -90,4 +92,20 @@ test('serviço pontual: cobrança 50/50 em Contas a receber trava o início e a 
   const q = await call('GET', '/rotulagem/quadro'); assert.equal(q.negocios[0].cobranca.entradaPaga, true); assert.equal(q.negocios[0].cobranca.finalPaga, false);
   const auth = createAuth({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), env: { ADMIN_USER: 'a', ADMIN_HASH: await hashSenha('Inicial12345') } });
   assert.equal(auth.permite('operacional', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), false); assert.equal(auth.permite('financeiro', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), false); assert.equal(auth.permite('admin', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), true); assert.equal(auth.permite('financeiro', 'POST', '/api/dem/rotulagem/negocios/9/cobranca'), true);
+});
+
+test('conferência por IA (a IA do cliente): pedido com os dados do formulário, leitura da resposta e histórico', async () => {
+  const resp = IA.interpretar('1 | OK | nome confere\n2) ERRO - ordem dos ingredientes invertida (RDC 727)\nitem 3: ATENÇÃO falta ver o rótulo\n99 | ERRO | fora da lista\nlinha solta sem formato\nRESUMO: Há um erro na lista de ingredientes. Revisar o restante.');
+  assert.deepEqual(resp.itens.map(i => [i.n, i.status]), [[1, 'ok'], [2, 'erro'], [3, 'atencao']]); assert.match(resp.itens[1].nota, /ordem dos ingredientes/); assert.match(resp.resumo, /erro na lista/);
+  assert.equal(IA.situacao(resp.itens), 'erros'); assert.equal(IA.situacao([{ status: 'ok' }]), 'ok'); assert.equal(IA.situacao([{ status: 'ok' }, { status: 'atencao' }]), 'atencao'); assert.equal(IA.situacao([]), 'sem');
+  const ped = IA.montarPedido({ titulo: 'Rótulo Granola', empresa: 'Cliente X', dados: [{ rotulo: 'Ingredientes', valor: 'Aveia 40 g' }] }); assert.match(ped, /Rótulo Granola/); assert.match(ped, /- Ingredientes: Aveia 40 g/); assert.match(ped, new RegExp(`${IA.REGRAS.length}\\. `)); assert.match(ped, /não substitui a revisão humana/);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  const n = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Molho', empresaId: '5' }); Object.assign(bitrix.deals[0], { UF_PROD: 'Molho da casa', UF_ING: 'Tomate 800 g, sal 10 g', UF_GLU: '2', UF_SAC: '0800 123' });
+  const pe = await call('GET', `/rotulagem/negocios/${n.id}/ia/pedido`); assert.equal(pe.dados.length, 4); assert.match(pe.pedido, /Contaminação cruzada com glúten\?: Não/); assert.match(pe.pedido, /Cliente: BK Anhaia/);
+  await assert.rejects(call('GET', '/multas/negocios/1/ia/pedido'), /não tem conferência por IA/); await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/ia/resultado`, { resposta: '' }), /Cole a resposta/);
+  const r = await call('POST', `/rotulagem/negocios/${n.id}/ia/resultado`, { resposta: '2 | ERRO | ordem', itens: [{ n: 2, status: 'erro', nota: 'ordem' }, { n: 1, status: 'ok' }, { n: 77, status: 'erro' }, { n: 3, status: 'qualquer' }] }, { nome: 'Ana', id: 'u1' });
+  assert.equal(r.ia.length, 1); assert.equal(r.ia[0].situacao, 'erros'); assert.equal(r.ia[0].itens.length, 3); assert.equal(r.ia[0].itens.find(i => i.n === 3).status, 'atencao'); assert.equal(r.regrasIa.length, IA.REGRAS.length); assert.match(r.notas[0].t, /não substitui a dupla checagem/);
+  assert.equal(r.aprovadoresValidos, 0);   // a IA nunca conta como aprovação
+  const sol = await call('POST', '/solicitacoes/negocios', { titulo: 'x pedido' }); assert.equal(sol.comIa, false);
 });
