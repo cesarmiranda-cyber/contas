@@ -139,3 +139,9 @@ Multas (funil 8), Rotulagem (12), Manuais e documentação (4), Solicitações (
 - **Entrada de solicitações por e-mail**: `POST /entrada/email` com cabeçalho `X-Entrada-Token` (token gerado na tela, guardado só como hash). Um script (Google Apps Script, fornecido na tela) envia cada e-mail sem que a senha da caixa fique no sistema. O BKN no assunto/texto liga a solicitação à unidade e à empresa; não duplica por `messageId`.
 - **Áreas por pessoa** (`areas` do usuário): contas, bk, cronograma, clientes, contratos, marketing, multas, rotulagem, manuais, solicitações, suplementos. Quem não tem a área “contratos” não vê valor, vigência nem proposta na Carteira.
 - **Oportunidade comercial** a partir de uma visita: cria negócio no funil Comercial B2B (categoria 0) com empresa, contato e consultora.
+
+## Integrações bancárias e de assinatura (Configurações → Integrações; `/api/settings/integracoes/*`, só administrador)
+
+- **Banco Inter (`lib/bancoInter.js`)**: OAuth2 client_credentials + certificado de cliente (mTLS), credenciais em `secrets.json`. Valida o par .crt/.key e mostra a validade (o Inter emite por 1 ano). Hoje: extrato e saldo; “Buscar no Banco Inter” na Conciliação traz o extrato do período para a conta escolhida, sem duplicar. Endereços e escopos seguem a documentação pública do Inter, **ainda não testados contra o banco real**: o “Testar conexão” devolve a resposta do banco para ajustar.
+- **Itaú**: extrato por arquivo OFX ou **camt.053** (ISO 20022) pelo mesmo importador da Conciliação. API do Itaú depende de credenciamento do CNPJ; não implementada.
+- **Autentique (`lib/autentique.js`)**: API GraphQL v2 (Bearer). Na ficha do cliente (área “contratos”) envia o PDF para assinatura, acompanha de hora em hora e, quando todos assinam, comenta no negócio e leva o contrato à etapa “Contrato assinado”. Também **não testada contra a API real**.

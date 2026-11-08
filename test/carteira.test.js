@@ -67,3 +67,18 @@ test('carteira: lê o Bitrix24 (situação, contrato, MBP/POP, alvará, treiname
   await assert.rejects(call('POST', '/email/campanhas', { nome: 'x', publico: 'todos', assunto: 'a', corpo: 'texto aqui' }), /público|nome/i);
   assert.equal((await call('POST', `/email/campanhas/${camp.id}/enviada`, {})).status, 'enviada'); await assert.rejects(call('PUT', `/email/campanhas/${camp.id}`, { assunto: 'outro' }), /já enviada/i);
 });
+
+test('carteira: contrato enviado para assinatura, andamento atualizado e negócio levado a "Contrato assinado"', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ca-')), bitrix = bitrixFake(), moved = [], estado = { v: 'pendente' }, enviados = [];
+  const autentique = { pronto: () => true, async enviar(o) { enviados.push(o); return { id: 'doc-9', links: [{ email: o.signatarios[0].email, link: 'https://aut.ink/x' }] }; }, async consultar() { return estado.v === 'assinado' ? { estado: 'assinado', assinados: 1, total: 1 } : { estado: 'pendente', assinados: 0, total: 1 }; } };
+  const funil = createBxFunil({ bitrix }); funil.mover = async (id, st) => moved.push([id, st]); funil.achaEtapa = async () => ({ id: 'C15:S' });
+  const api = createCarteiraApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil, store: { log() {} }, dir, autentique, areasDe: u => u.areas || ['contratos'] });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/car' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  await api.sincronizar(); await call('PUT', '/clientes/1', { contrato: { inicio: '2026-01-01', fim: '2027-01-01', dealId: '50' } });
+  const x = await call('POST', '/clientes/1/assinaturas', { nome: 'Contrato A', pdf: Buffer.from('%PDF-1.4 x').toString('base64'), signatarios: [{ email: 'a@x.com' }], sandbox: true });
+  assert.equal(x.estado, 'pendente'); assert.equal(enviados[0].sandbox, true); assert.ok(Buffer.isBuffer(enviados[0].pdf)); assert.equal(x.links[0].link, 'https://aut.ink/x');
+  await assert.rejects(call('POST', '/clientes/1/assinaturas', { pdf: 'x', signatarios: [] }, { areas: ['clientes'] }), /contratos/);
+  assert.equal((await call('GET', '/clientes/1', null, { areas: ['clientes'] })).assinaturas.length, 0);   // quem não vê contratos não vê as assinaturas
+  assert.equal((await api.atualizarAssinaturas()).atualizadas, 0); estado.v = 'assinado'; assert.equal((await api.atualizarAssinaturas()).atualizadas, 1);
+  assert.deepEqual(moved, [['50', 'C15:S']]); assert.equal((await call('GET', '/clientes/1')).assinaturas[0].estado, 'assinado'); assert.equal((await api.atualizarAssinaturas()).atualizadas, 0);
+});

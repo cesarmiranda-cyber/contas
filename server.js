@@ -42,12 +42,16 @@ const { createBxEmpresas } = require('./lib/bxEmpresas');
 const { createBxFunil } = require('./lib/bxFunil');
 const { createCarteiraApi } = require('./lib/carteiraApi');
 const { createDemandasApi } = require('./lib/demandasApi');
-const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR });
+const { createBancoInter } = require('./lib/bancoInter');
+const { createAutentique } = require('./lib/autentique');
+const { createIntegracoesApi } = require('./lib/integracoesApi');
+const inter = createBancoInter({ secrets }), autentique = createAutentique({ secrets }), integ = createIntegracoesApi({ secrets, inter, autentique, store });
+const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir: DATA_DIR, inter });
 const { createBitrixLogin } = require('./lib/bitrixLogin');
 const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
 const bx = createBxEmpresas({ bitrix }), funil = createBxFunil({ bitrix });
 const cronApi = createCronApi({ bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
-const carApi = createCarteiraApi({ bitrix, bx, funil, store, dir: DATA_DIR, areasDe: u => auth.areasDe(u) });
+const carApi = createCarteiraApi({ bitrix, bx, funil, store, dir: DATA_DIR, areasDe: u => auth.areasDe(u), autentique });
 const bkApiRef = {};
 const demApi = createDemandasApi({ bitrix, bx, funil, bk: { unidades: () => (bkApiRef.v ? bkApiRef.v.unidades() : []) }, store, dir: DATA_DIR });
 const bkApi = createBkApi({ fin, empresas, bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'bk-unidades.json') });
@@ -206,12 +210,13 @@ const server = http.createServer(async (req, res) => {
       const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : 1e6));
       return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
     }
+    if (u.pathname.startsWith('/api/settings/integracoes')) return send(res, 200, await integ.handle(req.method, u.pathname, () => readBody(req, 100000)));
     if (u.pathname.startsWith('/api/dem/')) {
       const r = await demApi.handle(req.method, u.pathname, u, () => readBody(req, 1e6), req.user);
       return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
     }
     if (u.pathname.startsWith('/api/car/')) {
-      const r = await carApi.handle(req.method, u.pathname, u, () => readBody(req, 1e6), req.user);
+      const r = await carApi.handle(req.method, u.pathname, u, () => readBody(req, /\/assinaturas$/.test(u.pathname) ? 16e6 : 1e6), req.user);
       if (!r) return send(res, 404, { error: 'não encontrado' });
       if (r.json && r.json.__csv !== undefined) { res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${r.json.nome}"` }); return res.end('\ufeff' + r.json.__csv); }
       return send(res, 200, r.json);
@@ -264,6 +269,7 @@ server.listen(PORT, () => {
   // Sincronização com o Bitrix24 (empresas, contatos, usuários, funis e etapas): 1 min após subir e depois de hora em hora. Idempotente.
   const sincBitrix = async () => { if (!bitrix.enabled) return; try { const r = await cronApi.reconciliar({ simular: false }); console.log('sync cronograma', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync cronograma', e.message); }
     try { const r = await carApi.sincronizar(); console.log('sync carteira', JSON.stringify(r)); const a = await carApi.avisar(); if (a.enviados.length) console.log('avisos de contrato (carteira)', a.enviados.length); } catch (e) { console.error('sync carteira', e.message); }
+    try { const r = await carApi.atualizarAssinaturas(); if (r.atualizadas) console.log('assinaturas atualizadas', r.atualizadas); } catch (e) { console.error('assinaturas', e.message); }
     try { const a = await demApi.avisar(); if (a.enviados.length) console.log('avisos de prazo (processos)', a.enviados.length); } catch (e) { console.error('avisos processos', e.message); }
     try { const r = await bkApi.sincronizarFunil({ simular: false }); console.log('sync BK', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync BK', e.message); } };
   setTimeout(sincBitrix, 60000); setInterval(sincBitrix, 3600 * 1000);
