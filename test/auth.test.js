@@ -71,7 +71,7 @@ test('bloqueio após 5 erros, limite por IP e liberação com o tempo', async ()
 
 test('perfis: o que cada um pode fazer', async () => {
   const { auth } = await novo(), p = auth.permite;
-  for (const perfil of ['admin', 'financeiro', 'consulta']) { assert.equal(p(perfil, 'GET', '/api/fin/resumo'), true); assert.equal(p(perfil, 'GET', '/api/settings'), true); }
+  for (const perfil of ['admin', 'financeiro', 'consulta']) { assert.equal(p(perfil, 'GET', '/api/fin/resumo'), true); assert.equal(p(perfil, 'GET', '/api/settings'), perfil !== 'consulta'); }
   assert.equal(p('consulta', 'POST', '/api/fin/pagar'), false); assert.equal(p('consulta', 'PUT', '/api/fin/pagar/x'), false); assert.equal(p('consulta', 'DELETE', '/api/fin/receber/x'), false);
   assert.equal(p('consulta', 'POST', '/api/fin/parcelas/preview'), true); assert.equal(p('consulta', 'POST', '/api/fin/nfe/previa'), true); assert.equal(p('consulta', 'POST', '/api/deals/7/detalhe'), true);
   assert.equal(p('consulta', 'POST', '/api/deals/7/cancel'), false); assert.equal(p('consulta', 'POST', '/api/sync'), false);

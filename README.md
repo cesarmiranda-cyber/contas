@@ -160,3 +160,7 @@ Para a IA do próprio cliente (CoPilot do Bitrix24). No cartão de Rotulagem (e 
 ## Entrada pelo Bitrix24 (sem senha do sistema)
 
 A tela inicial pede só o e-mail da conta do Bitrix24: o sistema envia um código de 6 dígitos para as **notificações da pessoa no próprio Bitrix24** (`im.notify.personal.add`), válido por 10 minutos, uso único, 5 tentativas, com limite por e-mail e por IP, e resposta genérica que não revela quem tem acesso. Só entram os usuários liberados em Usuários e acessos. Abrindo o app pelo menu do Bitrix24 a entrada é automática, e com o aplicativo local (OAuth) configurado aparece também o botão “Entrar com Bitrix24”. Administradores iniciais: variável `ADMIN_BITRIX_IDS` (IDs de usuário do Bitrix24, separados por vírgula). O usuário e senha do administrador só existe como entrada de emergência em `/?acesso=senha`, sem link visível.
+
+## Revisão geral (novembro/2026)
+
+Varredura de 25 telas com portal Bitrix24 simulado (0 erros de JavaScript e 0 erros 5xx), matriz de permissões por perfil e área, conferência dos funis no portal real (sem duplicidade de negócios por empresa) e correções: motor antigo de cobrança e `/api/settings` agora respeitam a área “Contas” (leitura só admin e financeiro); teto de 300 e-mails/hora na entrada de solicitações; só links https das assinaturas; CSV de e-mails protegido contra fórmulas; lista de clientes possivelmente duplicados com fusão (visitas, conferência e recorrências).

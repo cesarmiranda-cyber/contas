@@ -91,6 +91,10 @@ test('serviço pontual: cobrança 50/50 em Contas a receber trava o início e a 
   await assert.rejects(call('DELETE', `/rotulagem/negocios/${n.id}/cobranca`), /já paga/);
   const q = await call('GET', '/rotulagem/quadro'); assert.equal(q.negocios[0].cobranca.entradaPaga, true); assert.equal(q.negocios[0].cobranca.finalPaga, false);
   const auth = createAuth({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), env: { ADMIN_USER: 'a', ADMIN_HASH: await hashSenha('Inicial12345') } });
+  const u9 = auth.liberarBitrix({ bitrixId: '9', nome: 'Sem Contas', perfil: 'financeiro', areas: ['cronograma'] }), t9 = (await auth.entrarBitrix({ id: '9' })).token, g9 = (m, p) => auth.porteiro({ method: m, pathname: p, headers: { authorization: `Bearer ${t9}` } });
+  for (const p of ['/api/state', '/api/clientes', '/api/dashboard', '/api/links', '/api/carteiras', '/api/assinaturas']) assert.equal(g9('GET', p).status, 403, p);   // motor antigo de cobrança é da área Contas
+  assert.equal(g9('GET', '/api/settings').status, 403); assert.equal(g9('GET', '/api/cron/semana').user.nome, 'Sem Contas');
+  const adm = auth.listar().find(x => x.perfil === 'admin'), tAdm = (await auth.entrarBitrix({ id: adm.bitrixId || '0' }).catch(() => ({}))).token;
   assert.equal(auth.permite('operacional', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), false); assert.equal(auth.permite('financeiro', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), false); assert.equal(auth.permite('admin', 'POST', '/api/dem/rotulagem/negocios/9/liberar'), true); assert.equal(auth.permite('financeiro', 'POST', '/api/dem/rotulagem/negocios/9/cobranca'), true);
 });
 
