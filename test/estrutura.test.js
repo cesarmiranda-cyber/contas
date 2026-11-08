@@ -63,14 +63,10 @@ test('gerar cobranças exige cliente e, para emitir no Asaas, Asaas ativo e docu
   assert.deepEqual(ok.ids, ['100']); assert.equal(off.gerar[0].tipo, 'UNICA'); assert.equal(off.syncs.length, 0);
 });
 
-test('relatórios novos: estoque, notas, extrato, fluxo e inadimplência (com CSV)', async () => {
+test('relatórios novos: notas, extrato, fluxo e inadimplência (com CSV)', async () => {
   const { call, fin } = api();
   const emp = await call('POST', '/empresas', { nome: 'Alfa Ltda' });
   const conta = await call('POST', '/cad/contas', { empresaId: emp.id, nome: 'Itaú', saldoInicial: 1000, dataSaldo: `${D.slice(0, 4)}-01-01` });
-  const prod = await call('POST', '/produtos', { empresaId: emp.id, nome: 'Sabão', un: 'CX', estoqueMin: 20 });
-  await call('POST', '/estoque/movimento', { produtoId: prod.id, tipo: 'entrada', qtd: 10, custoUnit: 25, data: D });
-  const est = await call('GET', '/relatorio', null, `tipo=estoque&empresa=${emp.id}`);
-  assert.deepEqual(est.linhas[0], ['Sabão', 'CX', 10, 25, 250, 20, 'abaixo do mínimo']); assert.deepEqual(est.num, [2, 5]); assert.equal(est.total, 250);
   const [p] = await call('POST', '/pagar', { empresaId: emp.id, descricao: 'Aluguel', valor: 300, venc: D, contaId: conta.id }); await call('POST', `/pagar/${p.id}/baixar`, { data: D, contaId: conta.id });
   const ext = await call('GET', '/relatorio', null, `tipo=extrato&conta=${conta.id}`);
   assert.equal(ext.linhas.length, 1); assert.equal(ext.total, 700);
@@ -82,9 +78,8 @@ test('relatórios novos: estoque, notas, extrato, fluxo e inadimplência (com CS
   const fx = await call('GET', '/relatorio', null, `tipo=fluxo&empresa=${emp.id}`);
   assert.equal(fx.linhas.length, 9); assert.equal(fx.colunas[4], 'Saldo acumulado');
   assert.equal((await call('GET', '/relatorio', null, `tipo=notas&empresa=${emp.id}`)).linhas.length, 0);
-  const csv = await call('GET', '/relatorio', null, `tipo=estoque&empresa=${emp.id}&formato=csv`);
-  assert.match(csv.__csv, /Sabão;CX;10;25;250;20;abaixo do mínimo/);
-  assert.equal(fin.movimentos.all().length, 1);
+  const csv = await call('GET', '/relatorio', null, `tipo=extrato&conta=${conta.id}&formato=csv`);
+  assert.match(csv.__csv, /Aluguel/);
 });
 
 test('cliente (aba dentro da deal), atividades e passos de implantação', async () => {

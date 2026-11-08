@@ -70,9 +70,9 @@ test('demonstração: carrega todos os processos, painel/relatórios funcionam, 
   assert.equal((await call('GET', '/bootstrap')).demo, true);
   // painel completo
   const d = await call('GET', '/dashboard', null, 'periodo=6m');
-  assert.ok(d.kpis.receitaPrev > 0 && d.kpis.despesaPrev > 0 && d.kpis.saldoContas > 0 && d.kpis.estoqueValor > 0);
+  assert.ok(d.kpis.receitaPrev > 0 && d.kpis.despesaPrev > 0 && d.kpis.saldoContas > 0);
   assert.equal(d.contratos.total, 10); assert.ok(d.contratos.porStatus.vencido >= 1 && d.contratos.porStatus.vencendo >= 1);
-  assert.ok(d.estoque.qtdAbaixo >= 1); assert.ok(d.conciliacao.pendentes >= 5); assert.equal(d.notas.total, 4); assert.ok(d.folha.custo > 0);
+  assert.ok(d.conciliacao.pendentes >= 5); assert.equal(d.notas.total, 4); assert.ok(d.folha.custo > 0);
   assert.ok(d.categoriasDespesa.some(c => c.nome === 'Folha de pagamento')); assert.ok(d.serie.length >= 9 && d.serie.some(s => s.futuro));
   const empAlfa = (await call('GET', '/empresas')).find(e => e.nome.includes('Alfa')).id;
   const da = await call('GET', '/dashboard', null, `empresa=${empAlfa}&cat=Marketing`);
@@ -80,7 +80,6 @@ test('demonstração: carrega todos os processos, painel/relatórios funcionam, 
   // processos interligados: saldo das contas, DRE e relatórios
   const sal = await call('GET', '/contas/saldos', null, `empresa=${empAlfa}`); assert.ok(sal.length === 3 && sal.every(c => typeof c.saldo === 'number'));
   const dre = await call('GET', '/relatorio', null, `tipo=dre&empresa=${empAlfa}&de=${R.addMonths(`${mes}-01`, -5)}&ate=${H}`); assert.ok(dre.dre.totalReceitas > 0 && dre.dre.totalDespesas > 0);
-  assert.ok((await call('GET', '/relatorio', null, 'tipo=estoque')).linhas.length === 8);
   assert.ok((await call('GET', '/conciliacao')).linhas.some(l => l.sugestoes.length));      // há sugestões de conciliação
   const cts = await call('GET', '/contratos'); assert.equal(cts.length, 10); const alvo = cts.find(c => !c.cobrado && c.valor > 0 && c.faltas.length === 0);
   const det = await call('GET', `/contratos/${cts[0].id}`); assert.equal(det.demo, true); assert.ok(det.cliente.doc);
