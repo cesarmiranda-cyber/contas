@@ -152,3 +152,26 @@ test('funil único "Serviços técnicos": prepara um funil vazio (simulação an
   const r = await call('POST', '/servicos/preparar', { simular: false }); assert.deepEqual(r.etapas, ['Em andamento', 'Aguardando cliente', 'Concluído', 'Cancelado']);
   assert.ok(chamadas.includes('crm.dealcategory.update'));
 });
+
+test('calculadora da tabela nutricional: arredondamento, não significativos, %VD, energia, frontal, porções e tolerância (IN 75 / RDC 429)', async () => {
+  const C = require('../lib/rotulagemCalc');
+  assert.deepEqual([C.arredondar(12.5, 'g'), C.arredondar(12.4, 'g'), C.arredondar(9.96, 'g'), C.arredondar(1.25, 'g'), C.arredondar(0.449, 'g'), C.arredondar(0.456, 'mg'), C.arredondar(0.0449, 'mg')], [13, 12, 10, 1.3, 0.4, 0.46, 0.04]);
+  const r = C.calcular({ base: 'solido', porcao: 30, embalagem: 300, painel: 120, energia: '466', v100: { carbo: 70, acucTot: 30, acucAdic: 20, prot: 6, gordTot: 18, gordSat: 7, gordTrans: 0, fibras: 3, sodio: 650 }, lab: { sodio: 800, prot: 4, gordTot: 20 } });
+  const l = k => r.linhas.find(x => x.k === k);
+  assert.equal(l('carbo').vPorcao, 21); assert.equal(l('carbo').vd, 7); assert.equal(l('acucAdic').vd, 12); assert.equal(l('gordSat').vd, 11); assert.equal(l('gordTrans').ns100, true); assert.equal(l('sodio').vPorcao, 195); assert.equal(l('acucTot').vd, null);   // sem VDR: campo vazio
+  assert.equal(r.energia.calculada100, 466); assert.equal(r.energia.ok, true); assert.equal(r.energia.calculadaPorcao, 140); assert.equal(r.porcoes.texto, 'Porções por embalagem: 10');
+  assert.equal(r.frontal.obrigatoria, true); assert.equal(r.frontal.modeloAnexoXVII, 1); assert.equal(r.frontal.blocos, 4); assert.equal(r.frontal.ocupacaoPct, 4); assert.equal(r.frontal.areaMinCm2, 4.8); assert.deepEqual(r.frontal.fonte, { min: 9, max: 15 });
+  assert.deepEqual(r.tolerancia.map(t => [t.nome, t.ok]), [['Proteínas', false], ['Gorduras totais', true], ['Sódio', false]]);
+  const peq = C.calcular({ base: 'solido', porcao: 30, embalagem: 60, painel: 80, v100: { acucAdic: 20, carbo: 70, acucTot: 30, prot: 1, gordTot: 1, gordSat: 0, gordTrans: 0, fibras: 0, sodio: 10 } });
+  assert.equal(peq.frontal.modeloAnexoXVII, 5); assert.equal(peq.frontal.blocos, 2); assert.equal(peq.frontal.ocupacaoPct, 3.5); assert.deepEqual(peq.frontal.fonte, { min: null, max: 9 })
+  assert.equal(peq.porcoes.declarar, false);   // 60 g / 30 g = 2 porções: embalagem individual
+  const liq = C.calcular({ base: 'liquido', porcao: 200, embalagem: 1000, painel: 20, v100: { acucAdic: 7.5, carbo: 10, acucTot: 9, prot: 0, gordTot: 0, gordSat: 0, gordTrans: 0, fibras: 0, sodio: 20 } });
+  assert.equal(liq.frontal.obrigatoria, true); assert.equal(liq.frontal.opcional, true);   // 7,5 g/100 ml atinge o limite; painel < 35 cm² torna opcional
+  assert.equal(C.calcular({ base: 'solido', v100: { acucAdic: 14.6, gordSat: 5, sodio: 590 } }).frontal.perto.length, 2);   // perto do limite: pede o valor exato
+  assert.equal(C.porcoesPorEmbalagem(250, 100).texto, 'Porções por embalagem: Cerca de 3');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cl-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  const n = await call('POST', '/rotulagem/negocios', { titulo: 'Granola', empresaId: '5' });
+  const x = await call('POST', '/rotulagem/calculadora', { negocioId: n.id, base: 'solido', porcao: '30', v100: { carbo: '70', sodio: '650' } }, { nome: 'Ana' });
+  assert.ok(x.alertas.some(a => /sem valor informado/.test(a))); const d = await call('GET', `/rotulagem/negocios/${n.id}`); assert.match(d.calculo.texto, /CONFERÊNCIA NUMÉRICA/); assert.equal(d.comCalculadora, true);
+});

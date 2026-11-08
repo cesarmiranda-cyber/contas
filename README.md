@@ -172,3 +172,7 @@ Multas, rotulagem e suplementos deixaram de depender de um funil próprio no Bit
 - **Suplementos**: solicitação dos documentos → ordem de produção → teste de cápsula e estabilidade → memorial de cálculo → documentação de estabilidade (relatório do cliente ou protocolo + dossiê) → notificação no Solicita (nº do protocolo) → finalização (comprovante). Documentos: ordem de produção, memorial, rótulo, protocolo de estabilidade, relatório/dossiê e comprovante.
 - **Multas**: aviso recebido → atendimento → registro → plano de ação → cumprimento → resolvido/autuado.
 - Manuais (funil 4) e Solicitações (funil 17) continuam lendo o funil do Bitrix24.
+
+## Rotulagem: calculadora e conferência pelas normas
+
+O card de rotulagem tem a **calculadora da tabela nutricional** (RDC 429/2020 + IN 75/2020): arredondamento (Anexo III), valores não significativos (Anexo IV), porção e %VD (Anexo II), valor energético (Anexo XXII), número de porções (Anexo VI), se a lupa é obrigatória, qual modelo (Anexo XVII), área mínima e tamanho de fonte (Anexo XVIII) e tolerância de 20% contra a análise laboratorial (art. 33). O resultado fica registrado no card e no histórico. A conferência por IA usa 31 itens com a RDC 429, a IN 75 e a RDC 727 citadas por artigo e anexo, e o pedido envia à IA um resumo das três normas.
