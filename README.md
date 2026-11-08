@@ -163,3 +163,12 @@ A tela inicial pede só o e-mail da conta do Bitrix24: o sistema envia um códig
 ## Revisão geral (novembro/2026)
 
 Varredura de 25 telas com portal Bitrix24 simulado (0 erros de JavaScript e 0 erros 5xx), matriz de permissões por perfil e área, conferência dos funis no portal real (sem duplicidade de negócios por empresa) e correções: motor antigo de cobrança e `/api/settings` agora respeitam a área “Contas” (leitura só admin e financeiro); teto de 300 e-mails/hora na entrada de solicitações; só links https das assinaturas; CSV de e-mails protegido contra fórmulas; lista de clientes possivelmente duplicados com fusão (visitas, conferência e recorrências).
+
+## Processos geridos no app e funil único "Serviços técnicos"
+
+Multas, rotulagem e suplementos deixaram de depender de um funil próprio no Bitrix24 (o portal não permite criar novos funis). As etapas, o checklist, as regras e os dados ficam no app, e o Bitrix24 recebe um negócio-resumo por serviço no funil único "Serviços técnicos" (Em andamento, Aguardando cliente, Concluído, Cancelado). Um administrador prepara um funil vazio com o botão "Funil Serviços técnicos" (mostra o plano e pede confirmação). Falha no espelho nunca trava o processo.
+
+- **Rotulagem** (passo a passo da Nutri Mix): pagamento de 50% e questionário → conferência das informações → análise da legislação (enquadramento: norma específica ou RDC 429/2020, IN 75/2020 e RDC 727/2022) → relatório de adequação → enviado ao cliente → conferência das correções (rodadas repetidas até zerar) → aprovação final (dupla checagem, versão da arte aprovada, nunca com pendências) → arquivamento (arte final e e-mail de aprovação guardados).
+- **Suplementos**: solicitação dos documentos → ordem de produção → teste de cápsula e estabilidade → memorial de cálculo → documentação de estabilidade (relatório do cliente ou protocolo + dossiê) → notificação no Solicita (nº do protocolo) → finalização (comprovante). Documentos: ordem de produção, memorial, rótulo, protocolo de estabilidade, relatório/dossiê e comprovante.
+- **Multas**: aviso recebido → atendimento → registro → plano de ação → cumprimento → resolvido/autuado.
+- Manuais (funil 4) e Solicitações (funil 17) continuam lendo o funil do Bitrix24.

@@ -12,7 +12,7 @@ const F = require('../lib/feriados');
 
 const fake = () => {
   const deals = [], notif = [];
-  const est = { 8: [['C8:NEW', 'Aviso recebido', ''], ['C8:A', 'Plano de ação', ''], ['C8:W', 'Resolvido', 'S']], 12: [['C12:A', 'Cálculo nutricional', ''], ['C12:B', 'Layout do rótulo', ''], ['C12:C', 'Aprovação do cliente', ''], ['C12:W', 'Entregue', 'S']], 17: [['C17:N', 'Solicitação recebida', ''], ['C17:D', 'Entregue / Concluído', 'S']] };
+  const est = { 8: [['C8:NEW', 'Aviso recebido', ''], ['C8:A', 'Plano de ação', ''], ['C8:W', 'Resolvido', 'S']], 12: [['C12:A', 'Em andamento', ''], ['C12:B', 'Aguardando cliente', ''], ['C12:W', 'Concluído', 'S']], 17: [['C17:N', 'Solicitação recebida', ''], ['C17:D', 'Entregue / Concluído', 'S']] };
   return { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', deals, notif, async call(m, p) {
     if (m === 'crm.deal.fields') return { result: { UF_PROD: { formLabel: 'Nome do Produto' }, UF_ING: { formLabel: 'Ingredientes e quantidades (g)' }, UF_GLU: { formLabel: 'Contaminação cruzada com Glúten?', items: [{ ID: '1', VALUE: 'Sim' }, { ID: '2', VALUE: 'Não' }] }, UF_SAC: { formLabel: 'SAC' } } };
     if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' } } };
@@ -30,26 +30,46 @@ test('processos por funil: quadro, prazo, checklist, dupla checagem, alertas e e
   const api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => unidades }, store: { log() {} }, dir });
   const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
   const ana = { id: 'u1', nome: 'Ana' }, bia = { id: 'u2', nome: 'Bia' };
-  // multas: prazo vira o CLOSEDATE do negócio e dispara alertas uma vez por marco
+  // multas (geridas no app): o prazo gera alertas uma vez por marco; o Bitrix24 recebe só o resumo no funil "Serviços técnicos"
   const n = await call('POST', '/multas/negocios', { titulo: 'Defesa loja BKN 23735', empresaId: '5', prazo: F.somaDias(R.todayBR(), 6), responsavel: '11' });
-  assert.equal(n.checklist.length, 5); assert.equal(bitrix.deals[0].CATEGORY_ID, 8); assert.equal(bitrix.deals[0].STAGE_ID, 'C8:NEW');
-  const q = await call('GET', '/multas/quadro'); assert.equal(q.negocios[0].empresaNome, 'BK Anhaia'); assert.equal(q.negocios[0].responsavelNome, 'Ana Y'); assert.equal(q.negocios[0].situacao.estado, 'vencendo');
-  const av = await call('POST', '/avisar', { simular: false }); assert.equal(av.enviados.length, 1); assert.equal(bitrix.notif[0].USER_ID, '11'); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 0);
-  await call('PUT', `/multas/negocios/${n.id}`, { prazo: F.somaDias(R.todayBR(), 2) }); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 1);   // outro marco
-  await call('POST', `/multas/negocios/${n.id}/mover`, { etapa: 'C8:W' }); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 0);   // resolvida não alerta
-  // rotulagem: só passa para "Aprovação do cliente" com duas aprovações internas de pessoas diferentes
-  const r = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Granola', empresaId: '5' }); assert.equal(r.checklist.length, 6);
-  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'C12:C' }), /Dupla checagem/);
+  assert.equal(n.checklist.length, 5); assert.equal(n.id, 'M1'); assert.equal(bitrix.deals[0].CATEGORY_ID, 12); assert.equal(bitrix.deals[0].STAGE_ID, 'C12:A'); assert.match(bitrix.deals[0].TITLE, /^\[Multas\] Defesa/); assert.equal(bitrix.deals[0].CLOSEDATE, F.somaDias(R.todayBR(), 6));
+  const q = await call('GET', '/multas/quadro'); assert.equal(q.negocios[0].empresaNome, 'BK Anhaia'); assert.equal(q.negocios[0].responsavelNome, 'Ana Y'); assert.equal(q.negocios[0].situacao.estado, 'vencendo'); assert.equal(q.etapas.length, 7);
+  const av = await call('POST', '/avisar', { simular: false }); assert.equal(av.enviados.length, 1); assert.equal(bitrix.notif[0].USER_ID, '11'); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 1 - 1 + 0);
+  await call('PUT', '/multas/negocios/M1', { prazo: F.somaDias(R.todayBR(), 2) }); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 1);   // outro marco
+  assert.equal(bitrix.deals[0].CLOSEDATE, F.somaDias(R.todayBR(), 2));
+  await call('POST', '/multas/negocios/M1/mover', { etapa: 'm6' }); assert.equal(bitrix.deals[0].STAGE_ID, 'C12:W'); assert.equal((await call('POST', '/avisar', { simular: false })).enviados.length, 0);   // resolvida não alerta
+  // rotulagem: passo a passo com regras
+  const r = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Granola', empresaId: '5' }); assert.equal(r.checklist.length, 8); assert.equal(r.etapa, 'r1'); assert.equal(r.documentos.length, 6);
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r4' }), /Enquadramento regulatório/);   // precisa definir o enquadramento antes do relatório
+  await assert.rejects(call('PUT', `/rotulagem/negocios/${r.id}/campos`, { enquadramento: 'qualquer coisa' }), /Valor inválido/);
+  const camp = (await call('GET', `/rotulagem/negocios/${r.id}`)).campos.find(c => c.k === 'enquadramento'); await call('PUT', `/rotulagem/negocios/${r.id}/campos`, { enquadramento: camp.opcoes[1] });
+  assert.equal((await call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r4' })).etapa, 'r4');
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r7' }), /Dupla checagem/);
   await call('POST', `/rotulagem/negocios/${r.id}/aprovacao`, { decisao: 'aprovado' }, ana); await call('POST', `/rotulagem/negocios/${r.id}/aprovacao`, { decisao: 'aprovado' }, ana);
-  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'C12:C' }), /há 1/);   // a mesma pessoa duas vezes não vale
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r7' }), /há 1/);   // a mesma pessoa duas vezes não vale
   await call('POST', `/rotulagem/negocios/${r.id}/aprovacao`, { decisao: 'aprovado', nota: 'ok' }, bia);
-  assert.equal((await call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'C12:C' })).etapa, 'C12:C');
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r7' }), /Versão da arte aprovada/);
+  await call('PUT', `/rotulagem/negocios/${r.id}/campos`, { versaoAprovada: 'arte_v3_2026-11-09.pdf' });
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r7' }), /Nunca aprovar um rótulo com pendências/);   // sem conferência das correções
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/rodada`, { resultado: 'pendencias', texto: '' }), /Descreva as pendências/);
+  await call('POST', `/rotulagem/negocios/${r.id}/rodada`, { resultado: 'pendencias', texto: 'Falta a lupa frontal de sódio' }, ana);
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r7' }), /Nunca aprovar/);   // a última rodada ainda tem pendência
+  const r2 = await call('POST', `/rotulagem/negocios/${r.id}/rodada`, { resultado: 'ok' }, ana); assert.deepEqual(r2.rodadas.map(x => x.resultado), ['pendencias', 'ok']);
+  assert.equal((await call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r7' })).etapa, 'r7');
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r8' }), /Arte final aprovada/);   // arquivamento exige a aprovação e o e-mail guardados
+  await call('POST', `/rotulagem/negocios/${r.id}/link`, { nome: 'Arte final aprovada', url: 'https://drive.google.com/a' }); await call('POST', `/rotulagem/negocios/${r.id}/link`, { nome: 'E-mail de aprovação final', url: 'https://drive.google.com/b' });
+  assert.equal((await call('POST', `/rotulagem/negocios/${r.id}/mover`, { etapa: 'r8' })).etapaNome, 'Concluído e arquivado'); assert.equal((await call('GET', `/rotulagem/negocios/${r.id}`)).documentos.filter(x => x.url).length, 2);
   await call('POST', `/rotulagem/negocios/${r.id}/aprovacao`, { decisao: 'reprovado', nota: 'vírgula errada' }, bia);   // reprovou: zera as aprovações
   assert.equal((await call('GET', `/rotulagem/negocios/${r.id}`)).aprovadoresValidos, 0);
   const ck = await call('PUT', `/rotulagem/negocios/${r.id}/checklist/0`, { ok: true }, ana); assert.equal(ck.checklist[0].ok, true); assert.equal(ck.checklist[0].por, 'Ana');
-  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/link`, { url: 'javascript:alert(1)' }), /Link inválido/); assert.equal((await call('POST', `/rotulagem/negocios/${r.id}/link`, { url: 'https://drive.google.com/x', nome: 'Pasta' })).links.length, 1);
-  // suplementos só existe depois que o funil for informado
-  await assert.rejects(call('GET', '/suplementos/quadro'), /ainda não foi criado/);
+  await assert.rejects(call('POST', `/rotulagem/negocios/${r.id}/link`, { url: 'javascript:alert(1)' }), /Link inválido/); assert.equal((await call('POST', `/rotulagem/negocios/${r.id}/link`, { url: 'https://drive.google.com/x', nome: 'Pasta' })).links.length, 3);
+  // suplementos: 7 etapas reais, estabilidade e protocolo obrigatórios, 5 documentos + comprovante
+  const sp = await call('POST', '/suplementos/negocios', { titulo: 'Suplemento Whey', empresaId: '5' }); assert.equal(sp.checklist.length, 10); assert.equal((await call('GET', '/suplementos/quadro')).etapas.length, 8);
+  await assert.rejects(call('POST', `/suplementos/negocios/${sp.id}/mover`, { etapa: 's6' }), /Documentação de estabilidade/);
+  await call('PUT', `/suplementos/negocios/${sp.id}/campos`, { estabilidade: sp.campos[0].opcoes[1] }); assert.equal((await call('POST', `/suplementos/negocios/${sp.id}/mover`, { etapa: 's6' })).etapa, 's6');
+  await assert.rejects(call('POST', `/suplementos/negocios/${sp.id}/mover`, { etapa: 's7' }), /Nº do protocolo/);
+  await call('PUT', `/suplementos/negocios/${sp.id}/campos`, { protocoloSolicita: '25351.123456/2026-11' }); await assert.rejects(call('POST', `/suplementos/negocios/${sp.id}/mover`, { etapa: 's7' }), /Comprovante do protocolo/);
+  await call('POST', `/suplementos/negocios/${sp.id}/link`, { nome: 'Comprovante do protocolo', url: 'https://drive.google.com/c' }); assert.equal((await call('POST', `/suplementos/negocios/${sp.id}/mover`, { etapa: 's7' })).etapa, 's7');
   // entrada de e-mail: token, identificação da unidade pelo BKN, sem duplicar
   await assert.rejects(api.entradaEmail({ assunto: 'x' }, 'qualquer'), /não foi ativada/);
   const { token } = await call('POST', '/solicitacoes/entrada/token'); await assert.rejects(api.entradaEmail({ assunto: 'x' }, 'errado'), /Token inválido/);
@@ -76,20 +96,21 @@ test('serviço pontual: cobrança 50/50 em Contas a receber trava o início e a 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dm-')), bitrix = fake(), fin = createFinStore(dir); fin.empresas.add({ id: 'e1', nome: 'Nutri Mix', ativa: true });
   const api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, fin, store: { log() {} }, dir });
   const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
-  const n = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Molho', empresaId: '5' });
-  await assert.rejects(call('POST', '/solicitacoes/negocios/1/cobranca', { valor: 100 }), /não usa cobrança/); await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 1000 }), /empresa que vai faturar/);
-  await call('PUT', '/config', { empresaFaturaId: 'e1' }); await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 1 }), /valor total/);
-  const c = await call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 1001, vencEntrada: '2026-11-10' });
+  const n = await call('POST', '/suplementos/negocios', { titulo: 'Suplemento Whey', empresaId: '5' }), P = `/suplementos/negocios/${n.id}`;
+  await assert.rejects(call('POST', '/solicitacoes/negocios/1/cobranca', { valor: 100 }), /não usa cobrança/); await assert.rejects(call('POST', `${P}/cobranca`, { valor: 1000 }), /empresa que vai faturar/);
+  await call('PUT', '/config', { empresaFaturaId: 'e1' }); await assert.rejects(call('POST', `${P}/cobranca`, { valor: 1 }), /valor total/);
+  const c = await call('POST', `${P}/cobranca`, { valor: 1001, vencEntrada: '2026-11-10' });
   assert.equal(c.cobranca.entrada.valor, 500.5); assert.equal(c.cobranca.final.valor, 500.5); assert.equal(fin.receber.all().length, 2); assert.equal(fin.receber.all()[0].demandaId, n.id); assert.equal(fin.receber.all()[0].venc, '2026-11-10');
-  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/cobranca`, { valor: 5 }), /já tem cobrança/);
-  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:B' }), /entrada de 50%/);                 // não sai da 1ª etapa sem a entrada
+  await assert.rejects(call('POST', `${P}/cobranca`, { valor: 5 }), /já tem cobrança/);
+  await assert.rejects(call('POST', `${P}/mover`, { etapa: 's2' }), /entrada de 50%/);                 // não sai da 1ª etapa sem a entrada
   const ent = fin.receber.get(c.cobranca.entrada.id); fin.receber.put({ ...ent, status: 'pago', pagoEm: '2026-11-10' });
-  assert.equal((await call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:A' })).etapa, 'C12:A');
-  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:W' }), /50% finais/);                       // não entrega sem o final
-  await call('POST', `/rotulagem/negocios/${n.id}/liberar`, { qual: 'final', motivo: 'Cliente antigo, combinado por escrito' }); assert.equal((await call('GET', `/rotulagem/negocios/${n.id}`)).cobranca.liberacoes.length, 1);
-  await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/liberar`, { qual: 'final', motivo: 'x' }), /motivo/); assert.equal((await call('POST', `/rotulagem/negocios/${n.id}/mover`, { etapa: 'C12:W' })).etapa, 'C12:W');
-  await assert.rejects(call('DELETE', `/rotulagem/negocios/${n.id}/cobranca`), /já paga/);
-  const q = await call('GET', '/rotulagem/quadro'); assert.equal(q.negocios[0].cobranca.entradaPaga, true); assert.equal(q.negocios[0].cobranca.finalPaga, false);
+  assert.equal((await call('POST', `${P}/mover`, { etapa: 's2' })).etapa, 's2');
+  await assert.rejects(call('POST', `${P}/mover`, { etapa: 's7' }), /50% finais/);                       // não finaliza sem o final
+  await call('POST', `${P}/liberar`, { qual: 'final', motivo: 'Cliente antigo, combinado por escrito' }); assert.equal((await call('GET', P)).cobranca.liberacoes.length, 1);
+  await assert.rejects(call('POST', `${P}/liberar`, { qual: 'final', motivo: 'x' }), /motivo/);
+  await call('PUT', `${P}/campos`, { protocoloSolicita: '123' }); await call('POST', `${P}/link`, { nome: 'Comprovante do protocolo', url: 'https://drive.google.com/c' }); assert.equal((await call('POST', `${P}/mover`, { etapa: 's7' })).etapa, 's7');
+  await assert.rejects(call('DELETE', `${P}/cobranca`), /já paga/);
+  const q = await call('GET', '/suplementos/quadro'); assert.equal(q.negocios[0].cobranca.entradaPaga, true); assert.equal(q.negocios[0].cobranca.finalPaga, false);
   const auth = createAuth({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), env: { ADMIN_USER: 'a', ADMIN_HASH: await hashSenha('Inicial12345') } });
   const u9 = auth.liberarBitrix({ bitrixId: '9', nome: 'Sem Contas', perfil: 'financeiro', areas: ['cronograma'] }), t9 = (await auth.entrarBitrix({ id: '9' })).token, g9 = (m, p) => auth.porteiro({ method: m, pathname: p, headers: { authorization: `Bearer ${t9}` } });
   for (const p of ['/api/state', '/api/clientes', '/api/dashboard', '/api/links', '/api/carteiras', '/api/assinaturas']) assert.equal(g9('GET', p).status, 403, p);   // motor antigo de cobrança é da área Contas
@@ -105,11 +126,29 @@ test('conferência por IA (a IA do cliente): pedido com os dados do formulário,
   const ped = IA.montarPedido({ titulo: 'Rótulo Granola', empresa: 'Cliente X', dados: [{ rotulo: 'Ingredientes', valor: 'Aveia 40 g' }] }); assert.match(ped, /Rótulo Granola/); assert.match(ped, /- Ingredientes: Aveia 40 g/); assert.match(ped, new RegExp(`${IA.REGRAS.length}\\. `)); assert.match(ped, /não substitui a revisão humana/);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ia-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
   const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
-  const n = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Molho', empresaId: '5' }); Object.assign(bitrix.deals[0], { UF_PROD: 'Molho da casa', UF_ING: 'Tomate 800 g, sal 10 g', UF_GLU: '2', UF_SAC: '0800 123' });
+  const n = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Molho', empresaId: '5' }); await call('PUT', `/rotulagem/negocios/${n.id}/dados`, { 'nome do produto': 'Molho da casa', 'ingredientes e quantidades (g)': 'Tomate 800 g, sal 10 g', 'contaminação cruzada com glúten?': 'Não', sac: '0800 123' });
   const pe = await call('GET', `/rotulagem/negocios/${n.id}/ia/pedido`); assert.equal(pe.dados.length, 4); assert.match(pe.pedido, /Contaminação cruzada com glúten\?: Não/); assert.match(pe.pedido, /Cliente: BK Anhaia/);
-  await assert.rejects(call('GET', '/multas/negocios/1/ia/pedido'), /não tem conferência por IA/); await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/ia/resultado`, { resposta: '' }), /Cole a resposta/);
+  await assert.rejects(call('GET', '/multas/negocios/M1/ia/pedido'), /não tem conferência por IA/); await assert.rejects(call('POST', `/rotulagem/negocios/${n.id}/ia/resultado`, { resposta: '' }), /Cole a resposta/);
   const r = await call('POST', `/rotulagem/negocios/${n.id}/ia/resultado`, { resposta: '2 | ERRO | ordem', itens: [{ n: 2, status: 'erro', nota: 'ordem' }, { n: 1, status: 'ok' }, { n: 77, status: 'erro' }, { n: 3, status: 'qualquer' }] }, { nome: 'Ana', id: 'u1' });
   assert.equal(r.ia.length, 1); assert.equal(r.ia[0].situacao, 'erros'); assert.equal(r.ia[0].itens.length, 3); assert.equal(r.ia[0].itens.find(i => i.n === 3).status, 'atencao'); assert.equal(r.regrasIa.length, IA.REGRAS.length); assert.match(r.notas[0].t, /não substitui a dupla checagem/);
   assert.equal(r.aprovadoresValidos, 0);   // a IA nunca conta como aprovação
   const sol = await call('POST', '/solicitacoes/negocios', { titulo: 'x pedido' }); assert.equal(sol.comIa, false);
+});
+
+test('funil único "Serviços técnicos": prepara um funil vazio (simulação antes) e recusa funil com negócios de outros', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sv-')), chamadas = [], deals = [];
+  let rows = [['NEW', 'Coleta', ''], ['A', 'Cálculo', ''], ['B', 'Enquadramento', ''], ['C', 'Layout', ''], ['W', 'Entregue', 'S'], ['L', 'Cancelado', 'F']].map(([i, n, sm], k) => ({ ID: String(100 + k), STATUS_ID: `C12:${i}`, NAME: n, SEMANTICS: sm }));
+  const bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) { chamadas.push(m);
+    if (m === 'crm.dealcategory.list') return { result: [{ ID: '12', NAME: 'Rotulagem Nutricional' }] };
+    if (m === 'crm.deal.list') return { result: deals };
+    if (m === 'crm.status.list') return { result: rows };
+    if (m === 'crm.status.update') { rows.find(r => r.ID === String(p.id)).NAME = p.fields.NAME; return { result: true }; }
+    if (m === 'crm.status.delete') { rows = rows.filter(r => r.ID !== String(p.id)); return { result: true }; }
+    return { result: true }; } };
+  const api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix, ttl: 0 }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  const sim = await call('POST', '/servicos/preparar', {}); assert.equal(sim.simulacao, true); assert.equal(sim.plano.filter(x => x.acao === 'remover etapa').length, 2); assert.ok(!chamadas.some(c => /update|delete/.test(c)));   // simulação não altera nada
+  deals.push({ ID: '5', COMMENTS: 'negócio de outra pessoa' }); await assert.rejects(call('POST', '/servicos/preparar', { simular: false }), /não são do app/); deals.length = 0;
+  const r = await call('POST', '/servicos/preparar', { simular: false }); assert.deepEqual(r.etapas, ['Em andamento', 'Aguardando cliente', 'Concluído', 'Cancelado']);
+  assert.ok(chamadas.includes('crm.dealcategory.update'));
 });
