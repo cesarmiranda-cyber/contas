@@ -175,3 +175,11 @@ test('calculadora da tabela nutricional: arredondamento, não significativos, %V
   const x = await call('POST', '/rotulagem/calculadora', { negocioId: n.id, base: 'solido', porcao: '30', v100: { carbo: '70', sodio: '650' } }, { nome: 'Ana' });
   assert.ok(x.alertas.some(a => /sem valor informado/.test(a))); const d = await call('GET', `/rotulagem/negocios/${n.id}`); assert.match(d.calculo.texto, /CONFERÊNCIA NUMÉRICA/); assert.equal(d.comCalculadora, true);
 });
+
+test('porções de referência (IN 75, Anexo V): busca por produto e utensílios', () => {
+  const P = require('../lib/porcoes');
+  assert.equal(P.LISTA.length, 138); assert.ok(P.GRUPOS.length === 8);
+  const m = P.buscar('molho de tomate')[0]; assert.deepEqual([m.produto.slice(0, 15), m.valor, m.un, m.medida], ['Molho de tomate', 60, 'g', 'Colheres de sopa']);
+  assert.equal(P.buscar('iogurte')[0].valor, 200); assert.equal(P.buscar('IOGURTE')[0].un, 'g'); assert.equal(P.buscar('refrigerante')[0].un, 'ml'); assert.equal(P.buscar('pó para gelatina')[0].qsp, true);
+  assert.deepEqual(P.buscar('xyzqq'), []); assert.equal(P.UTENSILIOS.length, 6);
+});
