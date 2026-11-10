@@ -18,7 +18,7 @@ const auth = process.env.PORTAL_DOMAIN && process.env.SESSION_SECRET
   ? createAuth({ portal: process.env.PORTAL_DOMAIN, secret: process.env.SESSION_SECRET }) : null;
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://api.bitrix24.com; frame-ancestors 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
+  'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://api.bitrix24.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://api.bitrix24.com; frame-ancestors 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
 };
 const json = (res, code, obj) => { res.writeHead(code, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
 
@@ -37,6 +37,7 @@ const pagina = tok => fs.readFileSync(path.join(__dirname, 'public', 'index.html
 
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (u.pathname !== '/health') res.on('finish', () => console.log(`${req.method} ${u.pathname} -> ${res.statusCode} (origem ${req.headers.origin || req.headers.referer || '-'})`));
   try {
     if (u.pathname === '/health') return json(res, 200, { ok: true });
     if (u.pathname === '/api/consulta') {
