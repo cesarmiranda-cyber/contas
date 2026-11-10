@@ -1,0 +1,9 @@
+{
+  "name": "consulta-cliente",
+  "version": "1.0.0",
+  "description": "Consulta de cliente (responsável, negócios e atividades) para usuários sem acesso ao CRM do Bitrix24",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node --test" },
+  "engines": { "node": ">=20" }
+}
