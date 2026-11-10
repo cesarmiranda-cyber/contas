@@ -36,6 +36,7 @@
  .lbl svg{width:16px;height:16px;stroke:var(--navy);fill:none;stroke-width:1.8}
  .val{font-weight:600}.sub{color:var(--mut);font-size:14px}.none{color:var(--mut)}
  .orc{margin-top:12px}.orc summary{cursor:pointer;font-weight:700;color:var(--navy)}.orc table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13.5px}.orc th{text-align:left;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:4px 6px}.orc td{padding:6px;border-top:1px solid var(--bd);vertical-align:top}.orc .scroll{overflow-x:auto}
+ .pill{font-size:12px;font-weight:700;border-radius:99px;padding:2px 9px;white-space:nowrap}.pill.Ganho{background:var(--okbg);color:var(--ok)}.pill.Perdido{background:var(--nobg);color:var(--no)}.pill.Em{background:#e8eefb;color:#2d4fa3}
  .cons{margin-top:12px;border-top:1px dashed var(--bd);padding-top:10px}.cons .lbl{margin-bottom:4px}.cons li{font-size:13.5px;color:var(--mut);list-style:none}.cons ul{margin:0;padding:0}.cons b{color:var(--tx);font-weight:600}
  .msg{text-align:center;color:var(--mut);padding:14px}.err{color:var(--no)}
 </style></head><body><main>
@@ -55,20 +56,26 @@ const hora=s=>{const d=new Date(s);return isNaN(d)?'':d.toLocaleString('pt-BR',{
 const I={neg:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>',
          usr:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
          ati:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'};
+const pill=x=>`<span class="pill ${String(x||'').split(' ')[0]}">${esc(x||'-')}</span>`;
+function negs(n){
+  if(!n.total)return '';
+  const mais=n.total>n.itens.length?`<div class="sub" style="margin-top:6px">Mostrando os ${n.itens.length} mais recentes de ${n.total}.</div>`:'';
+  return `<details class="orc" open><summary>Negócios (${n.total}) · ${n.ganhos} ganho(s) · ${n.perdidos} perdido(s) · ${n.andamento} em andamento</summary><div class="scroll"><table><tr><th>Negócio</th><th>Funil</th><th>Situação</th><th>Data</th><th>Responsável</th></tr>${n.itens.map(i=>`<tr><td>${esc(i.titulo)}</td><td>${esc(i.funil)}</td><td>${pill(i.situacao)}</td><td>${dt(i.data)}</td><td>${esc(i.responsavel)}</td></tr>`).join('')}</table></div>${mais}</details>`}
 function orc(o){
   if(!o||!o.itens&&!o.erro)return '';
   if(o.erro)return '<div class="orc none">Não foi possível carregar os orçamentos agora.</div>';
   if(!o.total)return '<div class="orc"><b style="color:var(--navy)">Orçamentos</b> <span class="none">· nenhum orçamento</span></div>';
   const mais=o.total>o.itens.length?`<div class="sub" style="margin-top:6px">Mostrando os ${o.itens.length} mais recentes de ${o.total}.</div>`:'';
-  return `<details class="orc"><summary>Orçamentos (${o.total})</summary><div class="scroll"><table><tr><th>Orçamento</th><th>Etapa</th><th>Data</th><th>Responsável</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.titulo)}</td><td>${esc(i.etapa)}</td><td>${dt(i.data)}</td><td>${esc(i.responsavel)}</td></tr>`).join('')}</table></div>${mais}</details>`}
+  return `<details class="orc"><summary>Orçamentos (${o.total})</summary><div class="scroll"><table><tr><th>Orçamento</th><th>Etapa</th><th>Situação</th><th>Data</th><th>Responsável</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.titulo)}</td><td>${esc(i.etapa)}</td><td>${pill(i.situacao)}</td><td>${dt(i.data)}</td><td>${esc(i.responsavel)}</td></tr>`).join('')}</table></div>${mais}</details>`}
 function card(r){
   const n=r.negocios,a=r.atividades,sit=r.situacao.split(' ')[0];
-  const neg=n.total?`<div class="val">${esc(n.ultimo.titulo)}</div><div class="sub">${esc(n.ultimo.situacao)} · ${dt(n.ultimo.data)}${n.ultimo.responsavel&&n.ultimo.responsavel!==r.responsavel?'<br>Responsável: '+esc(n.ultimo.responsavel):''}</div><div class="sub">${n.total} negócio(s) no total</div>`:'<div class="none">Nenhum negócio</div>';
+  const neg=n.total?`<div class="val">${esc(n.ultimo.titulo)}</div><div class="sub">${pill(n.ultimo.situacao)} ${dt(n.ultimo.data)}</div><div class="sub">${n.total} negócio(s) no total</div>`:'<div class="none">Nenhum negócio</div>';
   const at=a.total&&a.ultima?`<div class="val">${esc(a.ultima.tipo)}</div><div class="sub">${dt(a.ultima.data)}</div><div class="sub">${a.total} atividade(s) no total</div>`:'<div class="none">Nenhuma atividade</div>';
   return `<div class="res ${sit}"><div class="top"><div class="nome">${esc(r.nome)}<span class="chip">${esc(r.tipo)}</span></div>
   <span class="st ${sit}">${esc(r.situacao)}${r.diasSemMovimento!==null?' · último movimento há '+r.diasSemMovimento+' dias':''}</span></div>
   <div class="resp"><div class="av">${esc(ini(r.responsavel))}</div><div><small>Responsável</small><b>${esc(r.responsavel)}</b></div></div>
   <div class="grid"><div class="box"><div class="lbl">${I.neg}Último negócio</div>${neg}</div><div class="box"><div class="lbl">${I.ati}Última atividade</div>${at}</div></div>
+  ${negs(r.negocios)}
   ${orc(r.orcamentos)}
   <div class="cons"><div class="lbl">${I.usr}Últimas consultas a este cliente</div>${r.consultas&&r.consultas.length?'<ul>'+r.consultas.map(c=>`<li><b>${c.voce?'Você':esc(c.nome)}</b> · ${hora(c.data)}</li>`).join('')+'</ul>':'<div class="none">Ninguém consultou este cliente antes.</div>'}</div></div>`}
 $('f').onsubmit=async e=>{e.preventDefault();const q=$('q').value.trim();
