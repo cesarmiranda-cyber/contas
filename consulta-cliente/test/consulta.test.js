@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { createBitrix, consultar } = require('../lib');
+const { createBitrix, consultar, criarExclusao } = require('../lib');
 
 // Bitrix falso: responde ao batch executando cada comando contra tabelas em memória.
 function fake() {
@@ -50,4 +50,21 @@ test('ignora sufixo colado no webhook (ex.: /profile/)', async () => {
   let url; const bx = createBitrix(' https://x.bitrix24.com.br/rest/1/tok/profile/ ', async u => { url = u; return { json: async () => ({ result: [] }) }; });
   await bx.call('crm.company.list');
   assert.equal(url, 'https://x.bitrix24.com.br/rest/1/tok/crm.company.list.json');
+});
+
+test('não mostra clientes cujo responsável é do departamento excluído', async () => {
+  const { bx } = fake();                                   // o cliente "Acme" pertence ao usuário 7
+  const r = await consultar(bx, 'acme', { excluirResponsaveis: async () => ['7', '8'] });
+  assert.deepEqual(r.resultados, []);
+});
+test('exclusão resolve departamento pelo nome e lista os usuários', async () => {
+  const chamadas = [];
+  const bx = { call: async (m, p) => { chamadas.push(m);
+    if (m === 'department.get') return { result: [{ ID: '5', NAME: 'Vendas - Pack' }, { ID: '6', NAME: 'Vendas - Pack 2' }] };
+    return { result: [{ ID: '7' }, { ID: '8' }] }; } };
+  assert.deepEqual(await criarExclusao(bx, 'vendas - pack')(), ['7', '8']);
+});
+test('exclusão falha fechada se o departamento não existe', async () => {
+  const bx = { call: async () => ({ result: [] }) };
+  await assert.rejects(criarExclusao(bx, 'Inexistente')(), /não encontrado/);
 });

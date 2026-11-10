@@ -38,6 +38,11 @@ Depois, no Bitrix24: **Aplicativos → Recursos para desenvolvedores → Outro �
 - URL de instalação: `https://consulta.seudominio.com.br/install`
 - Permissões: `crm`, `user` · deixe em "Usar somente API" **desmarcado**, para abrir a interface.
 
+## Clientes que não aparecem
+`EXCLUIR_DEPARTAMENTOS="Vendas - Pack"` (nomes ou IDs, separados por vírgula) em `/etc/consulta-cliente.env`: clientes cujo **responsável** é membro desses
+departamentos nunca aparecem na busca. Resolver o departamento pelo nome exige o escopo `department` no webhook (com ID numérico basta `user`).
+Falha fechada: se o departamento não for achado, a busca dá erro em vez de mostrar tudo. A lista de membros é guardada por 5 minutos.
+
 ## Login (dois modos)
 - **Por senha única (link no menu ou navegador):** defina `APP_PASSWORD` em `/etc/consulta-cliente.env` e reinicie o serviço. Cookie de 12 h, 5 tentativas erradas por IP bloqueiam por 15 min.
 - **Por aplicativo local do Bitrix24 (abaixo):**

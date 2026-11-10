@@ -42,17 +42,46 @@ function createBitrix(webhook, fetchImpl = fetch) {
 const SEMANTICA = { P: 'Em andamento', S: 'Ganho', F: 'Perdido' };
 const arr = v => (Array.isArray(v) ? v : []);
 
-async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now } = {}) {
+// Responsáveis cujos clientes NÃO podem aparecer: membros dos departamentos em `spec` (nomes ou IDs, separados por vírgula).
+// Falha fechada: se não achar o departamento ou não conseguir ler os usuários, lança erro (nunca devolve "tudo liberado").
+function criarExclusao(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) {
+  const itens = String(spec || '').split(',').map(x => x.trim()).filter(Boolean);
+  let cache = null;
+  return async () => {
+    if (!itens.length) return [];
+    if (cache && agora() - cache.t < ttlMs) return cache.ids;
+    const deps = [];
+    for (const it of itens) {
+      if (/^\d+$/.test(it)) { deps.push(it); continue; }
+      const achados = arr((await bitrix.call('department.get', { NAME: it })).result).filter(d => String(d.NAME).toLowerCase() === it.toLowerCase());
+      if (!achados.length) throw new Error(`Departamento "${it}" não encontrado`);
+      deps.push(...achados.map(d => String(d.ID)));
+    }
+    const ids = new Set(); let start = 0;
+    for (;;) {
+      const r = await bitrix.call('user.get', { FILTER: { UF_DEPARTMENT: deps }, start });
+      arr(r.result).forEach(u => ids.add(String(u.ID)));
+      if (r.next === undefined || r.next === null) break;
+      start = r.next;
+    }
+    cache = { t: agora(), ids: [...ids] };
+    return cache.ids;
+  };
+}
+
+async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis } = {}) {
   const q = String(texto || '').trim().replace(/\s+/g, ' ');
   if (q.length < 3) { const e = new Error('Digite pelo menos 3 letras do nome.'); e.status = 400; throw e; }
   const tokens = q.split(' ');
   const contatoFiltros = tokens.length === 1
     ? [{ '%NAME': q }, { '%LAST_NAME': q }]
     : [{ '%NAME': tokens[0], '%LAST_NAME': tokens[tokens.length - 1] }];
+  const excl = excluirResponsaveis ? await excluirResponsaveis() : [];
+  const semExcl = f => (excl.length ? { ...f, '!ASSIGNED_BY_ID': excl } : f);   // o próprio Bitrix já não devolve esses cadastros
   const sel = { select: ['ID', 'ASSIGNED_BY_ID'], order: { ID: 'DESC' } };
-  const busca = { emp: { method: 'crm.company.list', params: { ...sel, select: ['ID', 'TITLE', 'ASSIGNED_BY_ID'], filter: { '%TITLE': q } } } };
+  const busca = { emp: { method: 'crm.company.list', params: { ...sel, select: ['ID', 'TITLE', 'ASSIGNED_BY_ID'], filter: semExcl({ '%TITLE': q }) } } };
   contatoFiltros.forEach((f, i) => {
-    busca['c' + i] = { method: 'crm.contact.list', params: { ...sel, select: ['ID', 'NAME', 'LAST_NAME', 'ASSIGNED_BY_ID'], filter: f } };
+    busca['c' + i] = { method: 'crm.contact.list', params: { ...sel, select: ['ID', 'NAME', 'LAST_NAME', 'ASSIGNED_BY_ID'], filter: semExcl(f) } };
   });
   const { result: r1 } = await bitrix.batch(busca);
   const clientes = [];
@@ -64,8 +93,9 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now } =
       clientes.push({ tipo: 'Contato', id: +c.ID, nome: [c.NAME, c.LAST_NAME].filter(Boolean).join(' ') || `Contato #${c.ID}`, resp: c.ASSIGNED_BY_ID, ownerType: 3, dealField: 'CONTACT_ID' });
     }
   }
-  const lista = clientes.slice(0, 15);
-  const maisResultados = clientes.length > lista.length;
+  const permitidos = clientes.filter(c => !excl.includes(String(c.resp)));   // segunda barreira, no próprio servidor
+  const lista = permitidos.slice(0, 15);
+  const maisResultados = permitidos.length > lista.length;
   if (!lista.length) return { resultados: [], maisResultados: false };
 
   // negócios (total + o mais recente) e atividades do próprio cadastro
@@ -118,4 +148,4 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now } =
   return { resultados, maisResultados };
 }
 
-module.exports = { createBitrix, consultar, qs };
+module.exports = { createBitrix, consultar, criarExclusao, qs };
