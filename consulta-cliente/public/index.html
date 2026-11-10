@@ -22,6 +22,7 @@
 <form id="f"><input id="q" placeholder="Nome do cliente ou da empresa" autofocus autocomplete="off"><button>Consultar</button></form>
 <div id="out"></div>
 <script>
+const TOKEN='__TOKEN__';
 const $=id=>document.getElementById(id), out=$('out');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const dt=s=>{const d=new Date(s);if(isNaN(d))return '';const dias=Math.floor((Date.now()-d)/864e5);
@@ -37,7 +38,7 @@ function card(r){
 $('f').onsubmit=async e=>{e.preventDefault();const q=$('q').value.trim();
   if(q.length<3){out.innerHTML='<div class="msg">Digite pelo menos 3 letras.</div>';return}
   out.innerHTML='<div class="msg">Consultando…</div>';
-  try{const r=await fetch('/api/consulta?q='+encodeURIComponent(q));const j=await r.json();
+  try{const r=await fetch('/api/consulta?q='+encodeURIComponent(q),{headers:{Authorization:'Bearer '+TOKEN}});const j=await r.json();
     if(!r.ok)throw new Error(j.error||'Erro');
     out.innerHTML=j.resultados.length?j.resultados.map(card).join('')+(j.maisResultados?'<div class="msg">Mostrando os 15 primeiros. Refine a busca.</div>':''):'<div class="msg">Nenhum cliente encontrado.</div>'
   }catch(x){out.innerHTML='<div class="msg err">'+esc(x.message)+'</div>'}};
