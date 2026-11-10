@@ -131,11 +131,13 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   const maisResultados = permitidos.length > lista.length;
   if (!lista.length) return { resultados: [], maisResultados: false };
 
+  let nomesFunis = {}; try { if (funisNomes) nomesFunis = await funisNomes(); } catch (e) { console.error(e.message); }
+  const todosFunis = Object.keys(nomesFunis);   // pede explicitamente todos os funis (o geral e os demais)
   // negócios (total + o mais recente) e atividades do próprio cadastro
   const cmds = {};
   for (const c of lista) {
     const k = `${c.ownerType}_${c.id}`;
-    cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID', 'CATEGORY_ID'] } };
+    cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id, ...(todosFunis.length > 1 ? { CATEGORY_ID: todosFunis } : {}) }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID', 'CATEGORY_ID'] } };
     cmds['a' + k] = { method: 'crm.activity.list', params: { filter: { OWNER_TYPE_ID: c.ownerType, OWNER_ID: c.id }, order: { CREATED: 'DESC' }, select: ['ID', 'SUBJECT', 'TYPE_ID', 'CREATED', 'COMPLETED'] } };
   }
   let funis = { ids: [], stages: {} }, orcErro = false;
@@ -159,7 +161,6 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   const todosNegocios = lista.flatMap(c => arr(r2[`d${c.ownerType}_${c.id}`]));
   const chave = c => `${c.ownerType}_${c.id}`;
   const consultasDe = c => (historico ? historico.ler(chave(c)) : []).slice(0, 5);
-  let nomesFunis = {}; try { if (funisNomes) nomesFunis = await funisNomes(); } catch (e) { console.error(e.message); }
   const respIds = [...new Set([...lista.map(c => c.resp), ...todosNegocios.map(d => d.ASSIGNED_BY_ID), ...lista.flatMap(c => consultasDe(c).map(e => e.u)), ...lista.flatMap(c => arr(r2[`o${c.ownerType}_${c.id}`]).map(d => d.ASSIGNED_BY_ID))].filter(Boolean))];
   const nomes = {};
   if (respIds.length) {

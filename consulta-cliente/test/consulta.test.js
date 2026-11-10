@@ -116,3 +116,17 @@ test('lista todos os negócios com situação ganho/perdido/em andamento e nome 
   assert.deepEqual([n.total, n.ganhos, n.perdidos, n.andamento], [3, 1, 1, 1]);
   assert.deepEqual(n.itens.map(i => [i.titulo, i.situacao, i.funil]), [['C', 'Em andamento', 'Funil geral'], ['B', 'Perdido', 'Orçamento Editorial'], ['A', 'Ganho', 'Orçamento Editorial']]);
 });
+
+test('pede os negócios de todos os funis (o geral e os demais)', async () => {
+  const pedidos = [];
+  const bx = createBitrix('https://x.bitrix24.com.br/rest/1/t/', async (url, { body }) => {
+    const p = new URLSearchParams(body), out = { result: {}, result_total: {} }, ok = j => ({ json: async () => j });
+    if (url.endsWith('user.get.json')) return ok({ result: [] });
+    for (const [k, v] of p) { const m = k.match(/^cmd\[(.+)\]$/); if (!m) continue; pedidos.push(decodeURIComponent(v));
+      out.result[m[1]] = v.startsWith('crm.company.list') ? [{ ID: '1', TITLE: 'Acme', ASSIGNED_BY_ID: '7' }] : []; out.result_total[m[1]] = 0; }
+    return ok({ result: out });
+  });
+  await consultar(bx, 'acme', { funisNomes: async () => ({ 0: 'Funil geral', 5: 'Orçamento Editorial', 9: 'Pack' }) });
+  const d = pedidos.find(x => x.startsWith('crm.deal.list'));
+  for (const id of ['0', '5', '9']) assert.ok(d.includes(`filter[CATEGORY_ID][${['0', '5', '9'].indexOf(id)}]=${id}`), d);
+});
