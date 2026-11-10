@@ -28,14 +28,21 @@ function fake() {
 
 test('resume responsável, negócio e última atividade (própria ou de negócio)', async () => {
   const { bx } = fake();
-  const { resultados } = await consultar(bx, 'acme');
+  const { resultados } = await consultar(bx, 'acme', { agora: () => Date.parse('2026-11-10') });
   const r = resultados[0];
   assert.equal(r.nome, 'Acme'); assert.equal(r.responsavel, 'Ana Lima');
   assert.equal(r.negocios.total, 1); assert.equal(r.negocios.ultimo.situacao, 'Ganho');
+  assert.equal(r.situacao, 'Inativo'); assert.ok(r.diasSemMovimento > 90);
+  assert.equal(r.negocios.ultimo.valor, undefined);
   assert.equal(r.atividades.total, 2); assert.match(r.atividades.ultima.data, /2026-05-01/);
 });
 test('exige ao menos 3 letras', async () => {
   const { bx, calls } = fake();
   await assert.rejects(consultar(bx, 'ab'), e => e.status === 400);
   assert.equal(calls.length, 0);
+});
+test('cliente com movimento recente aparece como Ativo', async () => {
+  const { bx } = fake();
+  const { resultados } = await consultar(bx, 'acme', { agora: () => Date.parse('2026-05-20') });
+  assert.equal(resultados[0].situacao, 'Ativo');
 });

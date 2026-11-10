@@ -9,6 +9,7 @@ histórico completo. O webhook nunca vai para o navegador.
 
 - Só entra quem está logado no Bitrix24 (cabeçalho `X-Vibe-User-Id` do gateway da Vibecode; sem ele → 401).
 - Somente leitura (`crm.*.list`, `user.get`, `batch`).
+- **Situação:** Ativo = houve negócio ou atividade nos últimos 90 dias (`INATIVO_DIAS` no arquivo de configuração muda o prazo); senão Inativo; sem nada = Sem histórico.
 - Busca: empresas por parte do título; contatos por nome/sobrenome. Mostra até 15 resultados, mínimo 3 letras.
 - Negócios do cliente = `COMPANY_ID`/`CONTACT_ID`; última atividade considera as do cadastro **e** as dos negócios dele.
 

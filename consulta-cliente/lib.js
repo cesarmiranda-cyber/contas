@@ -40,7 +40,7 @@ function createBitrix(webhook, fetchImpl = fetch) {
 const SEMANTICA = { P: 'Em andamento', S: 'Ganho', F: 'Perdido' };
 const arr = v => (Array.isArray(v) ? v : []);
 
-async function consultar(bitrix, texto) {
+async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now } = {}) {
   const q = String(texto || '').trim().replace(/\s+/g, ' ');
   if (q.length < 3) { const e = new Error('Digite pelo menos 3 letras do nome.'); e.status = 400; throw e; }
   const tokens = q.split(' ');
@@ -70,7 +70,7 @@ async function consultar(bitrix, texto) {
   const cmds = {};
   for (const c of lista) {
     const k = `${c.ownerType}_${c.id}`;
-    cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'OPPORTUNITY', 'CURRENCY_ID', 'DATE_CREATE'] } };
+    cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE'] } };
     cmds['a' + k] = { method: 'crm.activity.list', params: { filter: { OWNER_TYPE_ID: c.ownerType, OWNER_ID: c.id }, order: { CREATED: 'DESC' }, select: ['ID', 'SUBJECT', 'TYPE_ID', 'CREATED', 'COMPLETED'] } };
   }
   const { result: r2, total: t2 } = await bitrix.batch(cmds);
@@ -94,15 +94,21 @@ async function consultar(bitrix, texto) {
 
   const TIPOS = { 1: 'Reunião', 2: 'Ligação', 3: 'Tarefa', 4: 'E-mail', 6: 'Comentário' };
   const ativ = a => a && { assunto: a.SUBJECT || '(sem assunto)', tipo: TIPOS[a.TYPE_ID] || 'Atividade', data: a.CREATED, concluida: a.COMPLETED === 'Y' };
+  // Ativo = houve negócio ou atividade nos últimos `inativoDias` dias.
+  const diasDesde = d => { const t = Date.parse(d); return Number.isNaN(t) ? null : Math.floor((agora() - t) / 864e5); };
   const resultados = lista.map(c => {
     const k = `${c.ownerType}_${c.id}`;
     const d = arr(r2['d' + k]), proprias = arr(r2['a' + k]), dosNeg = arr(r3['a' + k]);
     const ultimaAtiv = [...proprias.slice(0, 1), ...dosNeg.slice(0, 1)].sort((x, y) => String(y.CREATED).localeCompare(String(x.CREATED)))[0];
     const u = d[0];
+    const datas = [u?.DATE_CREATE, ultimaAtiv?.CREATED].map(diasDesde).filter(x => x !== null);
+    const dias = datas.length ? Math.max(0, Math.min(...datas)) : null;
     return {
+      situacao: dias === null ? 'Sem histórico' : dias <= inativoDias ? 'Ativo' : 'Inativo',
+      diasSemMovimento: dias,
       tipo: c.tipo, nome: c.nome,
       responsavel: c.resp ? (nomes[c.resp] || `Usuário #${c.resp}`) : 'Sem responsável',
-      negocios: { total: +(t2['d' + k] ?? d.length), ultimo: u && { titulo: u.TITLE, situacao: SEMANTICA[u.STAGE_SEMANTIC_ID] || 'Em andamento', data: u.DATE_CREATE, valor: +u.OPPORTUNITY || 0, moeda: u.CURRENCY_ID } },
+      negocios: { total: +(t2['d' + k] ?? d.length), ultimo: u && { titulo: u.TITLE, situacao: SEMANTICA[u.STAGE_SEMANTIC_ID] || 'Em andamento', data: u.DATE_CREATE } },
       atividades: { total: +(t2['a' + k] ?? proprias.length) + +(t3['a' + k] ?? dosNeg.length), ultima: ativ(ultimaAtiv) },
     };
   });
