@@ -199,7 +199,10 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
         const grupo = sem => { const itens = arr(r2[`d${sem}${k}`]).map(item); return { total: +(t2[`d${sem}${k}`] ?? itens.length), itens }; };
         const andamento = grupo('P'), ganhos = grupo('S'), perdidos = grupo('F');
         const u = d[0];
-        return { total: andamento.total + ganhos.total + perdidos.total, andamento, ganhos, perdidos, ultimo: u && { ...item(u), situacao: SEMANTICA[u.STAGE_SEMANTIC_ID] || 'Em andamento' } };
+        const total = andamento.total + ganhos.total + perdidos.total, finalizados = ganhos.total + perdidos.total;
+        // aproveitamento = ganhos ÷ (ganhos + perdidos): os em andamento ainda não foram decididos. "sobreTotal" inclui os em andamento.
+        const aproveitamento = { finalizados, taxa: finalizados ? +(100 * ganhos.total / finalizados).toFixed(1) : null, sobreTotal: total ? +(100 * ganhos.total / total).toFixed(1) : null };
+        return { total, aproveitamento, andamento, ganhos, perdidos, ultimo: u && { ...item(u), situacao: SEMANTICA[u.STAGE_SEMANTIC_ID] || 'Em andamento' } };
       })(),
       atividades: { total: +(t2['a' + k] ?? proprias.length) + +(t3['a' + k] ?? dosNeg.length), ultima: ativ(ultimaAtiv) },
     };

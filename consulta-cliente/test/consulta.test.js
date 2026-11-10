@@ -119,6 +119,31 @@ test('separa os negócios por situação, com total correto de cada grupo e nome
   assert.deepEqual(n.andamento.itens.map(i => [i.titulo, i.funil]), [['C', 'Funil geral']]);
   assert.deepEqual(n.perdidos.itens.map(i => [i.titulo, i.funil]), [['B', 'Orçamento Editorial']]);
   assert.equal(n.ultimo.titulo, 'C'); assert.equal(n.ultimo.situacao, 'Em andamento');
+  assert.deepEqual(n.aproveitamento, { finalizados: 23, taxa: 95.7, sobreTotal: 44 });   // 22/23 e 22/50
+});
+test('aproveitamento com os números reais: 337 ganhos, 163 perdidos, 69 em andamento', async () => {
+  const bx = createBitrix('https://x.bitrix24.com.br/rest/1/t/', async (url, { body }) => {
+    const p = new URLSearchParams(body), out = { result: {}, result_total: {} }, ok = j => ({ json: async () => j });
+    if (url.endsWith('user.get.json')) return ok({ result: [] });
+    for (const [k, v] of p) { const m = k.match(/^cmd\[(.+)\]$/); if (!m) continue;
+      out.result[m[1]] = v.startsWith('crm.company.list') ? [{ ID: '1', TITLE: 'Pipoca', ASSIGNED_BY_ID: '7' }] : [];
+      out.result_total[m[1]] = v.includes('SEMANTIC_ID%5D=S') ? 337 : v.includes('SEMANTIC_ID%5D=F') ? 163 : v.includes('SEMANTIC_ID%5D=P') ? 69 : 0; }
+    return ok({ result: out });
+  });
+  const a = (await consultar(bx, 'pipoca')).resultados[0].negocios.aproveitamento;
+  assert.deepEqual(a, { finalizados: 500, taxa: 67.4, sobreTotal: 59.2 });
+});
+test('aproveitamento sem negócios finalizados não divide por zero', async () => {
+  const { bx } = fake();
+  const a = (await consultar(bx, 'acme')).resultados[0].negocios.aproveitamento;   // só 1 ganho; nenhum perdido
+  assert.equal(a.taxa, 100);
+  const sem = createBitrix('https://x.bitrix24.com.br/rest/1/t/', async (url, { body }) => {
+    const out = { result: {}, result_total: {} };
+    for (const [k, v] of new URLSearchParams(body)) { const m = k.match(/^cmd\[(.+)\]$/); if (m) { out.result[m[1]] = v.startsWith('crm.company.list') ? [{ ID: '1', TITLE: 'X', ASSIGNED_BY_ID: '' }] : []; out.result_total[m[1]] = 0; } }
+    return { json: async () => (url.endsWith('user.get.json') ? { result: [] } : { result: out }) };
+  });
+  const b = (await consultar(sem, 'xxx')).resultados[0].negocios.aproveitamento;
+  assert.deepEqual(b, { finalizados: 0, taxa: null, sobreTotal: null });
 });
 test('pede os negócios de todos os funis (o geral e os demais)', async () => {
   const pedidos = [];
