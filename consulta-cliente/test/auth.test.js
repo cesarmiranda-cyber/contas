@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { createAuth } = require('../auth');
+const { createAuth, permitido } = require('../auth');
 
 const fetchOk = async () => ({ json: async () => ({ result: { ID: '42' } }) });
 test('troca AUTH_ID do portal certo por token válido', async () => {
@@ -30,4 +30,9 @@ test('senha única: aceita a certa, bloqueia após 5 erros', () => {
   assert.equal(a.verificar(a.entrarSenha('abc', 'abc', '1.1.1.1')).id, '0');
   for (let i = 0; i < 5; i++) assert.equal(a.entrarSenha('x', 'abc', '2.2.2.2'), null);
   assert.equal(a.entrarSenha('abc', 'abc', '2.2.2.2'), 'bloqueado');
+});
+test('lista de usuários permitidos (vazia libera todos)', () => {
+  assert.equal(permitido('9', ''), true);
+  assert.equal(permitido('9', '3, 9 ,12'), true);
+  assert.equal(permitido('4', '3,9,12'), false);
 });

@@ -38,6 +38,10 @@ Depois, no Bitrix24: **Aplicativos → Recursos para desenvolvedores → Outro �
 - URL de instalação: `https://consulta.seudominio.com.br/install`
 - Permissões: `crm`, `user` · deixe em "Usar somente API" **desmarcado**, para abrir a interface.
 
+## Quem pode consultar
+Por padrão, qualquer usuário logado no Bitrix24 que consiga abrir o app. Para limitar, liste os **IDs** dos usuários em `/etc/consulta-cliente.env`
+(`ALLOWED_USER_IDS=12,45,78`) e reinicie o serviço. O ID está na URL do perfil: `.../company/personal/user/ID/`. Fora da lista → "não autorizado".
+
 ## Login (dois modos)
 - **Por senha única (link no menu ou navegador):** defina `APP_PASSWORD` em `/etc/consulta-cliente.env` e reinicie o serviço. Cookie de 12 h, 5 tentativas erradas por IP bloqueiam por 15 min.
 - **Por aplicativo local do Bitrix24 (abaixo):**
