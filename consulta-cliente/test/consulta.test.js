@@ -46,3 +46,8 @@ test('cliente com movimento recente aparece como Ativo', async () => {
   const { resultados } = await consultar(bx, 'acme', { agora: () => Date.parse('2026-05-20') });
   assert.equal(resultados[0].situacao, 'Ativo');
 });
+test('ignora sufixo colado no webhook (ex.: /profile/)', async () => {
+  let url; const bx = createBitrix(' https://x.bitrix24.com.br/rest/1/tok/profile/ ', async u => { url = u; return { json: async () => ({ result: [] }) }; });
+  await bx.call('crm.company.list');
+  assert.equal(url, 'https://x.bitrix24.com.br/rest/1/tok/crm.company.list.json');
+});

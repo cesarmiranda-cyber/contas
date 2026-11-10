@@ -12,7 +12,9 @@ function flatten(obj, prefix, out) {
 const qs = o => new URLSearchParams(flatten(o, '', [])).toString();
 
 function createBitrix(webhook, fetchImpl = fetch) {
-  const base = String(webhook || '').replace(/\/+$/, '');
+  // Usa só https://portal/rest/ID/TOKEN: se colaram a URL de exemplo do Bitrix (ex.: .../TOKEN/profile/), o sufixo é descartado.
+  const raw = String(webhook || '').trim();
+  const base = (raw.match(/^https?:\/\/[^/\s]+\/rest\/\d+\/[^/\s]+/) || [raw.replace(/\/+$/, '')])[0];
   async function call(method, params = {}) {
     if (!base) throw new Error('BITRIX_WEBHOOK não configurado');
     const r = await fetchImpl(`${base}/${method}.json`, {
