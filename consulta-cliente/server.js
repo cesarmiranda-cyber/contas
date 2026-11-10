@@ -3,7 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { createBitrix, consultar } = require('./lib');
-const { createAuth, permitido } = require('./auth');
+const { createAuth } = require('./auth');
 
 try { // .env opcional (em produção as variáveis já vêm no processo)
   for (const l of fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split('\n')) {
@@ -25,11 +25,7 @@ const json = (res, code, obj) => { res.writeHead(code, { ...SEC, 'Content-Type':
 // Só usuário logado no Bitrix24: token assinado emitido em POST / (abertura do app). AUTH_DISABLED=1 só para desenvolvimento.
 const cookie = req => (String(req.headers.cookie || '').match(/(?:^|;\s*)sessao=([^;]+)/) || [])[1] || '';
 const tokenDe = req => (req.headers.authorization || '').replace(/^Bearer /, '') || cookie(req);
-const logado = req => {
-  if (process.env.AUTH_DISABLED === '1') return true;
-  const v = auth && auth.verificar(tokenDe(req));
-  return !!v && permitido(v.id, process.env.ALLOWED_USER_IDS);
-};
+const logado = req => process.env.AUTH_DISABLED === '1' || !!(auth && auth.verificar(tokenDe(req)));
 const loginPage = erro => `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Entrar</title>
 <body style="font:16px system-ui;max-width:360px;margin:15vh auto;padding:0 16px"><h2>Consultar cliente</h2>${erro ? `<p style="color:#c0392b">${erro}</p>` : ''}
 <form method=post action=/login><input type=password name=senha placeholder="Senha de acesso" autofocus style="width:100%;padding:10px;font-size:16px;box-sizing:border-box"><button style="margin-top:10px;padding:10px 18px;font-size:16px">Entrar</button></form></body>`;
@@ -55,11 +51,6 @@ const server = http.createServer(async (req, res) => {
       const f = req.method === 'POST' ? await lerForm(req) : u.searchParams;
       const tok = auth && await auth.entrar({ authId: f.get('AUTH_ID'), domain: f.get('DOMAIN') || u.searchParams.get('DOMAIN') });
       if (!tok) console.log(`login Bitrix recusado: auth=${!!auth} AUTH_ID=${f.get('AUTH_ID') ? 'sim' : 'não'} DOMAIN=${f.get('DOMAIN') || u.searchParams.get('DOMAIN') || '(vazio)'} esperado=${process.env.PORTAL_DOMAIN || '(não configurado)'}`);
-      const quem = tok && auth.verificar(tok);
-      if (quem && !permitido(quem.id, process.env.ALLOWED_USER_IDS)) {
-        console.log(`usuário ${quem.id} sem permissão (ALLOWED_USER_IDS)`);
-        return html(res, 403, 'Seu usuário não está autorizado a usar esta consulta. Peça a liberação ao administrador.');
-      }
       return tok ? html(res, 200, pagina(tok)) : html(res, 401, 'Não foi possível confirmar seu login no Bitrix24. Abra o app por dentro do Bitrix24.');
     }
     if (u.pathname === '/login' && req.method === 'POST') {     // acesso por senha (link fora do Bitrix)

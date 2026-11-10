@@ -34,9 +34,4 @@ function createAuth({ portal, secret, ttlMs = 12 * 3600e3, fetchImpl = fetch, no
   }
   return { emitir, verificar, entrar, entrarSenha };
 }
-// Lista de IDs permitidos (ALLOWED_USER_IDS=12,45,78). Vazia = qualquer usuário logado no Bitrix24 pode consultar.
-const permitido = (id, lista) => {
-  const ids = String(lista || '').split(',').map(x => x.trim()).filter(Boolean);
-  return !ids.length || ids.includes(String(id));
-};
-module.exports = { createAuth, permitido };
+module.exports = { createAuth };
