@@ -37,6 +37,8 @@ Depois, no Bitrix24: **Aplicativos → Recursos para desenvolvedores → Outro �
 - URL de instalação: `https://consulta.seudominio.com.br/install`
 - Permissões: `crm`, `user` · deixe em "Usar somente API" **desmarcado**, para abrir a interface.
 
-## Login
+## Login (dois modos)
+- **Por senha única (link no menu ou navegador):** defina `APP_PASSWORD` em `/etc/consulta-cliente.env` e reinicie o serviço. Cookie de 12 h, 5 tentativas erradas por IP bloqueiam por 15 min.
+- **Por aplicativo local do Bitrix24 (abaixo):**
 Ao abrir o app o Bitrix envia `AUTH_ID`/`DOMAIN`; o servidor confirma no portal (`profile`), aceita só o `PORTAL_DOMAIN` configurado e entrega um token assinado (12 h).
 Acessar a URL direto, fora do Bitrix, não mostra nada. Quem abre o app precisa ter acesso a ele (Aplicativos → disponibilidade).

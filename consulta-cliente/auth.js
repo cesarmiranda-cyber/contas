@@ -22,6 +22,15 @@ function createAuth({ portal, secret, ttlMs = 12 * 3600e3, fetchImpl = fetch, no
     const j = r && await r.json().catch(() => null);
     return j?.result?.ID ? emitir(j.result.ID) : null;
   }
-  return { emitir, verificar, entrar };
+  // Acesso por senha única (quando o app é aberto por link, fora do Bitrix). Limita tentativas por IP.
+  const falhas = new Map();
+  function entrarSenha(senha, esperada, ip) {
+    const f = falhas.get(ip) || { n: 0, ate: 0 };
+    if (f.n >= 5 && now() < f.ate) return 'bloqueado';
+    const a = crypto.createHash('sha256').update(String(senha || '')).digest(), b = crypto.createHash('sha256').update(String(esperada || '')).digest();
+    if (!esperada || !crypto.timingSafeEqual(a, b)) { falhas.set(ip, { n: f.n + 1, ate: now() + 15 * 60e3 }); return null; }
+    falhas.delete(ip); return emitir('0');
+  }
+  return { emitir, verificar, entrar, entrarSenha };
 }
 module.exports = { createAuth };

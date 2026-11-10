@@ -16,3 +16,9 @@ test('recusa outro domínio, token adulterado e token vencido', async () => {
   assert.equal(a.verificar(t.slice(0, -2) + 'aa'), null);
   n += 11; assert.equal(a.verificar(t), null);
 });
+test('senha única: aceita a certa, bloqueia após 5 erros', () => {
+  const a = createAuth({ portal: 'p', secret: 's' });
+  assert.equal(a.verificar(a.entrarSenha('abc', 'abc', '1.1.1.1')).id, '0');
+  for (let i = 0; i < 5; i++) assert.equal(a.entrarSenha('x', 'abc', '2.2.2.2'), null);
+  assert.equal(a.entrarSenha('abc', 'abc', '2.2.2.2'), 'bloqueado');
+});

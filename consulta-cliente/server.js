@@ -23,8 +23,12 @@ const SEC = {
 const json = (res, code, obj) => { res.writeHead(code, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
 
 // Só usuário logado no Bitrix24: token assinado emitido em POST / (abertura do app). AUTH_DISABLED=1 só para desenvolvimento.
-const logado = req => process.env.AUTH_DISABLED === '1' ||
-  !!(auth && auth.verificar((req.headers.authorization || '').replace(/^Bearer /, '')));
+const cookie = req => (String(req.headers.cookie || '').match(/(?:^|;\s*)sessao=([^;]+)/) || [])[1] || '';
+const tokenDe = req => (req.headers.authorization || '').replace(/^Bearer /, '') || cookie(req);
+const logado = req => process.env.AUTH_DISABLED === '1' || !!(auth && auth.verificar(tokenDe(req)));
+const loginPage = erro => `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Entrar</title>
+<body style="font:16px system-ui;max-width:360px;margin:15vh auto;padding:0 16px"><h2>Consultar cliente</h2>${erro ? `<p style="color:#c0392b">${erro}</p>` : ''}
+<form method=post action=/login><input type=password name=senha placeholder="Senha de acesso" autofocus style="width:100%;padding:10px;font-size:16px;box-sizing:border-box"><button style="margin-top:10px;padding:10px 18px;font-size:16px">Entrar</button></form></body>`;
 const html = (res, code, body) => { res.writeHead(code, { ...SEC, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(body); };
 const lerForm = req => new Promise(ok => {
   let t = ''; req.on('data', c => { if (t.length < 1e5) t += c; }); req.on('end', () => ok(new URLSearchParams(t))); req.on('error', () => ok(new URLSearchParams()));
@@ -47,8 +51,16 @@ const server = http.createServer(async (req, res) => {
       const tok = auth && await auth.entrar({ authId: f.get('AUTH_ID'), domain: f.get('DOMAIN') });
       return tok ? html(res, 200, pagina(tok)) : html(res, 401, 'Não foi possível confirmar seu login no Bitrix24. Abra o app por dentro do Bitrix24.');
     }
+    if (u.pathname === '/login' && req.method === 'POST') {     // acesso por senha (link fora do Bitrix)
+      const f = await lerForm(req), ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress).split(',')[0].trim();
+      const tok = auth && process.env.APP_PASSWORD ? auth.entrarSenha(f.get('senha'), process.env.APP_PASSWORD, ip) : null;
+      if (tok === 'bloqueado') return html(res, 429, loginPage('Muitas tentativas. Tente de novo em 15 minutos.'));
+      if (!tok) return html(res, 401, loginPage('Senha incorreta.'));
+      res.writeHead(303, { ...SEC, Location: '/', 'Set-Cookie': `sessao=${tok}; Max-Age=43200; Path=/; HttpOnly; Secure; SameSite=Lax` }); return res.end();
+    }
     if (u.pathname === '/' && req.method === 'GET') {
-      return process.env.AUTH_DISABLED === '1' ? html(res, 200, pagina('dev')) : html(res, 401, 'Abra este app por dentro do Bitrix24.');
+      if (process.env.AUTH_DISABLED === '1') return html(res, 200, pagina('dev'));
+      return logado(req) ? html(res, 200, pagina(cookie(req))) : html(res, process.env.APP_PASSWORD ? 200 : 401, process.env.APP_PASSWORD ? loginPage('') : 'Abra este app por dentro do Bitrix24.');
     }
     json(res, 404, { error: 'Não encontrado.' });
   } catch (e) {
