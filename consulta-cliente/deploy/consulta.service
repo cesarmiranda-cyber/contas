@@ -7,6 +7,7 @@ WorkingDirectory=/opt/consulta-cliente
 EnvironmentFile=/etc/consulta-cliente.env
 ExecStart=/usr/bin/node server.js
 Restart=always
+StateDirectory=consulta-cliente
 NoNewPrivileges=true
 [Install]
 WantedBy=multi-user.target

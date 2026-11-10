@@ -69,7 +69,7 @@ function criarExclusao(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) 
   };
 }
 
-async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis } = {}) {
+async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis, historico, usuario } = {}) {
   const q = String(texto || '').trim().replace(/\s+/g, ' ');
   if (q.length < 3) { const e = new Error('Digite pelo menos 3 letras do nome.'); e.status = 400; throw e; }
   const tokens = q.split(' ');
@@ -117,7 +117,9 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
 
   // responsáveis
   const ultimosNegocios = lista.map(c => arr(r2[`d${c.ownerType}_${c.id}`])[0]).filter(Boolean);
-  const respIds = [...new Set([...lista.map(c => c.resp), ...ultimosNegocios.map(d => d.ASSIGNED_BY_ID)].filter(Boolean))];
+  const chave = c => `${c.ownerType}_${c.id}`;
+  const consultasDe = c => (historico ? historico.ler(chave(c)) : []).slice(0, 5);
+  const respIds = [...new Set([...lista.map(c => c.resp), ...ultimosNegocios.map(d => d.ASSIGNED_BY_ID), ...lista.flatMap(c => consultasDe(c).map(e => e.u))].filter(Boolean))];
   const nomes = {};
   if (respIds.length) {
     try {
@@ -137,6 +139,7 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
     const datas = [u?.DATE_CREATE, ultimaAtiv?.CREATED].map(diasDesde).filter(x => x !== null);
     const dias = datas.length ? Math.max(0, Math.min(...datas)) : null;
     return {
+      consultas: consultasDe(c).map(e => ({ nome: nomes[e.u] || `Usuário #${e.u}`, data: e.t, voce: e.u === String(usuario) })),
       situacao: dias === null ? 'Sem histórico' : dias <= inativoDias ? 'Ativo' : 'Inativo',
       diasSemMovimento: dias,
       tipo: c.tipo, nome: c.nome,
@@ -145,6 +148,8 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
       atividades: { total: +(t2['a' + k] ?? proprias.length) + +(t3['a' + k] ?? dosNeg.length), ultima: ativ(ultimaAtiv) },
     };
   });
+  // registra só depois de montar a resposta: o histórico mostrado é o das consultas anteriores
+  if (historico && usuario !== undefined) for (const c of lista) historico.registrar(chave(c), usuario);
   return { resultados, maisResultados };
 }
 

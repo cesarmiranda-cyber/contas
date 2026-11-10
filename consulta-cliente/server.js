@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { createBitrix, consultar, criarExclusao } = require('./lib');
 const { createAuth } = require('./auth');
+const { criarHistorico } = require('./historico');
 
 try { // .env opcional (em produção as variáveis já vêm no processo)
   for (const l of fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split('\n')) {
@@ -14,6 +15,7 @@ try { // .env opcional (em produção as variáveis já vêm no processo)
 
 const bitrix = createBitrix(process.env.BITRIX_WEBHOOK);
 const PORT = +process.env.PORT || 3000;
+const historico = criarHistorico(process.env.DATA_DIR || process.env.STATE_DIRECTORY || path.join(__dirname, 'data'));
 const excluirResponsaveis = criarExclusao(bitrix, process.env.EXCLUIR_DEPARTAMENTOS);
 const auth = process.env.PORTAL_DOMAIN && process.env.SESSION_SECRET
   ? createAuth({ portal: process.env.PORTAL_DOMAIN, secret: process.env.SESSION_SECRET }) : null;
@@ -26,7 +28,8 @@ const json = (res, code, obj) => { res.writeHead(code, { ...SEC, 'Content-Type':
 // Só usuário logado no Bitrix24: token assinado emitido em POST / (abertura do app). AUTH_DISABLED=1 só para desenvolvimento.
 const cookie = req => (String(req.headers.cookie || '').match(/(?:^|;\s*)sessao=([^;]+)/) || [])[1] || '';
 const tokenDe = req => (req.headers.authorization || '').replace(/^Bearer /, '') || cookie(req);
-const logado = req => process.env.AUTH_DISABLED === '1' || !!(auth && auth.verificar(tokenDe(req)));
+const quemE = req => process.env.AUTH_DISABLED === '1' ? { id: '0' } : (auth && auth.verificar(tokenDe(req))) || null;
+const logado = req => !!quemE(req);
 const loginPage = erro => `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Entrar</title>
 <body style="font:16px system-ui;max-width:360px;margin:15vh auto;padding:0 16px"><h2>Consultar cliente</h2>${erro ? `<p style="color:#c0392b">${erro}</p>` : ''}
 <form method=post action=/login><input type=password name=senha placeholder="Senha de acesso" autofocus style="width:100%;padding:10px;font-size:16px;box-sizing:border-box"><button style="margin-top:10px;padding:10px 18px;font-size:16px">Entrar</button></form></body>`;
@@ -43,7 +46,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/health') return json(res, 200, { ok: true });
     if (u.pathname === '/api/consulta') {
       if (!logado(req)) return json(res, 401, { error: 'Entre pelo Bitrix24 para usar a consulta.' });
-      return json(res, 200, await consultar(bitrix, u.searchParams.get('q'), { inativoDias: +process.env.INATIVO_DIAS || 90, excluirResponsaveis }));
+      return json(res, 200, await consultar(bitrix, u.searchParams.get('q'), { inativoDias: +process.env.INATIVO_DIAS || 90, excluirResponsaveis, historico, usuario: quemE(req).id }));
     }
     if (u.pathname === '/install' && req.method === 'POST') {   // Bitrix chama ao instalar o app local
       return html(res, 200, '<script src="https://api.bitrix24.com/api/v1/"></script><script>BX24.init(function(){BX24.installFinish()})</script>');

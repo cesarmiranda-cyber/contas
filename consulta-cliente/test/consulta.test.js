@@ -68,3 +68,11 @@ test('exclusão falha fechada se o departamento não existe', async () => {
   const bx = { call: async () => ({ result: [] }) };
   await assert.rejects(criarExclusao(bx, 'Inexistente')(), /não encontrado/);
 });
+
+test('mostra quem consultou antes e registra a consulta atual', async () => {
+  const { bx } = fake(); const regs = [];
+  const historico = { ler: k => k === '4_1' ? [{ u: '7', t: '2026-11-01T10:00:00Z' }] : [], registrar: (k, u) => regs.push([k, u]) };
+  const { resultados } = await consultar(bx, 'acme', { historico, usuario: '99' });
+  assert.equal(resultados[0].consultas[0].nome, 'Ana Lima'); assert.equal(resultados[0].consultas[0].voce, false);
+  assert.deepEqual(regs, [['4_1', '99']]);
+});
