@@ -7,7 +7,7 @@ apt-get update -y && apt-get install -y curl debian-keyring debian-archive-keyri
 command -v node >/dev/null || { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; }
 command -v caddy >/dev/null || { apt-get install -y caddy; }
 id consulta >/dev/null 2>&1 || useradd --system --home /opt/consulta-cliente consulta
-mkdir -p /opt/consulta-cliente && cp -r server.js lib.js auth.js package.json public /opt/consulta-cliente/ && chown -R consulta /opt/consulta-cliente
+mkdir -p /opt/consulta-cliente && cp -r ./*.js package.json public /opt/consulta-cliente/ && chown -R consulta /opt/consulta-cliente
 if [ ! -f /etc/consulta-cliente.env ]; then
   read -rsp "Cole o webhook do Bitrix24 (não aparece na tela): " WH; echo
   umask 077
