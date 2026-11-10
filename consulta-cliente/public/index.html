@@ -64,7 +64,7 @@ function grupoNeg(nome,cls,g,aberto){
   return `<details class="grp"${aberto?' open':''}><summary><span class="pill ${cls}">${nome}</span> ${g.total} negócio(s)</summary><div class="scroll"><table><tr><th>Negócio</th><th>Funil</th><th>Data</th><th>Responsável</th></tr>${g.itens.map(i=>`<tr><td>${esc(i.titulo)}</td><td>${esc(i.funil)}</td><td>${dt(i.data)}</td><td>${esc(i.responsavel)}</td></tr>`).join('')}</table></div>${mais}</details>`}
 function negs(n){
   if(!n.total)return '';
-  return `<div class="orc"><div style="font-weight:700;color:var(--navy)">Negócios (${n.total})</div>${grupoNeg('Em andamento','Em',n.andamento,true)}${grupoNeg('Ganho','Ganho',n.ganhos,false)}${grupoNeg('Perdido','Perdido',n.perdidos,false)}</div>`}
+  return `<div class="orc"><div style="font-weight:700;color:var(--navy)">Negócios (${n.total})</div>${grupoNeg('Em andamento','Em',n.andamento,false)}${grupoNeg('Ganho','Ganho',n.ganhos,false)}${grupoNeg('Perdido','Perdido',n.perdidos,false)}</div>`}
 function orc(o){
   if(!o||!o.itens&&!o.erro)return '';
   if(o.erro)return '<div class="orc none">Não foi possível carregar os orçamentos agora.</div>';
