@@ -44,7 +44,7 @@ departamentos nunca aparecem na busca. Resolver o departamento pelo nome exige o
 Falha fechada: se o departamento não for achado, a busca dá erro em vez de mostrar tudo. A lista de membros é guardada por 5 minutos.
 
 ## Histórico de consultas
-Cada resultado mostra as últimas 5 pessoas que consultaram aquele cliente (nome do Bitrix e data/hora). Fica em `consultas.json` (modo 600) no diretório de estado do serviço (`/var/lib/consulta-cliente`); guarda até 20 por cliente; a mesma pessoa consultando de novo em 10 min só atualiza a hora.
+Cada resultado mostra as últimas 10 consultas que consultaram aquele cliente (nome do Bitrix e data/hora). Fica em `consultas.json` (modo 600) no diretório de estado do serviço (`/var/lib/consulta-cliente`); guarda até 20 por cliente; a mesma pessoa consultando de novo em 10 min só atualiza a hora.
 
 ## Orçamentos
 `ORCAMENTO_FUNIS="Orçamento Editorial"` (nomes ou IDs de funis de negócio, separados por vírgula): cada cartão ganha "Orçamentos (N)" com título, etapa, data e responsável dos negócios do cliente nesses funis (50 mais recentes). Se o funil não for achado, só essa parte mostra aviso; a busca continua.

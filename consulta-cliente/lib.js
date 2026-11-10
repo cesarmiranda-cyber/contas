@@ -160,7 +160,7 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   // responsáveis
   const todosNegocios = lista.flatMap(c => arr(r2[`d${c.ownerType}_${c.id}`]));
   const chave = c => `${c.ownerType}_${c.id}`;
-  const consultasDe = c => (historico ? historico.ler(chave(c)) : []).slice(0, 5);
+  const consultasDe = c => (historico ? historico.ler(chave(c)) : []).slice(0, 10);
   const respIds = [...new Set([...lista.map(c => c.resp), ...todosNegocios.map(d => d.ASSIGNED_BY_ID), ...lista.flatMap(c => consultasDe(c).map(e => e.u)), ...lista.flatMap(c => arr(r2[`o${c.ownerType}_${c.id}`]).map(d => d.ASSIGNED_BY_ID))].filter(Boolean))];
   const nomes = {};
   if (respIds.length) {

@@ -130,3 +130,11 @@ test('pede os negócios de todos os funis (o geral e os demais)', async () => {
   const d = pedidos.find(x => x.startsWith('crm.deal.list'));
   for (const id of ['0', '5', '9']) assert.ok(d.includes(`filter[CATEGORY_ID][${['0', '5', '9'].indexOf(id)}]=${id}`), d);
 });
+
+test('mostra até 10 consultas anteriores do cliente', async () => {
+  const { bx } = fake();
+  const historico = { ler: () => Array.from({ length: 15 }, (_, i) => ({ u: '7', t: `2026-11-${String(15 - i).padStart(2, '0')}T10:00:00Z` })), registrar: () => {} };
+  const { resultados } = await consultar(bx, 'acme', { historico, usuario: '99' });
+  assert.equal(resultados[0].consultas.length, 10);
+  assert.match(resultados[0].consultas[0].data, /2026-11-15/);
+});
