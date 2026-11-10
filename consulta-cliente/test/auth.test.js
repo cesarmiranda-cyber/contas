@@ -9,6 +9,15 @@ test('troca AUTH_ID do portal certo por token válido', async () => {
   const t = await a.entrar({ authId: 'x', domain: 'p.bitrix24.com.br' });
   assert.equal(a.verificar(t).id, '42');
 });
+test('aceita quando o Bitrix não informa o DOMAIN (valida no portal configurado)', async () => {
+  let url; const a = createAuth({ portal: 'p.bitrix24.com.br', secret: 's', fetchImpl: async u => { url = u; return { json: async () => ({ result: { ID: '7' } }) }; } });
+  assert.equal(a.verificar(await a.entrar({ authId: 'x', domain: '' })).id, '7');
+  assert.match(url, /^https:\/\/p\.bitrix24\.com\.br\//);
+});
+test('recusa token que o portal não reconhece', async () => {
+  const a = createAuth({ portal: 'p.bitrix24.com.br', secret: 's', fetchImpl: async () => ({ json: async () => ({ error: 'expired_token' }) }) });
+  assert.equal(await a.entrar({ authId: 'x', domain: '' }), null);
+});
 test('recusa outro domínio, token adulterado e token vencido', async () => {
   let n = 1000; const a = createAuth({ portal: 'p.bitrix24.com.br', secret: 's', fetchImpl: fetchOk, now: () => n, ttlMs: 10 });
   assert.equal(await a.entrar({ authId: 'x', domain: 'falso.com' }), null);

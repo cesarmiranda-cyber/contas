@@ -15,9 +15,10 @@ function createAuth({ portal, secret, ttlMs = 12 * 3600e3, fetchImpl = fetch, no
     if (esperado.length !== dado.length || !crypto.timingSafeEqual(esperado, dado)) return null;
     try { const v = JSON.parse(Buffer.from(p, 'base64url')); return v.exp > now() && /^\d+$/.test(v.id) ? v : null; } catch { return null; }
   }
-  // Troca o AUTH_ID do Bitrix por um token nosso. Só aceita o portal configurado (evita apontar para um servidor falso).
+  // Troca o AUTH_ID do Bitrix por um token nosso. A validação real é o `profile` no portal configurado (nunca em outro host);
+  // se o Bitrix informar um DOMAIN diferente, recusa. Algumas versões do Bitrix mandam o DOMAIN só na URL, ou não mandam.
   async function entrar({ authId, domain }) {
-    if (!authId || String(domain || '').toLowerCase() !== portal.toLowerCase()) return null;
+    if (!authId || (domain && String(domain).toLowerCase() !== portal.toLowerCase())) return null;
     const r = await fetchImpl(`https://${portal}/rest/profile.json?auth=${encodeURIComponent(authId)}`).catch(() => null);
     const j = r && await r.json().catch(() => null);
     return j?.result?.ID ? emitir(j.result.ID) : null;

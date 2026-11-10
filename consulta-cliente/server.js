@@ -49,8 +49,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (u.pathname === '/' && (req.method === 'POST' || (req.method === 'GET' && u.searchParams.get('AUTH_ID')))) {   // Bitrix abre o app (iframe) com AUTH_ID e DOMAIN
       const f = req.method === 'POST' ? await lerForm(req) : u.searchParams;
-      const tok = auth && await auth.entrar({ authId: f.get('AUTH_ID'), domain: f.get('DOMAIN') });
-      if (!tok) console.log(`login Bitrix recusado: auth=${!!auth} AUTH_ID=${f.get('AUTH_ID') ? 'sim' : 'não'} DOMAIN=${f.get('DOMAIN') || '(vazio)'} esperado=${process.env.PORTAL_DOMAIN || '(não configurado)'}`);
+      const tok = auth && await auth.entrar({ authId: f.get('AUTH_ID'), domain: f.get('DOMAIN') || u.searchParams.get('DOMAIN') });
+      if (!tok) console.log(`login Bitrix recusado: auth=${!!auth} AUTH_ID=${f.get('AUTH_ID') ? 'sim' : 'não'} DOMAIN=${f.get('DOMAIN') || u.searchParams.get('DOMAIN') || '(vazio)'} esperado=${process.env.PORTAL_DOMAIN || '(não configurado)'}`);
       return tok ? html(res, 200, pagina(tok)) : html(res, 401, 'Não foi possível confirmar seu login no Bitrix24. Abra o app por dentro do Bitrix24.');
     }
     if (u.pathname === '/login' && req.method === 'POST') {     // acesso por senha (link fora do Bitrix)
