@@ -102,6 +102,8 @@ function criarExclusao(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) 
   };
 }
 
+const SEMS = ['P', 'S', 'F'];   // em andamento, ganho, perdido
+
 async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis, historico, usuario, orcamentos, funisNomes } = {}) {
   const q = String(texto || '').trim().replace(/\s+/g, ' ');
   if (q.length < 3) { const e = new Error('Digite pelo menos 3 letras do nome.'); e.status = 400; throw e; }
@@ -137,7 +139,9 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   const cmds = {};
   for (const c of lista) {
     const k = `${c.ownerType}_${c.id}`;
-    cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id, ...(todosFunis.length > 1 ? { CATEGORY_ID: todosFunis } : {}) }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID', 'CATEGORY_ID'] } };
+    for (const sem of SEMS) {
+      cmds[`d${sem}${k}`] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id, STAGE_SEMANTIC_ID: sem, ...(todosFunis.length > 1 ? { CATEGORY_ID: todosFunis } : {}) }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID', 'CATEGORY_ID'] } };
+    }
     cmds['a' + k] = { method: 'crm.activity.list', params: { filter: { OWNER_TYPE_ID: c.ownerType, OWNER_ID: c.id }, order: { CREATED: 'DESC' }, select: ['ID', 'SUBJECT', 'TYPE_ID', 'CREATED', 'COMPLETED'] } };
   }
   let funis = { ids: [], stages: {} }, orcErro = false;
@@ -149,16 +153,17 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   }
   const { result: r2, total: t2 } = await bitrix.batch(cmds);
 
+  const negDe = k => SEMS.flatMap(x => arr(r2[`d${x}${k}`])).sort((a, b) => +b.ID - +a.ID);
   // atividades registradas nos negócios do cliente (até os 50 mais recentes)
   const cmds3 = {};
   for (const c of lista) {
-    const k = `${c.ownerType}_${c.id}`, ids = arr(r2['d' + k]).map(d => +d.ID);
+    const k = `${c.ownerType}_${c.id}`, ids = negDe(k).slice(0, 50).map(d => +d.ID);
     if (ids.length) cmds3['a' + k] = { method: 'crm.activity.list', params: { filter: { OWNER_TYPE_ID: 2, OWNER_ID: ids }, order: { CREATED: 'DESC' }, select: ['ID', 'SUBJECT', 'TYPE_ID', 'CREATED', 'COMPLETED'] } };
   }
   const { result: r3, total: t3 } = Object.keys(cmds3).length ? await bitrix.batch(cmds3) : { result: {}, total: {} };
 
   // responsáveis
-  const todosNegocios = lista.flatMap(c => arr(r2[`d${c.ownerType}_${c.id}`]));
+  const todosNegocios = lista.flatMap(c => negDe(`${c.ownerType}_${c.id}`));
   const chave = c => `${c.ownerType}_${c.id}`;
   const consultasDe = c => (historico ? historico.ler(chave(c)) : []).slice(0, 10);
   const respIds = [...new Set([...lista.map(c => c.resp), ...todosNegocios.map(d => d.ASSIGNED_BY_ID), ...lista.flatMap(c => consultasDe(c).map(e => e.u)), ...lista.flatMap(c => arr(r2[`o${c.ownerType}_${c.id}`]).map(d => d.ASSIGNED_BY_ID))].filter(Boolean))];
@@ -175,7 +180,7 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   const diasDesde = d => { const t = Date.parse(d); return Number.isNaN(t) ? null : Math.floor((agora() - t) / 864e5); };
   const resultados = lista.map(c => {
     const k = `${c.ownerType}_${c.id}`;
-    const d = arr(r2['d' + k]), proprias = arr(r2['a' + k]), dosNeg = arr(r3['a' + k]);
+    const d = negDe(k), proprias = arr(r2['a' + k]), dosNeg = arr(r3['a' + k]);
     const ultimaAtiv = [...proprias.slice(0, 1), ...dosNeg.slice(0, 1)].sort((x, y) => String(y.CREATED).localeCompare(String(x.CREATED)))[0];
     const u = d[0];
     const datas = [u?.DATE_CREATE, ultimaAtiv?.CREATED].map(diasDesde).filter(x => x !== null);
@@ -190,10 +195,11 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
       tipo: c.tipo, nome: c.nome,
       responsavel: c.resp ? (nomes[c.resp] || `Usuário #${c.resp}`) : 'Sem responsável',
       negocios: (() => {
-        const sit = x => SEMANTICA[x.STAGE_SEMANTIC_ID] || 'Em andamento';
-        const itens = d.map(x => ({ titulo: x.TITLE, funil: nomesFunis[x.CATEGORY_ID] || '', situacao: sit(x), data: x.DATE_CREATE, responsavel: x.ASSIGNED_BY_ID ? (nomes[x.ASSIGNED_BY_ID] || `Usuário #${x.ASSIGNED_BY_ID}`) : '' }));
-        const conta = n => itens.filter(i => i.situacao === n).length;   // dos negócios listados (os 50 mais recentes)
-        return { total: +(t2['d' + k] ?? d.length), ganhos: conta('Ganho'), perdidos: conta('Perdido'), andamento: conta('Em andamento'), itens, ultimo: itens[0] };
+        const item = x => ({ titulo: x.TITLE, funil: nomesFunis[x.CATEGORY_ID] || '', data: x.DATE_CREATE, responsavel: x.ASSIGNED_BY_ID ? (nomes[x.ASSIGNED_BY_ID] || `Usuário #${x.ASSIGNED_BY_ID}`) : '' });
+        const grupo = sem => { const itens = arr(r2[`d${sem}${k}`]).map(item); return { total: +(t2[`d${sem}${k}`] ?? itens.length), itens }; };
+        const andamento = grupo('P'), ganhos = grupo('S'), perdidos = grupo('F');
+        const u = d[0];
+        return { total: andamento.total + ganhos.total + perdidos.total, andamento, ganhos, perdidos, ultimo: u && { ...item(u), situacao: SEMANTICA[u.STAGE_SEMANTIC_ID] || 'Em andamento' } };
       })(),
       atividades: { total: +(t2['a' + k] ?? proprias.length) + +(t3['a' + k] ?? dosNeg.length), ultima: ativ(ultimaAtiv) },
     };

@@ -18,7 +18,7 @@ function fake() {
       out.result[m[1]] = meth === 'crm.company.list' ? [{ ID: '1', TITLE: 'Acme', ASSIGNED_BY_ID: '7' }]
         : meth === 'crm.contact.list' ? []
         : meth === 'crm.deal.list' && v.includes('filter%5BCATEGORY_ID') ? [{ ID: '20', TITLE: 'Orçamento livro X', STAGE_ID: 'C5:NEW', STAGE_SEMANTIC_ID: 'P', DATE_CREATE: '2026-02-03T10:00:00-03:00', ASSIGNED_BY_ID: '7' }]
-        : meth === 'crm.deal.list' ? [{ ID: '9', TITLE: 'Venda', STAGE_SEMANTIC_ID: 'S', ASSIGNED_BY_ID: '7', OPPORTUNITY: '100', CURRENCY_ID: 'BRL', DATE_CREATE: '2026-01-02T10:00:00-03:00' }]
+        : meth === 'crm.deal.list' ? (v.includes('STAGE_SEMANTIC_ID%5D=S') ? [{ ID: '9', TITLE: 'Venda', STAGE_SEMANTIC_ID: 'S', ASSIGNED_BY_ID: '7', OPPORTUNITY: '100', CURRENCY_ID: 'BRL', DATE_CREATE: '2026-01-02T10:00:00-03:00' }] : [])
         : [{ ID: '5', SUBJECT: 'Ligar', TYPE_ID: '2', CREATED: v.includes('OWNER_TYPE_ID%5D=4') ? '2026-03-01T10:00:00-03:00' : '2026-05-01T10:00:00-03:00' }];
       out.result_total[m[1]] = out.result[m[1]].length;
     }
@@ -35,7 +35,7 @@ test('resume responsável, negócio e última atividade (própria ou de negócio
   assert.equal(r.negocios.total, 1); assert.equal(r.negocios.ultimo.situacao, 'Ganho');
   assert.equal(r.situacao, 'Inativo'); assert.ok(r.diasSemMovimento > 90);
   assert.equal(r.negocios.ultimo.valor, undefined); assert.equal(r.negocios.ultimo.responsavel, 'Ana Lima');
-  assert.equal(r.negocios.itens.length, 1); assert.equal(r.negocios.ganhos, 1); assert.equal(r.negocios.perdidos, 0);
+  assert.deepEqual([r.negocios.andamento.total, r.negocios.ganhos.total, r.negocios.perdidos.total], [0, 1, 0]); assert.equal(r.negocios.ganhos.itens[0].titulo, 'Venda');
   assert.equal(r.atividades.total, 2); assert.match(r.atividades.ultima.data, /2026-05-01/);
 });
 test('exige ao menos 3 letras', async () => {
@@ -98,25 +98,28 @@ test('criarOrcamentos acha o funil pelo nome e as etapas', async () => {
   assert.deepEqual(await criarOrcamentos(bx, 'orçamento editorial')(), { ids: ['5'], stages: { 'C5:NEW': 'Nova' } });
 });
 
-test('lista todos os negócios com situação ganho/perdido/em andamento e nome do funil', async () => {
+test('separa os negócios por situação, com total correto de cada grupo e nome do funil', async () => {
   const bx = createBitrix('https://x.bitrix24.com.br/rest/1/t/', async (url, { body }) => {
     const p = new URLSearchParams(body), out = { result: {}, result_total: {} };
     const ok = j => ({ json: async () => j });
     if (url.endsWith('user.get.json')) return ok({ result: [{ ID: '7', NAME: 'Ana', LAST_NAME: 'Lima' }] });
+    const d = (id, t, sem, cat, data) => ({ ID: id, TITLE: t, STAGE_SEMANTIC_ID: sem, CATEGORY_ID: cat, DATE_CREATE: data, ASSIGNED_BY_ID: '7' });
     for (const [k, v] of p) { const m = k.match(/^cmd\[(.+)\]$/); if (!m) continue; const meth = v.split('?')[0];
-      out.result[m[1]] = meth === 'crm.company.list' ? [{ ID: '1', TITLE: 'Acme', ASSIGNED_BY_ID: '7' }] : meth === 'crm.deal.list' ? [
-        { ID: '3', TITLE: 'C', STAGE_SEMANTIC_ID: 'P', CATEGORY_ID: '0', DATE_CREATE: '2026-03-01T10:00:00-03:00', ASSIGNED_BY_ID: '7' },
-        { ID: '2', TITLE: 'B', STAGE_SEMANTIC_ID: 'F', CATEGORY_ID: '5', DATE_CREATE: '2026-02-01T10:00:00-03:00', ASSIGNED_BY_ID: '7' },
-        { ID: '1', TITLE: 'A', STAGE_SEMANTIC_ID: 'S', CATEGORY_ID: '5', DATE_CREATE: '2026-01-01T10:00:00-03:00', ASSIGNED_BY_ID: '7' }] : [];
-      out.result_total[m[1]] = out.result[m[1]].length; }
+      let r = [], total;
+      if (meth === 'crm.company.list') r = [{ ID: '1', TITLE: 'Acme', ASSIGNED_BY_ID: '7' }];
+      else if (meth === 'crm.deal.list' && v.includes('STAGE_SEMANTIC_ID%5D=P')) { r = [d('3', 'C', 'P', '0', '2026-03-01T10:00:00-03:00')]; total = 27; }
+      else if (meth === 'crm.deal.list' && v.includes('STAGE_SEMANTIC_ID%5D=F')) { r = [d('2', 'B', 'F', '5', '2026-02-01T10:00:00-03:00')]; total = 1; }
+      else if (meth === 'crm.deal.list' && v.includes('STAGE_SEMANTIC_ID%5D=S')) { r = [d('1', 'A', 'S', '5', '2026-01-01T10:00:00-03:00')]; total = 22; }
+      out.result[m[1]] = r; out.result_total[m[1]] = total ?? r.length; }
     return ok({ result: out });
   });
   const { resultados } = await consultar(bx, 'acme', { funisNomes: async () => ({ 0: 'Funil geral', 5: 'Orçamento Editorial' }) });
   const n = resultados[0].negocios;
-  assert.deepEqual([n.total, n.ganhos, n.perdidos, n.andamento], [3, 1, 1, 1]);
-  assert.deepEqual(n.itens.map(i => [i.titulo, i.situacao, i.funil]), [['C', 'Em andamento', 'Funil geral'], ['B', 'Perdido', 'Orçamento Editorial'], ['A', 'Ganho', 'Orçamento Editorial']]);
+  assert.deepEqual([n.total, n.andamento.total, n.ganhos.total, n.perdidos.total], [50, 27, 22, 1]);
+  assert.deepEqual(n.andamento.itens.map(i => [i.titulo, i.funil]), [['C', 'Funil geral']]);
+  assert.deepEqual(n.perdidos.itens.map(i => [i.titulo, i.funil]), [['B', 'Orçamento Editorial']]);
+  assert.equal(n.ultimo.titulo, 'C'); assert.equal(n.ultimo.situacao, 'Em andamento');
 });
-
 test('pede os negócios de todos os funis (o geral e os demais)', async () => {
   const pedidos = [];
   const bx = createBitrix('https://x.bitrix24.com.br/rest/1/t/', async (url, { body }) => {
