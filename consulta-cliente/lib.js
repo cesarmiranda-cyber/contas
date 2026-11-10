@@ -81,7 +81,7 @@ function criarFunisPermitidos(funisNomes, spec) {
   const itens = String(spec || '').split(',').map(x => x.trim()).filter(Boolean);
   return async () => {
     if (!itens.length) return null;
-    const nomes = await funisNomes();
+    const nomes = itens.every(it => /^\d+$/.test(it)) ? {} : await funisNomes();   // só consulta os nomes se algum item não for número
     return itens.map(it => {
       if (/^\d+$/.test(it)) return it;
       const id = Object.keys(nomes).find(k => String(nomes[k]).toLowerCase() === it.toLowerCase());

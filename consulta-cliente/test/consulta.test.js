@@ -188,3 +188,10 @@ test('funil permitido inexistente dá erro claro; sem configuração = todos', a
   assert.equal(await criarFunisPermitidos(nomes, '')(), null);
   assert.deepEqual(await criarFunisPermitidos(nomes, 'Funil geral, 5')(), ['0', '5']);
 });
+
+test('FUNIS_NEGOCIOS=0 (Funil geral) funciona sem consultar os nomes dos funis', async () => {
+  let consultou = false;
+  const ids = await criarFunisPermitidos(async () => { consultou = true; return {}; }, '0')();
+  assert.deepEqual(ids, ['0']); assert.equal(consultou, false);
+  assert.deepEqual(await criarFunisPermitidos(async () => ({ 0: 'Funil geral' }), 'Funil geral')(), ['0']);
+});
