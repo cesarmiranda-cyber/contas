@@ -42,6 +42,27 @@ function createBitrix(webhook, fetchImpl = fetch) {
 const SEMANTICA = { P: 'Em andamento', S: 'Ganho', F: 'Perdido' };
 const arr = v => (Array.isArray(v) ? v : []);
 
+// Funis de orçamento (nomes ou IDs, separados por vírgula): resolve os IDs e os nomes das etapas. Guardado por 5 minutos.
+function criarOrcamentos(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) {
+  const itens = String(spec || '').split(',').map(x => x.trim()).filter(Boolean);
+  let cache = null;
+  return async () => {
+    if (!itens.length) return { ids: [], stages: {} };
+    if (cache && agora() - cache.t < ttlMs) return cache.v;
+    const todas = arr((await bitrix.call('crm.dealcategory.list', { select: ['ID', 'NAME'] })).result);
+    const ids = [];
+    for (const it of itens) {
+      const achada = /^\d+$/.test(it) ? { ID: it } : todas.find(c => String(c.NAME).toLowerCase() === it.toLowerCase());
+      if (!achada) throw new Error(`Funil "${it}" não encontrado`);
+      ids.push(String(achada.ID));
+    }
+    const stages = {};
+    for (const id of ids) for (const e of arr((await bitrix.call('crm.dealcategory.stage.list', { id })).result)) stages[e.STATUS_ID] = e.NAME;
+    cache = { t: agora(), v: { ids, stages } };
+    return cache.v;
+  };
+}
+
 // Responsáveis cujos clientes NÃO podem aparecer: membros dos departamentos em `spec` (nomes ou IDs, separados por vírgula).
 // Falha fechada: se não achar o departamento ou não conseguir ler os usuários, lança erro (nunca devolve "tudo liberado").
 function criarExclusao(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) {
@@ -69,7 +90,7 @@ function criarExclusao(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) 
   };
 }
 
-async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis, historico, usuario } = {}) {
+async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis, historico, usuario, orcamentos } = {}) {
   const q = String(texto || '').trim().replace(/\s+/g, ' ');
   if (q.length < 3) { const e = new Error('Digite pelo menos 3 letras do nome.'); e.status = 400; throw e; }
   const tokens = q.split(' ');
@@ -105,6 +126,13 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
     cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID'] } };
     cmds['a' + k] = { method: 'crm.activity.list', params: { filter: { OWNER_TYPE_ID: c.ownerType, OWNER_ID: c.id }, order: { CREATED: 'DESC' }, select: ['ID', 'SUBJECT', 'TYPE_ID', 'CREATED', 'COMPLETED'] } };
   }
+  let funis = { ids: [], stages: {} }, orcErro = false;
+  try { if (orcamentos) funis = await orcamentos(); } catch (e) { orcErro = true; console.error(e.message); }   // não derruba a busca
+  if (funis.ids.length) {
+    for (const c of lista) {
+      cmds[`o${c.ownerType}_${c.id}`] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id, CATEGORY_ID: funis.ids }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_ID', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID'] } };
+    }
+  }
   const { result: r2, total: t2 } = await bitrix.batch(cmds);
 
   // atividades registradas nos negócios do cliente (até os 50 mais recentes)
@@ -119,7 +147,7 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   const ultimosNegocios = lista.map(c => arr(r2[`d${c.ownerType}_${c.id}`])[0]).filter(Boolean);
   const chave = c => `${c.ownerType}_${c.id}`;
   const consultasDe = c => (historico ? historico.ler(chave(c)) : []).slice(0, 5);
-  const respIds = [...new Set([...lista.map(c => c.resp), ...ultimosNegocios.map(d => d.ASSIGNED_BY_ID), ...lista.flatMap(c => consultasDe(c).map(e => e.u))].filter(Boolean))];
+  const respIds = [...new Set([...lista.map(c => c.resp), ...ultimosNegocios.map(d => d.ASSIGNED_BY_ID), ...lista.flatMap(c => consultasDe(c).map(e => e.u)), ...lista.flatMap(c => arr(r2[`o${c.ownerType}_${c.id}`]).map(d => d.ASSIGNED_BY_ID))].filter(Boolean))];
   const nomes = {};
   if (respIds.length) {
     try {
@@ -139,6 +167,9 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
     const datas = [u?.DATE_CREATE, ultimaAtiv?.CREATED].map(diasDesde).filter(x => x !== null);
     const dias = datas.length ? Math.max(0, Math.min(...datas)) : null;
     return {
+      orcamentos: orcErro ? { erro: true } : { total: +(t2[`o${k}`] ?? arr(r2[`o${k}`]).length), itens: arr(r2[`o${k}`]).map(o => ({
+        titulo: o.TITLE, etapa: funis.stages[o.STAGE_ID] || SEMANTICA[o.STAGE_SEMANTIC_ID] || 'Em andamento', situacao: SEMANTICA[o.STAGE_SEMANTIC_ID] || 'Em andamento',
+        data: o.DATE_CREATE, responsavel: o.ASSIGNED_BY_ID ? (nomes[o.ASSIGNED_BY_ID] || `Usuário #${o.ASSIGNED_BY_ID}`) : '' })) },
       consultas: consultasDe(c).map(e => ({ nome: nomes[e.u] || `Usuário #${e.u}`, data: e.t, voce: e.u === String(usuario) })),
       situacao: dias === null ? 'Sem histórico' : dias <= inativoDias ? 'Ativo' : 'Inativo',
       diasSemMovimento: dias,
@@ -153,4 +184,4 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   return { resultados, maisResultados };
 }
 
-module.exports = { createBitrix, consultar, criarExclusao, qs };
+module.exports = { createBitrix, consultar, criarExclusao, criarOrcamentos, qs };

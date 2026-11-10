@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { createBitrix, consultar, criarExclusao } = require('../lib');
+const { createBitrix, consultar, criarExclusao, criarOrcamentos } = require('../lib');
 
 // Bitrix falso: responde ao batch executando cada comando contra tabelas em memória.
 function fake() {
@@ -17,6 +17,7 @@ function fake() {
       const [meth] = v.split('?');
       out.result[m[1]] = meth === 'crm.company.list' ? [{ ID: '1', TITLE: 'Acme', ASSIGNED_BY_ID: '7' }]
         : meth === 'crm.contact.list' ? []
+        : meth === 'crm.deal.list' && v.includes('CATEGORY_ID') ? [{ ID: '20', TITLE: 'Orçamento livro X', STAGE_ID: 'C5:NEW', STAGE_SEMANTIC_ID: 'P', DATE_CREATE: '2026-02-03T10:00:00-03:00', ASSIGNED_BY_ID: '7' }]
         : meth === 'crm.deal.list' ? [{ ID: '9', TITLE: 'Venda', STAGE_SEMANTIC_ID: 'S', ASSIGNED_BY_ID: '7', OPPORTUNITY: '100', CURRENCY_ID: 'BRL', DATE_CREATE: '2026-01-02T10:00:00-03:00' }]
         : [{ ID: '5', SUBJECT: 'Ligar', TYPE_ID: '2', CREATED: v.includes('OWNER_TYPE_ID%5D=4') ? '2026-03-01T10:00:00-03:00' : '2026-05-01T10:00:00-03:00' }];
       out.result_total[m[1]] = out.result[m[1]].length;
@@ -75,4 +76,23 @@ test('mostra quem consultou antes e registra a consulta atual', async () => {
   const { resultados } = await consultar(bx, 'acme', { historico, usuario: '99' });
   assert.equal(resultados[0].consultas[0].nome, 'Ana Lima'); assert.equal(resultados[0].consultas[0].voce, false);
   assert.deepEqual(regs, [['4_1', '99']]);
+});
+
+test('lista os orçamentos do cliente (funil resolvido pelo nome) com etapa e responsável', async () => {
+  const { bx } = fake();
+  const orcamentos = async () => ({ ids: ['5'], stages: { 'C5:NEW': 'Em análise' } });
+  const { resultados } = await consultar(bx, 'acme', { orcamentos });
+  const o = resultados[0].orcamentos;
+  assert.equal(o.total, 1); assert.equal(o.itens[0].titulo, 'Orçamento livro X');
+  assert.equal(o.itens[0].etapa, 'Em análise'); assert.equal(o.itens[0].responsavel, 'Ana Lima');
+});
+test('funil de orçamento inexistente não derruba a busca', async () => {
+  const { bx } = fake();
+  const orc = criarOrcamentos({ call: async () => ({ result: [{ ID: '1', NAME: 'Outro' }] }) }, 'Orçamento Editorial');
+  const { resultados } = await consultar(bx, 'acme', { orcamentos: orc });
+  assert.equal(resultados[0].orcamentos.erro, true); assert.equal(resultados[0].nome, 'Acme');
+});
+test('criarOrcamentos acha o funil pelo nome e as etapas', async () => {
+  const bx = { call: async m => m === 'crm.dealcategory.list' ? { result: [{ ID: '5', NAME: 'Orçamento Editorial' }] } : { result: [{ STATUS_ID: 'C5:NEW', NAME: 'Nova' }] } };
+  assert.deepEqual(await criarOrcamentos(bx, 'orçamento editorial')(), { ids: ['5'], stages: { 'C5:NEW': 'Nova' } });
 });
