@@ -72,7 +72,7 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now } =
   const cmds = {};
   for (const c of lista) {
     const k = `${c.ownerType}_${c.id}`;
-    cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE'] } };
+    cmds['d' + k] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID'] } };
     cmds['a' + k] = { method: 'crm.activity.list', params: { filter: { OWNER_TYPE_ID: c.ownerType, OWNER_ID: c.id }, order: { CREATED: 'DESC' }, select: ['ID', 'SUBJECT', 'TYPE_ID', 'CREATED', 'COMPLETED'] } };
   }
   const { result: r2, total: t2 } = await bitrix.batch(cmds);
@@ -86,7 +86,8 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now } =
   const { result: r3, total: t3 } = Object.keys(cmds3).length ? await bitrix.batch(cmds3) : { result: {}, total: {} };
 
   // responsáveis
-  const respIds = [...new Set(lista.map(c => c.resp).filter(Boolean))];
+  const ultimosNegocios = lista.map(c => arr(r2[`d${c.ownerType}_${c.id}`])[0]).filter(Boolean);
+  const respIds = [...new Set([...lista.map(c => c.resp), ...ultimosNegocios.map(d => d.ASSIGNED_BY_ID)].filter(Boolean))];
   const nomes = {};
   if (respIds.length) {
     try {
@@ -110,7 +111,7 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now } =
       diasSemMovimento: dias,
       tipo: c.tipo, nome: c.nome,
       responsavel: c.resp ? (nomes[c.resp] || `Usuário #${c.resp}`) : 'Sem responsável',
-      negocios: { total: +(t2['d' + k] ?? d.length), ultimo: u && { titulo: u.TITLE, situacao: SEMANTICA[u.STAGE_SEMANTIC_ID] || 'Em andamento', data: u.DATE_CREATE } },
+      negocios: { total: +(t2['d' + k] ?? d.length), ultimo: u && { titulo: u.TITLE, situacao: SEMANTICA[u.STAGE_SEMANTIC_ID] || 'Em andamento', data: u.DATE_CREATE, responsavel: u.ASSIGNED_BY_ID ? (nomes[u.ASSIGNED_BY_ID] || `Usuário #${u.ASSIGNED_BY_ID}`) : '' } },
       atividades: { total: +(t2['a' + k] ?? proprias.length) + +(t3['a' + k] ?? dosNeg.length), ultima: ativ(ultimaAtiv) },
     };
   });
