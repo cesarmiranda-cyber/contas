@@ -49,6 +49,9 @@ Cada resultado mostra as últimas 10 consultas que consultaram aquele cliente (n
 ## Orçamentos
 `ORCAMENTO_FUNIS="Orçamento Editorial"` (nomes ou IDs de funis de negócio, separados por vírgula): cada cartão ganha "Orçamentos (N)" com título, etapa, data e responsável dos negócios do cliente nesses funis (50 mais recentes). Se o funil não for achado, só essa parte mostra aviso; a busca continua.
 
+## Funis considerados
+`FUNIS_NEGOCIOS="Funil geral, Orçamento Editorial"` (nomes ou IDs): só negócios desses funis entram em tudo (lista, totais, aproveitamento, último negócio, atividades dos negócios). Sem a variável, todos os funis. Nome inexistente → erro claro no log (nunca mostra funis a mais em silêncio).
+
 ## Login (dois modos)
 - **Por senha única (link no menu ou navegador):** defina `APP_PASSWORD` em `/etc/consulta-cliente.env` e reinicie o serviço. Cookie de 12 h, 5 tentativas erradas por IP bloqueiam por 15 min.
 - **Por aplicativo local do Bitrix24 (abaixo):**

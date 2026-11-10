@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { createBitrix, consultar, criarExclusao, criarOrcamentos, criarFunisNomes } = require('../lib');
+const { createBitrix, consultar, criarExclusao, criarOrcamentos, criarFunisNomes, criarFunisPermitidos } = require('../lib');
 
 // Bitrix falso: responde ao batch executando cada comando contra tabelas em memória.
 function fake() {
@@ -165,4 +165,26 @@ test('mostra até 10 consultas anteriores do cliente', async () => {
   const { resultados } = await consultar(bx, 'acme', { historico, usuario: '99' });
   assert.equal(resultados[0].consultas.length, 10);
   assert.match(resultados[0].consultas[0].data, /2026-11-15/);
+});
+
+test('filtro de funis vale para a lista de negócios (só os funis permitidos são pedidos)', async () => {
+  const pedidos = [];
+  const bx = createBitrix('https://x.bitrix24.com.br/rest/1/t/', async (url, { body }) => {
+    const out = { result: {}, result_total: {} }, ok = j => ({ json: async () => j });
+    if (url.endsWith('user.get.json')) return ok({ result: [] });
+    for (const [k, v] of new URLSearchParams(body)) { const m = k.match(/^cmd\[(.+)\]$/); if (!m) continue; pedidos.push(decodeURIComponent(v));
+      out.result[m[1]] = v.startsWith('crm.company.list') ? [{ ID: '1', TITLE: 'Acme', ASSIGNED_BY_ID: '' }] : []; out.result_total[m[1]] = 0; }
+    return ok({ result: out });
+  });
+  const nomes = async () => ({ 0: 'Funil geral', 5: 'Orçamento Editorial', 8: 'PREPRESS ESTRUTURA | REL', 9: 'MONITOR OP - IPSIS' });
+  await consultar(bx, 'acme', { funisNomes: nomes, funisPermitidos: criarFunisPermitidos(nomes, 'Orçamento Editorial, funil geral') });
+  const deals = pedidos.filter(x => x.startsWith('crm.deal.list'));
+  assert.equal(deals.length, 3);                                    // em andamento, ganho, perdido
+  for (const d of deals) { assert.ok(d.includes('CATEGORY_ID][0]=5') && d.includes('CATEGORY_ID][1]=0'), d); assert.ok(!d.includes('=8') && !d.includes('=9'), d); }
+});
+test('funil permitido inexistente dá erro claro; sem configuração = todos', async () => {
+  const nomes = async () => ({ 0: 'Funil geral', 5: 'Orçamento Editorial' });
+  await assert.rejects(criarFunisPermitidos(nomes, 'Funil que nao existe')(), /não encontrado/);
+  assert.equal(await criarFunisPermitidos(nomes, '')(), null);
+  assert.deepEqual(await criarFunisPermitidos(nomes, 'Funil geral, 5')(), ['0', '5']);
 });

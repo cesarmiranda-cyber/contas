@@ -2,7 +2,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { createBitrix, consultar, criarExclusao, criarOrcamentos, criarFunisNomes } = require('./lib');
+const { createBitrix, consultar, criarExclusao, criarOrcamentos, criarFunisNomes, criarFunisPermitidos } = require('./lib');
 const { createAuth } = require('./auth');
 const { criarHistorico } = require('./historico');
 
@@ -17,6 +17,7 @@ const bitrix = createBitrix(process.env.BITRIX_WEBHOOK);
 const PORT = +process.env.PORT || 3000;
 const historico = criarHistorico(process.env.DATA_DIR || process.env.STATE_DIRECTORY || path.join(__dirname, 'data'));
 const funisNomes = criarFunisNomes(bitrix);
+const funisPermitidos = criarFunisPermitidos(funisNomes, process.env.FUNIS_NEGOCIOS);
 const orcamentos = criarOrcamentos(bitrix, process.env.ORCAMENTO_FUNIS);
 const excluirResponsaveis = criarExclusao(bitrix, process.env.EXCLUIR_DEPARTAMENTOS);
 const auth = process.env.PORTAL_DOMAIN && process.env.SESSION_SECRET
@@ -48,7 +49,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === '/health') return json(res, 200, { ok: true });
     if (u.pathname === '/api/consulta') {
       if (!logado(req)) return json(res, 401, { error: 'Entre pelo Bitrix24 para usar a consulta.' });
-      return json(res, 200, await consultar(bitrix, u.searchParams.get('q'), { inativoDias: +process.env.INATIVO_DIAS || 90, excluirResponsaveis, orcamentos, funisNomes, historico, usuario: quemE(req).id }));
+      return json(res, 200, await consultar(bitrix, u.searchParams.get('q'), { inativoDias: +process.env.INATIVO_DIAS || 90, excluirResponsaveis, orcamentos, funisNomes, funisPermitidos, historico, usuario: quemE(req).id }));
     }
     if (u.pathname === '/install' && req.method === 'POST') {   // Bitrix chama ao instalar o app local
       return html(res, 200, '<script src="https://api.bitrix24.com/api/v1/"></script><script>BX24.init(function(){BX24.installFinish()})</script>');

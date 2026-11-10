@@ -75,6 +75,22 @@ function criarFunisNomes(bitrix, { ttlMs = 300000, agora = Date.now } = {}) {
   };
 }
 
+// Funis cujos negócios entram na consulta (nomes ou IDs, separados por vírgula; "Funil geral" é o padrão do Bitrix, ID 0).
+// Sem configuração devolve null (todos os funis). Nome que não existe → erro.
+function criarFunisPermitidos(funisNomes, spec) {
+  const itens = String(spec || '').split(',').map(x => x.trim()).filter(Boolean);
+  return async () => {
+    if (!itens.length) return null;
+    const nomes = await funisNomes();
+    return itens.map(it => {
+      if (/^\d+$/.test(it)) return it;
+      const id = Object.keys(nomes).find(k => String(nomes[k]).toLowerCase() === it.toLowerCase());
+      if (id === undefined) throw new Error(`Funil "${it}" não encontrado (FUNIS_NEGOCIOS)`);
+      return id;
+    });
+  };
+}
+
 // Responsáveis cujos clientes NÃO podem aparecer: membros dos departamentos em `spec` (nomes ou IDs, separados por vírgula).
 // Falha fechada: se não achar o departamento ou não conseguir ler os usuários, lança erro (nunca devolve "tudo liberado").
 function criarExclusao(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) {
@@ -104,7 +120,7 @@ function criarExclusao(bitrix, spec, { ttlMs = 300000, agora = Date.now } = {}) 
 
 const SEMS = ['P', 'S', 'F'];   // em andamento, ganho, perdido
 
-async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis, historico, usuario, orcamentos, funisNomes } = {}) {
+async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, excluirResponsaveis, historico, usuario, orcamentos, funisNomes, funisPermitidos } = {}) {
   const q = String(texto || '').trim().replace(/\s+/g, ' ');
   if (q.length < 3) { const e = new Error('Digite pelo menos 3 letras do nome.'); e.status = 400; throw e; }
   const tokens = q.split(' ');
@@ -134,13 +150,16 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   if (!lista.length) return { resultados: [], maisResultados: false };
 
   let nomesFunis = {}; try { if (funisNomes) nomesFunis = await funisNomes(); } catch (e) { console.error(e.message); }
-  const todosFunis = Object.keys(nomesFunis);   // pede explicitamente todos os funis (o geral e os demais)
+  // Funis considerados em TUDO (lista, totais, aproveitamento, último negócio, atividades dos negócios). Sem configuração: todos.
+  // Se a configuração estiver errada (funil inexistente) o erro sobe: melhor falhar do que mostrar funis que não deviam aparecer.
+  const funisOk = funisPermitidos ? await funisPermitidos() : null;
+  const todosFunis = funisOk && funisOk.length ? funisOk : Object.keys(nomesFunis);   // pede explicitamente os funis (o geral e os demais)
   // negócios (total + o mais recente) e atividades do próprio cadastro
   const cmds = {};
   for (const c of lista) {
     const k = `${c.ownerType}_${c.id}`;
     for (const sem of SEMS) {
-      cmds[`d${sem}${k}`] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id, STAGE_SEMANTIC_ID: sem, ...(todosFunis.length > 1 ? { CATEGORY_ID: todosFunis } : {}) }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID', 'CATEGORY_ID'] } };
+      cmds[`d${sem}${k}`] = { method: 'crm.deal.list', params: { filter: { [c.dealField]: c.id, STAGE_SEMANTIC_ID: sem, ...((funisOk && funisOk.length) || todosFunis.length > 1 ? { CATEGORY_ID: todosFunis } : {}) }, order: { ID: 'DESC' }, select: ['ID', 'TITLE', 'STAGE_SEMANTIC_ID', 'DATE_CREATE', 'ASSIGNED_BY_ID', 'CATEGORY_ID'] } };
     }
     cmds['a' + k] = { method: 'crm.activity.list', params: { filter: { OWNER_TYPE_ID: c.ownerType, OWNER_ID: c.id }, order: { CREATED: 'DESC' }, select: ['ID', 'SUBJECT', 'TYPE_ID', 'CREATED', 'COMPLETED'] } };
   }
@@ -212,4 +231,4 @@ async function consultar(bitrix, texto, { inativoDias = 90, agora = Date.now, ex
   return { resultados, maisResultados };
 }
 
-module.exports = { createBitrix, consultar, criarExclusao, criarOrcamentos, criarFunisNomes, qs };
+module.exports = { createBitrix, consultar, criarExclusao, criarOrcamentos, criarFunisNomes, criarFunisPermitidos, qs };
