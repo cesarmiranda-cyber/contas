@@ -1,0 +1,9 @@
+{
+  "name": "projetos-m4",
+  "version": "1.0.0",
+  "description": "Portal do cliente - Projetos M4 (cronograma, Gantt e acompanhamento)",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=20" }
+}
