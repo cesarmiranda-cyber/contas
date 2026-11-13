@@ -4,7 +4,7 @@ set -euo pipefail
 : "${VIBE_APP_KEY:?}" "${SERVER_ID:?}"
 cd "$(dirname "$0")"; umask 077
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-tar czf "$T/app.tgz" server.js package.json lib public
+tar czf "$T/app.tgz" server.js nucleo.js package.json lib rotas public
 T="$T" python3 - <<'PY' > "$T/deploy.json"
 import base64, json, os
 print(json.dumps({"source": {"content": base64.b64encode(open(os.environ["T"]+"/app.tgz","rb").read()).decode()},

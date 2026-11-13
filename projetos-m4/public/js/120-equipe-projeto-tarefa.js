@@ -1,0 +1,71 @@
+// ---------- equipe: projeto e tarefa ----------
+function modalSalvarModelo(p) {
+  const v = overlay(true), err = h('div'), nome = h('input', { maxlength: 80, placeholder: 'Ex.: Implantação Bitrix24 — varejo' });
+  juntar(v, h('div', { class: 'modal', style: 'max-width:480px' }, h('h2', {}, 'Salvar como modelo'), h('p', { class: 'muted small' }, 'As atividades deste projeto (durações, dependências, pedidos ao cliente e aprovações) viram um modelo para criar novos projetos. Datas e responsáveis não vão junto.'), h('label', {}, 'Nome do modelo'), nome, err,
+    h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => { try { await api('POST', '/api/modelos', { projetoId: p.id, nome: nome.value }); v.remove(); toast('Modelo salvo. Ele aparece em “Novo projeto”.'); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); } } }, 'Salvar modelo'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'))));
+}
+async function modalModelos() {
+  const v = overlay(true), caixa = h('div'); const carrega = async () => { const { modelos } = await api('GET', '/api/modelos'); caixa.replaceChildren(...modelos.map(m => h('div', { class: 'modelo' }, h('div', { class: 'row' }, h('b', { class: 'grow' }, m.nome), m.embutido ? h('span', { class: 'chip-mini' }, 'Padrão') : h('button', { class: 'btn sm perigo', onclick: async () => { if (confirm(`Excluir o modelo “${m.nome}”? Projetos já criados não mudam.`)) { await api('DELETE', '/api/modelos/' + m.id); toast('Modelo excluído.'); carrega(); } } }, 'Excluir')),
+    h('div', { class: 'muted small' }, `${m.qtdTarefas} atividades${m.diasUteis ? ' · dias úteis' : ''}${m.tipo ? ' · ' + m.tipo : ''}`), h('div', { class: 'small', style: 'margin-top:4px' }, m.tarefas.map(x => `${x.nome} (${x.dur}d)`).join(' → '))))); };
+  juntar(v, h('div', { class: 'modal' }, h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Modelos de projeto'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), h('p', { class: 'muted small' }, 'Para criar um modelo, abra um projeto com as atividades prontas e use “Salvar como modelo”.'), caixa)); await carrega();
+}
+async function modalProjeto(p, pre) {
+  const v = overlay(true), err = h('div'); const { clientes } = await api('GET', '/api/clientes'); const modelos = p ? [] : (await api('GET', '/api/modelos')).modelos; const sel = new Set(((p || pre || {}).clientes || []).map(c => c.id)); const x = p || pre || {};
+  const inp = (val, extra) => h('input', { value: val ?? '', ...extra });
+  const f = {
+    nome: inp(x.nome, { maxlength: 160 }), codigo: inp(x.codigo, { placeholder: 'Automático (PRJ-0001)' }),
+    tipo: h('select', {}, h('option', { value: '' }, 'Selecione…'), ['Implantação Bitrix24', 'Treinamento', 'Integração / Automação', 'Customização', 'Suporte / Sustentação', 'Outro'].map(t => h('option', { value: t }, t))),
+    prio: h('select', {}, Object.entries(PRIO).map(([k, t]) => h('option', { value: k }, t))), empresa: inp(x.empresa, { placeholder: 'Empresa contratante' }),
+    cnome: inp(x.contatoNome), cemail: inp(x.contatoEmail, { type: 'email' }), ctel: inp(x.contatoTelefone, { type: 'tel' }),
+    ini: inp(x.inicioPrevisto, { type: 'date' }), fim: inp(x.fimPrevisto, { type: 'date' }), valor: inp(x.valor, { type: 'number', min: 0, step: '0.01', placeholder: '0,00' }), neg: inp(x.negocioBitrix, { inputmode: 'numeric', placeholder: 'Ex.: 1234' }),
+    desc: h('textarea', { rows: 4, placeholder: 'O que será entregue, etapas e o que o cliente precisa fornecer' }, x.descricao || ''), link: inp(x.link, { type: 'url', placeholder: 'https://…' }),
+    obs: h('textarea', { rows: 3 }, x.obsInternas || ''), uteis: h('input', { type: 'checkbox', style: 'width:auto', checked: !!x.diasUteis }), feriados: h('textarea', { rows: 2, placeholder: 'AAAA-MM-DD, um por linha (ex.: 2027-02-09)' }, (x.feriadosExtras || []).join('\n')), ger: inp(p ? x.gerente : U.nome),
+    sit: h('select', {}, [['andamento', 'Em andamento'], ['pausado', 'Pausado'], ['concluido', 'Concluído']].map(([k, t]) => h('option', { value: k }, t)))
+  };
+  f.modelo = h('select', {}, h('option', { value: '' }, 'Em branco (sem atividades)'), modelos.map(m => h('option', { value: m.id }, `${m.nome} · ${m.qtdTarefas} atividades${m.embutido ? '' : ' (seu modelo)'}`))); f.inicioModelo = h('input', { type: 'date', value: new Date().toISOString().slice(0, 10) }); f.previa = h('div', { class: 'muted small', style: 'margin:6px 0 0' });
+  f.modelo.addEventListener('change', () => { const m = modelos.find(z => z.id === f.modelo.value); f.previa.textContent = m ? `${m.descricao ? m.descricao + ' ' : ''}Atividades: ${m.tarefas.map(x => `${x.nome} (${x.dur}d)`).join(' → ')}.` : ''; if (m) { if (m.tipo) f.tipo.value = m.tipo; f.uteis.checked = m.diasUteis; if (!f.desc.value) f.desc.value = m.descricao; } });
+  f.tipo.value = x.tipo || ''; f.prio.value = x.prioridade || 'media'; f.sit.value = x.situacao || 'andamento';
+  const c = (rot, el) => h('div', {}, h('label', {}, rot), el); const sec = t => h('h3', { class: 'sec' }, t);
+  const lista = h('div', { style: 'max-height:200px;overflow:auto;border:1px solid var(--linha);border-radius:10px;padding:6px 10px' }, clientes.length ? clientes.filter(c => c.ativo).map(c => h('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0;font-weight:400;color:var(--tinta)' }, h('input', { type: 'checkbox', style: 'width:auto', checked: sel.has(c.id), onchange: e => e.target.checked ? sel.add(c.id) : sel.delete(c.id) }), `${c.nome} · ${c.empresa || c.email}`)) : h('span', { class: 'muted' }, 'Nenhum cliente cadastrado no portal ainda.'));
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, p ? 'Editar projeto' : 'Novo projeto'),
+    !p && modelos.length > 0 && [sec('Começar de um modelo (opcional)'), h('div', { class: 'g2' }, c('Modelo', f.modelo), c('Início do projeto', f.inicioModelo)), f.previa],
+    sec('Identificação'), h('div', { class: 'g2' }, c('Nome do projeto *', f.nome), c('Código', f.codigo), c('Tipo', f.tipo), c('Prioridade', f.prio), c('Gerente do projeto', f.ger), c('Situação', f.sit)),
+    sec('Cliente contratante'), h('div', { class: 'g2' }, c('Empresa', f.empresa), c('Nome do contato', f.cnome), c('E-mail do contato', f.cemail), c('Telefone do contato', f.ctel)),
+    sec('Prazos e valores'), h('div', { class: 'g2' }, c('Início previsto', f.ini), c('Término contratado', f.fim), c('Valor do projeto (R$) · interno', f.valor), c('ID do negócio no Bitrix24 · interno', f.neg)),
+    sec('Escopo'), c('Objetivo e escopo (o cliente vê)', f.desc), c('Link da pasta de documentos (o cliente vê)', f.link), c('Observações internas (o cliente não vê)', f.obs),
+    sec('Calendário'), h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.uteis, 'Contar só dias úteis (segunda a sexta, sem feriados nacionais)'),
+    h('p', { class: 'muted small', style: 'margin:4px 0 0' }, 'Com isso ligado, as datas das atividades caem em dias úteis, e dependências e durações pulam fins de semana e feriados. Ao mudar, as atividades existentes são reajustadas.'), c('Feriados extras do projeto (Carnaval, feriados locais…)', f.feriados),
+    sec('Acesso dos clientes'), h('label', {}, 'Clientes com acesso a este projeto'), lista, err,
+    h('p', { class: 'muted small' }, 'Depois de salvar, adicione as atividades do projeto (botão “+ Atividade”).'),
+    h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn pri', onclick: async () => {
+      try {
+        const b = { nome: f.nome.value, codigo: f.codigo.value, tipo: f.tipo.value, prioridade: f.prio.value, gerente: f.ger.value, situacao: f.sit.value, empresa: f.empresa.value, contatoNome: f.cnome.value, contatoEmail: f.cemail.value, contatoTelefone: f.ctel.value,
+          inicioPrevisto: f.ini.value, fimPrevisto: f.fim.value, valor: f.valor.value, negocioBitrix: f.neg.value, descricao: f.desc.value, link: f.link.value, obsInternas: f.obs.value, diasUteis: f.uteis.checked, feriadosExtras: f.feriados.value, clientes: [...sel] }; if (!p && f.modelo.value) { b.modeloId = f.modelo.value; b.inicioModelo = f.inicioModelo.value; }
+        const r = p ? await api('PATCH', '/api/projetos/' + p.id, b) : await api('POST', '/api/projetos', b); v.remove(); go({ nome: 'projeto', id: r.projeto.id });
+      } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
+    } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), p && U.admin && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir o projeto e todas as atividades, registros e arquivos?')) { await api('DELETE', '/api/projetos/' + p.id); v.remove(); go({ nome: 'projetos' }); } } }, 'Excluir'))));
+}
+function modalTarefa(p, t) {
+  const v = overlay(true), err = h('div'); const outras = p.tarefas.filter(x => !t || x.id !== t.id); const deps = (t ? t.deps || [] : []).map(d => ({ ...d }));
+  const f = { nome: h('input', { value: t ? t.nome : '' }), inicio: h('input', { type: 'date', value: t ? t.inicio : p.hoje }), fim: h('input', { type: 'date', value: t ? t.fim : p.hoje }), dur: h('input', { type: 'number', min: 1, step: 1 }), prog: h('input', { type: 'number', min: 0, max: 100, value: t ? t.progresso : 0 }), resp: h('input', { value: t ? t.responsavel : '', placeholder: 'Quem está trabalhando nela' }), desc: h('textarea', { rows: 3 }, t ? t.descricao : ''), interna: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.interna }), aguarda: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.aguardaCliente }), aprov: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.requerAprovacao }), pedido: h('textarea', { rows: 2, maxlength: 500, placeholder: 'O que você precisa do cliente? Ex.: lista de usuários e permissões' }, t ? t.pedido || '' : '') };
+  // datas: mudar o início leva o término junto (mantém a duração); mudar a duração muda o término
+  const cal = calCli(p); let ini0 = f.inicio.value;
+  const pintaDur = () => { f.dur.value = f.inicio.value && f.fim.value ? Math.max(1, cal.dif(f.inicio.value, f.fim.value) + 1) : ''; f.fim.min = f.inicio.value; };
+  f.inicio.addEventListener('change', () => { if (!f.inicio.value) return; const dur = f.fim.value && ini0 ? cal.dif(ini0, f.fim.value) : 0; f.inicio.value = cal.prox(f.inicio.value); if (f.fim.value) f.fim.value = cal.soma(f.inicio.value, Math.max(0, dur)); ini0 = f.inicio.value; pintaDur(); });
+  f.fim.addEventListener('change', () => { if (f.fim.value) f.fim.value = cal.ant(f.fim.value); if (f.fim.value && f.inicio.value && f.fim.value < f.inicio.value) { f.inicio.value = f.fim.value; ini0 = f.inicio.value; } pintaDur(); });
+  f.dur.addEventListener('input', () => { const n = Math.max(1, Math.round(+f.dur.value) || 1); if (f.inicio.value) { f.fim.value = cal.soma(f.inicio.value, n - 1); f.fim.min = f.inicio.value; } });
+  pintaDur();
+  const depsBox = h('div'); const pintaDeps = () => depsBox.replaceChildren(...deps.map((d, i) => h('div', { class: 'row', style: 'margin:6px 0' },
+    h('select', { onchange: e => d.de = e.target.value }, outras.map(o => h('option', { value: o.id, selected: o.id === d.de }, o.nome))),
+    h('select', { style: 'width:auto', onchange: e => d.tipo = e.target.value }, [['FS', 'Espera terminar'], ['SS', 'Começa junto']].map(([k, tt]) => h('option', { value: k, selected: k === d.tipo }, tt))),
+    h('input', { type: 'number', style: 'width:80px', value: d.lag, min: -365, max: 365, title: 'Defasagem em dias: 0 = sem espera; 5 = espera mais 5 dias; negativo = adianta', onchange: e => d.lag = +e.target.value }), h('span', { class: 'muted small' }, 'dia(s) de defasagem'), h('button', { class: 'btn sm', onclick: () => { deps.splice(i, 1); pintaDeps(); } }, '✕')))); pintaDeps();
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, p.diasUteis ? 'Duração (dias úteis)' : 'Duração (dias)'), f.dur), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
+    h('label', {}, 'Descrição'), f.desc, h('label', {}, 'Dependências (as datas se ajustam sozinhas) · defasagem: 0 = sem espera, 5 = espera mais 5 dias, negativo = adianta'), depsBox, outras.length > 0 && h('button', { class: 'btn sm', onclick: () => { deps.push({ de: outras[0].id, tipo: 'FS', lag: 0 }); pintaDeps(); } }, '+ Dependência'),
+    h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.interna, 'Atividade interna (o cliente não vê)'),
+    h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.aprov, 'Requer aprovação do cliente (você envia a entrega e ele aprova ou pede ajustes)'),
+    h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.aguarda, 'Aguardando o cliente (aparece em “Precisamos de você” para ele)'), f.pedido, err,
+    h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => {
+      try { const b = { nome: f.nome.value, inicio: f.inicio.value, fim: f.fim.value, progresso: f.prog.value, responsavel: f.resp.value, descricao: f.desc.value, interna: f.interna.checked, aguardaCliente: f.aguarda.checked, requerAprovacao: f.aprov.checked, pedido: f.pedido.value, deps }; if (t) { if (!(await patchTarefa(t, b))) return; } else { const r = await api('POST', `/api/projetos/${p.id}/tarefas`, b); avisaAjustes(r.ajustes); } v.remove(); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
+    } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), t && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir esta atividade?')) { await api('DELETE', '/api/tarefas/' + t.id); v.remove(); render(); } } }, 'Excluir'))));
+}
+
