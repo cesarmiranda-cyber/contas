@@ -157,7 +157,6 @@ function renderHub() {
   const nome = state.me?.name || '';
   const hora = new Date().getHours();
   const saud = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
-  const soon = [['cal', 'Prazos e audiências', 'Controle de prazos processuais e agenda de audiências.'], ['doc', 'Contratos e documentos', 'Modelos, assinatura e arquivo dos documentos do cliente.'], ['coin', 'Honorários', 'Acompanhe propostas, cobranças e recebimentos.']];
   $app.innerHTML = `
   <div class="hub">
     <header class="hub-hero">
@@ -175,7 +174,6 @@ function renderHub() {
         <p>Cadastre clientes a partir do CNPJ com dados da Receita Federal, vincule contatos e consulte a base de clientes.</p>
         <span class="go">Abrir módulo ${icon('arrow')}</span>
       </button>
-      ${soon.map(([i, t, d]) => `<div class="module soon" role="listitem" aria-disabled="true"><span class="tag">Em breve</span><span class="ico">${icon(i)}</span><h3>${t}</h3><p>${d}</p></div>`).join('')}
     </div></div>
   </div>`;
   $app.querySelector('[data-go]').onclick = (e) => go(e.currentTarget.dataset.go);
