@@ -293,3 +293,18 @@ test('início do cliente (resumo de projetos e suporte), documentos do projeto e
   await call('PATCH', '/api/solicitacoes/' + s.id, { status: 'concluida' }, EQ); s = await lista(k); assert.strictEqual(s.aberto, false); assert.strictEqual(s.vezDe, null); const sup = (await call('GET', '/api/inicio', null, k)).j.suporte; assert.strictEqual(sup.abertos, 0); assert.strictEqual(sup.total, 1); assert.strictEqual(sup.ultimo.protocolo, r.j.protocolo);
   assert.strictEqual((await call('GET', '/api/inicio', null, EQ)).s, 403);
 });
+
+test('permissões: o cliente não altera prazos, atividades nem projetos; só a equipe', async () => {
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Curioso', email: 'curioso@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'curioso@x.com').id;
+  const p = (await call('POST', '/api/projetos', { nome: 'Prazo protegido', clientes: [cid] }, EQ)).j.projeto;
+  const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Entrega', inicio: '2031-01-05', fim: '2031-01-09' }, EQ)).j.tarefa;
+  const antes = JSON.stringify((await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas);
+  const tentativas = [['PATCH', '/api/tarefas/' + t, { inicio: '2031-02-01', fim: '2031-02-05' }], ['PATCH', '/api/tarefas/' + t, { progresso: 100 }], ['PATCH', '/api/tarefas/' + t, { deps: [] }], ['POST', `/api/projetos/${p.id}/tarefas`, { nome: 'X', inicio: '2031-01-01', fim: '2031-01-02' }],
+    ['DELETE', '/api/tarefas/' + t], ['PATCH', '/api/projetos/' + p.id, { fimPrevisto: '2031-12-01' }], ['PATCH', '/api/projetos/' + p.id, { clientes: [] }], ['DELETE', '/api/projetos/' + p.id], ['POST', `/api/clientes/${cid}/projetos`, { projetos: [] }]];
+  for (const [m, u, b] of tentativas) { const r = m === 'DELETE' ? await fetch(base + u, { method: m, headers: k }) : await call(m, u, b, k); assert.strictEqual(r.status ?? r.s, 403, `${m} ${u} deveria ser 403 para o cliente`); }
+  assert.strictEqual(JSON.stringify((await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas), antes, 'nada mudou'); // prazos e atividades intactos
+  for (const [m, u, b] of tentativas) { const r = m === 'DELETE' ? await fetch(base + u, { method: m }) : await call(m, u, b); assert.strictEqual(r.status ?? r.s, 401, `${m} ${u} deveria ser 401 sem login`); } // anônimo
+  assert.strictEqual((await call('PATCH', '/api/tarefas/' + t, { inicio: '2031-01-12', fim: '2031-01-16' }, EQ)).s, 200); // a equipe pode
+  assert.strictEqual((await call('GET', '/api/me', null, { 'x-vibe-user-id': 'net_123', 'x-vibe-user-role': 'ADMIN' })).j.usuario, null); // id não numérico nunca é equipe
+});

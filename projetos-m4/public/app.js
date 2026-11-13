@@ -228,7 +228,7 @@ async function telaProjeto(m) {
   juntar(m, tabs);
   if (aba === 'historico') return juntar(m, await historicoProjeto(p)); if (aba === 'docs') return juntar(m, await documentosProjeto(p)); if (aba === 'dados') return juntar(m, ficha(p));
   if (!p.tarefas.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
-  if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, eq ? 'Arraste o bloco para mover as datas · arraste as pontas para mudar início/término · arraste do círculo de uma atividade até outra para criar a dependência · clique na seta para remover' : 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
+  if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, eq ? 'Arraste o bloco para mover as datas · arraste as pontas para mudar início/término · arraste do círculo de uma atividade até outra para criar a dependência · clique na seta para remover' : 'Passe o mouse para detalhes · clique para abrir · para pedir mudança de prazo, abra a atividade')), gantt(p));
   else if (!eq) juntar(m, listaCliente(p));
   else juntar(m, h('div', { class: 'card' }, h('table', {}, h('thead', {}, h('tr', {}, ['Atividade', 'Início', 'Término', '%', 'Responsável', 'Status', ''].map(x => h('th', {}, x)))),
     h('tbody', {}, p.tarefas.map(t => h('tr', { style: 'cursor:pointer', onclick: () => drawer(p, t) }, h('td', {}, t.nome, t.interna && h('span', { class: 'muted small' }, ' (interna)')), h('td', {}, fmt(t.inicio)), h('td', {}, fmt(t.fim)), h('td', {}, t.progresso + '%'), h('td', {}, t.responsavel || '—'),
@@ -358,7 +358,7 @@ async function drawer(p, t) {
     const { itens } = await api('GET', `/api/tarefas/${t.id}/itens`); fio.replaceChildren(...(itens.length ? itens.map(i => h('div', { class: 'msg' + (i.tipoAutor === 'equipe' ? ' eq' : '') }, h('div', { class: 'quem' }, `${i.autor} `, h('span', { class: 'muted' }, `${i.tipoAutor === 'equipe' ? 'Equipe Manda4' : 'Cliente'} · ${fmtTs(i.ts)}`)),
       i.texto && h('p', {}, i.texto), i.arquivo && h('p', {}, h('a', { href: '/api/arquivos/' + i.arquivo.id, download: i.arquivo.nome }, '📎 ' + i.arquivo.nome), h('span', { class: 'muted small' }, ` (${Math.ceil(i.arquivo.tamanho / 1024)} KB)`)))) : [h('p', { class: 'muted' }, 'Nenhum registro ainda.')]));
   };
-  juntar(box, h('div', { class: 'row' }, h('h2', { class: 'grow' }, t.nome), eq && h('button', { class: 'btn pri sm', onclick: () => { v.remove(); modalTarefa(p, t); } }, 'Editar atividade'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), chip(t.status.cor, t.status.rotulo),
+  juntar(box, h('div', { class: 'row' }, h('h2', { class: 'grow' }, t.nome), eq && h('button', { class: 'btn pri sm', onclick: () => { v.remove(); modalTarefa(p, t); } }, 'Editar atividade'), !eq && t.status.codigo !== 'concluida' && h('button', { class: 'btn sm', title: 'O prazo é ajustado pela equipe Manda4. Peça por aqui.', onclick: () => { v.remove(); novaSolic({ projetoId: p.id, categoria: 'mudanca', assunto: `Pedido de ajuste de prazo: ${t.nome}`, texto: `Gostaria de pedir um ajuste de prazo na atividade “${t.nome}” (hoje: ${fmt(t.inicio)} a ${fmt(t.fim)}).\n\nNovo prazo desejado:\nMotivo:` }); } }, 'Pedir ajuste de prazo'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), chip(t.status.cor, t.status.rotulo),
     t.aguardaCliente && t.progresso < 100 && h('div', { class: 'callout' }, h('b', {}, U.tipo === 'equipe' ? 'Aguardando o cliente' : 'A equipe precisa de você'), h('p', {}, t.pedido || 'A equipe aguarda o seu retorno para continuar.'), t.respondidoEm && h('p', { class: 'small' }, `${U.tipo === 'equipe' ? 'Cliente respondeu' : 'Você respondeu'} em ${fmtTs(t.respondidoEm)}.`)),
     h('p', { class: 'muted' }, t.descricao), h('p', {}, `📅 ${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}% concluído`), h('p', {}, '👷 Quem está trabalhando: ', h('b', {}, t.responsavel || 'a definir')),
     (t.deps || []).length > 0 && h('p', { class: 'muted small' }, 'Depende de: ' + t.deps.map(d => { const o = p.tarefas.find(x => x.id === d.de); return o ? `${o.nome} (${d.tipo === 'SS' ? 'começam juntas' : 'espera terminar'}${d.lag ? ', ' + d.lag + 'd' : ''})` : null; }).filter(Boolean).join('; ')),
@@ -491,12 +491,13 @@ async function telaSolic(m) {
   }
   juntar(m, grade); pinta();
 }
-async function novaSolic() {
+async function novaSolic(pre = {}) {
   const v = overlay(true), err = h('div'); const { projetos } = await api('GET', '/api/projetos');
   const sel = (o, def) => h('select', {}, Object.entries(o).map(([k, t]) => h('option', { value: k, selected: k === def }, t)));
   const pj = h('select', {}, h('option', { value: '' }, 'Geral (sem projeto)'), projetos.map(p => h('option', { value: p.id }, `${p.nome}${p.codigo ? ' · ' + p.codigo : ''}`)));
   const cat = sel(CATS, 'duvida'), pri = sel(PRIOS, 'media'), tel = h('input', { type: 'tel', placeholder: '(11) 90000-0000' }), as = h('input', { maxlength: 160, placeholder: 'Resumo em uma linha' }), tx = h('textarea', { rows: 6, placeholder: 'Conte o que aconteceu ou o que você precisa: o que estava fazendo, o que esperava e o que aconteceu.' }), arq = h('input', { type: 'file', multiple: true });
   const c = (r, el) => h('div', {}, h('label', {}, r), el);
+  if (pre.projetoId) pj.value = pre.projetoId; if (pre.categoria) cat.value = pre.categoria; if (pre.assunto) as.value = pre.assunto; if (pre.texto) tx.value = pre.texto;
   juntar(v, h('div', { class: 'modal' }, h('h2', {}, 'Abrir chamado de suporte'), h('p', { class: 'muted small' }, 'Seu chamado vai direto para a equipe Manda4, com protocolo para acompanhamento.'),
     h('div', { class: 'g2' }, c('Projeto', pj), c('Categoria', cat), c('Prioridade', pri), c('Telefone para contato (opcional)', tel)), h('label', {}, 'Assunto *'), as, h('label', {}, 'Descrição *'), tx, h('label', {}, 'Anexos (prints, documentos · até 3 arquivos de 10 MB)'), arq, err,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async ev => { ev.target.disabled = true; err.replaceChildren(); try {
