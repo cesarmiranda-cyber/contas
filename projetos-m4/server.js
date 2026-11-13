@@ -7,7 +7,11 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const store = createStore(DATA_DIR); const db = store.db;
 const PUB = path.join(__dirname, 'public');
 const secrets = createSecrets(DATA_DIR); const bitrix = createBitrix('');
-const suporte = createSuporte({ store, secrets, bitrix, publicUrl: process.env.PUBLIC_URL || '' });
+const crypto = require('crypto');
+const assinar = (id, exp) => crypto.createHmac('sha256', store.secret).update(`arq.${id}.${exp}`).digest('hex');
+const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+const linkArquivo = id => { if (!PUBLIC_URL) return ''; const exp = Date.now() + 30 * 86400e3; return `${PUBLIC_URL}/api/baixar/${id}?e=${exp}&t=${assinar(id, exp)}`; };
+const suporte = createSuporte({ store, secrets, bitrix, publicUrl: PUBLIC_URL, linkArquivo });
 const MAX_FILE = 10 * 1024 * 1024;
 
 const SEC = {
@@ -107,6 +111,8 @@ function lerTarefa(b, parcial) {
   if ('responsavel' in b) o.responsavel = str(b.responsavel, 160);
   if ('descricao' in b) o.descricao = str(b.descricao, 2000);
   if ('interna' in b) o.interna = !!b.interna;
+  if ('aguardaCliente' in b) o.aguardaCliente = !!b.aguardaCliente;
+  if ('pedido' in b) o.pedido = str(b.pedido, 500);
   if ('deps' in b) {
     if (!Array.isArray(b.deps) || b.deps.length > 30) throw bad(400, 'Dependências inválidas.');
     o.deps = b.deps.map(d => ({ de: String(d.de), tipo: d.tipo === 'SS' ? 'SS' : 'FS', lag: Math.max(-365, Math.min(365, Math.round(+d.lag || 0))) }));
@@ -185,7 +191,7 @@ rota('DELETE', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
 rota('POST', '/api/projetos/([0-9a-f]+)/tarefas', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
   const d = lerTarefa(b, false); const t = { id: store.id(), projetoId: p.id, progresso: 0, responsavel: '', descricao: '', interna: false, deps: [], ...d, ordem: tarefasDe(p.id).length };
-  const mudou = aplicarTarefas(p.id, () => db.tarefas.push(t));
+  const mudou = aplicarTarefas(p.id, () => db.tarefas.push(t)); if (t.aguardaCliente) store.log(u.nome, 'equipe', 'pediu_cliente', t.nome, p.id);
   store.log(u.nome, 'equipe', 'criou_tarefa', t.nome, p.id); store.save(); send(res, 201, { tarefa: t.id, reagendadas: mudou });
 });
 rota('PATCH', '/api/tarefas/([0-9a-f]+)', async (req, res, m, b, u) => {
@@ -219,23 +225,38 @@ rota('POST', '/api/tarefas/([0-9a-f]+)/itens', async (req, res, m, b, u) => {
     db.arquivos.push(a); item.arquivoId = a.id;
   }
   if (!item.texto && !item.arquivoId) throw bad(400, 'Escreva um texto ou anexe um documento.');
+  if (u.tipo === 'cliente' && t.aguardaCliente) t.respondidoEm = item.ts;
   db.itens.push(item); store.log(u.nome, u.tipo, item.arquivoId ? 'enviou_arquivo' : 'comentou', `${t.nome}`, p.id); store.save(); send(res, 201, { ok: true });
 });
-rota('GET', '/api/arquivos/([0-9a-f]+)', async (req, res, m, _b, u) => {
-  exigir(u); const a = db.arquivos.find(x => x.id === m[1]); if (!a) throw bad(404, 'Arquivo não encontrado.'); tarefaAcessivel(u, a.tarefaId);
+function enviarArquivo(res, a, u) {
   let buf; try { buf = fs.readFileSync(store.file(a.id)); } catch { throw bad(404, 'Arquivo não encontrado.'); }
-  store.log(u.nome, u.tipo, 'baixou_arquivo', a.nome);
+  store.log(u ? u.nome : 'Link assinado', u ? u.tipo : 'equipe', 'baixou_arquivo', a.nome);
   res.writeHead(200, { ...SEC, 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(a.nome)}`, 'Content-Length': buf.length, 'Cache-Control': 'private, no-store' }); res.end(buf);
+}
+rota('GET', '/api/arquivos/([0-9a-f]+)', async (req, res, m, _b, u) => {
+  exigir(u); const a = db.arquivos.find(x => x.id === m[1]); if (!a) throw bad(404, 'Arquivo não encontrado.');
+  if (a.solicitacaoId) { const s = db.solicitacoes.find(x => x.id === a.solicitacaoId); if (!s || (u.tipo === 'cliente' && s.clienteId !== u.id)) throw bad(404, 'Arquivo não encontrado.'); } else tarefaAcessivel(u, a.tarefaId);
+  enviarArquivo(res, a, u);
+});
+// Link com assinatura e validade, colocado no card do Bitrix24 para a equipe baixar sem login no portal.
+rota('GET', '/api/baixar/([0-9a-f]+)', async (req, res, m) => {
+  const q = new URL(req.url, 'http://x').searchParams, exp = +q.get('e'), t = String(q.get('t') || ''); const esperado = assinar(m[1], exp);
+  const ok = Number.isFinite(exp) && exp > Date.now() && t.length === esperado.length && crypto.timingSafeEqual(Buffer.from(t), Buffer.from(esperado));
+  if (!ok) throw bad(403, 'Link inválido ou expirado.'); const a = db.arquivos.find(x => x.id === m[1]); if (!a) throw bad(404, 'Arquivo não encontrado.'); enviarArquivo(res, a, null);
 });
 
 const protocolo = () => 'SUP-' + String(db.solicitacoes.reduce((m, x) => Math.max(m, +(/^SUP-(\d+)$/.exec(x.protocolo || '') || [])[1] || 0), 0) + 1).padStart(4, '0');
 const cardUrl = s => s.bitrix && s.bitrix.dealId && bitrix.base ? `https://${hostDe(bitrix.base)}/crm/deal/details/${s.bitrix.dealId}/` : '';
+const msgView = m => { const a = m.arquivoId && db.arquivos.find(x => x.id === m.arquivoId); return { id: m.id, autor: m.autor, tipoAutor: m.tipoAutor, ts: m.ts, texto: m.texto, arquivo: a ? { id: a.id, nome: a.nome, tamanho: a.tamanho } : undefined }; };
 function solView(s, u) {
-  const base = { id: s.id, protocolo: s.protocolo, projetoId: s.projetoId, projeto: (projetoDe(s.projetoId) || {}).nome, categoria: s.categoria, prioridade: s.prioridade, assunto: s.assunto, texto: s.texto, status: s.status, resposta: s.resposta, criadoEm: s.criadoEm };
+  const base = { id: s.id, protocolo: s.protocolo, projetoId: s.projetoId, projeto: (projetoDe(s.projetoId) || {}).nome, categoria: s.categoria, prioridade: s.prioridade, assunto: s.assunto, texto: s.texto, status: s.status, resposta: s.resposta, criadoEm: s.criadoEm,
+    etapa: s.etapa ? s.etapa.nome : '', historico: s.historico || [], mensagens: (s.mensagens || []).map(msgView), avaliacao: s.avaliacao ? { nota: s.avaliacao.nota, comentario: s.avaliacao.comentario, ts: s.avaliacao.ts } : null,
+    podeAvaliar: !s.avaliacao && (s.status === 'concluida' || (s.etapa && s.etapa.semantica === 'S')) };
   return u.tipo === 'equipe' ? { ...base, cliente: s.cliente, empresa: s.empresa, email: s.email, telefone: s.telefone, bitrix: s.bitrix ? { status: s.bitrix.status, erro: s.bitrix.erro, dealId: s.bitrix.dealId, tentativas: s.bitrix.tentativas, url: cardUrl(s) } : null } : base;
 }
 rota('GET', '/api/solicitacoes', async (req, res, _m, _b, u) => {
-  exigir(u); const l = db.solicitacoes.filter(s => u.tipo === 'equipe' || s.clienteId === u.id).map(s => solView(s, u));
+  exigir(u); await suporte.sincronizarSeVelho(); // etapa do card sempre fresca (no máx. 1 consulta/min)
+  const l = db.solicitacoes.filter(s => u.tipo === 'equipe' || s.clienteId === u.id).map(s => solView(s, u));
   send(res, 200, { solicitacoes: l.sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)), categorias: CAT, prioridades: PRIO });
 });
 rota('POST', '/api/solicitacoes', async (req, res, _m, b, u) => {
@@ -243,10 +264,10 @@ rota('POST', '/api/solicitacoes', async (req, res, _m, b, u) => {
   if (b.categoria && !CAT[b.categoria]) throw bad(400, 'Categoria inválida.'); if (b.prioridade && !PRIO[b.prioridade]) throw bad(400, 'Prioridade inválida.');
   const conta = db.clientes.find(c => c.id === u.id) || {};
   const s = { id: store.id(), protocolo: protocolo(), clienteId: u.id, cliente: u.nome, empresa: u.empresa || '', email: conta.email || '', telefone: str(b.telefone, 40) || conta.telefone || '', projetoId: pid, categoria: b.categoria || 'duvida', prioridade: b.prioridade || 'media',
-    assunto: str(b.assunto, 160, true, 'Assunto'), texto: str(b.texto, 4000, true, 'Descrição'), status: 'nova', resposta: '', criadoEm: store.agora(), bitrix: { status: 'pendente', tentativas: 0 } };
-  db.solicitacoes.push(s); store.log(u.nome, 'cliente', 'solicitou', `${s.protocolo} · ${s.assunto}`, pid); store.save();
+    assunto: str(b.assunto, 160, true, 'Assunto'), texto: str(b.texto, 4000, true, 'Descrição'), status: 'nova', resposta: '', mensagens: [], criadoEm: store.agora(), bitrix: { status: 'pendente', tentativas: 0 } };
+  db.solicitacoes.push(s); store.log(u.nome, 'cliente', 'solicitou', `${s.protocolo} · ${s.assunto}`, pid, { cliente: u.id }); store.save();
   suporte.enviar(s).catch(() => {}); // cria o card em segundo plano; se falhar, a fila reenvia
-  send(res, 201, { ok: true, protocolo: s.protocolo });
+  send(res, 201, { ok: true, protocolo: s.protocolo, id: s.id });
 });
 rota('PATCH', '/api/solicitacoes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const s = db.solicitacoes.find(x => x.id === m[1]); if (!s) throw bad(404, 'Solicitação não encontrada.');
@@ -256,6 +277,53 @@ rota('PATCH', '/api/solicitacoes/([0-9a-f]+)', async (req, res, m, b, u) => {
 rota('POST', '/api/solicitacoes/([0-9a-f]+)/reenviar', async (req, res, m, _b, u) => {
   exigir(u, 'equipe'); const s = db.solicitacoes.find(x => x.id === m[1]); if (!s) throw bad(404, 'Solicitação não encontrada.');
   suporte.aplicar(); const r = await suporte.enviar(s); store.log(u.nome, 'equipe', 'reenviou_chamado', s.protocolo, s.projetoId); send(res, 200, { bitrix: { status: r.status, erro: r.erro, dealId: r.dealId, url: cardUrl(s) } });
+});
+
+const solAcessivel = (u, id) => { exigir(u); const s = db.solicitacoes.find(x => x.id === id); if (!s || (u.tipo === 'cliente' && s.clienteId !== u.id)) throw bad(404, 'Chamado não encontrado.'); return s; };
+rota('POST', '/api/solicitacoes/([0-9a-f]+)/mensagens', async (req, res, m, b, u) => {
+  const s = solAcessivel(u, m[1]); const msg = { id: store.id(), autor: u.nome, tipoAutor: u.tipo, ts: store.agora(), texto: str(b.texto, 4000), bx: false };
+  if (b.arquivo) {
+    const nome = str(b.arquivo.nome, 160, true, 'Nome do arquivo').replace(/[\\/\0\r\n"]/g, '_'); const buf = Buffer.from(String(b.arquivo.base64 || ''), 'base64');
+    if (!buf.length) throw bad(400, 'Arquivo vazio.'); if (buf.length > MAX_FILE) throw bad(413, 'Arquivo acima de 10 MB.');
+    const a = { id: store.id(), solicitacaoId: s.id, nome, tamanho: buf.length, ts: msg.ts }; fs.writeFileSync(store.file(a.id), buf, { mode: 0o600 }); db.arquivos.push(a); msg.arquivoId = a.id;
+  }
+  if (!msg.texto && !msg.arquivoId) throw bad(400, 'Escreva uma mensagem ou anexe um documento.');
+  (s.mensagens = s.mensagens || []).push(msg); if (u.tipo === 'equipe' && s.status === 'nova') s.status = 'em_analise';
+  store.log(u.nome, u.tipo, u.tipo === 'cliente' ? 'complementou_chamado' : 'respondeu_chamado', `${s.protocolo} · ${s.assunto}`, s.projetoId, { cliente: s.clienteId }); store.save();
+  suporte.flushMensagens(s).catch(() => {}); send(res, 201, { ok: true });
+});
+rota('POST', '/api/solicitacoes/([0-9a-f]+)/avaliar', async (req, res, m, b, u) => {
+  exigir(u, 'cliente'); const s = solAcessivel(u, m[1]); const nota = Math.round(+b.nota);
+  if (!(nota >= 1 && nota <= 5)) throw bad(400, 'A nota deve ser de 1 a 5.'); if (s.avaliacao) throw bad(409, 'Este atendimento já foi avaliado.');
+  if (!(s.status === 'concluida' || (s.etapa && s.etapa.semantica === 'S'))) throw bad(400, 'Você poderá avaliar quando o atendimento for concluído.');
+  s.avaliacao = { nota, comentario: str(b.comentario, 1000), ts: store.agora() }; store.log(u.nome, 'cliente', 'avaliou_atendimento', `${s.protocolo} · ${nota}/5`, s.projetoId, { cliente: u.id }); store.save();
+  suporte.avaliacaoBitrix(s).catch(() => {}); send(res, 201, { ok: true });
+});
+
+// ---- início do cliente: o que precisa dele, o que está acontecendo e novidades ----
+const ROTULO = { criou_tarefa: d => `Nova atividade: ${d}`, editou_tarefa: d => `Atividade atualizada: ${d}`, comentou: d => `A equipe comentou em ${d}`, enviou_arquivo: d => `A equipe enviou um documento em ${d}`, pediu_cliente: d => `A equipe precisa de você em ${d}`,
+  editou_projeto: () => 'Dados do projeto atualizados', respondeu_chamado: d => `A equipe respondeu o chamado ${d}`, etapa_chamado: d => `Chamado: ${d}` };
+function novidadesDe(u) {
+  const c = db.clientes.find(x => x.id === u.id) || {}; const meus = new Set(db.projetos.filter(p => p.clientes.includes(u.id)).map(p => p.id)); const desde = Date.now() - 30 * 86400e3; const vistas = new Map();
+  for (const l of [...db.logs].reverse()) {
+    if (l.tipo !== 'equipe' || !ROTULO[l.acao] || Date.parse(l.ts) < desde) continue; if (!(l.cliente === u.id || (l.projetoId && meus.has(l.projetoId)))) continue;
+    if (['criou_tarefa', 'editou_tarefa', 'pediu_cliente', 'comentou', 'enviou_arquivo'].includes(l.acao) && db.tarefas.some(x => x.projetoId === l.projetoId && x.nome === l.detalhe && x.interna)) continue; // atividade interna nunca aparece
+    const k = l.acao + '|' + l.detalhe + '|' + (l.projetoId || ''); const ant = vistas.get(k); if (ant && Math.abs(Date.parse(ant.ts) - Date.parse(l.ts)) < 3600e3) continue; vistas.set(k, l);
+  }
+  const itens = [...vistas.values()].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 20).map(l => ({ ts: l.ts, texto: ROTULO[l.acao](l.detalhe), projeto: (projetoDe(l.projetoId) || {}).nome || '' }));
+  const visto = c.vistoEm || c.criadoEm || '1970'; return { itens, novas: itens.filter(i => i.ts > visto).length };
+}
+rota('GET', '/api/novidades', async (req, res, _m, _b, u) => { exigir(u, 'cliente'); send(res, 200, novidadesDe(u)); });
+rota('POST', '/api/novidades/lido', async (req, res, _m, _b, u) => { exigir(u, 'cliente'); const c = db.clientes.find(x => x.id === u.id); if (c) { c.vistoEm = store.agora(); store.save(); } send(res, 200, { ok: true }); });
+rota('GET', '/api/inicio', async (req, res, _m, _b, u) => {
+  exigir(u, 'cliente'); const h = hoje(); const meus = db.projetos.filter(p => p.clientes.includes(u.id)); const pendencias = [], agora = [], proximas = [];
+  for (const p of meus) for (const t of tarefasDe(p.id).filter(x => !x.interna)) {
+    const st = S.status(t, tarefasDe(p.id).filter(x => !x.interna), h); const item = { projetoId: p.id, projeto: p.nome, tarefaId: t.id, tarefa: t.nome, inicio: t.inicio, fim: t.fim, progresso: t.progresso, status: st };
+    if (t.aguardaCliente && (+t.progresso || 0) < 100) pendencias.push({ ...item, pedido: t.pedido || '', respondidoEm: t.respondidoEm || null });
+    if (st.codigo !== 'concluida' && t.inicio <= h) agora.push(item); else if (st.codigo !== 'concluida' && S.diffDays(h, t.inicio) <= 14) proximas.push(item);
+  }
+  const por = (a, b) => a.fim.localeCompare(b.fim) || a.inicio.localeCompare(b.inicio);
+  send(res, 200, { pendencias: pendencias.sort(por), agora: agora.sort(por).slice(0, 6), proximas: proximas.sort((a, b) => a.inicio.localeCompare(b.inicio)).slice(0, 5), novidades: novidadesDe(u).novas });
 });
 
 // ---- integração com o funil de suporte (somente administradores do Bitrix24) ----
@@ -307,6 +375,7 @@ rota('GET', '/api/painel', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe'); const ps = db.projetos.map(p => projetoView(p, u, false));
   send(res, 200, { projetos: ps.length, verde: ps.filter(p => p.resumo.cor === 'verde').length, amarelo: ps.filter(p => p.resumo.cor === 'amarelo').length, vermelho: ps.filter(p => p.resumo.cor === 'vermelho').length,
     solicitacoesNovas: db.solicitacoes.filter(s => s.status === 'nova').length, clientes: db.clientes.length,
+    avaliacaoMedia: (() => { const n = db.solicitacoes.filter(x => x.avaliacao).map(x => x.avaliacao.nota); return n.length ? Math.round(n.reduce((a, b) => a + b, 0) / n.length * 10) / 10 : null; })(),
     aguardando: db.clientes.filter(c => c.ativo !== false && !db.projetos.some(p => p.clientes.includes(c.id))).length });
 });
 
@@ -325,9 +394,9 @@ const server = http.createServer(async (req, res) => {
     if (!pathname.startsWith('/api/')) return estatico(req, res);
     const hit = R.map(([m, re, fn]) => [m, re.exec(pathname), fn]).find(([m, mm]) => mm && m === req.method);
     if (!hit) return send(res, 404, { erro: 'Rota não encontrada.' });
-    let b = {}; if (req.method !== 'GET') { if (!mesmaOrigem(req)) throw bad(403, 'Origem não permitida.'); b = await readBody(req, /itens$/.test(pathname) ? 16e6 : 1e6); }
+    let b = {}; if (req.method !== 'GET') { if (!mesmaOrigem(req)) throw bad(403, 'Origem não permitida.'); b = await readBody(req, /(itens|mensagens)$/.test(pathname) ? 16e6 : 1e6); }
     await hit[2](req, res, hit[1], b, quem(req));
   } catch (e) { if (!e.status) console.error(e); send(res, e.status || 500, { erro: e.status ? e.message : 'Erro interno.' }); }
 });
-if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); setInterval(() => suporte.processarPendentes().catch(() => {}), 2 * 60e3).unref(); setTimeout(() => suporte.processarPendentes().catch(() => {}), 5e3).unref(); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }
+if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); setInterval(() => suporte.ciclo(), 2 * 60e3).unref(); setTimeout(() => suporte.ciclo(), 5e3).unref(); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }
 module.exports = { server, store, suporte, bitrix, secrets };

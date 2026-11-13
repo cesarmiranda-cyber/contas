@@ -18,8 +18,8 @@ function createStore(dir) {
   const agora = () => new Date().toISOString();
   let secret; const sf = path.join(dir, 'secret');
   try { secret = fs.readFileSync(sf, 'utf8').trim(); } catch { secret = crypto.randomBytes(32).toString('hex'); fs.writeFileSync(sf, secret, { mode: 0o600 }); }
-  const log = (quem, tipo, acao, detalhe = '', projetoId = null) => {
-    db.logs.push({ id: id(), ts: agora(), quem, tipo, acao, detalhe: String(detalhe).slice(0, 300), projetoId });
+  const log = (quem, tipo, acao, detalhe = '', projetoId = null, extra = {}) => {
+    db.logs.push({ id: id(), ts: agora(), quem, tipo, acao, detalhe: String(detalhe).slice(0, 300), projetoId, ...extra });
     if (db.logs.length > 5000) db.logs.splice(0, db.logs.length - 5000);
     save();
   };

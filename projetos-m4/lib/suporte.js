@@ -15,7 +15,7 @@ function montar(s, ctx) {
   return { titulo, html };
 }
 
-function createSuporte({ store, secrets, bitrix, publicUrl = '' }) {
+function createSuporte({ store, secrets, bitrix, publicUrl = '', linkArquivo = () => '' }) {
   const db = store.db; db.config = db.config || {};
   const cfg = () => db.config.suporte || {};
   const webhook = () => secrets.get('bitrixWebhook') || process.env.BITRIX_WEBHOOK || '';
@@ -48,9 +48,47 @@ function createSuporte({ store, secrets, bitrix, publicUrl = '' }) {
       if (contatoId) f.CONTACT_ID = contatoId;
       const r = await bitrix.call('crm.deal.add', { fields: f, params: { REGISTER_SONET_EVENT: 'Y' } });
       Object.assign(b, { status: 'enviado', dealId: +r.result, erro: '', enviadoEm: store.agora() });
+      if (!s.etapa) { s.etapa = { id: cfg().estagioId, nome: cfg().etapaNome || 'Recebido', semantica: '', desde: store.agora() }; s.historico = [{ ts: store.agora(), etapa: s.etapa.nome }]; }
     } catch (e) { b.tentativas++; b.status = 'erro'; b.erro = String(e.message).slice(0, 300); b.ultimaTentativa = store.agora(); }
     store.save(); return b;
   }
+  // Mensagens do portal (cliente e equipe) viram comentários na linha do tempo do card.
+  const comentario = (dealId, texto) => bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: dealId, ENTITY_TYPE: 'deal', COMMENT: texto } });
+  async function flushMensagens(s) {
+    if (!pronto() || !s.bitrix || !s.bitrix.dealId) return 0; let n = 0;
+    for (const m of s.mensagens || []) {
+      if (m.bx) continue;
+      const arq = m.arquivoId ? store.db.arquivos.find(a => a.id === m.arquivoId) : null; const l = arq ? linkArquivo(arq.id) : '';
+      const txt = `${m.tipoAutor === 'cliente' ? 'Cliente' : 'Equipe'} (${m.autor}) no portal, ${s.protocolo}:\n${m.texto || ''}${arq ? `\nAnexo: ${arq.nome}${l ? ' — baixar (link válido por 30 dias): ' + l : ' (disponível no portal)'}` : ''}`.trim();
+      try { await comentario(s.bitrix.dealId, txt); m.bx = true; n++; } catch (e) { break; } // tenta de novo no próximo ciclo
+    }
+    if (n) store.save(); return n;
+  }
+  async function avaliacaoBitrix(s) { if (!pronto() || !s.bitrix?.dealId || !s.avaliacao || s.avaliacao.bx) return; try { await comentario(s.bitrix.dealId, `Avaliação do cliente (${s.protocolo}): ${s.avaliacao.nota}/5${s.avaliacao.comentario ? ' — ' + s.avaliacao.comentario : ''}`); s.avaliacao.bx = true; store.save(); } catch { /* próximo ciclo */ } }
+  // Traz a etapa do card no Bitrix24 para o portal (o cliente acompanha o andamento).
+  async function sincronizar() {
+    if (!pronto()) return 0;
+    const abertos = db.solicitacoes.filter(s => s.bitrix && s.bitrix.dealId && !(s.etapa && s.etapa.semantica)); if (!abertos.length) return 0;
+    const eid = +cfg().categoriaId === 0 ? 'DEAL_STAGE' : `DEAL_STAGE_${cfg().categoriaId}`;
+    const etapas = new Map(((await bitrix.call('crm.status.list', { filter: { ENTITY_ID: eid } })).result || []).map(x => [x.STATUS_ID, { nome: x.NAME, sem: x.SEMANTICS || '' }]));
+    let n = 0;
+    for (let i = 0; i < abertos.length; i += 50) {
+      const lote = abertos.slice(i, i + 50); const r = await bitrix.call('crm.deal.list', { filter: { ID: lote.map(s => s.bitrix.dealId) }, select: ['ID', 'STAGE_ID'] });
+      for (const d of r.result || []) {
+        const s = lote.find(x => x.bitrix.dealId === +d.ID); const e = etapas.get(d.STAGE_ID); if (!s || !e || (s.etapa && s.etapa.id === d.STAGE_ID)) continue;
+        s.etapa = { id: d.STAGE_ID, nome: e.nome, semantica: e.sem === 'S' || e.sem === 'F' ? e.sem : '', desde: store.agora() }; (s.historico = s.historico || []).push({ ts: s.etapa.desde, etapa: e.nome });
+        if (e.sem === 'S') s.status = 'concluida'; else if (e.sem === 'F') s.status = 'recusada'; else if (s.status === 'nova') s.status = 'em_analise';
+        store.log('Bitrix24', 'equipe', 'etapa_chamado', `${s.protocolo} → ${e.nome}`, s.projetoId, { cliente: s.clienteId }); n++;
+      }
+    }
+    if (n) store.save(); return n;
+  }
+  async function ciclo() {
+    let r = { reenviados: 0, mensagens: 0, etapas: 0 };
+    try { r.reenviados = await processarPendentes(); for (const s of db.solicitacoes) { r.mensagens += await flushMensagens(s); await avaliacaoBitrix(s); } r.etapas = await sincronizar(); } catch { /* próximo ciclo */ }
+    return r;
+  }
+  let ultimaSync = 0; const sincronizarSeVelho = (ms = 60e3) => { if (Date.now() - ultimaSync < ms) return Promise.resolve(0); ultimaSync = Date.now(); return sincronizar().catch(() => 0); };
   let rodando = false;
   async function processarPendentes() {
     if (rodando) return 0; rodando = true; let n = 0;
@@ -68,6 +106,6 @@ function createSuporte({ store, secrets, bitrix, publicUrl = '' }) {
     }
     return out;
   }
-  return { montar, enviar, processarPendentes, funis, pronto, cfg, webhook, aplicar };
+  return { montar, enviar, processarPendentes, funis, pronto, cfg, webhook, aplicar, flushMensagens, avaliacaoBitrix, sincronizar, sincronizarSeVelho, ciclo };
 }
 module.exports = { createSuporte, montar, PRIO, CAT };

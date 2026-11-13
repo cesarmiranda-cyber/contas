@@ -25,6 +25,10 @@ const LOGO = () => { const d = document.createElementNS('http://www.w3.org/2000/
   d.innerHTML = '<g fill="#f5a400">' + q.map(([x, y]) => `<rect x="${x}" y="${y}" width="9" height="9" rx="3"/>`).join('') + '</g>'; return d; };
 const NOME = 'MAND\u039b4'; // "A" sem a barra, como no logotipo
 const NS_SVG = 'http://www.w3.org/2000/svg';
+// append seguro: ignora false/null (condições falsas não viram o texto "false")
+const juntar = (el, ...kids) => el.append(...kids.flat().filter(c => c != null && c !== false));
+const lerArquivo = async f => { if (f.size > 10 * 1024 * 1024) throw new Error(`“${f.name}” passa de 10 MB.`); const buf = new Uint8Array(await f.arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode(...buf.subarray(i, i + 32768)); return { nome: f.name, base64: btoa(s) }; };
+const estrelas = n => '★'.repeat(n) + '☆'.repeat(5 - n);
 let U = null, view = { nome: 'projetos' };
 const go = v => { view = v; render(); };
 
@@ -38,9 +42,22 @@ function render() {
   const top = h('header', { class: 'top' }, h('div', { class: 'logo', 'aria-label': 'Manda4 · Projetos e Suporte' }, LOGO(), NOME, h('span', { class: 'logo-sub' }, 'Projetos e Suporte')),
     h('nav', {}, nav.map(([k, t]) => h('a', { class: view.nome === k || (k === 'projetos' && view.nome === 'projeto') ? 'on' : '', onclick: () => go({ nome: k }) }, t))),
     h('span', { class: 'muted small' }, `${U.nome}${eq ? ' · equipe' : ''}`),
-    !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); U = null; render(); } }, 'Sair'));
+    !eq && sino(), !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); U = null; render(); } }, 'Sair'));
   const main = h('main', { class: 'wrap' }); $app.append(top, main);
   ({ projetos: telaProjetos, projeto: telaProjeto, solicitacoes: telaSolic, clientes: telaClientes, acessos: telaLog, integracao: telaIntegracao }[view.nome])(main).catch(e => main.append(h('div', { class: 'erro' }, e.message)));
+}
+
+// ---------- novidades (sino) ----------
+function sino() {
+  const n = h('span', { class: 'sino-n', hidden: true }); const svg = document.createElementNS(NS_SVG, 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = '<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>';
+  const b = h('button', { class: 'sino', 'aria-label': 'Novidades', title: 'Novidades', onclick: async () => {
+    const v = overlay(), box = h('aside', { class: 'drawer' }); v.append(box); const { itens } = await api('GET', '/api/novidades');
+    box.append(h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Novidades'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), h('p', { class: 'muted small' }, 'O que a equipe Manda4 fez nos seus projetos e chamados nos últimos 30 dias.'),
+      itens.length ? h('div', { class: 'fio' }, itens.map(i => h('div', { class: 'msg eq' }, h('div', { class: 'quem' }, i.texto), h('div', { class: 'muted small' }, `${i.projeto ? i.projeto + ' · ' : ''}${fmtTs(i.ts)}`)))) : h('div', { class: 'vazio' }, 'Nenhuma novidade por enquanto.'));
+    await api('POST', '/api/novidades/lido', {}); n.hidden = true;
+  } }, svg, n);
+  api('GET', '/api/novidades').then(r => { if (r.novas) { n.textContent = r.novas > 9 ? '9+' : r.novas; n.hidden = false; } }).catch(() => {}); return b;
 }
 
 // ---------- login / cadastro ----------
@@ -74,7 +91,7 @@ function espera(m) {
   const ico = document.createElementNS(NS_SVG, 'svg'); ico.setAttribute('viewBox', '0 0 24 24'); ico.setAttribute('aria-hidden', 'true');
   ico.innerHTML = '<path d="M6 2h12M6 22h12M7 2v4.5L12 12l5-5.5V2M7 22v-4.5L12 12l5 5.5V22" fill="none" stroke="#a37800" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>';
   const passo = (cls, n, t, st) => h('li', { class: cls }, h('span', { class: 'n' }, cls === 'feito' ? '✓' : n), h('b', {}, t), h('span', { class: 's' }, st));
-  m.append(h('div', { class: 'card espera', role: 'status' }, h('div', { class: 'ico' }, ico), h('span', { class: 'chip amarelo pulso' }, 'Aguardando ativação'),
+  juntar(m, h('div', { class: 'card espera', role: 'status' }, h('div', { class: 'ico' }, ico), h('span', { class: 'chip amarelo pulso' }, 'Aguardando ativação'),
     h('h2', {}, 'Sua conta foi criada. Estamos ativando o seu acesso.'),
     h('p', {}, `Olá, ${primeiroNome(U.nome)}! A equipe Manda4 vai vincular você ao seu projeto. Assim que for ativado, o cronograma e o status aparecem aqui. Você não precisa fazer nada.`),
     h('ol', { class: 'passos' }, passo('feito', 1, 'Conta criada', 'Concluído'), passo('agora', 2, 'Manda4 vincula seu projeto', 'Em andamento'), passo('', 3, 'Acompanhe e envie documentos', 'Em breve')),
@@ -85,11 +102,21 @@ async function telaProjetos(m) {
   const { projetos } = await api('GET', '/api/projetos'); const eq = U.tipo === 'equipe'; let painel = null;
   if (eq) painel = await api('GET', '/api/painel');
   if (!eq && !projetos.length) return espera(m);
-  if (eq) m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Projetos'), h('button', { class: 'btn pri', onclick: () => modalProjeto() }, '+ Novo projeto')));
-  else m.append(h('div', { class: 'ola' }, h('h1', {}, 'Olá, ', h('em', {}, primeiroNome(U.nome))), h('p', {}, 'Acompanhe os seus projetos e fale com o suporte da Manda4.')), h('h2', { class: 'secao', style: 'margin-top:0' }, 'Meus projetos'));
-  if (painel) m.append(h('div', { class: 'kpis' }, [['Projetos', painel.projetos], ['No prazo', painel.verde], ['Em alerta', painel.amarelo], ['Atrasados', painel.vermelho], ['Chamados novos', painel.solicitacoesNovas], ['Clientes aguardando ativação', painel.aguardando]].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', {}, n)))));
-  if (!projetos.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhum projeto ainda. Crie o primeiro.'));
-  m.append(h('div', { class: 'cards' }, projetos.map(p => h('div', { class: 'card click', onclick: () => go({ nome: 'projeto', id: p.id }) },
+  if (eq) juntar(m, h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Projetos'), h('button', { class: 'btn pri', onclick: () => modalProjeto() }, '+ Novo projeto')));
+  else {
+    const ini = await api('GET', '/api/inicio'); const abre = (i) => go({ nome: 'projeto', id: i.projetoId, abrir: i.tarefaId }); const lin = (i, extra) => h('div', { class: 'lin-ativ', tabindex: 0, role: 'button', onclick: () => abre(i), onkeydown: e => e.key === 'Enter' && abre(i) },
+      h('i', { class: 'dot ' + i.status.cor }), h('div', { class: 'grow' }, h('b', {}, i.tarefa), h('div', { class: 'muted small' }, `${i.projeto} · ${extra}`)), h('span', { class: 'muted small' }, i.progresso + '%'));
+    juntar(m, h('div', { class: 'ola' }, h('h1', {}, 'Olá, ', h('em', {}, primeiroNome(U.nome))), h('p', {}, 'Acompanhe os seus projetos e fale com o suporte da Manda4.')),
+      ini.pendencias.length > 0 && h('div', { class: 'card precisa' }, h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Precisamos de você'), chip('amarelo', `${ini.pendencias.length} pendência(s)`)), h('p', { class: 'muted small' }, 'Estas atividades dependem de uma informação ou documento seu para continuar no prazo.'),
+        ini.pendencias.map(i => h('div', { class: 'pend' }, h('div', { class: 'grow' }, h('b', {}, i.tarefa), h('div', { class: 'muted small' }, `${i.projeto} · até ${fmt(i.fim)}`), h('p', { style: 'margin:6px 0 0' }, i.pedido || 'A equipe aguarda o seu retorno.')),
+          i.respondidoEm ? chip('verde', 'Você respondeu') : null, h('button', { class: 'btn pri sm', onclick: () => abre(i) }, i.respondidoEm ? 'Ver conversa' : 'Responder')))),
+      (ini.agora.length || ini.proximas.length) > 0 && h('div', { class: 'duas' }, h('div', { class: 'card' }, h('h3', {}, 'Acontecendo agora'), ini.agora.length ? ini.agora.map(i => lin(i, `até ${fmt(i.fim)}`)) : h('p', { class: 'muted small' }, 'Nada em andamento no momento.')),
+        h('div', { class: 'card' }, h('h3', {}, 'Próximas atividades'), ini.proximas.length ? ini.proximas.map(i => lin(i, `começa em ${fmt(i.inicio)}`)) : h('p', { class: 'muted small' }, 'Nenhuma nos próximos 14 dias.'))),
+      h('h2', { class: 'secao' }, 'Meus projetos'));
+  }
+  if (painel) juntar(m, h('div', { class: 'kpis' }, [['Projetos', painel.projetos], ['No prazo', painel.verde], ['Em alerta', painel.amarelo], ['Atrasados', painel.vermelho], ['Chamados novos', painel.solicitacoesNovas], ['Clientes aguardando ativação', painel.aguardando], ['Satisfação média', painel.avaliacaoMedia ? `★ ${painel.avaliacaoMedia}` : '—']].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', {}, n)))));
+  if (!projetos.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhum projeto ainda. Crie o primeiro.'));
+  juntar(m, h('div', { class: 'cards' }, projetos.map(p => h('div', { class: 'card click', onclick: () => go({ nome: 'projeto', id: p.id }) },
     h('div', { class: 'row' }, h('h3', { class: 'grow' }, p.nome), chip(p.resumo.cor, COR[p.resumo.cor])),
     h('p', { class: 'muted small', style: 'margin:2px 0 0' }, [p.codigo, p.tipo, p.empresa].filter(Boolean).join(' · ')),
     h('p', { class: 'muted' }, p.descricao || 'Sem descrição'), h('div', { class: 'bar' }, h('i', { style: `width:${p.resumo.progresso}%` })),
@@ -114,15 +141,18 @@ function ficha(p) {
 }
 async function telaProjeto(m) {
   const { projeto: p } = await api('GET', '/api/projetos/' + view.id); const eq = U.tipo === 'equipe'; const aba = view.aba || 'gantt';
-  m.append(h('div', { class: 'row' }, h('a', { class: 'btn sm', onclick: () => go({ nome: 'projetos' }) }, '← Projetos'), h('h1', { class: 'grow' }, p.nome), chip(p.resumo.cor, COR[p.resumo.cor]),
-    eq && h('button', { class: 'btn sm', onclick: () => modalProjeto(p) }, 'Editar projeto'), eq && h('button', { class: 'btn pri sm', onclick: () => modalTarefa(p) }, '+ Atividade')),
+  juntar(m, h('div', { class: 'row' }, h('a', { class: 'btn sm', onclick: () => go({ nome: 'projetos' }) }, '← Projetos'), h('h1', { class: 'grow' }, p.nome), chip(p.resumo.cor, COR[p.resumo.cor]),
+    h('button', { class: 'btn sm sem-print', onclick: () => window.print() }, 'Imprimir / PDF'), eq && h('button', { class: 'btn sm', onclick: () => modalProjeto(p) }, 'Editar projeto'), eq && h('button', { class: 'btn pri sm', onclick: () => modalTarefa(p) }, '+ Atividade')),
+    h('p', { class: 'so-print' }, `Relatório do projeto ${p.codigo || ''} · gerado em ${fmtTs(new Date().toISOString())} · Manda4 Projetos e Suporte`),
+    p.resumo.total > 0 && p.resumo.concluidas === p.resumo.total && h('div', { class: 'parabens' }, h('b', {}, 'Projeto concluído! '), 'Obrigado pela parceria. ', !eq && h('a', { onclick: () => go({ nome: 'solicitacoes' }) }, 'Precisa de algo? Abra um chamado →')),
     h('div', { class: 'kpis' }, [['Progresso', p.resumo.progresso + '%'], ['Atividades', `${p.resumo.concluidas}/${p.resumo.total} concluídas`], ['No prazo', p.resumo.verde], ['Em alerta', p.resumo.amarelo], ['Atrasadas', p.resumo.vermelho], ['Previsão de término', fmt(p.resumo.fim) || '—']].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', { style: 'font-size:20px' }, n)))),
     ficha(p));
   const tabs = h('div', { class: 'tabs' }, [['gantt', 'Cronograma (Gantt)'], ['lista', 'Lista de atividades']].map(([k, t]) => h('a', { class: aba === k ? 'on' : '', onclick: () => { view.aba = k; render(); } }, t)));
-  m.append(tabs); if (!p.tarefas.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
-  if (aba === 'gantt') m.append(h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
-  else m.append(h('div', { class: 'card' }, h('table', {}, h('thead', {}, h('tr', {}, ['Atividade', 'Início', 'Término', '%', 'Responsável', 'Status'].map(t => h('th', {}, t)))),
-    h('tbody', {}, p.tarefas.map(t => h('tr', { style: 'cursor:pointer', onclick: () => drawer(p, t) }, h('td', {}, t.nome, t.interna && h('span', { class: 'muted small' }, ' (interna)')), h('td', {}, fmt(t.inicio)), h('td', {}, fmt(t.fim)), h('td', {}, t.progresso + '%'), h('td', {}, t.responsavel || '—'), h('td', {}, chip(t.status.cor, t.status.rotulo))))))));
+  if (view.abrir) { const t0 = p.tarefas.find(x => x.id === view.abrir); view.abrir = null; if (t0) setTimeout(() => drawer(p, t0), 50); }
+  juntar(m, tabs); if (!p.tarefas.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
+  if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
+  else juntar(m, h('div', { class: 'card' }, h('table', {}, h('thead', {}, h('tr', {}, ['Atividade', 'Início', 'Término', '%', 'Responsável', 'Status'].map(t => h('th', {}, t)))),
+    h('tbody', {}, p.tarefas.map(t => h('tr', { style: 'cursor:pointer', onclick: () => drawer(p, t) }, h('td', {}, t.nome, t.interna && h('span', { class: 'muted small' }, ' (interna)')), h('td', {}, fmt(t.inicio)), h('td', {}, fmt(t.fim)), h('td', {}, t.progresso + '%'), h('td', {}, t.responsavel || '—'), h('td', {}, chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', {}, chip('amarelo', eq ? (t.respondidoEm ? 'Cliente respondeu' : 'Aguardando cliente') : 'Aguardando você')))))))));
 }
 function gantt(p) {
   const ts = [...p.tarefas].sort((a, b) => a.inicio.localeCompare(b.inicio) || a.fim.localeCompare(b.fim)); const RH = 44, DW = view.dw || 26;
@@ -148,7 +178,7 @@ function gantt(p) {
   cv.append(svg, h('div', { class: 'g-hoje', style: `left:${x(p.hoje) + DW / 2}px` }));
   for (const t of ts) {
     const i = pos.get(t.id).i, w = Math.max(DW, x(t.fim) + DW - x(t.inicio));
-    const b = h('div', { class: 'g-bloco ' + t.status.cor, style: `left:${x(t.inicio)}px;width:${w - 2}px;top:${48 + i * RH + 9}px`, tabindex: 0, role: 'button', 'aria-label': `${t.nome}: ${t.status.rotulo}`, onclick: () => drawer(p, t), onkeydown: e => e.key === 'Enter' && drawer(p, t) },
+    const b = h('div', { class: 'g-bloco ' + t.status.cor + (t.aguardaCliente && t.progresso < 100 ? ' aguarda' : ''), style: `left:${x(t.inicio)}px;width:${w - 2}px;top:${48 + i * RH + 9}px`, tabindex: 0, role: 'button', 'aria-label': `${t.nome}: ${t.status.rotulo}`, onclick: () => drawer(p, t), onkeydown: e => e.key === 'Enter' && drawer(p, t) },
       h('div', { class: 'pg', style: `width:${t.progresso}%` }), h('span', {}, w > 90 ? `${t.nome}` : ''));
     b.addEventListener('mousemove', e => tip(e, t)); b.addEventListener('mouseleave', () => $tip.hidden = true); b.addEventListener('focus', () => { const r = b.getBoundingClientRect(); tip({ clientX: r.left, clientY: r.bottom }, t); }); b.addEventListener('blur', () => $tip.hidden = true);
     cv.append(b);
@@ -159,7 +189,7 @@ function gantt(p) {
   return h('div', { class: 'gantt' }, nomes, sc);
 }
 function tip(e, t) {
-  $tip.replaceChildren(h('b', {}, t.nome), chip(t.status.cor, t.status.rotulo), h('div', {}, `${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}%`), h('div', {}, 'Quem está trabalhando: ' + (t.responsavel || 'a definir')), t.itens ? h('div', {}, `${t.itens} registro(s) · clique para abrir`) : h('div', {}, 'Clique para abrir'));
+  $tip.replaceChildren(h('b', {}, t.nome), chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', { style: 'margin-top:4px;color:#ffd33d' }, (U.tipo === 'equipe' ? 'Aguardando o cliente: ' : 'Aguardando você: ') + (t.pedido || 'retorno pendente')), h('div', {}, `${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}%`), h('div', {}, 'Quem está trabalhando: ' + (t.responsavel || 'a definir')), t.itens ? h('div', {}, `${t.itens} registro(s) · clique para abrir`) : h('div', {}, 'Clique para abrir'));
   $tip.hidden = false; const w = $tip.offsetWidth; $tip.style.left = Math.min(e.clientX + 14, innerWidth - w - 8) + 'px'; $tip.style.top = Math.min(e.clientY + 14, innerHeight - $tip.offsetHeight - 8) + 'px';
 }
 
@@ -173,6 +203,7 @@ async function drawer(p, t) {
       i.texto && h('p', {}, i.texto), i.arquivo && h('p', {}, h('a', { href: '/api/arquivos/' + i.arquivo.id, download: i.arquivo.nome }, '📎 ' + i.arquivo.nome), h('span', { class: 'muted small' }, ` (${Math.ceil(i.arquivo.tamanho / 1024)} KB)`)))) : [h('p', { class: 'muted' }, 'Nenhum registro ainda.')]));
   };
   box.append(h('div', { class: 'row' }, h('h2', { class: 'grow' }, t.nome), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), chip(t.status.cor, t.status.rotulo),
+    t.aguardaCliente && t.progresso < 100 && h('div', { class: 'callout' }, h('b', {}, U.tipo === 'equipe' ? 'Aguardando o cliente' : 'A equipe precisa de você'), h('p', {}, t.pedido || 'A equipe aguarda o seu retorno para continuar.'), t.respondidoEm && h('p', { class: 'small' }, `${U.tipo === 'equipe' ? 'Cliente respondeu' : 'Você respondeu'} em ${fmtTs(t.respondidoEm)}.`)),
     h('p', { class: 'muted' }, t.descricao), h('p', {}, `📅 ${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}% concluído`), h('p', {}, '👷 Quem está trabalhando: ', h('b', {}, t.responsavel || 'a definir')),
     (t.deps || []).length > 0 && h('p', { class: 'muted small' }, 'Depende de: ' + t.deps.map(d => { const o = p.tarefas.find(x => x.id === d.de); return o ? `${o.nome} (${d.tipo === 'SS' ? 'começam juntas' : 'espera terminar'}${d.lag ? ', ' + d.lag + 'd' : ''})` : null; }).filter(Boolean).join('; ')),
     eq && h('button', { class: 'btn sm', onclick: () => { v.remove(); modalTarefa(p, t); } }, 'Editar atividade'),
@@ -221,16 +252,17 @@ async function modalProjeto(p, pre) {
 }
 function modalTarefa(p, t) {
   const v = overlay(true), err = h('div'); const outras = p.tarefas.filter(x => !t || x.id !== t.id); const deps = (t ? t.deps || [] : []).map(d => ({ ...d }));
-  const f = { nome: h('input', { value: t ? t.nome : '' }), inicio: h('input', { type: 'date', value: t ? t.inicio : p.hoje }), fim: h('input', { type: 'date', value: t ? t.fim : p.hoje }), prog: h('input', { type: 'number', min: 0, max: 100, value: t ? t.progresso : 0 }), resp: h('input', { value: t ? t.responsavel : '', placeholder: 'Quem está trabalhando nela' }), desc: h('textarea', { rows: 3 }, t ? t.descricao : ''), interna: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.interna }) };
+  const f = { nome: h('input', { value: t ? t.nome : '' }), inicio: h('input', { type: 'date', value: t ? t.inicio : p.hoje }), fim: h('input', { type: 'date', value: t ? t.fim : p.hoje }), prog: h('input', { type: 'number', min: 0, max: 100, value: t ? t.progresso : 0 }), resp: h('input', { value: t ? t.responsavel : '', placeholder: 'Quem está trabalhando nela' }), desc: h('textarea', { rows: 3 }, t ? t.descricao : ''), interna: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.interna }), aguarda: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.aguardaCliente }), pedido: h('textarea', { rows: 2, maxlength: 500, placeholder: 'O que você precisa do cliente? Ex.: lista de usuários e permissões' }, t ? t.pedido || '' : '') };
   const depsBox = h('div'); const pintaDeps = () => depsBox.replaceChildren(...deps.map((d, i) => h('div', { class: 'row', style: 'margin:6px 0' },
     h('select', { onchange: e => d.de = e.target.value }, outras.map(o => h('option', { value: o.id, selected: o.id === d.de }, o.nome))),
     h('select', { style: 'width:auto', onchange: e => d.tipo = e.target.value }, [['FS', 'Espera terminar'], ['SS', 'Começa junto']].map(([k, tt]) => h('option', { value: k, selected: k === d.tipo }, tt))),
     h('input', { type: 'number', style: 'width:80px', value: d.lag, title: 'Defasagem em dias', onchange: e => d.lag = +e.target.value }), h('button', { class: 'btn sm', onclick: () => { deps.splice(i, 1); pintaDeps(); } }, '✕')))); pintaDeps();
   v.append(h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
     h('label', {}, 'Descrição'), f.desc, h('label', {}, 'Dependências (as datas se ajustam sozinhas)'), depsBox, outras.length > 0 && h('button', { class: 'btn sm', onclick: () => { deps.push({ de: outras[0].id, tipo: 'FS', lag: 0 }); pintaDeps(); } }, '+ Dependência'),
-    h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.interna, 'Atividade interna (o cliente não vê)'), err,
+    h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.interna, 'Atividade interna (o cliente não vê)'),
+    h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.aguarda, 'Aguardando o cliente (aparece em “Precisamos de você” para ele)'), f.pedido, err,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => {
-      try { const b = { nome: f.nome.value, inicio: f.inicio.value, fim: f.fim.value, progresso: f.prog.value, responsavel: f.resp.value, descricao: f.desc.value, interna: f.interna.checked, deps }; if (t) await api('PATCH', '/api/tarefas/' + t.id, b); else await api('POST', `/api/projetos/${p.id}/tarefas`, b); v.remove(); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
+      try { const b = { nome: f.nome.value, inicio: f.inicio.value, fim: f.fim.value, progresso: f.prog.value, responsavel: f.resp.value, descricao: f.desc.value, interna: f.interna.checked, aguardaCliente: f.aguarda.checked, pedido: f.pedido.value, deps }; if (t) await api('PATCH', '/api/tarefas/' + t.id, b); else await api('POST', `/api/projetos/${p.id}/tarefas`, b); v.remove(); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
     } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), t && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir esta atividade?')) { await api('DELETE', '/api/tarefas/' + t.id); v.remove(); render(); } } }, 'Excluir'))));
 }
 
@@ -239,33 +271,53 @@ const SOL = { nova: 'Nova', em_analise: 'Em análise', aprovada: 'Aprovada', rec
 const CATS = { duvida: 'Dúvida', problema: 'Problema / erro', mudanca: 'Solicitação de mudança', acesso: 'Acesso e usuários', financeiro: 'Financeiro', outro: 'Outro' };
 const PRIOS = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
 function toast(msg) { const e = h('div', { class: 'toast', role: 'status' }, msg); document.body.append(e); setTimeout(() => e.remove(), 4200); }
+function trilha(s) {
+  if (!s.historico.length) return null;
+  return h('div', { class: 'trilha', role: 'list', 'aria-label': 'Andamento do chamado' }, s.historico.map((x, k) => h('div', { class: 'passo' + (k === s.historico.length - 1 ? ' atual' : ' feito'), role: 'listitem' }, h('i', {}), h('b', {}, x.etapa), h('span', { class: 'small muted' }, fmtTs(x.ts)))));
+}
+function conversa(s, eq) {
+  const fio = h('div', { class: 'fio', style: 'margin:10px 0' }, s.mensagens.map(x => h('div', { class: 'msg' + (x.tipoAutor === 'equipe' ? ' eq' : '') }, h('div', { class: 'quem' }, `${x.autor} `, h('span', { class: 'muted' }, `${x.tipoAutor === 'equipe' ? 'Equipe Manda4' : 'Cliente'} · ${fmtTs(x.ts)}`)),
+    x.texto && h('p', {}, x.texto), x.arquivo && h('p', {}, h('a', { href: '/api/arquivos/' + x.arquivo.id, download: x.arquivo.nome }, '📎 ' + x.arquivo.nome), h('span', { class: 'muted small' }, ` (${Math.ceil(x.arquivo.tamanho / 1024)} KB)`)))));
+  const tx = h('textarea', { rows: 2, placeholder: eq ? 'Responder ao cliente…' : 'Escrever uma mensagem ou complemento…' }), file = h('input', { type: 'file' }), err = h('div');
+  return h('div', {}, fio, tx, h('div', { class: 'row', style: 'margin-top:6px' }, file, h('button', { class: 'btn sm pri', onclick: async ev => { ev.target.disabled = true; err.replaceChildren(); try {
+    const body = { texto: tx.value }; if (file.files[0]) body.arquivo = await lerArquivo(file.files[0]); await api('POST', `/api/solicitacoes/${s.id}/mensagens`, body); render();
+  } catch (e) { err.append(h('div', { class: 'erro' }, e.message)); ev.target.disabled = false; } } }, 'Enviar')), err);
+}
+function avaliacao(s, eq) {
+  if (s.avaliacao) return h('div', { class: 'aval' }, h('b', { class: 'estrelas' }, estrelas(s.avaliacao.nota)), h('span', { class: 'muted small' }, eq ? ' Avaliação do cliente' : ' Obrigado pela sua avaliação!'), s.avaliacao.comentario && h('p', { style: 'margin:4px 0 0' }, s.avaliacao.comentario));
+  if (eq || !s.podeAvaliar) return null; let nota = 0; const bs = [1, 2, 3, 4, 5].map(n => h('button', { class: 'estrela', 'aria-label': `${n} de 5`, onclick: () => { nota = n; bs.forEach((b, k) => b.classList.toggle('on', k < n)); } }, '★'));
+  const cm = h('textarea', { rows: 2, placeholder: 'Quer contar como foi? (opcional)' }), err = h('div');
+  return h('div', { class: 'aval' }, h('b', {}, 'Como foi o atendimento?'), h('div', { class: 'estrelas-in' }, bs), cm, err, h('button', { class: 'btn sm pri', style: 'margin-top:6px', onclick: async ev => { if (!nota) { err.replaceChildren(h('div', { class: 'erro' }, 'Escolha de 1 a 5 estrelas.')); return; } ev.target.disabled = true;
+    try { await api('POST', `/api/solicitacoes/${s.id}/avaliar`, { nota, comentario: cm.value }); toast('Obrigado pela avaliação!'); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); ev.target.disabled = false; } } }, 'Enviar avaliação'));
+}
 async function telaSolic(m) {
   const { solicitacoes } = await api('GET', '/api/solicitacoes'); const eq = U.tipo === 'equipe';
-  m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Suporte e solicitações'), !eq && h('button', { class: 'btn pri', onclick: novaSolic }, '+ Abrir chamado')));
+  juntar(m, h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Suporte e solicitações'), !eq && h('button', { class: 'btn pri', onclick: () => novaSolic() }, '+ Abrir chamado')));
   const sem = eq && solicitacoes.some(s => s.bitrix && s.bitrix.status === 'nao_configurado');
-  if (sem) m.append(h('div', { class: 'aviso' }, h('b', {}, 'Os chamados ainda não estão chegando ao funil de suporte do Bitrix24. '), U.admin ? h('a', { onclick: () => go({ nome: 'integracao' }) }, 'Configurar a integração →') : 'Peça a um administrador para configurar a integração.'));
-  if (!solicitacoes.length) return m.append(h('div', { class: 'card vazio' }, eq ? 'Nenhum chamado ainda.' : 'Nenhum chamado por aqui. Precisa de algo? Abra um chamado de suporte.'));
-  m.append(h('div', { class: 'cards' }, solicitacoes.map(s => {
-    const st = h('select', { onchange: e => api('PATCH', '/api/solicitacoes/' + s.id, { status: e.target.value }).then(render) }, Object.entries(SOL).map(([k, t]) => h('option', { value: k, selected: k === s.status }, t)));
-    const rs = h('textarea', { rows: 2, placeholder: 'Resposta ao cliente' }, s.resposta); const bx = s.bitrix;
-    return h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, s.assunto), eq ? st : chip(s.status === 'recusada' ? 'vermelho' : s.status === 'nova' || s.status === 'em_analise' ? 'amarelo' : 'verde', SOL[s.status])),
+  if (sem) juntar(m, h('div', { class: 'aviso' }, h('b', {}, 'Os chamados ainda não estão chegando ao funil de suporte do Bitrix24. '), U.admin ? h('a', { onclick: () => go({ nome: 'integracao' }) }, 'Configurar a integração →') : 'Peça a um administrador para configurar a integração.'));
+  if (!solicitacoes.length) return juntar(m, h('div', { class: 'card vazio' }, eq ? 'Nenhum chamado ainda.' : 'Nenhum chamado por aqui. Precisa de algo? Abra um chamado de suporte.'));
+  juntar(m, h('div', { class: 'chamados' }, solicitacoes.map(s => {
+    const st = h('select', { onchange: e => api('PATCH', '/api/solicitacoes/' + s.id, { status: e.target.value }).then(render) }, Object.entries(SOL).map(([k, t]) => h('option', { value: k, selected: k === s.status }, t))); const bx = s.bitrix;
+    return h('div', { class: 'card chamado' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, s.assunto), eq ? st : chip(s.status === 'recusada' ? 'vermelho' : s.status === 'concluida' ? 'verde' : 'amarelo', s.etapa || SOL[s.status])),
       h('p', { class: 'muted small', style: 'margin:4px 0' }, h('b', {}, s.protocolo), ` · ${CATS[s.categoria] || ''} · Prioridade ${PRIOS[s.prioridade] || ''} · ${s.projeto || 'Geral'} · ${fmtTs(s.criadoEm)}`),
-      eq && h('p', { class: 'muted small', style: 'margin:0 0 6px' }, [s.cliente, s.empresa, s.email, s.telefone].filter(Boolean).join(' · ')), h('p', { style: 'white-space:pre-wrap' }, s.texto),
+      eq && h('p', { class: 'muted small', style: 'margin:0 0 6px' }, [s.cliente, s.empresa, s.email, s.telefone].filter(Boolean).join(' · ')), trilha(s), h('p', { style: 'white-space:pre-wrap' }, s.texto),
       eq && bx && h('div', { class: 'bx' }, bx.status === 'enviado' ? [chip('verde', 'Card criado no Bitrix24'), bx.url && h('a', { href: bx.url, target: '_blank', rel: 'noopener noreferrer' }, `Abrir card #${bx.dealId}`)]
         : [chip(bx.status === 'erro' ? 'vermelho' : 'amarelo', bx.status === 'erro' ? 'Falha ao criar o card' : 'Card ainda não criado'), h('span', { class: 'muted small' }, bx.erro || ''), h('button', { class: 'btn sm', onclick: async ev => { ev.target.disabled = true; try { const r = await api('POST', `/api/solicitacoes/${s.id}/reenviar`, {}); toast(r.bitrix.status === 'enviado' ? 'Card criado no Bitrix24.' : (r.bitrix.erro || 'Não foi possível criar o card.')); } catch (e) { toast(e.message); } render(); } }, 'Reenviar ao Bitrix24')]),
-      eq ? [rs, h('button', { class: 'btn sm', style: 'margin-top:8px', onclick: () => api('PATCH', '/api/solicitacoes/' + s.id, { resposta: rs.value }).then(render) }, 'Salvar resposta')] : s.resposta && h('div', { class: 'msg eq' }, h('div', { class: 'quem' }, 'Resposta da equipe'), h('p', {}, s.resposta)));
+      conversa(s, eq), avaliacao(s, eq));
   })));
 }
 async function novaSolic() {
   const v = overlay(true), err = h('div'); const { projetos } = await api('GET', '/api/projetos');
   const sel = (o, def) => h('select', {}, Object.entries(o).map(([k, t]) => h('option', { value: k, selected: k === def }, t)));
   const pj = h('select', {}, h('option', { value: '' }, 'Geral (sem projeto)'), projetos.map(p => h('option', { value: p.id }, `${p.nome}${p.codigo ? ' · ' + p.codigo : ''}`)));
-  const cat = sel(CATS, 'duvida'), pri = sel(PRIOS, 'media'), tel = h('input', { type: 'tel', placeholder: '(11) 90000-0000' }), as = h('input', { maxlength: 160, placeholder: 'Resumo em uma linha' }), tx = h('textarea', { rows: 6, placeholder: 'Conte o que aconteceu ou o que você precisa: o que estava fazendo, o que esperava e o que aconteceu.' });
+  const cat = sel(CATS, 'duvida'), pri = sel(PRIOS, 'media'), tel = h('input', { type: 'tel', placeholder: '(11) 90000-0000' }), as = h('input', { maxlength: 160, placeholder: 'Resumo em uma linha' }), tx = h('textarea', { rows: 6, placeholder: 'Conte o que aconteceu ou o que você precisa: o que estava fazendo, o que esperava e o que aconteceu.' }), arq = h('input', { type: 'file', multiple: true });
   const c = (r, el) => h('div', {}, h('label', {}, r), el);
   v.append(h('div', { class: 'modal' }, h('h2', {}, 'Abrir chamado de suporte'), h('p', { class: 'muted small' }, 'Seu chamado vai direto para a equipe Manda4, com protocolo para acompanhamento.'),
-    h('div', { class: 'g2' }, c('Projeto', pj), c('Categoria', cat), c('Prioridade', pri), c('Telefone para contato (opcional)', tel)), h('label', {}, 'Assunto *'), as, h('label', {}, 'Descrição *'), tx, err,
+    h('div', { class: 'g2' }, c('Projeto', pj), c('Categoria', cat), c('Prioridade', pri), c('Telefone para contato (opcional)', tel)), h('label', {}, 'Assunto *'), as, h('label', {}, 'Descrição *'), tx, h('label', {}, 'Anexos (prints, documentos · até 3 arquivos de 10 MB)'), arq, err,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async ev => { ev.target.disabled = true; err.replaceChildren(); try {
-      const r = await api('POST', '/api/solicitacoes', { projetoId: pj.value, categoria: cat.value, prioridade: pri.value, telefone: tel.value, assunto: as.value, texto: tx.value }); v.remove(); render(); toast(`Chamado ${r.protocolo} registrado. A equipe Manda4 foi avisada.`);
+      const arqs = [...arq.files]; if (arqs.length > 3) throw new Error('Envie no máximo 3 arquivos por chamado. Você pode anexar mais depois, na conversa.'); const prontos = await Promise.all(arqs.map(lerArquivo));
+      const r = await api('POST', '/api/solicitacoes', { projetoId: pj.value, categoria: cat.value, prioridade: pri.value, telefone: tel.value, assunto: as.value, texto: tx.value });
+      for (const a of prontos) await api('POST', `/api/solicitacoes/${r.id}/mensagens`, { arquivo: a }).catch(() => {}); v.remove(); render(); toast(`Chamado ${r.protocolo} registrado. A equipe Manda4 foi avisada.`);
     } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); ev.target.disabled = false; } } }, 'Enviar chamado'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'))));
 }
 
@@ -292,7 +344,7 @@ async function telaClientes(m) {
     })))) : h('div', { class: 'card vazio' }, clientes.length ? 'Nenhum cliente neste filtro.' : 'Nenhum cliente cadastrado ainda. Quando alguém criar conta no portal, aparece aqui.'));
   };
   const aba = (k, t, q) => h('button', { class: 'filtro' + (view.filtro === k ? ' on' : ''), onclick: ev => { view.filtro = k; ev.target.parentNode.querySelectorAll('.filtro').forEach(b => b.classList.toggle('on', b === ev.target)); pinta(); } }, `${t} `, h('span', { class: 'n' }, q));
-  m.append(h('h1', {}, 'Clientes do portal'), h('p', { class: 'muted' }, 'Quem criou conta no portal. Para liberar o acesso, ative o cliente em um ou mais projetos.'),
+  juntar(m, h('h1', {}, 'Clientes do portal'), h('p', { class: 'muted' }, 'Quem criou conta no portal. Para liberar o acesso, ative o cliente em um ou mais projetos.'),
     n.aguardando > 0 && h('div', { class: 'aviso' }, h('b', {}, `${n.aguardando} cliente(s) aguardando ativação. `), 'Eles já criaram a conta e estão esperando você vincular um projeto.'),
     h('div', { class: 'toolbar' }, h('div', { class: 'filtros' }, aba('aguardando', 'Aguardando ativação', n.aguardando), aba('ativo', 'Ativos', n.ativo), aba('bloqueado', 'Bloqueados', n.bloqueado), aba('todos', 'Todos', clientes.length)),
       h('input', { class: 'busca', type: 'search', placeholder: 'Buscar por nome, e-mail, empresa ou projeto', value: view.busca, oninput: e => { view.busca = e.target.value; pinta(); } })), lista); pinta();
@@ -320,7 +372,7 @@ async function telaIntegracao(m) {
       selF.replaceChildren(...funis.map(f => h('option', { value: f.id, selected: f.id === e.categoriaId }, f.nome))); pintaEtapas(); msg.append(h('div', { class: 'ok' }, `Conexão ok. ${funis.length} funil(is) encontrado(s). Escolha o funil e a etapa inicial dos chamados.`)); }
     catch (x) { msg.append(h('div', { class: 'erro' }, x.message)); } ev.target.disabled = false; };
   selF.addEventListener('change', pintaEtapas);
-  m.append(h('h1', {}, 'Integração · funil de suporte'), h('p', { class: 'muted' }, 'Cada chamado aberto pelo cliente vira um card no funil que você escolher no Bitrix24.'),
+  juntar(m, h('h1', {}, 'Integração · funil de suporte'), h('p', { class: 'muted' }, 'Cada chamado aberto pelo cliente vira um card no funil que você escolher no Bitrix24.'),
     h('div', { class: 'card integ' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Conexão com o Bitrix24'), e.pronto ? chip('verde', 'Funcionando') : chip('amarelo', 'Não configurada')),
       e.pronto && h('p', { class: 'muted small' }, `Portal ${e.host} · funil “${e.funilNome}” · etapa inicial “${e.etapaNome}”`),
       h('label', {}, 'Webhook de entrada do Bitrix24'), wh, h('p', { class: 'muted small' }, 'No Bitrix24: Recursos para desenvolvedores → Outros → Webhook de entrada, com permissão em CRM. O endereço fica guardado só no servidor e nunca volta inteiro para o navegador.'),
@@ -336,8 +388,8 @@ async function telaIntegracao(m) {
 }
 
 async function telaLog(m) {
-  const { logs } = await api('GET', '/api/logs'); m.append(h('h1', {}, 'Acessos e atividade'), h('p', { class: 'muted' }, 'Últimos 300 eventos: logins, projetos abertos, comentários, documentos e solicitações.'));
-  m.append(h('div', { class: 'card', style: 'margin-top:16px;overflow:auto' }, h('table', {}, h('thead', {}, h('tr', {}, ['Quando', 'Quem', 'Ação', 'Projeto', 'Detalhe'].map(t => h('th', {}, t)))),
+  const { logs } = await api('GET', '/api/logs'); juntar(m, h('h1', {}, 'Acessos e atividade'), h('p', { class: 'muted' }, 'Últimos 300 eventos: logins, projetos abertos, comentários, documentos e solicitações.'));
+  juntar(m, h('div', { class: 'card', style: 'margin-top:16px;overflow:auto' }, h('table', {}, h('thead', {}, h('tr', {}, ['Quando', 'Quem', 'Ação', 'Projeto', 'Detalhe'].map(t => h('th', {}, t)))),
     h('tbody', {}, logs.map(l => h('tr', {}, h('td', {}, fmtTs(l.ts)), h('td', {}, l.quem, h('span', { class: 'muted small' }, l.tipo === 'cliente' ? ' · cliente' : ' · equipe')), h('td', {}, l.acao.replace(/_/g, ' ')), h('td', {}, l.projeto || ''), h('td', { class: 'muted' }, l.detalhe)))))));
 }
 boot();
