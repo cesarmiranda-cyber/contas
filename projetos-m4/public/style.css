@@ -9,11 +9,12 @@
 @media (prefers-color-scheme:dark){:root{--tinta:#e8edf8;--tinta-2:#9aa6c2;--linha:#26304a;--fundo:#0d1424;--card:#151e33;--marca-fundo:#16264a;--marca-2:#6ea2ff;--verde-bg:#12301f;--amarelo-bg:#3a3010;--vermelho-bg:#3d1717}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--fundo);color:var(--tinta);font:14px/1.5 var(--fonte)}
-h1,h2,h3{margin:0;line-height:1.2} h1{font-size:24px} h2{font-size:18px} h3{font-size:15px}
+h1,h2,h3{margin:0;line-height:1.15;font-weight:800;letter-spacing:-.02em} h1{font-size:26px} h2{font-size:19px} h3{font-size:15px;font-weight:700}
 button,input,select,textarea{font:inherit;color:inherit}
 .muted{color:var(--tinta-2)} .small{font-size:12px}
 .btn{border:1px solid var(--linha);background:var(--card);padding:9px 18px;border-radius:99px;cursor:pointer;font-weight:500}
 .btn:hover{border-color:var(--marca-2)} .btn.pri{background:var(--marca);border-color:var(--marca);color:#fff;box-shadow:0 6px 16px rgba(255,106,43,.28)} .btn.pri:hover{background:#f05a1a;border-color:#f05a1a}
+.a-btn,a.btn{text-decoration:none;color:var(--tinta);display:inline-block}
 .btn.perigo{color:var(--vermelho)} .btn.sm{padding:4px 10px;font-size:12px}
 input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--linha);border-radius:10px;background:var(--card)}
 input:focus,select:focus,textarea:focus,.btn:focus-visible{outline:2px solid var(--marca-2);outline-offset:1px}
@@ -27,22 +28,23 @@ label{display:block;font-size:12px;font-weight:600;color:var(--tinta-2);margin:1
 .login .brand .logo{flex-direction:column;gap:4px;font-size:24px;font-weight:800;letter-spacing:.06em}.login .brand .logo svg{width:52px;height:52px}
 .login .brand .tit{font-size:30px;letter-spacing:-.02em;margin:14px 0 4px;text-align:center}.login .brand .sub{margin:0;opacity:.9;text-align:center;max-width:560px;font-size:15px}
 .login .nota a.site{color:var(--marca-2);font-weight:600;text-decoration:none}.login .nota a.site:hover{text-decoration:underline}
-/* login (modelo: topo azul com onda, ilustração à esquerda, cartão flutuante à direita) */
-.login{min-height:100vh;position:relative;background:#fff;overflow:hidden}
-.login .onda{position:absolute;top:0;left:0;width:100%;height:min(62vh,520px)}
-.login .cena{position:relative;max-width:1080px;margin:0 auto;padding:22px 24px 48px;display:grid;grid-template-columns:1fr 400px;grid-template-areas:"brand brand" "esq cartao";gap:28px 56px;align-items:start}
-.login .brand{grid-area:brand;display:flex;flex-direction:column;align-items:center;color:#fff;gap:2px} .login .brand .small{opacity:.8}
-.login .esq{grid-area:esq;padding-top:36px} .login .ilus{width:100%;max-width:380px;display:block;margin:0 auto;filter:drop-shadow(0 18px 30px rgba(8,38,92,.25))}
-.login .conf{text-align:center;font-weight:600;font-size:13px;margin:44px 0 18px;color:var(--tinta)}
-.login .bene{list-style:none;margin:0 auto;padding:0;max-width:380px;display:grid;gap:10px;color:var(--tinta-2)}
-.login .bene li{padding-left:26px;position:relative} .login .bene li::before{content:"";position:absolute;left:0;top:4px;width:16px;height:16px;border-radius:50%;background:var(--verde-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%231f9d55' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
-.login .cartao{grid-area:cartao;background:#fff;border:1px solid var(--linha);border-radius:16px;box-shadow:0 18px 50px rgba(8,38,92,.22);padding:28px;margin-top:36px;color:var(--tinta)}
-.login .cartao h2{text-align:center;font-size:22px} .login .cartao>p.muted{text-align:center;margin:4px 0 6px}
-.login .cartao .btn{width:100%;margin-top:18px;padding:12px}
-.login .troca{text-align:center;margin:16px 0 0} .login .troca a{color:var(--marca-2);cursor:pointer;font-weight:600}
+/* login: fundo e tipografia do site da Manda4 (barra branca + azul-claro, Inter pesada, laranja de destaque) */
+.login{--tinta:#161b2e;--tinta-2:#5b6479;--linha:#e3e8f2;--card:#fff;--fundo:#f3f7fd;min-height:100vh;color:var(--tinta);background:linear-gradient(135deg,#d9e7fb 0%,#eaf2fd 38%,#f7f9fe 70%,#fdf4ee 100%);color-scheme:light}
+.login .lt{background:#fff;border-bottom:1px solid var(--linha);display:flex;align-items:center;justify-content:space-between;padding:12px 32px}
+.login .lt .logo{flex-direction:column;align-items:flex-start;gap:4px;font-size:20px;font-weight:800;letter-spacing:.08em;color:#1b2030}.login .lt .logo svg{width:46px;height:46px}
+.login .cena{max-width:1120px;margin:0 auto;padding:56px 24px 64px;display:grid;grid-template-columns:1fr 410px;gap:48px;align-items:center}
+.login .selos{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.login .selo{display:inline-flex;border-radius:99px;padding:5px 14px;font-size:12.5px;font-weight:600}.login .selo.or{background:#fff2ea;color:#c2410c;border:1px solid #ffd9c7}.login .selo.az{background:#fff;color:#0b5cad;border:1px solid #cfe0f6}
+.login .tit{font-size:clamp(32px,4.6vw,54px);font-weight:800;letter-spacing:-.035em;line-height:1.04;color:#161b2e;margin:0}.login .tit em{font-style:normal;color:var(--destaque)}
+.login .sub{font-size:18px;line-height:1.55;color:var(--tinta-2);margin:20px 0 22px;max-width:560px}
+.login .bene{list-style:none;margin:0;padding:0;display:grid;gap:10px;color:var(--tinta-2);font-weight:500}
+.login .bene li{padding-left:28px;position:relative}.login .bene li::before{content:"";position:absolute;left:0;top:3px;width:18px;height:18px;border-radius:50%;background:var(--verde-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%231f9d55' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.login .cartao{background:#fff;border:1px solid var(--linha);border-radius:20px;box-shadow:0 20px 50px rgba(30,60,120,.14);padding:30px}
+.login .cartao h2{text-align:center;font-size:24px;font-weight:800;letter-spacing:-.02em}.login .cartao>p.muted{text-align:center;margin:6px 0 6px}
+.login .cartao .btn{width:100%;margin-top:18px;padding:13px;font-weight:700}
+.login .troca{text-align:center;margin:16px 0 0}.login .troca a{color:var(--marca-2);cursor:pointer;font-weight:600}
 .login .nota{text-align:center;margin:12px 0 0}
-@media(max-width:860px){.login .brand .tit{font-size:22px}.login .cena{grid-template-columns:1fr;grid-template-areas:"brand" "cartao" "esq";max-width:460px;padding:18px 16px 40px}.login .onda{height:400px}.login .cartao{margin-top:8px}.login .esq{padding-top:8px}.login .ilus{max-width:300px}}
-@media(prefers-color-scheme:dark){.login{background:var(--fundo)}.login .cartao{background:var(--card)}}
+@media(max-width:900px){.login .cena{grid-template-columns:1fr;gap:28px;padding:28px 16px 40px;max-width:520px}.login .lt{padding:10px 16px}.login .lt .btn{display:none}.login .sub{font-size:16px}.login .cartao{order:-1}}
 
 /* shell */
 .top{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--linha);display:flex;align-items:center;gap:20px;padding:10px 24px;flex-wrap:wrap}
