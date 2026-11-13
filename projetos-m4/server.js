@@ -70,6 +70,8 @@ function lerProjeto(b, parcial) {
   if ('negocioBitrix' in b) { const v = str(b.negocioBitrix, 12); if (v && !/^\d+$/.test(v)) throw bad(400, 'O ID do negócio no Bitrix24 deve ser numérico.'); o.negocioBitrix = v; }
   if ('link' in b) { const v = str(b.link, 500); if (v && !/^https?:\/\/\S+$/i.test(v)) throw bad(400, 'O link deve começar com http:// ou https://.'); o.link = v; }
   if ('obsInternas' in b) o.obsInternas = str(b.obsInternas, 4000);
+  if ('diasUteis' in b) o.diasUteis = !!b.diasUteis;
+  if ('feriadosExtras' in b) { const lista = Array.isArray(b.feriadosExtras) ? b.feriadosExtras : String(b.feriadosExtras || '').split(/[\s,;]+/).filter(Boolean); if (lista.length > 60) throw bad(400, 'No máximo 60 feriados extras.'); if (lista.some(d => !S.isDate(d))) throw bad(400, 'Feriados extras: use datas AAAA-MM-DD.'); o.feriadosExtras = [...new Set(lista)].sort(); }
   if ('situacao' in b && ['andamento', 'pausado', 'concluido'].includes(b.situacao)) o.situacao = b.situacao;
   return o;
 }
@@ -102,7 +104,8 @@ function projetoView(p, u, comTarefas) {
   if (desvio > 0 && resumo.cor !== 'vermelho') resumo.cor = desvio > 7 ? 'vermelho' : 'amarelo'; // previsão além do prazo contratado
   const out = { id: p.id, nome: p.nome, descricao: p.descricao, gerente: p.gerente, situacao: p.situacao, criadoEm: p.criadoEm, resumo, hoje: h,
     codigo: p.codigo || '', tipo: p.tipo || '', prioridade: p.prioridade || 'media', empresa: p.empresa || '', contatoNome: p.contatoNome || '', contatoEmail: p.contatoEmail || '', contatoTelefone: p.contatoTelefone || '',
-    inicioPrevisto: p.inicioPrevisto || '', fimPrevisto: p.fimPrevisto || '', link: p.link || '',
+    inicioPrevisto: p.inicioPrevisto || '', fimPrevisto: p.fimPrevisto || '', link: p.link || '', diasUteis: !!p.diasUteis, feriadosExtras: p.feriadosExtras || [],
+    feriados: p.diasUteis ? (() => { const ds = all.flatMap(t => [t.inicio, t.fim]).sort(); return ds.length ? calDe(p).feriadosEntre(S.addDays(ds[0], -30), S.addDays(ds[ds.length - 1], 120)) : []; })() : [],
     desvioDias: desvio };
   if (u.tipo === 'equipe') { // campos internos: o cliente nunca recebe
     out.acessosClientes = p.clientes.map(id => { let ultimo = null, total = 0; for (const l of db.logs) if (l.uid === id && l.projetoId === p.id && l.acao === 'abriu_projeto') { total++; ultimo = l.ts; } return { nome: nomeCliente(id), ultimo, total }; });
@@ -129,12 +132,14 @@ function lerTarefa(b, parcial) {
   return o;
 }
 // Salva tarefa, valida dependências (mesmo projeto, sem ciclo) e reagenda as sucessoras.
+const calDe = p => S.calendario({ diasUteis: !!(p && p.diasUteis), extras: (p && p.feriadosExtras) || [] });
 function aplicarTarefas(pid, mexe) {
   const antes = tarefasDe(pid).map(t => JSON.stringify(t)); const bkp = new Map(tarefasDe(pid).map(t => [t.id, { ...t }]));
   try {
     mexe(); const all = tarefasDe(pid); const ids = new Set(all.map(t => t.id));
     for (const t of all) { t.deps = (t.deps || []).filter(d => d.de !== t.id && ids.has(d.de)); if (t.fim < t.inicio) throw bad(400, 'O término não pode ser antes do início.'); }
-    return S.reagendar(all);
+    const cal = calDe(projetoDe(pid)); const normal = S.normalizar(all, cal); // em dias úteis: início/término caem em dia útil
+    const reag = S.reagendar(all, cal); return [...new Set([...normal, ...reag])];
   } catch (e) { // desfaz
     db.tarefas = db.tarefas.filter(t => t.projetoId !== pid || bkp.has(t.id)); for (const t of db.tarefas) if (bkp.has(t.id)) Object.assign(t, bkp.get(t.id)); void antes; throw e;
   }
@@ -143,11 +148,11 @@ function aplicarTarefas(pid, mexe) {
 // uma entrada para cada atividade que as dependências reagendaram (além da que o usuário editou)
 function registraReagendadas(u, ids, antes, causa) {
   for (const id of ids) { if (id === causa.id) continue; const x = db.tarefas.find(y => y.id === id); if (!x) continue; const dx = Audit.diff(antes.get(id) || {}, x, { inicio: 'Início', fim: 'Término' });
-    if (dx.length) reg(u, 'reagendada_dependencia', x.nome, x.projetoId, { tarefaId: x.id, interna: !!x.interna, diff: dx, motivo: `por causa da atividade “${causa.nome}”` }); }
+    if (dx.length) reg(u, 'reagendada_dependencia', x.nome, x.projetoId, { tarefaId: x.id, interna: !!x.interna, diff: dx, motivo: causa.motivo || `por causa da atividade “${causa.nome}”` }); }
 }
 // Dependências que impedem a atividade de começar na data pedida (início mínimo = fim da anterior + 1 + defasagem, ou início da anterior + defasagem).
-function depsBloqueio(deps, inicio, todas) {
-  const out = []; for (const d of deps || []) { const p = todas.find(x => x.id === d.de); if (!p) continue; const base = d.tipo === 'SS' ? p.inicio : S.addDays(p.fim, 1), minimo = S.addDays(base, +d.lag || 0);
+function depsBloqueio(deps, inicio, todas, cal = S.CAL_CORRIDOS) {
+  const out = []; for (const d of deps || []) { const p = todas.find(x => x.id === d.de); if (!p) continue; const base = S.baseDep(p, d.tipo, cal), minimo = S.minimoDep(p, d.tipo, d.lag, cal);
     if (inicio < minimo) out.push({ de: p.id, nome: p.nome, tipo: d.tipo, lag: +d.lag || 0, base, minimo, predInicio: p.inicio, predFim: p.fim }); }
   return out;
 }
@@ -198,7 +203,8 @@ rota('PATCH', '/api/projetos/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
   const novo = { ...p, ...lerProjeto(b, true) }; validarProjeto(novo);
   if (Array.isArray(b.clientes)) novo.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
-  const antesP = { ...p, clientes: [...p.clientes] }; Object.assign(p, novo);
+  const antesP = { ...p, clientes: [...p.clientes] }; const snapsCal = new Map(tarefasDe(p.id).map(x => [x.id, snapT(x)])); Object.assign(p, novo);
+  if (JSON.stringify([antesP.diasUteis, antesP.feriadosExtras]) !== JSON.stringify([p.diasUteis, p.feriadosExtras])) { const mudouCal = aplicarTarefas(p.id, () => {}); registraReagendadas(u, mudouCal, snapsCal, { id: null, nome: '', motivo: 'por mudança no calendário do projeto (dias úteis e feriados)' }); }
   const dp = Audit.diff(antesP, p, Audit.CAMPOS_PROJETO, nomeCliente, Audit.INTERNOS_PROJETO); if (dp.length) reg(u, 'editou_projeto', p.nome, p.id, { diff: dp }); store.save(); send(res, 200, { projeto: projetoView(p, u, true) });
 });
 rota('DELETE', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
@@ -222,12 +228,13 @@ rota('PATCH', '/api/tarefas/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const t = db.tarefas.find(x => x.id === m[1]); if (!t) throw bad(404, 'Tarefa não encontrada.');
   const d = lerTarefa(b, true);
   // mover para antes do que as dependências permitem: avisa o motivo e deixa a equipe escolher (defasagem, remover ou empurrar)
-  const modo = ['defasagem', 'remover', 'empurrar'].includes(b.dependencia) ? b.dependencia : null; const depsAtuais = d.deps || t.deps || [];
+  const modo = ['defasagem', 'remover', 'empurrar'].includes(b.dependencia) ? b.dependencia : null; const depsAtuais = d.deps || t.deps || []; const calT = calDe(projetoDe(t.projetoId));
+  if ('inicio' in d && calT.ativo) d.inicio = calT.proximoUtil(d.inicio); // em dias úteis o início cai em dia útil
   if ('inicio' in d && depsAtuais.length) {
-    const bloq = depsBloqueio(depsAtuais, d.inicio, tarefasDe(t.projetoId));
+    const bloq = depsBloqueio(depsAtuais, d.inicio, tarefasDe(t.projetoId), calT);
     if (bloq.length && !modo) throw Object.assign(bad(409, 'Esta atividade depende de outra e não pode começar nessa data.'), { extra: { codigo: 'BLOQUEADA_POR_DEPENDENCIA', inicio: d.inicio, minimo: bloq.map(x => x.minimo).sort().pop(), motivos: bloq } });
     if (bloq.length && modo === 'remover') d.deps = depsAtuais.filter(x => !bloq.some(y => y.de === x.de));
-    if (bloq.length && modo === 'defasagem') d.deps = depsAtuais.map(x => { const y = bloq.find(z => z.de === x.de); if (!y) return x; const lag = S.diffDays(y.base, d.inicio); if (lag < -365) throw bad(400, 'A defasagem ficaria menor que -365 dias. Remova a dependência.'); return { ...x, lag }; });
+    if (bloq.length && modo === 'defasagem') d.deps = depsAtuais.map(x => { const y = bloq.find(z => z.de === x.de); if (!y) return x; const lag = calT.diffUteis(y.base, d.inicio); if (lag < -365) throw bad(400, 'A defasagem ficaria menor que -365 dias. Remova a dependência.'); return { ...x, lag }; });
   }
   const pedia = !!t.aguardaCliente, antesT = snapT(t), snaps = new Map(tarefasDe(t.projetoId).map(x => [x.id, snapT(x)])); const mudou = aplicarTarefas(t.projetoId, () => Object.assign(t, d));
   if (d.aguardaCliente === false) t.respondidoEm = null;

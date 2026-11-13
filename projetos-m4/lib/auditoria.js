@@ -2,10 +2,10 @@
 // Registro de alterações: gera o "de → para" de cada mudança e decide o que o cliente pode ver.
 const CAMPOS_TAREFA = { nome: 'Nome', inicio: 'Início', fim: 'Término', progresso: 'Andamento', responsavel: 'Responsável', descricao: 'Descrição', interna: 'Atividade interna', aguardaCliente: 'Aguardando o cliente', pedido: 'Pedido ao cliente', deps: 'Dependências' };
 const CAMPOS_PROJETO = { nome: 'Nome', descricao: 'Objetivo e escopo', gerente: 'Gerente', codigo: 'Código', tipo: 'Tipo', prioridade: 'Prioridade', empresa: 'Empresa', contatoNome: 'Contato (nome)', contatoEmail: 'Contato (e-mail)', contatoTelefone: 'Contato (telefone)',
-  inicioPrevisto: 'Início previsto', fimPrevisto: 'Término contratado', link: 'Pasta de documentos', situacao: 'Situação', valor: 'Valor do projeto', negocioBitrix: 'Negócio no Bitrix24', obsInternas: 'Observações internas', clientes: 'Clientes com acesso' };
+  inicioPrevisto: 'Início previsto', fimPrevisto: 'Término contratado', link: 'Pasta de documentos', situacao: 'Situação', valor: 'Valor do projeto', negocioBitrix: 'Negócio no Bitrix24', obsInternas: 'Observações internas', diasUteis: 'Contar só dias úteis', feriadosExtras: 'Feriados extras', clientes: 'Clientes com acesso' };
 const INTERNOS_PROJETO = new Set(['valor', 'negocioBitrix', 'obsInternas', 'clientes']); // o cliente nunca vê
 const TXT = { prioridade: { baixa: 'Baixa', media: 'Média', alta: 'Alta' }, situacao: { andamento: 'Em andamento', pausado: 'Pausado', concluido: 'Concluído' } };
-const BOOL = new Set(['interna', 'aguardaCliente']);
+const BOOL = new Set(['interna', 'aguardaCliente', 'diasUteis']);
 
 const norm = (k, v) => BOOL.has(k) ? !!v : (v == null ? '' : v);
 function fmtVal(k, v) {
@@ -18,6 +18,7 @@ function diff(antes, depois, campos, nomeDe = x => x, internos = new Set()) {
   const out = [];
   for (const [k, rot] of Object.entries(campos)) {
     let a = antes[k], b = depois[k];
+    if (k === 'feriadosExtras') { a = (a || []).join(', '); b = (b || []).join(', '); }
     if (k === 'deps') { a = depsTexto(a, nomeDe); b = depsTexto(b, nomeDe); } else if (k === 'clientes') { a = (a || []).map(nomeDe).join(', '); b = (b || []).map(nomeDe).join(', '); }
     a = norm(k, a); b = norm(k, b); if (a === b) continue;
     out.push({ campo: rot, de: fmtVal(k, a), para: fmtVal(k, b), ...(internos.has(k) ? { interno: true } : {}) });

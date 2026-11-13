@@ -8,6 +8,36 @@ const diffDays = (a, b) => Math.round((toMs(b) - toMs(a)) / DAY); // b - a
 const isDate = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && toStr(toMs(s)) === s;
 const hojeSP = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now);
 
+// Feriados nacionais do Brasil (fixos + Sexta-feira Santa). Carnaval e Corpus Christi são pontos facultativos: entram como feriados extras do projeto.
+function pascoa(ano) {
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1; return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+const feriadosBR = ano => [`${ano}-01-01`, addDays(pascoa(ano), -2), `${ano}-04-21`, `${ano}-05-01`, `${ano}-09-07`, `${ano}-10-12`, `${ano}-11-02`, `${ano}-11-15`, `${ano}-11-20`, `${ano}-12-25`];
+// Calendário do projeto. Desligado = dias corridos (comportamento original). Ligado = só segunda a sexta, sem feriados.
+function calendario(opts = {}) {
+  const ativo = !!opts.diasUteis, extras = new Set(opts.extras || []), cache = new Map();
+  const feriado = s => { const a = +s.slice(0, 4); if (!cache.has(a)) cache.set(a, new Set(feriadosBR(a))); return cache.get(a).has(s) || extras.has(s); };
+  const dow = s => new Date(toMs(s)).getUTCDay();
+  const util = s => !ativo || (dow(s) !== 0 && dow(s) !== 6 && !feriado(s));
+  const proximoUtil = s => { while (!util(s)) s = addDays(s, 1); return s; };
+  const anteriorUtil = s => { while (!util(s)) s = addDays(s, -1); return s; };
+  const somaUteis = (s, n) => { if (!ativo) return addDays(s, n); let d = n >= 0 ? proximoUtil(s) : anteriorUtil(s), k = Math.abs(n); const passo = n >= 0 ? 1 : -1; while (k > 0) { d = addDays(d, passo); if (util(d)) k--; } return d; };
+  const diffUteis = (a, b) => { if (!ativo) return diffDays(a, b); if (b === a) return 0; const [x, y, sinal] = b > a ? [a, b, 1] : [b, a, -1]; let n = 0; for (let d = addDays(x, 1); d <= y; d = addDays(d, 1)) if (util(d)) n++; return sinal * n; };
+  const feriadosEntre = (a, b) => { const out = []; if (!ativo) return out; for (let d = a; d <= b; d = addDays(d, 1)) if (feriado(d)) out.push(d); return out; };
+  return { ativo, util, feriado, proximoUtil, anteriorUtil, somaUteis, diffUteis, feriadosEntre };
+}
+const CAL_CORRIDOS = calendario();
+// Início mínimo que a dependência permite (FS: depois do fim da anterior + defasagem; SS: junto com o início da anterior + defasagem).
+const minimoDep = (p, tipo, lag, cal = CAL_CORRIDOS) => tipo === 'SS' ? cal.somaUteis(p.inicio, +lag || 0) : cal.somaUteis(p.fim, 1 + (+lag || 0));
+const baseDep = (p, tipo, cal = CAL_CORRIDOS) => tipo === 'SS' ? cal.somaUteis(p.inicio, 0) : cal.somaUteis(p.fim, 1); // início sem defasagem
+// Em dias úteis, início e término caem em dias úteis. Retorna os ids alterados.
+function normalizar(tarefas, cal) {
+  const mudou = []; if (!cal.ativo) return mudou;
+  for (const t of tarefas) { const i = cal.proximoUtil(t.inicio); let f = cal.anteriorUtil(t.fim); if (f < i) f = i; if (i !== t.inicio || f !== t.fim) { t.inicio = i; t.fim = f; mudou.push(t.id); } }
+  return mudou;
+}
+
 // Ordem topológica; lança erro se houver ciclo.
 function ordenar(tarefas) {
   const byId = new Map(tarefas.map(t => [t.id, t]));
@@ -23,22 +53,13 @@ function ordenar(tarefas) {
   return out;
 }
 
-// Empurra tarefas para frente quando a dependência exige (mantém a duração). Retorna ids alterados.
-function reagendar(tarefas) {
-  const byId = new Map(tarefas.map(t => [t.id, t]));
-  const mudou = [];
+// Empurra tarefas para frente quando a dependência exige (mantém a duração, em dias úteis se o calendário for de dias úteis). Retorna ids alterados.
+function reagendar(tarefas, cal = CAL_CORRIDOS) {
+  const byId = new Map(tarefas.map(t => [t.id, t])); const mudou = [];
   for (const t of ordenar(tarefas)) {
     let min = null;
-    for (const d of t.deps || []) {
-      const p = byId.get(d.de); if (!p) continue;
-      const lag = +d.lag || 0;
-      const c = d.tipo === 'SS' ? addDays(p.inicio, lag) : addDays(p.fim, 1 + lag);
-      if (min === null || c > min) min = c;
-    }
-    if (min && t.inicio < min) {
-      const dur = diffDays(t.inicio, t.fim);
-      t.inicio = min; t.fim = addDays(min, dur); mudou.push(t.id);
-    }
+    for (const d of t.deps || []) { const p = byId.get(d.de); if (!p) continue; const c = minimoDep(p, d.tipo, d.lag, cal); if (min === null || c > min) min = c; }
+    if (min && t.inicio < min) { const dur = cal.diffUteis(t.inicio, t.fim); t.inicio = min; t.fim = cal.somaUteis(min, dur); mudou.push(t.id); }
   }
   return mudou;
 }
@@ -79,4 +100,4 @@ function resumo(tarefas, hoje) {
   return r;
 }
 
-module.exports = { isDate, addDays, diffDays, hojeSP, ordenar, reagendar, status, resumo };
+module.exports = { isDate, addDays, diffDays, hojeSP, ordenar, reagendar, status, resumo, calendario, feriadosBR, minimoDep, baseDep, normalizar, CAL_CORRIDOS };

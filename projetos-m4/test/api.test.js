@@ -333,3 +333,25 @@ test('mover antes do que a dependência permite: o app explica e deixa escolher 
   // início de tarefa SEM dependência nunca é bloqueado
   const livre = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Livre', inicio: '2032-06-01', fim: '2032-06-02' }, EQ)).j.tarefa; assert.strictEqual((await call('PATCH', '/api/tarefas/' + livre, { inicio: '2031-01-01', fim: '2031-01-02' }, EQ)).s, 200);
 });
+
+test('dias úteis no projeto: normaliza datas, respeita feriados e dependências, e registra a mudança de calendário', async () => {
+  const p = (await call('POST', '/api/projetos', { nome: 'Dias úteis', diasUteis: true, feriadosExtras: '2031-03-04\n2031-03-05' }, EQ)).j.projeto; assert.strictEqual(p.diasUteis, true); assert.deepStrictEqual(p.feriadosExtras, ['2031-03-04', '2031-03-05']);
+  assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', feriadosExtras: 'amanhã' }, EQ)).s, 400);
+  const get = async () => (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto;
+  // sábado–domingo viram segunda; a API avisa o ajuste
+  const r = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Fim de semana', inicio: '2031-01-04', fim: '2031-01-05' }, EQ); assert.deepStrictEqual(r.j.ajustes.map(x => [x.inicio, x.fim]), [['2031-01-06', '2031-01-06']]);
+  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'A', inicio: '2031-01-06', fim: '2031-01-10' }, EQ)).j.tarefa;
+  const b = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'B', inicio: '2031-01-06', fim: '2031-01-07', deps: [{ de: a, tipo: 'FS', lag: 1 }] }, EQ)).j.tarefa; // a termina sexta; +1 dia útil de defasagem
+  let t = (await get()).tarefas.find(x => x.id === b); assert.deepStrictEqual([t.inicio, t.fim], ['2031-01-14', '2031-01-15']); // ter e qua (pula o fim de semana e a defasagem)
+  // mover B para antes: o motivo e a defasagem são em dias úteis
+  const bl = await call('PATCH', '/api/tarefas/' + b, { inicio: '2031-01-11', fim: '2031-01-14' }, EQ); assert.strictEqual(bl.s, 409); assert.strictEqual(bl.j.minimo, '2031-01-14'); assert.strictEqual(bl.j.motivos[0].base, '2031-01-13'); // sábado pedido → segunda (13) já é anterior ao mínimo
+  assert.strictEqual((await call('PATCH', '/api/tarefas/' + b, { inicio: '2031-01-13', fim: '2031-01-14', dependencia: 'defasagem' }, EQ)).s, 200); t = (await get()).tarefas.find(x => x.id === b); assert.deepStrictEqual([t.inicio, t.deps[0].lag], ['2031-01-13', 0]);
+  // feriados extras entram na contagem: carnaval (04 e 05/03)
+  const c = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Carnaval', inicio: '2031-03-03', fim: '2031-03-03' }, EQ)).j.tarefa; const d = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Depois', inicio: '2031-03-03', fim: '2031-03-03', deps: [{ de: c, tipo: 'FS', lag: 0 }] }, EQ)).j.tarefa;
+  assert.strictEqual((await get()).tarefas.find(x => x.id === d).inicio, '2031-03-06'); assert.ok((await get()).feriados.includes('2031-03-04') && (await get()).feriados.includes('2031-04-21')); // feriados para o Gantt
+  // ligar o calendário em um projeto existente normaliza as datas e deixa o registro
+  const q = (await call('POST', '/api/projetos', { nome: 'Corridos' }, EQ)).j.projeto; const e = (await call('POST', `/api/projetos/${q.id}/tarefas`, { nome: 'Sábado', inicio: '2031-01-04', fim: '2031-01-05' }, EQ)).j.tarefa; assert.strictEqual((await call('GET', '/api/projetos/' + q.id, null, EQ)).j.projeto.tarefas[0].inicio, '2031-01-04'); // corridos: sábado vale
+  await call('PATCH', '/api/projetos/' + q.id, { diasUteis: true }, EQ); const q2 = (await call('GET', '/api/projetos/' + q.id, null, EQ)).j.projeto; assert.strictEqual(q2.tarefas[0].inicio, '2031-01-06'); assert.ok(q2.diasUteis);
+  const hist = (await call('GET', `/api/projetos/${q.id}/historico`, null, EQ)).j.itens; assert.ok(hist.some(x => x.acao === 'editou_projeto' && x.diff.some(y => y.campo === 'Contar só dias úteis' && y.para === 'Sim'))); assert.ok(hist.some(x => x.acao === 'reagendada_dependencia' && /calendário/.test(x.motivo)));
+  assert.ok(e);
+});

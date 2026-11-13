@@ -184,7 +184,7 @@ const brl = v => v == null || v === '' ? '' : Number(v).toLocaleString('pt-BR', 
 function ficha(p) {
   const eq = U.tipo === 'equipe';
   const prazo = p.fimPrevisto ? (p.desvioDias == null ? fmt(p.fimPrevisto) : h('span', {}, fmt(p.fimPrevisto), ' ', p.desvioDias > 0 ? chip(p.desvioDias > 7 ? 'vermelho' : 'amarelo', `previsão ${p.desvioDias} dia(s) além`) : chip('verde', 'previsão dentro do prazo'))) : '';
-  const itens = [['Código', p.codigo], ['Tipo', p.tipo], ['Prioridade', PRIO[p.prioridade]], ['Empresa', p.empresa], ['Gerente do projeto', p.gerente],
+  const itens = [['Calendário', p.diasUteis ? 'Dias úteis (seg–sex, sem feriados)' : ''], ['Código', p.codigo], ['Tipo', p.tipo], ['Prioridade', PRIO[p.prioridade]], ['Empresa', p.empresa], ['Gerente do projeto', p.gerente],
     ['Contato do cliente', [p.contatoNome, p.contatoEmail, p.contatoTelefone].filter(Boolean).join(' · ')], ['Início previsto', fmt(p.inicioPrevisto)], ['Término contratado', prazo],
     ['Pasta de documentos', p.link ? h('a', { href: p.link, target: '_blank', rel: 'noopener noreferrer' }, 'Abrir link') : ''],
     ...(eq ? [['Valor do projeto (interno)', brl(p.valor)], ['Negócio no Bitrix24', p.negocioBitrix ? '#' + p.negocioBitrix : ''], ['Clientes com acesso', p.clientes.map(c => c.nome).join(', ') || 'nenhum'], ['Acessos do cliente ao projeto', (p.acessosClientes || []).map(a => a.ultimo ? `${a.nome}: último acesso ${fmtTs(a.ultimo)} (${a.total} visita(s))` : `${a.nome}: ainda não acessou`).join(' · ')]] : [])].filter(x => x[1]);
@@ -243,7 +243,7 @@ function gantt(p) {
   let mesAtual = '';
   for (let i = 0; i < dias; i++) {
     const d = new Date(min + i * DAY), s = iso(min + i * DAY), dow = d.getUTCDay();
-    if (dow === 0 || dow === 6) juntar(cv, h('div', { class: 'g-fds', style: `left:${i * DW}px;width:${DW}px` }));
+    if (dow === 0 || dow === 6) juntar(cv, h('div', { class: 'g-fds', style: `left:${i * DW}px;width:${DW}px` })); else if (p.diasUteis && (p.feriados || []).includes(s)) juntar(cv, h('div', { class: 'g-fds g-fer', title: 'Feriado', style: `left:${i * DW}px;width:${DW}px` }));
     if (DW >= 18 || d.getUTCDate() === 1 || dow === 1) juntar(cv, h('div', { class: 'g-dia', style: `left:${i * DW}px;width:${DW}px` }, DW >= 18 || dow === 1 ? d.getUTCDate() : ''));
     const mk = s.slice(0, 7); if (mk !== mesAtual) { mesAtual = mk; juntar(cv, h('div', { class: 'g-mes', style: `left:${i * DW}px` }, d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }))); }
   }
@@ -299,6 +299,14 @@ function dialogoBloqueio(t, pedido, d) {
         opcao(`Começar em ${fmt(d.minimo)}`, 'Respeita a dependência como está.', '', 'empurrar'),
         h('button', { class: 'btn', onclick: () => fim(null) }, 'Cancelar'))));
   });
+}
+// Calendário do projeto no navegador: dias corridos, ou dias úteis (seg–sex, sem os feriados que o servidor envia).
+function calCli(p) {
+  const fer = new Set((p && p.feriados) || []), ativo = !!(p && p.diasUteis); const dow = s => new Date(ms(s)).getUTCDay();
+  const util = s => !ativo || (dow(s) !== 0 && dow(s) !== 6 && !fer.has(s)), prox = s => { while (!util(s)) s = somaDias(s, 1); return s; }, ant = s => { while (!util(s)) s = somaDias(s, -1); return s; };
+  const soma = (s, n) => { if (!ativo) return somaDias(s, n); let d = n >= 0 ? prox(s) : ant(s), k = Math.abs(n); const passo = n >= 0 ? 1 : -1; while (k > 0) { d = somaDias(d, passo); if (util(d)) k--; } return d; };
+  const dif = (a, b) => { if (!ativo) return Math.round((ms(b) - ms(a)) / DAY); if (a === b) return 0; const [x, y, sg] = b > a ? [a, b, 1] : [b, a, -1]; let n = 0; for (let d = somaDias(x, 1); d <= y; d = somaDias(d, 1)) if (util(d)) n++; return sg * n; };
+  return { ativo, util, prox, ant, soma, dif, fer };
 }
 let arrastando = false;
 // Cria dependência arrastando do círculo de uma atividade até outra: círculo do fim = a outra só começa quando esta terminar; círculo do início = começam juntas.
@@ -411,7 +419,7 @@ async function modalProjeto(p, pre) {
     cnome: inp(x.contatoNome), cemail: inp(x.contatoEmail, { type: 'email' }), ctel: inp(x.contatoTelefone, { type: 'tel' }),
     ini: inp(x.inicioPrevisto, { type: 'date' }), fim: inp(x.fimPrevisto, { type: 'date' }), valor: inp(x.valor, { type: 'number', min: 0, step: '0.01', placeholder: '0,00' }), neg: inp(x.negocioBitrix, { inputmode: 'numeric', placeholder: 'Ex.: 1234' }),
     desc: h('textarea', { rows: 4, placeholder: 'O que será entregue, etapas e o que o cliente precisa fornecer' }, x.descricao || ''), link: inp(x.link, { type: 'url', placeholder: 'https://…' }),
-    obs: h('textarea', { rows: 3 }, x.obsInternas || ''), ger: inp(p ? x.gerente : U.nome),
+    obs: h('textarea', { rows: 3 }, x.obsInternas || ''), uteis: h('input', { type: 'checkbox', style: 'width:auto', checked: !!x.diasUteis }), feriados: h('textarea', { rows: 2, placeholder: 'AAAA-MM-DD, um por linha (ex.: 2027-02-09)' }, (x.feriadosExtras || []).join('\n')), ger: inp(p ? x.gerente : U.nome),
     sit: h('select', {}, [['andamento', 'Em andamento'], ['pausado', 'Pausado'], ['concluido', 'Concluído']].map(([k, t]) => h('option', { value: k }, t)))
   };
   f.tipo.value = x.tipo || ''; f.prio.value = x.prioridade || 'media'; f.sit.value = x.situacao || 'andamento';
@@ -422,12 +430,14 @@ async function modalProjeto(p, pre) {
     sec('Cliente contratante'), h('div', { class: 'g2' }, c('Empresa', f.empresa), c('Nome do contato', f.cnome), c('E-mail do contato', f.cemail), c('Telefone do contato', f.ctel)),
     sec('Prazos e valores'), h('div', { class: 'g2' }, c('Início previsto', f.ini), c('Término contratado', f.fim), c('Valor do projeto (R$) · interno', f.valor), c('ID do negócio no Bitrix24 · interno', f.neg)),
     sec('Escopo'), c('Objetivo e escopo (o cliente vê)', f.desc), c('Link da pasta de documentos (o cliente vê)', f.link), c('Observações internas (o cliente não vê)', f.obs),
+    sec('Calendário'), h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.uteis, 'Contar só dias úteis (segunda a sexta, sem feriados nacionais)'),
+    h('p', { class: 'muted small', style: 'margin:4px 0 0' }, 'Com isso ligado, as datas das atividades caem em dias úteis, e dependências e durações pulam fins de semana e feriados. Ao mudar, as atividades existentes são reajustadas.'), c('Feriados extras do projeto (Carnaval, feriados locais…)', f.feriados),
     sec('Acesso dos clientes'), h('label', {}, 'Clientes com acesso a este projeto'), lista, err,
     h('p', { class: 'muted small' }, 'Depois de salvar, adicione as atividades do projeto (botão “+ Atividade”).'),
     h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn pri', onclick: async () => {
       try {
         const b = { nome: f.nome.value, codigo: f.codigo.value, tipo: f.tipo.value, prioridade: f.prio.value, gerente: f.ger.value, situacao: f.sit.value, empresa: f.empresa.value, contatoNome: f.cnome.value, contatoEmail: f.cemail.value, contatoTelefone: f.ctel.value,
-          inicioPrevisto: f.ini.value, fimPrevisto: f.fim.value, valor: f.valor.value, negocioBitrix: f.neg.value, descricao: f.desc.value, link: f.link.value, obsInternas: f.obs.value, clientes: [...sel] };
+          inicioPrevisto: f.ini.value, fimPrevisto: f.fim.value, valor: f.valor.value, negocioBitrix: f.neg.value, descricao: f.desc.value, link: f.link.value, obsInternas: f.obs.value, diasUteis: f.uteis.checked, feriadosExtras: f.feriados.value, clientes: [...sel] };
         const r = p ? await api('PATCH', '/api/projetos/' + p.id, b) : await api('POST', '/api/projetos', b); v.remove(); go({ nome: 'projeto', id: r.projeto.id });
       } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
     } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), p && U.admin && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir o projeto e todas as atividades, registros e arquivos?')) { await api('DELETE', '/api/projetos/' + p.id); v.remove(); go({ nome: 'projetos' }); } } }, 'Excluir'))));
@@ -436,17 +446,17 @@ function modalTarefa(p, t) {
   const v = overlay(true), err = h('div'); const outras = p.tarefas.filter(x => !t || x.id !== t.id); const deps = (t ? t.deps || [] : []).map(d => ({ ...d }));
   const f = { nome: h('input', { value: t ? t.nome : '' }), inicio: h('input', { type: 'date', value: t ? t.inicio : p.hoje }), fim: h('input', { type: 'date', value: t ? t.fim : p.hoje }), dur: h('input', { type: 'number', min: 1, step: 1 }), prog: h('input', { type: 'number', min: 0, max: 100, value: t ? t.progresso : 0 }), resp: h('input', { value: t ? t.responsavel : '', placeholder: 'Quem está trabalhando nela' }), desc: h('textarea', { rows: 3 }, t ? t.descricao : ''), interna: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.interna }), aguarda: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.aguardaCliente }), pedido: h('textarea', { rows: 2, maxlength: 500, placeholder: 'O que você precisa do cliente? Ex.: lista de usuários e permissões' }, t ? t.pedido || '' : '') };
   // datas: mudar o início leva o término junto (mantém a duração); mudar a duração muda o término
-  const dd = (a, b) => Math.round((ms(b) - ms(a)) / DAY); let ini0 = f.inicio.value;
-  const pintaDur = () => { f.dur.value = f.inicio.value && f.fim.value ? Math.max(1, dd(f.inicio.value, f.fim.value) + 1) : ''; f.fim.min = f.inicio.value; };
-  f.inicio.addEventListener('change', () => { if (!f.inicio.value) return; if (f.fim.value && ini0) f.fim.value = somaDias(f.fim.value, dd(ini0, f.inicio.value)); ini0 = f.inicio.value; pintaDur(); });
-  f.fim.addEventListener('change', () => { if (f.fim.value && f.inicio.value && f.fim.value < f.inicio.value) { f.inicio.value = f.fim.value; ini0 = f.inicio.value; } pintaDur(); });
-  f.dur.addEventListener('input', () => { const n = Math.max(1, Math.round(+f.dur.value) || 1); if (f.inicio.value) { f.fim.value = somaDias(f.inicio.value, n - 1); f.fim.min = f.inicio.value; } });
+  const cal = calCli(p); let ini0 = f.inicio.value;
+  const pintaDur = () => { f.dur.value = f.inicio.value && f.fim.value ? Math.max(1, cal.dif(f.inicio.value, f.fim.value) + 1) : ''; f.fim.min = f.inicio.value; };
+  f.inicio.addEventListener('change', () => { if (!f.inicio.value) return; const dur = f.fim.value && ini0 ? cal.dif(ini0, f.fim.value) : 0; f.inicio.value = cal.prox(f.inicio.value); if (f.fim.value) f.fim.value = cal.soma(f.inicio.value, Math.max(0, dur)); ini0 = f.inicio.value; pintaDur(); });
+  f.fim.addEventListener('change', () => { if (f.fim.value) f.fim.value = cal.ant(f.fim.value); if (f.fim.value && f.inicio.value && f.fim.value < f.inicio.value) { f.inicio.value = f.fim.value; ini0 = f.inicio.value; } pintaDur(); });
+  f.dur.addEventListener('input', () => { const n = Math.max(1, Math.round(+f.dur.value) || 1); if (f.inicio.value) { f.fim.value = cal.soma(f.inicio.value, n - 1); f.fim.min = f.inicio.value; } });
   pintaDur();
   const depsBox = h('div'); const pintaDeps = () => depsBox.replaceChildren(...deps.map((d, i) => h('div', { class: 'row', style: 'margin:6px 0' },
     h('select', { onchange: e => d.de = e.target.value }, outras.map(o => h('option', { value: o.id, selected: o.id === d.de }, o.nome))),
     h('select', { style: 'width:auto', onchange: e => d.tipo = e.target.value }, [['FS', 'Espera terminar'], ['SS', 'Começa junto']].map(([k, tt]) => h('option', { value: k, selected: k === d.tipo }, tt))),
     h('input', { type: 'number', style: 'width:80px', value: d.lag, min: -365, max: 365, title: 'Defasagem em dias: 0 = sem espera; 5 = espera mais 5 dias; negativo = adianta', onchange: e => d.lag = +e.target.value }), h('span', { class: 'muted small' }, 'dia(s) de defasagem'), h('button', { class: 'btn sm', onclick: () => { deps.splice(i, 1); pintaDeps(); } }, '✕')))); pintaDeps();
-  juntar(v, h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, 'Duração (dias)'), f.dur), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, p.diasUteis ? 'Duração (dias úteis)' : 'Duração (dias)'), f.dur), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
     h('label', {}, 'Descrição'), f.desc, h('label', {}, 'Dependências (as datas se ajustam sozinhas) · defasagem: 0 = sem espera, 5 = espera mais 5 dias, negativo = adianta'), depsBox, outras.length > 0 && h('button', { class: 'btn sm', onclick: () => { deps.push({ de: outras[0].id, tipo: 'FS', lag: 0 }); pintaDeps(); } }, '+ Dependência'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.interna, 'Atividade interna (o cliente não vê)'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.aguarda, 'Aguardando o cliente (aparece em “Precisamos de você” para ele)'), f.pedido, err,
