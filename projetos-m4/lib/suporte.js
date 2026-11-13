@@ -3,7 +3,7 @@
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const br = s => esc(s).replace(/\r?\n/g, '<br>');
 const PRIO = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
-const CAT = { duvida: 'Dúvida', problema: 'Problema / erro', mudanca: 'Solicitação de mudança', acesso: 'Acesso e usuários', financeiro: 'Financeiro', outro: 'Outro' };
+const CAT = { duvida: 'Dúvida', problema: 'Problema / erro', mudanca: 'Solicitação de mudança', acesso: 'Acesso e usuários', financeiro: 'Financeiro', privacidade: 'Privacidade e dados (LGPD)', outro: 'Outro' };
 const MAX_TENT = 8;
 
 function montar(s, ctx) {

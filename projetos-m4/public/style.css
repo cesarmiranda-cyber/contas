@@ -235,3 +235,7 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 .rel-resumo{display:flex;gap:18px;align-items:center;margin:6px 0 10px}.rel-sec{margin-top:18px;break-inside:avoid}.rel-sec h3{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta-2);margin-bottom:6px}
 .rel-lista{margin:0;padding-left:18px}.rel-lista li{margin:4px 0}.rel-rodape{margin-top:22px;padding-top:10px;border-top:1px solid var(--linha)}
 @media print{@page{margin:14mm}.relatorio-aberto .proj-hero,.relatorio-aberto .tabs,.relatorio-aberto .precisa,.relatorio-aberto .parabens,.relatorio-aberto .so-print{display:none!important}.relatorio{border:0;box-shadow:none;padding:0;max-width:none}}
+
+/* LGPD */
+.aceite{display:flex;gap:8px;align-items:flex-start;margin:14px 0 0;font-weight:400;color:var(--tinta-2);font-size:13px}.aceite input{margin-top:3px}
+.link-legal{color:var(--marca-2);cursor:pointer;text-decoration:underline}.legal-texto{white-space:pre-wrap;line-height:1.6;max-height:60vh;overflow:auto;padding:4px 2px}
