@@ -160,3 +160,5 @@ table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:9px 10p
 .sino-n[hidden]{display:none}
 input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selector-button{border:1px solid var(--linha);background:var(--fundo);border-radius:99px;padding:6px 14px;margin-right:10px;font:inherit;font-weight:600;cursor:pointer}
 .conversa-env{display:flex;gap:8px;align-items:center}
+
+.rapido{margin:14px 0;padding:12px 14px;background:var(--marca-fundo);border-radius:12px}.rapido label{margin:0 0 6px}.rapido input[type=range]{flex:1;padding:0;accent-color:var(--destaque);min-width:140px}

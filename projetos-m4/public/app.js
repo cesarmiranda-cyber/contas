@@ -52,8 +52,8 @@ function sino() {
   const n = h('span', { class: 'sino-n', hidden: true }); const svg = document.createElementNS(NS_SVG, 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
   svg.innerHTML = '<path d="M6 9a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>';
   const b = h('button', { class: 'sino', 'aria-label': 'Novidades', title: 'Novidades', onclick: async () => {
-    const v = overlay(), box = h('aside', { class: 'drawer' }); v.append(box); const { itens } = await api('GET', '/api/novidades');
-    box.append(h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Novidades'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), h('p', { class: 'muted small' }, 'O que a equipe Manda4 fez nos seus projetos e chamados nos últimos 30 dias.'),
+    const v = overlay(), box = h('aside', { class: 'drawer' }); juntar(v, box); const { itens } = await api('GET', '/api/novidades');
+    juntar(box, h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Novidades'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), h('p', { class: 'muted small' }, 'O que a equipe Manda4 fez nos seus projetos e chamados nos últimos 30 dias.'),
       itens.length ? h('div', { class: 'fio' }, itens.map(i => h('div', { class: 'msg eq' }, h('div', { class: 'quem' }, i.texto), h('div', { class: 'muted small' }, `${i.projeto ? i.projeto + ' · ' : ''}${fmtTs(i.ts)}`)))) : h('div', { class: 'vazio' }, 'Nenhuma novidade por enquanto.'));
     await api('POST', '/api/novidades/lido', {}); n.hidden = true;
   } }, svg, n);
@@ -151,8 +151,8 @@ async function telaProjeto(m) {
   if (view.abrir) { const t0 = p.tarefas.find(x => x.id === view.abrir); view.abrir = null; if (t0) setTimeout(() => drawer(p, t0), 50); }
   juntar(m, tabs); if (!p.tarefas.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
   if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
-  else juntar(m, h('div', { class: 'card' }, h('table', {}, h('thead', {}, h('tr', {}, ['Atividade', 'Início', 'Término', '%', 'Responsável', 'Status'].map(t => h('th', {}, t)))),
-    h('tbody', {}, p.tarefas.map(t => h('tr', { style: 'cursor:pointer', onclick: () => drawer(p, t) }, h('td', {}, t.nome, t.interna && h('span', { class: 'muted small' }, ' (interna)')), h('td', {}, fmt(t.inicio)), h('td', {}, fmt(t.fim)), h('td', {}, t.progresso + '%'), h('td', {}, t.responsavel || '—'), h('td', {}, chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', {}, chip('amarelo', eq ? (t.respondidoEm ? 'Cliente respondeu' : 'Aguardando cliente') : 'Aguardando você')))))))));
+  else juntar(m, h('div', { class: 'card' }, h('table', {}, h('thead', {}, h('tr', {}, ['Atividade', 'Início', 'Término', '%', 'Responsável', 'Status', ...(eq ? [''] : [])].map(t => h('th', {}, t)))),
+    h('tbody', {}, p.tarefas.map(t => h('tr', { style: 'cursor:pointer', onclick: () => drawer(p, t) }, h('td', {}, t.nome, t.interna && h('span', { class: 'muted small' }, ' (interna)')), h('td', {}, fmt(t.inicio)), h('td', {}, fmt(t.fim)), h('td', {}, t.progresso + '%'), h('td', {}, t.responsavel || '—'), h('td', {}, chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', {}, chip('amarelo', eq ? (t.respondidoEm ? 'Cliente respondeu' : 'Aguardando cliente') : 'Aguardando você'))), eq && h('td', {}, h('button', { class: 'btn sm', onclick: e => { e.stopPropagation(); modalTarefa(p, t); } }, 'Editar'))))))));
 }
 function gantt(p) {
   const ts = [...p.tarefas].sort((a, b) => a.inicio.localeCompare(b.inicio) || a.fim.localeCompare(b.fim)); const RH = 44, DW = view.dw || 26;
@@ -162,11 +162,11 @@ function gantt(p) {
   let mesAtual = '';
   for (let i = 0; i < dias; i++) {
     const d = new Date(min + i * DAY), s = iso(min + i * DAY), dow = d.getUTCDay();
-    if (dow === 0 || dow === 6) cv.append(h('div', { class: 'g-fds', style: `left:${i * DW}px;width:${DW}px` }));
-    if (DW >= 18 || d.getUTCDate() === 1 || dow === 1) cv.append(h('div', { class: 'g-dia', style: `left:${i * DW}px;width:${DW}px` }, DW >= 18 || dow === 1 ? d.getUTCDate() : ''));
-    const mk = s.slice(0, 7); if (mk !== mesAtual) { mesAtual = mk; cv.append(h('div', { class: 'g-mes', style: `left:${i * DW}px` }, d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }))); }
+    if (dow === 0 || dow === 6) juntar(cv, h('div', { class: 'g-fds', style: `left:${i * DW}px;width:${DW}px` }));
+    if (DW >= 18 || d.getUTCDate() === 1 || dow === 1) juntar(cv, h('div', { class: 'g-dia', style: `left:${i * DW}px;width:${DW}px` }, DW >= 18 || dow === 1 ? d.getUTCDate() : ''));
+    const mk = s.slice(0, 7); if (mk !== mesAtual) { mesAtual = mk; juntar(cv, h('div', { class: 'g-mes', style: `left:${i * DW}px` }, d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }))); }
   }
-  ts.forEach((t, i) => cv.append(h('div', { class: 'g-lin', style: `top:${48 + i * RH}px` })));
+  ts.forEach((t, i) => juntar(cv, h('div', { class: 'g-lin', style: `top:${48 + i * RH}px` })));
   const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'g-svg'); svg.setAttribute('width', W); svg.setAttribute('height', 48 + ts.length * RH);
   svg.innerHTML = '<defs><marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#7d8aa8"/></marker></defs>';
   const pos = new Map(ts.map((t, i) => [t.id, { i, l: x(t.inicio), r: x(t.fim) + DW }]));
@@ -175,13 +175,13 @@ function gantt(p) {
     const [x1, x2] = d.tipo === 'SS' ? [a.l, b.l] : [a.r, b.l]; const mx = d.tipo === 'SS' ? Math.min(x1, x2) - 10 : x1 + 8;
     const path = document.createElementNS(NS, 'path'); path.setAttribute('d', `M${x1},${ya} H${mx} V${yb} H${x2 - 1}`); path.setAttribute('fill', 'none'); path.setAttribute('stroke', '#7d8aa8'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('marker-end', 'url(#ar)'); svg.append(path);
   }
-  cv.append(svg, h('div', { class: 'g-hoje', style: `left:${x(p.hoje) + DW / 2}px` }));
+  juntar(cv, svg, h('div', { class: 'g-hoje', style: `left:${x(p.hoje) + DW / 2}px` }));
   for (const t of ts) {
     const i = pos.get(t.id).i, w = Math.max(DW, x(t.fim) + DW - x(t.inicio));
     const b = h('div', { class: 'g-bloco ' + t.status.cor + (t.aguardaCliente && t.progresso < 100 ? ' aguarda' : ''), style: `left:${x(t.inicio)}px;width:${w - 2}px;top:${48 + i * RH + 9}px`, tabindex: 0, role: 'button', 'aria-label': `${t.nome}: ${t.status.rotulo}`, onclick: () => drawer(p, t), onkeydown: e => e.key === 'Enter' && drawer(p, t) },
       h('div', { class: 'pg', style: `width:${t.progresso}%` }), h('span', {}, w > 90 ? `${t.nome}` : ''));
     b.addEventListener('mousemove', e => tip(e, t)); b.addEventListener('mouseleave', () => $tip.hidden = true); b.addEventListener('focus', () => { const r = b.getBoundingClientRect(); tip({ clientX: r.left, clientY: r.bottom }, t); }); b.addEventListener('blur', () => $tip.hidden = true);
-    cv.append(b);
+    juntar(cv, b);
   }
   const nomes = h('div', { class: 'g-nomes' }, h('div', { class: 'g-head' }, h('select', { style: 'width:auto;padding:3px 6px;font-size:12px', onchange: e => { view.dw = +e.target.value; render(); } }, [[26, 'Dias'], [10, 'Semanas'], [4, 'Meses']].map(([v, t]) => h('option', { value: v, selected: v === DW }, t)))),
     ts.map(t => h('div', { class: 'g-nome', title: t.nome, onclick: () => drawer(p, t) }, h('i', { class: 'dot ' + t.status.cor }), h('span', {}, t.nome))));
@@ -195,18 +195,22 @@ function tip(e, t) {
 
 // ---------- painel da atividade ----------
 function overlay(centro) { const v = h('div', { class: 'veu' + (centro ? ' centro' : ''), onmousedown: e => e.target === v && v.remove() }); document.body.append(v); return v; }
+function rapido(p, t, v) {
+  const val = h('b', {}, t.progresso + '%'); const r = h('input', { type: 'range', min: 0, max: 100, step: 5, value: t.progresso, 'aria-label': 'Andamento da atividade', oninput: () => { val.textContent = r.value + '%'; } });
+  return h('div', { class: 'rapido' }, h('label', {}, 'Atualizar andamento'), h('div', { class: 'row' }, r, val, h('button', { class: 'btn sm', onclick: async ev => { ev.target.disabled = true; try { await api('PATCH', '/api/tarefas/' + t.id, { progresso: +r.value }); v.remove(); toast('Andamento atualizado.'); render(); } catch (e) { toast(e.message); ev.target.disabled = false; } } }, 'Salvar')));
+}
 async function drawer(p, t) {
-  $tip.hidden = true; const v = overlay(), box = h('aside', { class: 'drawer' }); v.append(box); const eq = U.tipo === 'equipe';
+  $tip.hidden = true; const v = overlay(), box = h('aside', { class: 'drawer' }); juntar(v, box); const eq = U.tipo === 'equipe';
   const fio = h('div', { class: 'fio' }), err = h('div'); const txt = h('textarea', { rows: 3, placeholder: 'Escreva uma informação, dúvida ou observação…' }); const file = h('input', { type: 'file' });
   const carregar = async () => {
     const { itens } = await api('GET', `/api/tarefas/${t.id}/itens`); fio.replaceChildren(...(itens.length ? itens.map(i => h('div', { class: 'msg' + (i.tipoAutor === 'equipe' ? ' eq' : '') }, h('div', { class: 'quem' }, `${i.autor} `, h('span', { class: 'muted' }, `${i.tipoAutor === 'equipe' ? 'Equipe Manda4' : 'Cliente'} · ${fmtTs(i.ts)}`)),
       i.texto && h('p', {}, i.texto), i.arquivo && h('p', {}, h('a', { href: '/api/arquivos/' + i.arquivo.id, download: i.arquivo.nome }, '📎 ' + i.arquivo.nome), h('span', { class: 'muted small' }, ` (${Math.ceil(i.arquivo.tamanho / 1024)} KB)`)))) : [h('p', { class: 'muted' }, 'Nenhum registro ainda.')]));
   };
-  box.append(h('div', { class: 'row' }, h('h2', { class: 'grow' }, t.nome), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), chip(t.status.cor, t.status.rotulo),
+  juntar(box, h('div', { class: 'row' }, h('h2', { class: 'grow' }, t.nome), eq && h('button', { class: 'btn pri sm', onclick: () => { v.remove(); modalTarefa(p, t); } }, 'Editar atividade'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), chip(t.status.cor, t.status.rotulo),
     t.aguardaCliente && t.progresso < 100 && h('div', { class: 'callout' }, h('b', {}, U.tipo === 'equipe' ? 'Aguardando o cliente' : 'A equipe precisa de você'), h('p', {}, t.pedido || 'A equipe aguarda o seu retorno para continuar.'), t.respondidoEm && h('p', { class: 'small' }, `${U.tipo === 'equipe' ? 'Cliente respondeu' : 'Você respondeu'} em ${fmtTs(t.respondidoEm)}.`)),
     h('p', { class: 'muted' }, t.descricao), h('p', {}, `📅 ${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}% concluído`), h('p', {}, '👷 Quem está trabalhando: ', h('b', {}, t.responsavel || 'a definir')),
     (t.deps || []).length > 0 && h('p', { class: 'muted small' }, 'Depende de: ' + t.deps.map(d => { const o = p.tarefas.find(x => x.id === d.de); return o ? `${o.nome} (${d.tipo === 'SS' ? 'começam juntas' : 'espera terminar'}${d.lag ? ', ' + d.lag + 'd' : ''})` : null; }).filter(Boolean).join('; ')),
-    eq && h('button', { class: 'btn sm', onclick: () => { v.remove(); modalTarefa(p, t); } }, 'Editar atividade'),
+    eq && rapido(p, t, v),
     h('h3', { style: 'margin-top:18px' }, 'Informações e documentos'), fio, h('label', {}, 'Adicionar texto'), txt, h('label', {}, 'Anexar documento (até 10 MB)'), file, err,
     h('button', { class: 'btn pri', style: 'margin-top:12px', onclick: async ev => {
       err.replaceChildren(); const body = { texto: txt.value }; const f = file.files[0]; ev.target.disabled = true;
@@ -235,7 +239,7 @@ async function modalProjeto(p, pre) {
   f.tipo.value = x.tipo || ''; f.prio.value = x.prioridade || 'media'; f.sit.value = x.situacao || 'andamento';
   const c = (rot, el) => h('div', {}, h('label', {}, rot), el); const sec = t => h('h3', { class: 'sec' }, t);
   const lista = h('div', { style: 'max-height:200px;overflow:auto;border:1px solid var(--linha);border-radius:10px;padding:6px 10px' }, clientes.length ? clientes.filter(c => c.ativo).map(c => h('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0;font-weight:400;color:var(--tinta)' }, h('input', { type: 'checkbox', style: 'width:auto', checked: sel.has(c.id), onchange: e => e.target.checked ? sel.add(c.id) : sel.delete(c.id) }), `${c.nome} · ${c.empresa || c.email}`)) : h('span', { class: 'muted' }, 'Nenhum cliente cadastrado no portal ainda.'));
-  v.append(h('div', { class: 'modal' }, h('h2', {}, p ? 'Editar projeto' : 'Novo projeto'),
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, p ? 'Editar projeto' : 'Novo projeto'),
     sec('Identificação'), h('div', { class: 'g2' }, c('Nome do projeto *', f.nome), c('Código', f.codigo), c('Tipo', f.tipo), c('Prioridade', f.prio), c('Gerente do projeto', f.ger), c('Situação', f.sit)),
     sec('Cliente contratante'), h('div', { class: 'g2' }, c('Empresa', f.empresa), c('Nome do contato', f.cnome), c('E-mail do contato', f.cemail), c('Telefone do contato', f.ctel)),
     sec('Prazos e valores'), h('div', { class: 'g2' }, c('Início previsto', f.ini), c('Término contratado', f.fim), c('Valor do projeto (R$) · interno', f.valor), c('ID do negócio no Bitrix24 · interno', f.neg)),
@@ -257,7 +261,7 @@ function modalTarefa(p, t) {
     h('select', { onchange: e => d.de = e.target.value }, outras.map(o => h('option', { value: o.id, selected: o.id === d.de }, o.nome))),
     h('select', { style: 'width:auto', onchange: e => d.tipo = e.target.value }, [['FS', 'Espera terminar'], ['SS', 'Começa junto']].map(([k, tt]) => h('option', { value: k, selected: k === d.tipo }, tt))),
     h('input', { type: 'number', style: 'width:80px', value: d.lag, title: 'Defasagem em dias', onchange: e => d.lag = +e.target.value }), h('button', { class: 'btn sm', onclick: () => { deps.splice(i, 1); pintaDeps(); } }, '✕')))); pintaDeps();
-  v.append(h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
     h('label', {}, 'Descrição'), f.desc, h('label', {}, 'Dependências (as datas se ajustam sozinhas)'), depsBox, outras.length > 0 && h('button', { class: 'btn sm', onclick: () => { deps.push({ de: outras[0].id, tipo: 'FS', lag: 0 }); pintaDeps(); } }, '+ Dependência'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.interna, 'Atividade interna (o cliente não vê)'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.aguarda, 'Aguardando o cliente (aparece em “Precisamos de você” para ele)'), f.pedido, err,
@@ -312,7 +316,7 @@ async function novaSolic() {
   const pj = h('select', {}, h('option', { value: '' }, 'Geral (sem projeto)'), projetos.map(p => h('option', { value: p.id }, `${p.nome}${p.codigo ? ' · ' + p.codigo : ''}`)));
   const cat = sel(CATS, 'duvida'), pri = sel(PRIOS, 'media'), tel = h('input', { type: 'tel', placeholder: '(11) 90000-0000' }), as = h('input', { maxlength: 160, placeholder: 'Resumo em uma linha' }), tx = h('textarea', { rows: 6, placeholder: 'Conte o que aconteceu ou o que você precisa: o que estava fazendo, o que esperava e o que aconteceu.' }), arq = h('input', { type: 'file', multiple: true });
   const c = (r, el) => h('div', {}, h('label', {}, r), el);
-  v.append(h('div', { class: 'modal' }, h('h2', {}, 'Abrir chamado de suporte'), h('p', { class: 'muted small' }, 'Seu chamado vai direto para a equipe Manda4, com protocolo para acompanhamento.'),
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, 'Abrir chamado de suporte'), h('p', { class: 'muted small' }, 'Seu chamado vai direto para a equipe Manda4, com protocolo para acompanhamento.'),
     h('div', { class: 'g2' }, c('Projeto', pj), c('Categoria', cat), c('Prioridade', pri), c('Telefone para contato (opcional)', tel)), h('label', {}, 'Assunto *'), as, h('label', {}, 'Descrição *'), tx, h('label', {}, 'Anexos (prints, documentos · até 3 arquivos de 10 MB)'), arq, err,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async ev => { ev.target.disabled = true; err.replaceChildren(); try {
       const arqs = [...arq.files]; if (arqs.length > 3) throw new Error('Envie no máximo 3 arquivos por chamado. Você pode anexar mais depois, na conversa.'); const prontos = await Promise.all(arqs.map(lerArquivo));
@@ -354,7 +358,7 @@ function modalAcesso(c, projetos) {
   const pre = { empresa: c.empresa, contatoNome: c.nome, contatoEmail: c.email, contatoTelefone: c.telefone, clientes: [{ id: c.id }] };
   const caixa = h('div', { class: 'lista-proj' }, projetos.length ? projetos.map(p => h('label', { class: 'item-proj' }, h('input', { type: 'checkbox', checked: sel.has(p.id), onchange: e => e.target.checked ? sel.add(p.id) : sel.delete(p.id) }),
     h('span', {}, h('b', {}, p.nome), h('span', { class: 'muted small' }, ` ${[p.codigo, p.empresa].filter(Boolean).join(' · ')}`)))) : h('p', { class: 'muted' }, 'Ainda não há projetos. Crie o primeiro para este cliente.'));
-  v.append(h('div', { class: 'modal' }, h('h2', {}, ativar ? 'Ativar acesso' : 'Projetos do cliente'), h('div', { class: 'quem-cli', style: 'margin:8px 0 4px' }, h('span', { class: 'avatar' }, iniciais(c.nome)), h('div', {}, h('b', {}, c.nome), h('div', { class: 'muted small' }, [c.empresa, c.email].filter(Boolean).join(' · ')))),
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, ativar ? 'Ativar acesso' : 'Projetos do cliente'), h('div', { class: 'quem-cli', style: 'margin:8px 0 4px' }, h('span', { class: 'avatar' }, iniciais(c.nome)), h('div', {}, h('b', {}, c.nome), h('div', { class: 'muted small' }, [c.empresa, c.email].filter(Boolean).join(' · ')))),
     h('label', {}, ativar ? 'Em quais projetos este cliente pode entrar?' : 'Projetos que este cliente pode acompanhar'), caixa,
     h('button', { class: 'btn sm', style: 'margin-top:10px', onclick: () => { v.remove(); modalProjeto(null, pre); } }, '+ Criar novo projeto para este cliente'), err,
     h('div', { class: 'row', style: 'margin-top:18px' }, h('button', { class: 'btn pri', onclick: async ev => { ev.target.disabled = true; try {
