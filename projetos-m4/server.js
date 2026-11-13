@@ -276,7 +276,9 @@ const msgView = m => { const a = m.arquivoId && db.arquivos.find(x => x.id === m
 function solView(s, u) {
   const base = { id: s.id, protocolo: s.protocolo, projetoId: s.projetoId, projeto: (projetoDe(s.projetoId) || {}).nome, categoria: s.categoria, prioridade: s.prioridade, assunto: s.assunto, texto: s.texto, status: s.status, resposta: s.resposta, criadoEm: s.criadoEm,
     etapa: s.etapa ? s.etapa.nome : '', historico: s.historico || [], mensagens: (s.mensagens || []).map(msgView), avaliacao: s.avaliacao ? { nota: s.avaliacao.nota, comentario: s.avaliacao.comentario, ts: s.avaliacao.ts } : null,
-    podeAvaliar: !s.avaliacao && (s.status === 'concluida' || (s.etapa && s.etapa.semantica === 'S')) };
+    podeAvaliar: !s.avaliacao && (s.status === 'concluida' || (s.etapa && s.etapa.semantica === 'S')),
+    aberto: !['concluida', 'recusada'].includes(s.status), atualizadoEm: [s.criadoEm, s.etapa && s.etapa.desde, ...(s.mensagens || []).map(x => x.ts)].filter(Boolean).sort().pop(),
+    vezDe: ['concluida', 'recusada'].includes(s.status) ? null : (((s.mensagens || []).slice(-1)[0] || {}).tipoAutor === 'equipe' ? 'cliente' : 'equipe') }; // quem precisa agir agora
   return u.tipo === 'equipe' ? { ...base, cliente: s.cliente, empresa: s.empresa, email: s.email, telefone: s.telefone, bitrix: s.bitrix ? { status: s.bitrix.status, erro: s.bitrix.erro, dealId: s.bitrix.dealId, tentativas: s.bitrix.tentativas, url: cardUrl(s) } : null } : base;
 }
 rota('GET', '/api/solicitacoes', async (req, res, _m, _b, u) => {
@@ -341,14 +343,27 @@ function novidadesDe(u) {
 rota('GET', '/api/novidades', async (req, res, _m, _b, u) => { exigir(u, 'cliente'); send(res, 200, novidadesDe(u)); });
 rota('POST', '/api/novidades/lido', async (req, res, _m, _b, u) => { exigir(u, 'cliente'); const c = db.clientes.find(x => x.id === u.id); if (c) { c.vistoEm = store.agora(); store.save(); } send(res, 200, { ok: true }); });
 rota('GET', '/api/inicio', async (req, res, _m, _b, u) => {
-  exigir(u, 'cliente'); const h = hoje(); const meus = db.projetos.filter(p => p.clientes.includes(u.id)); const pendencias = [], agora = [], proximas = [];
+  exigir(u, 'cliente'); const h = hoje(); const meus = db.projetos.filter(p => p.clientes.includes(u.id)); const pendencias = [], agora = [], proximas = []; let proxima = null;
   for (const p of meus) for (const t of tarefasDe(p.id).filter(x => !x.interna)) {
     const st = S.status(t, tarefasDe(p.id).filter(x => !x.interna), h); const item = { projetoId: p.id, projeto: p.nome, tarefaId: t.id, tarefa: t.nome, inicio: t.inicio, fim: t.fim, progresso: t.progresso, status: st };
     if (t.aguardaCliente && (+t.progresso || 0) < 100) pendencias.push({ ...item, pedido: t.pedido || '', respondidoEm: t.respondidoEm || null });
+    if (st.codigo !== 'concluida' && (!proxima || t.fim < proxima.fim)) proxima = { ...item, atrasada: t.fim < h };
     if (st.codigo !== 'concluida' && t.inicio <= h) agora.push(item); else if (st.codigo !== 'concluida' && S.diffDays(h, t.inicio) <= 14) proximas.push(item);
   }
   const por = (a, b) => a.fim.localeCompare(b.fim) || a.inicio.localeCompare(b.inicio);
-  send(res, 200, { pendencias: pendencias.sort(por), agora: agora.sort(por).slice(0, 6), proximas: proximas.sort((a, b) => a.inicio.localeCompare(b.inicio)).slice(0, 5), novidades: novidadesDe(u).novas });
+  const resumos = meus.map(p => projetoView(p, u, false).resumo);
+  const projetos = { total: meus.length, unicoId: meus.length === 1 ? meus[0].id : null, progresso: resumos.length ? Math.round(resumos.reduce((a, r) => a + r.progresso, 0) / resumos.length) : 0,
+    verde: resumos.filter(r => r.cor === 'verde').length, amarelo: resumos.filter(r => r.cor === 'amarelo').length, vermelho: resumos.filter(r => r.cor === 'vermelho').length, proxima };
+  const sols = db.solicitacoes.filter(x => x.clienteId === u.id).map(x => solView(x, u)).sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm));
+  const suporte = { total: sols.length, abertos: sols.filter(x => x.aberto).length, aguardandoVoce: sols.filter(x => x.vezDe === 'cliente').length, ultimo: sols[0] ? { id: sols[0].id, protocolo: sols[0].protocolo, assunto: sols[0].assunto, etapa: sols[0].etapa, aberto: sols[0].aberto, atualizadoEm: sols[0].atualizadoEm } : null };
+  const nv = novidadesDe(u);
+  send(res, 200, { pendencias: pendencias.sort(por), agora: agora.sort(por).slice(0, 6), proximas: proximas.sort((a, b) => a.inicio.localeCompare(b.inicio)).slice(0, 5), novidades: nv.novas, novidadesLista: nv.itens.slice(0, 5), projetos, suporte });
+});
+// Todos os documentos enviados nas atividades do projeto, em um só lugar (o cliente não vê os de atividades internas).
+rota('GET', '/api/projetos/([0-9a-f]+)/documentos', async (req, res, m, _b, u) => {
+  exigir(u); const p = projetoDe(m[1]); if (!p || !podeVer(u, p)) throw bad(404, 'Projeto não encontrado.'); const tarefas = new Map(tarefasDe(p.id).filter(t => u.tipo === 'equipe' || !t.interna).map(t => [t.id, t]));
+  const docs = db.itens.filter(i => i.arquivoId && tarefas.has(i.tarefaId)).map(i => { const a = db.arquivos.find(x => x.id === i.arquivoId); return a && { id: a.id, nome: a.nome, tamanho: a.tamanho, ts: i.ts, autor: i.autor, tipoAutor: i.tipoAutor, tarefa: tarefas.get(i.tarefaId).nome, tarefaId: i.tarefaId }; }).filter(Boolean);
+  send(res, 200, { documentos: docs.sort((a, b) => b.ts.localeCompare(a.ts)) });
 });
 
 // ---- integração com o funil de suporte (somente administradores do Bitrix24) ----

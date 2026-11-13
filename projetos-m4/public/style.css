@@ -184,3 +184,27 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 .rodape{text-align:center;color:var(--tinta-2);font-size:12px;padding:18px 12px 24px}
 .nova-versao{position:fixed;top:0;left:0;right:0;z-index:300;background:var(--tinta);color:#fff;text-align:center;padding:10px 14px;font-weight:500}.nova-versao .btn{margin-left:10px}
 @media print{.rodape,.nova-versao{display:none}}
+
+/* início do cliente */
+.hero-cli{padding:6px 0 18px}.eyebrow{margin:0 0 4px;color:var(--tinta-2);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px}
+.hero-cli h1{font-size:clamp(30px,4.6vw,48px);font-weight:800;letter-spacing:-.035em;line-height:1.04}.hero-cli h1 em{font-style:normal;color:var(--destaque)}.hero-cli .sub{font-size:17px;color:var(--tinta-2);margin:8px 0 0}
+.acessos{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.acesso{padding:22px;display:flex;flex-direction:column;gap:12px}.ac-topo{display:flex;align-items:center;gap:12px}.ac-topo h2{font-size:24px;letter-spacing:-.02em}
+.ac-ico{flex:none;width:48px;height:48px;border-radius:14px;display:grid;place-items:center}.ac-ico svg{width:26px;height:26px}.ac-ico.azul{background:var(--marca-fundo);color:var(--marca-2)}.ac-ico.laranja{background:#fff2ea;color:var(--destaque)}
+.ac-num b{font-size:42px;letter-spacing:-.035em;line-height:1}.ac-chips{display:flex;gap:8px;flex-wrap:wrap}.ac-prox{margin:0}.ac-cta{margin-top:auto;padding-top:4px;display:flex;gap:8px;flex-wrap:wrap}
+.novid{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--linha)}
+.logo.clicavel{cursor:pointer}
+/* projeto */
+.proj-hero{padding:18px 22px}.ph-corpo{display:flex;gap:20px;align-items:center;margin:12px 0 16px}.anel{width:96px;height:96px;flex:none;color:var(--tinta)}.proj-hero h1{font-size:clamp(24px,3.4vw,34px)}
+.ph-fatos{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px;border-top:1px solid var(--linha);padding-top:14px}.fato{display:flex;flex-direction:column;gap:3px}
+.grupo-ativ{margin-bottom:14px}.grupo-ativ h3{margin-bottom:6px}.ativ{display:flex;gap:12px;align-items:center;padding:12px 8px;border-top:1px solid var(--linha);cursor:pointer;border-radius:10px}.ativ:hover,.ativ:focus-visible{background:var(--marca-fundo)}
+.ativ-dir{display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}.bar.mini{height:6px;margin:8px 0 0}
+.doc{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--linha)}.doc-ico{flex:none;width:40px;height:40px;border-radius:10px;background:var(--marca-fundo);color:var(--marca-2);display:grid;place-items:center}.doc-ico svg{width:20px;height:20px}
+.doc a{color:var(--marca-2);font-weight:600}.doc-dir{display:flex;flex-direction:column;gap:4px;align-items:flex-end;text-align:right}
+/* suporte: lista + conversa */
+.sup{display:grid;grid-template-columns:minmax(300px,390px) 1fr;gap:16px;align-items:start;margin-top:16px}
+.sup-lista{padding:14px;position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto}.sup-lista .busca{max-width:none;margin-bottom:10px}.sup-lista .filtros{margin-bottom:10px}.sup-lista .filtro{padding:5px 11px;font-size:12.5px}
+.sup-item{padding:12px;border-radius:12px;border:1px solid transparent;cursor:pointer}.sup-item:hover{background:var(--fundo)}.sup-item.on{background:var(--marca-fundo);border-color:#bcd3f1}.sup-ass{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vez{background:#fff2ea;color:#c2410c;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:700}.so-mobile{display:none;margin-bottom:10px}.sup-detalhe .chamado{margin:0}
+@media(max-width:900px){.acessos{grid-template-columns:1fr}.sup{grid-template-columns:1fr}.sup-lista{position:static;max-height:none}.sup.com-sel .sup-lista{display:none}.sup:not(.com-sel) .sup-detalhe{display:none}.so-mobile{display:inline-block}.ph-corpo{align-items:flex-start}}
+@media(max-width:700px){.top{gap:8px 12px}.top nav{order:3;flex-basis:100%;flex-wrap:nowrap;overflow-x:auto}.top nav a{white-space:nowrap}}

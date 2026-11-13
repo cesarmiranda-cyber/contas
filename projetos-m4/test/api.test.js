@@ -270,3 +270,26 @@ test('cache: a página aponta para a versão atual dos arquivos e nunca é guard
   assert.match((await fetch(base + '/app.js?v=antiga')).headers.get('cache-control'), /no-cache/); assert.match((await fetch(base + '/style.css')).headers.get('cache-control'), /no-cache/); // versão desconhecida: sempre revalida
   assert.strictEqual((await fetch(base + '/../server.js')).status, 404);
 });
+
+test('início do cliente (resumo de projetos e suporte), documentos do projeto e vez do chamado', async () => {
+  const Sch = require('../lib/schedule'); const h = Sch.hojeSP(); const d = n => Sch.addDays(h, n);
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Nina Reis', email: 'nina@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const vazio = (await call('GET', '/api/inicio', null, k)).j; assert.strictEqual(vazio.projetos.total, 0); assert.strictEqual(vazio.suporte.total, 0); assert.strictEqual(vazio.projetos.proxima, null); // aguardando ativação
+  const id = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'nina@x.com').id;
+  const p1 = (await call('POST', '/api/projetos', { nome: 'Projeto N1', clientes: [id] }, EQ)).j.projeto; const p2 = (await call('POST', '/api/projetos', { nome: 'Projeto N2', clientes: [id] }, EQ)).j.projeto;
+  const t1 = (await call('POST', `/api/projetos/${p1.id}/tarefas`, { nome: 'Entrega 1', inicio: d(-3), fim: d(4), progresso: 100 }, EQ)).j.tarefa; await call('POST', `/api/projetos/${p1.id}/tarefas`, { nome: 'Entrega 2', inicio: d(-2), fim: d(6), progresso: 20 }, EQ);
+  const ti = (await call('POST', `/api/projetos/${p1.id}/tarefas`, { nome: 'Interna', inicio: d(-1), fim: d(1), interna: true }, EQ)).j.tarefa;
+  const ini = (await call('GET', '/api/inicio', null, k)).j; assert.strictEqual(ini.projetos.total, 2); assert.strictEqual(ini.projetos.unicoId, null); assert.strictEqual(ini.projetos.proxima.tarefa, 'Entrega 2'); assert.ok(ini.projetos.proxima.fim === d(6) && !ini.projetos.proxima.atrasada);
+  assert.strictEqual(ini.projetos.verde + ini.projetos.amarelo + ini.projetos.vermelho, 2); assert.ok(!JSON.stringify(ini).includes('Interna'));
+  // documentos: do projeto, sem os de atividade interna para o cliente
+  await call('POST', `/api/tarefas/${t1}/itens`, { texto: 'contrato', arquivo: { nome: 'contrato.pdf', base64: Buffer.from('x').toString('base64') } }, k); await call('POST', `/api/tarefas/${ti}/itens`, { texto: 'segredo', arquivo: { nome: 'interno.xlsx', base64: Buffer.from('y').toString('base64') } }, EQ);
+  const dc = (await call('GET', `/api/projetos/${p1.id}/documentos`, null, k)).j.documentos; assert.deepStrictEqual(dc.map(x => [x.nome, x.tarefa, x.tipoAutor]), [['contrato.pdf', 'Entrega 1', 'cliente']]); assert.strictEqual((await call('GET', `/api/projetos/${p1.id}/documentos`, null, EQ)).j.documentos.length, 2);
+  assert.strictEqual((await call('GET', `/api/projetos/${p2.id}/documentos`, null, k)).j.documentos.length, 0); assert.strictEqual((await call('GET', `/api/projetos/${p1.id}/documentos`)).s, 401);
+  // chamado: de quem é a vez
+  const r = await call('POST', '/api/solicitacoes', { assunto: 'Dúvida X', texto: 'texto', categoria: 'duvida' }, k); const lista = async (h) => (await call('GET', '/api/solicitacoes', null, h)).j.solicitacoes.find(x => x.protocolo === r.j.protocolo);
+  let s = await lista(k); assert.ok(s.aberto); assert.strictEqual(s.vezDe, 'equipe'); assert.ok(s.atualizadoEm);
+  await call('POST', `/api/solicitacoes/${s.id}/mensagens`, { texto: 'Pode enviar o print?' }, EQ); s = await lista(k); assert.strictEqual(s.vezDe, 'cliente'); assert.strictEqual((await call('GET', '/api/inicio', null, k)).j.suporte.aguardandoVoce, 1);
+  await call('POST', `/api/solicitacoes/${s.id}/mensagens`, { texto: 'Segue' }, k); assert.strictEqual((await lista(k)).vezDe, 'equipe');
+  await call('PATCH', '/api/solicitacoes/' + s.id, { status: 'concluida' }, EQ); s = await lista(k); assert.strictEqual(s.aberto, false); assert.strictEqual(s.vezDe, null); const sup = (await call('GET', '/api/inicio', null, k)).j.suporte; assert.strictEqual(sup.abertos, 0); assert.strictEqual(sup.total, 1); assert.strictEqual(sup.ultimo.protocolo, r.j.protocolo);
+  assert.strictEqual((await call('GET', '/api/inicio', null, EQ)).s, 403);
+});
