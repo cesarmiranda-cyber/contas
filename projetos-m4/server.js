@@ -1,6 +1,6 @@
 'use strict';
 const http = require('http'); const fs = require('fs'); const path = require('path');
-const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const Audit = require('./lib/auditoria'); const A = require('./lib/auth'); const S = require('./lib/schedule');
+const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const Audit = require('./lib/auditoria'); const Modelos = require('./lib/modelos'); const A = require('./lib/auth'); const S = require('./lib/schedule');
 
 const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -124,6 +124,7 @@ function lerTarefa(b, parcial) {
   if ('descricao' in b) o.descricao = str(b.descricao, 2000);
   if ('interna' in b) o.interna = !!b.interna;
   if ('aguardaCliente' in b) o.aguardaCliente = !!b.aguardaCliente;
+  if ('requerAprovacao' in b) o.requerAprovacao = !!b.requerAprovacao;
   if ('pedido' in b) o.pedido = str(b.pedido, 500);
   if ('deps' in b) {
     if (!Array.isArray(b.deps) || b.deps.length > 30) throw bad(400, 'Dependências inválidas.');
@@ -146,6 +147,11 @@ function aplicarTarefas(pid, mexe) {
 }
 
 // uma entrada para cada atividade que as dependências reagendaram (além da que o usuário editou)
+const modeloPorId = id => Modelos.EMBUTIDOS.find(m => m.id === id) || (db.modelos || []).find(m => m.id === id);
+function aplicarModelo(u, p, modelo, inicio) {
+  const novas = Modelos.gerarTarefas(modelo, inicio, calDe(p), S, store.id).map((t, i) => ({ ...t, projetoId: p.id, ordem: tarefasDe(p.id).length + i }));
+  aplicarTarefas(p.id, () => db.tarefas.push(...novas)); reg(u, 'aplicou_modelo', `${modelo.nome} (${novas.length} atividades)`, p.id); return novas.length;
+}
 function registraReagendadas(u, ids, antes, causa) {
   for (const id of ids) { if (id === causa.id) continue; const x = db.tarefas.find(y => y.id === id); if (!x) continue; const dx = Audit.diff(antes.get(id) || {}, x, { inicio: 'Início', fim: 'Término' });
     if (dx.length) reg(u, 'reagendada_dependencia', x.nome, x.projetoId, { tarefaId: x.id, interna: !!x.interna, diff: dx, motivo: causa.motivo || `por causa da atividade “${causa.nome}”` }); }
@@ -193,11 +199,13 @@ rota('GET', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
 });
 rota('POST', '/api/projetos', async (req, res, _m, b, u) => {
   exigir(u, 'equipe');
-  const d = lerProjeto(b, false);
+  const d = lerProjeto(b, false); const modelo = b.modeloId ? modeloPorId(String(b.modeloId)) : null; if (b.modeloId && !modelo) throw bad(400, 'Modelo não encontrado.');
+  const inicioModelo = b.inicioModelo ? String(b.inicioModelo) : S.hojeSP(); if (modelo && !S.isDate(inicioModelo)) throw bad(400, 'Data de início inválida.');
+  if (modelo) { if (!('tipo' in b)) d.tipo = modelo.tipo; if (!('descricao' in b) || !d.descricao) d.descricao = modelo.descricao || ''; if (!('diasUteis' in b)) d.diasUteis = !!modelo.diasUteis; }
   const p = { situacao: 'andamento', prioridade: 'media', ...d, id: store.id(), gerente: d.gerente || u.nome, descricao: d.descricao || '', clientes: [], criadoEm: store.agora(), criadoPor: u.nome };
   p.codigo = p.codigo || proximoCodigo(); validarProjeto(p);
   if (Array.isArray(b.clientes)) p.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
-  db.projetos.push(p); reg(u, 'criou_projeto', p.nome, p.id, { diff: Audit.diff({}, p, Audit.CAMPOS_PROJETO, nomeCliente, Audit.INTERNOS_PROJETO) }); store.save(); send(res, 201, { projeto: projetoView(p, u, true) });
+  db.projetos.push(p); if (modelo) aplicarModelo(u, p, modelo, inicioModelo); reg(u, 'criou_projeto', p.nome, p.id, { diff: Audit.diff({}, p, Audit.CAMPOS_PROJETO, nomeCliente, Audit.INTERNOS_PROJETO) }); store.save(); send(res, 201, { projeto: projetoView(p, u, true) });
 });
 rota('PATCH', '/api/projetos/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
@@ -452,6 +460,22 @@ rota('GET', '/api/projetos/([0-9a-f]+)/historico', async (req, res, m, _b, u) =>
   if (u.tipo === 'equipe') { q.set('projeto', p.id); return send(res, 200, { itens: filtraLogs(q), completo: true }); }
   const itens = []; for (let i = db.logs.length - 1; i >= 0 && itens.length < 300; i--) { const l = db.logs[i]; if (l.projetoId !== p.id) continue; const e = Audit.paraCliente(l); if (e) itens.push(e); }
   send(res, 200, { itens, completo: false });
+});
+const modeloView = m => ({ id: m.id, nome: m.nome, tipo: m.tipo || '', descricao: m.descricao || '', embutido: !!m.embutido, diasUteis: !!m.diasUteis, qtdTarefas: m.tarefas.length, tarefas: m.tarefas.map(t => ({ nome: t.nome, dur: t.dur })) });
+rota('GET', '/api/modelos', async (req, res, _m, _b, u) => { exigir(u, 'equipe'); send(res, 200, { modelos: [...Modelos.EMBUTIDOS, ...(db.modelos || [])].map(modeloView) }); });
+rota('POST', '/api/modelos', async (req, res, _m, b, u) => {
+  exigir(u, 'equipe'); const p = projetoDe(String(b.projetoId)); if (!p) throw bad(404, 'Projeto não encontrado.'); const nome = str(b.nome, 80, true, 'Nome do modelo'); const ts = tarefasDe(p.id); if (!ts.length) throw bad(400, 'O projeto não tem atividades para salvar como modelo.');
+  if ([...Modelos.EMBUTIDOS, ...(db.modelos || [])].some(m => m.nome.toLowerCase() === nome.toLowerCase())) throw bad(409, 'Já existe um modelo com este nome.');
+  const m = { id: store.id(), nome, tipo: p.tipo || '', descricao: p.descricao || '', diasUteis: !!p.diasUteis, tarefas: Modelos.modeloDoProjeto(ts, calDe(p)), criadoPor: u.nome, criadoEm: store.agora() }; (db.modelos = db.modelos || []).push(m);
+  reg(u, 'salvou_modelo', `${nome} (${m.tarefas.length} atividades)`, p.id); store.save(); send(res, 201, { modelo: modeloView(m) });
+});
+rota('DELETE', '/api/modelos/([0-9a-f]+)', async (req, res, m, _b, u) => {
+  exigir(u, 'equipe'); const mod = (db.modelos || []).find(x => x.id === m[1]); if (!mod) throw bad(404, 'Modelo não encontrado (os modelos padrão não podem ser excluídos).');
+  db.modelos = db.modelos.filter(x => x.id !== mod.id); reg(u, 'excluiu_modelo', mod.nome); store.save(); send(res, 200, { ok: true });
+});
+rota('POST', '/api/projetos/([0-9a-f]+)/aplicar-modelo', async (req, res, m, b, u) => {
+  exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.'); const modelo = modeloPorId(String(b.modeloId)); if (!modelo) throw bad(404, 'Modelo não encontrado.');
+  const inicio = b.inicio ? String(b.inicio) : S.hojeSP(); if (!S.isDate(inicio)) throw bad(400, 'Data de início inválida.'); const n = aplicarModelo(u, p, modelo, inicio); store.save(); send(res, 200, { ok: true, atividades: n });
 });
 rota('GET', '/api/painel', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe'); const ps = db.projetos.map(p => projetoView(p, u, false));

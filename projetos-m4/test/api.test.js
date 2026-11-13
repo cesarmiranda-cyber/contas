@@ -355,3 +355,27 @@ test('dias úteis no projeto: normaliza datas, respeita feriados e dependências
   const hist = (await call('GET', `/api/projetos/${q.id}/historico`, null, EQ)).j.itens; assert.ok(hist.some(x => x.acao === 'editou_projeto' && x.diff.some(y => y.campo === 'Contar só dias úteis' && y.para === 'Sim'))); assert.ok(hist.some(x => x.acao === 'reagendada_dependencia' && /calendário/.test(x.motivo)));
   assert.ok(e);
 });
+
+test('modelos de projeto: embutidos, criar projeto a partir do modelo, salvar e excluir modelo', async () => {
+  const Sch = require('../lib/schedule');
+  assert.strictEqual((await call('GET', '/api/modelos')).s, 401); assert.strictEqual((await call('GET', '/api/modelos', null, { cookie: (await call('POST', '/api/auth/cadastro', { nome: 'Cli M', email: 'clim@x.com', senha: 'senha1234' })).c.split(';')[0] })).s, 403);
+  const lista = (await call('GET', '/api/modelos', null, EQ)).j.modelos; const impl = lista.find(m => m.id === 'implantacao-bitrix24'); assert.ok(impl.embutido && impl.qtdTarefas === 12 && impl.diasUteis);
+  assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', modeloId: 'nao-existe' }, EQ)).s, 400); assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', modeloId: 'treinamento', inicioModelo: 'ontem' }, EQ)).s, 400);
+  // projeto a partir do modelo (segunda-feira 2031-01-06)
+  const r = await call('POST', '/api/projetos', { nome: 'Acme · Implantação', modeloId: 'implantacao-bitrix24', inicioModelo: '2031-01-06' }, EQ); assert.strictEqual(r.s, 201); const p = (await call('GET', '/api/projetos/' + r.j.projeto.id, null, EQ)).j.projeto;
+  assert.strictEqual(p.tipo, 'Implantação Bitrix24'); assert.strictEqual(p.diasUteis, true); assert.strictEqual(p.tarefas.length, 12); const T = n => p.tarefas.find(x => x.nome === n);
+  assert.deepStrictEqual([T('Reunião de abertura').inicio, T('Levantamento de processos').inicio], ['2031-01-06', '2031-01-07']); assert.ok(T('Go-live').inicio > T('Homologação e aceite do cliente').fim);
+  assert.ok(T('Cadastro de usuários e acessos').aguardaCliente && /lista de usuários/.test(T('Cadastro de usuários e acessos').pedido)); assert.ok(T('Homologação e aceite do cliente').requerAprovacao);
+  const testes = T('Testes e ajustes'); assert.strictEqual(testes.deps.length, 4); for (const d of testes.deps) { const pre = p.tarefas.find(x => x.id === d.de); assert.ok(testes.inicio > pre.fim, 'testes só depois de ' + pre.nome); }
+  for (const t of p.tarefas) { assert.ok(Sch.calendario({ diasUteis: true }).util(t.inicio) && Sch.calendario({ diasUteis: true }).util(t.fim), 'dias úteis: ' + t.nome); }
+  assert.ok((await call('GET', `/api/projetos/${p.id}/historico`, null, EQ)).j.itens.some(x => x.acao === 'aplicou_modelo' && x.detalhe.includes('12 atividades')));
+  // salvar como modelo: preserva durações, dependências, offsets e flags
+  const salvo = await call('POST', '/api/modelos', { projetoId: p.id, nome: 'Meu modelo' }, EQ); assert.strictEqual(salvo.s, 201); assert.strictEqual(salvo.j.modelo.qtdTarefas, 12); assert.strictEqual((await call('POST', '/api/modelos', { projetoId: p.id, nome: 'meu MODELO' }, EQ)).s, 409);
+  const vazio = (await call('POST', '/api/projetos', { nome: 'Sem atividades' }, EQ)).j.projeto; assert.strictEqual((await call('POST', '/api/modelos', { projetoId: vazio.id, nome: 'Vazio' }, EQ)).s, 400);
+  const r2 = await call('POST', '/api/projetos', { nome: 'Cópia', modeloId: salvo.j.modelo.id, inicioModelo: '2031-03-10' }, EQ); const p2 = (await call('GET', '/api/projetos/' + r2.j.projeto.id, null, EQ)).j.projeto; assert.strictEqual(p2.tarefas.length, 12);
+  const dur = t => Sch.calendario({ diasUteis: true }).diffUteis(t.inicio, t.fim); for (const t of p.tarefas) { const c = p2.tarefas.find(x => x.nome === t.nome); assert.strictEqual(dur(c), dur(t), 'duração de ' + t.nome); assert.strictEqual(c.deps.length, t.deps.length); assert.strictEqual(!!c.requerAprovacao, !!t.requerAprovacao); }
+  assert.strictEqual(p2.tarefas.find(x => x.nome === 'Reunião de abertura').inicio, '2031-03-10');
+  // aplicar em projeto existente e excluir modelo
+  assert.strictEqual((await call('POST', `/api/projetos/${vazio.id}/aplicar-modelo`, { modeloId: 'treinamento', inicio: '2031-02-03' }, EQ)).j.atividades, 5); assert.strictEqual((await call('GET', '/api/projetos/' + vazio.id, null, EQ)).j.projeto.tarefas.length, 5);
+  assert.strictEqual((await call('DELETE', '/api/modelos/' + salvo.j.modelo.id, null, EQ)).s, 200); assert.strictEqual((await call('GET', '/api/modelos', null, EQ)).j.modelos.some(m => m.nome === 'Meu modelo'), false); assert.strictEqual((await call('DELETE', '/api/modelos/xyz', null, EQ)).s, 404);
+});

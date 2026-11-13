@@ -1,11 +1,11 @@
 'use strict';
 // Registro de alterações: gera o "de → para" de cada mudança e decide o que o cliente pode ver.
-const CAMPOS_TAREFA = { nome: 'Nome', inicio: 'Início', fim: 'Término', progresso: 'Andamento', responsavel: 'Responsável', descricao: 'Descrição', interna: 'Atividade interna', aguardaCliente: 'Aguardando o cliente', pedido: 'Pedido ao cliente', deps: 'Dependências' };
+const CAMPOS_TAREFA = { nome: 'Nome', inicio: 'Início', fim: 'Término', progresso: 'Andamento', responsavel: 'Responsável', descricao: 'Descrição', interna: 'Atividade interna', aguardaCliente: 'Aguardando o cliente', pedido: 'Pedido ao cliente', requerAprovacao: 'Requer aprovação do cliente', deps: 'Dependências' };
 const CAMPOS_PROJETO = { nome: 'Nome', descricao: 'Objetivo e escopo', gerente: 'Gerente', codigo: 'Código', tipo: 'Tipo', prioridade: 'Prioridade', empresa: 'Empresa', contatoNome: 'Contato (nome)', contatoEmail: 'Contato (e-mail)', contatoTelefone: 'Contato (telefone)',
   inicioPrevisto: 'Início previsto', fimPrevisto: 'Término contratado', link: 'Pasta de documentos', situacao: 'Situação', valor: 'Valor do projeto', negocioBitrix: 'Negócio no Bitrix24', obsInternas: 'Observações internas', diasUteis: 'Contar só dias úteis', feriadosExtras: 'Feriados extras', clientes: 'Clientes com acesso' };
 const INTERNOS_PROJETO = new Set(['valor', 'negocioBitrix', 'obsInternas', 'clientes']); // o cliente nunca vê
 const TXT = { prioridade: { baixa: 'Baixa', media: 'Média', alta: 'Alta' }, situacao: { andamento: 'Em andamento', pausado: 'Pausado', concluido: 'Concluído' } };
-const BOOL = new Set(['interna', 'aguardaCliente', 'diasUteis']);
+const BOOL = new Set(['interna', 'aguardaCliente', 'diasUteis', 'requerAprovacao']);
 
 const norm = (k, v) => BOOL.has(k) ? !!v : (v == null ? '' : v);
 function fmtVal(k, v) {
@@ -27,7 +27,7 @@ function diff(antes, depois, campos, nomeDe = x => x, internos = new Set()) {
 }
 
 const ROTULO = { login: 'entrou no portal', login_falhou: 'errou a senha ao tentar entrar', cadastro: 'criou a conta', saiu: 'saiu do portal', abriu_projeto: 'abriu o projeto', abriu_atividade: 'abriu a atividade', abriu_suporte: 'abriu a aba Suporte', baixou_arquivo: 'baixou o arquivo',
-  comentou: 'comentou na atividade', enviou_arquivo: 'enviou um documento na atividade', criou_projeto: 'criou o projeto', editou_projeto: 'alterou os dados do projeto', excluiu_projeto: 'excluiu o projeto', criou_tarefa: 'criou a atividade', editou_tarefa: 'alterou a atividade', excluiu_tarefa: 'removeu a atividade',
+  comentou: 'comentou na atividade', enviou_arquivo: 'enviou um documento na atividade', criou_projeto: 'criou o projeto', aplicou_modelo: 'aplicou o modelo', salvou_modelo: 'salvou um modelo de projeto', excluiu_modelo: 'excluiu um modelo de projeto', editou_projeto: 'alterou os dados do projeto', excluiu_projeto: 'excluiu o projeto', criou_tarefa: 'criou a atividade', editou_tarefa: 'alterou a atividade', excluiu_tarefa: 'removeu a atividade',
   reagendada_dependencia: 'teve as datas ajustadas por dependência', pediu_cliente: 'pediu uma informação ao cliente na atividade', ativou_cliente: 'ativou o acesso do cliente', alterou_acesso_cliente: 'alterou o acesso do cliente', bloqueou_cliente: 'bloqueou o cliente', reativou_cliente: 'reativou o cliente',
   solicitou: 'abriu o chamado', complementou_chamado: 'complementou o chamado', respondeu_chamado: 'respondeu o chamado', atualizou_solicitacao: 'atualizou o chamado', etapa_chamado: 'mudou a etapa do chamado', avaliou_atendimento: 'avaliou o atendimento', reenviou_chamado: 'reenviou o chamado ao Bitrix24', configurou_suporte: 'configurou a integração de suporte' };
 const ACESSOS = new Set(['login', 'login_falhou', 'cadastro', 'saiu', 'abriu_projeto', 'abriu_atividade', 'abriu_suporte', 'baixou_arquivo']);

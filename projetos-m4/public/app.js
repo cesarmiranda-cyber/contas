@@ -143,7 +143,7 @@ async function telaProjetos(m) {
   const { projetos } = await api('GET', '/api/projetos'); const eq = U.tipo === 'equipe'; let painel = null;
   if (eq) painel = await api('GET', '/api/painel');
   if (!eq && !projetos.length) return espera(m);
-  if (eq) juntar(m, h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Projetos'), h('button', { class: 'btn pri', onclick: () => modalProjeto() }, '+ Novo projeto')));
+  if (eq) juntar(m, h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Projetos'), h('button', { class: 'btn', onclick: () => modalModelos() }, 'Modelos'), h('button', { class: 'btn pri', onclick: () => modalProjeto() }, '+ Novo projeto')));
   else juntar(m, h('div', { class: 'ola' }, h('h1', {}, 'Meus projetos'), h('p', {}, `${projetos.length} projeto(s) com a Manda4. Clique em um para ver o cronograma, os documentos e o histórico.`)));
   if (painel) juntar(m, h('div', { class: 'kpis' }, [['Projetos', painel.projetos], ['No prazo', painel.verde], ['Em alerta', painel.amarelo], ['Atrasados', painel.vermelho], ['Chamados novos', painel.solicitacoesNovas], ['Clientes aguardando ativação', painel.aguardando], ['Satisfação média', painel.avaliacaoMedia ? `★ ${painel.avaliacaoMedia}` : '—']].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', {}, n)))));
   if (!projetos.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhum projeto ainda. Crie o primeiro.'));
@@ -214,7 +214,7 @@ async function telaProjeto(m) {
   const fato = (rot, v) => v ? h('div', { class: 'fato' }, h('span', { class: 'muted small' }, rot), h('b', {}, v)) : null;
   const prazo = p.resumo.fim ? h('span', {}, fmt(p.resumo.fim), p.desvioDias > 0 ? [' ', chip(p.desvioDias > 7 ? 'vermelho' : 'amarelo', `${p.desvioDias} dia(s) além do contratado`)] : p.desvioDias != null ? [' ', chip('verde', 'dentro do prazo')] : null) : null;
   juntar(m, h('section', { class: 'card proj-hero' }, h('div', { class: 'row' }, h('a', { class: 'btn sm', onclick: () => go({ nome: 'projetos' }) }, '← Projetos'), h('span', { class: 'grow' }),
-      h('button', { class: 'btn sm sem-print', onclick: () => window.print() }, 'Imprimir / PDF'), eq && h('button', { class: 'btn sm', onclick: () => modalProjeto(p) }, 'Editar projeto'), eq && h('button', { class: 'btn pri sm', onclick: () => modalTarefa(p) }, '+ Atividade')),
+      h('button', { class: 'btn sm sem-print', onclick: () => window.print() }, 'Imprimir / PDF'), eq && p.tarefas.length > 0 && h('button', { class: 'btn sm', onclick: () => modalSalvarModelo(p) }, 'Salvar como modelo'), eq && h('button', { class: 'btn sm', onclick: () => modalProjeto(p) }, 'Editar projeto'), eq && h('button', { class: 'btn pri sm', onclick: () => modalTarefa(p) }, '+ Atividade')),
     h('div', { class: 'ph-corpo' }, anel(p.resumo.progresso), h('div', { class: 'grow' }, h('h1', {}, p.nome), h('p', { class: 'muted', style: 'margin:2px 0 8px' }, [p.codigo, p.tipo, p.empresa].filter(Boolean).join(' · ') || 'Projeto Manda4'),
       h('div', { class: 'ac-chips' }, chip(p.resumo.cor, COR[p.resumo.cor]), SITUACAO[p.situacao] && chip('amarelo', SITUACAO[p.situacao]), contaChips(p.resumo)))),
     h('div', { class: 'ph-fatos' }, fato('Previsão de término', prazo), fato('Término contratado', fmt(p.fimPrevisto)), fato('Atividades concluídas', `${p.resumo.concluidas} de ${p.resumo.total}`), fato('Próxima entrega', proxima ? `${proxima.nome} · ${fmt(proxima.fim)}` : null), fato('Gerente', p.gerente))),
@@ -409,8 +409,18 @@ async function drawer(p, t) {
 }
 
 // ---------- equipe: projeto e tarefa ----------
+function modalSalvarModelo(p) {
+  const v = overlay(true), err = h('div'), nome = h('input', { maxlength: 80, placeholder: 'Ex.: Implantação Bitrix24 — varejo' });
+  juntar(v, h('div', { class: 'modal', style: 'max-width:480px' }, h('h2', {}, 'Salvar como modelo'), h('p', { class: 'muted small' }, 'As atividades deste projeto (durações, dependências, pedidos ao cliente e aprovações) viram um modelo para criar novos projetos. Datas e responsáveis não vão junto.'), h('label', {}, 'Nome do modelo'), nome, err,
+    h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => { try { await api('POST', '/api/modelos', { projetoId: p.id, nome: nome.value }); v.remove(); toast('Modelo salvo. Ele aparece em “Novo projeto”.'); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); } } }, 'Salvar modelo'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'))));
+}
+async function modalModelos() {
+  const v = overlay(true), caixa = h('div'); const carrega = async () => { const { modelos } = await api('GET', '/api/modelos'); caixa.replaceChildren(...modelos.map(m => h('div', { class: 'modelo' }, h('div', { class: 'row' }, h('b', { class: 'grow' }, m.nome), m.embutido ? h('span', { class: 'chip-mini' }, 'Padrão') : h('button', { class: 'btn sm perigo', onclick: async () => { if (confirm(`Excluir o modelo “${m.nome}”? Projetos já criados não mudam.`)) { await api('DELETE', '/api/modelos/' + m.id); toast('Modelo excluído.'); carrega(); } } }, 'Excluir')),
+    h('div', { class: 'muted small' }, `${m.qtdTarefas} atividades${m.diasUteis ? ' · dias úteis' : ''}${m.tipo ? ' · ' + m.tipo : ''}`), h('div', { class: 'small', style: 'margin-top:4px' }, m.tarefas.map(x => `${x.nome} (${x.dur}d)`).join(' → '))))); };
+  juntar(v, h('div', { class: 'modal' }, h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Modelos de projeto'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), h('p', { class: 'muted small' }, 'Para criar um modelo, abra um projeto com as atividades prontas e use “Salvar como modelo”.'), caixa)); await carrega();
+}
 async function modalProjeto(p, pre) {
-  const v = overlay(true), err = h('div'); const { clientes } = await api('GET', '/api/clientes'); const sel = new Set(((p || pre || {}).clientes || []).map(c => c.id)); const x = p || pre || {};
+  const v = overlay(true), err = h('div'); const { clientes } = await api('GET', '/api/clientes'); const modelos = p ? [] : (await api('GET', '/api/modelos')).modelos; const sel = new Set(((p || pre || {}).clientes || []).map(c => c.id)); const x = p || pre || {};
   const inp = (val, extra) => h('input', { value: val ?? '', ...extra });
   const f = {
     nome: inp(x.nome, { maxlength: 160 }), codigo: inp(x.codigo, { placeholder: 'Automático (PRJ-0001)' }),
@@ -422,10 +432,13 @@ async function modalProjeto(p, pre) {
     obs: h('textarea', { rows: 3 }, x.obsInternas || ''), uteis: h('input', { type: 'checkbox', style: 'width:auto', checked: !!x.diasUteis }), feriados: h('textarea', { rows: 2, placeholder: 'AAAA-MM-DD, um por linha (ex.: 2027-02-09)' }, (x.feriadosExtras || []).join('\n')), ger: inp(p ? x.gerente : U.nome),
     sit: h('select', {}, [['andamento', 'Em andamento'], ['pausado', 'Pausado'], ['concluido', 'Concluído']].map(([k, t]) => h('option', { value: k }, t)))
   };
+  f.modelo = h('select', {}, h('option', { value: '' }, 'Em branco (sem atividades)'), modelos.map(m => h('option', { value: m.id }, `${m.nome} · ${m.qtdTarefas} atividades${m.embutido ? '' : ' (seu modelo)'}`))); f.inicioModelo = h('input', { type: 'date', value: new Date().toISOString().slice(0, 10) }); f.previa = h('div', { class: 'muted small', style: 'margin:6px 0 0' });
+  f.modelo.addEventListener('change', () => { const m = modelos.find(z => z.id === f.modelo.value); f.previa.textContent = m ? `${m.descricao ? m.descricao + ' ' : ''}Atividades: ${m.tarefas.map(x => `${x.nome} (${x.dur}d)`).join(' → ')}.` : ''; if (m) { if (m.tipo) f.tipo.value = m.tipo; f.uteis.checked = m.diasUteis; if (!f.desc.value) f.desc.value = m.descricao; } });
   f.tipo.value = x.tipo || ''; f.prio.value = x.prioridade || 'media'; f.sit.value = x.situacao || 'andamento';
   const c = (rot, el) => h('div', {}, h('label', {}, rot), el); const sec = t => h('h3', { class: 'sec' }, t);
   const lista = h('div', { style: 'max-height:200px;overflow:auto;border:1px solid var(--linha);border-radius:10px;padding:6px 10px' }, clientes.length ? clientes.filter(c => c.ativo).map(c => h('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0;font-weight:400;color:var(--tinta)' }, h('input', { type: 'checkbox', style: 'width:auto', checked: sel.has(c.id), onchange: e => e.target.checked ? sel.add(c.id) : sel.delete(c.id) }), `${c.nome} · ${c.empresa || c.email}`)) : h('span', { class: 'muted' }, 'Nenhum cliente cadastrado no portal ainda.'));
   juntar(v, h('div', { class: 'modal' }, h('h2', {}, p ? 'Editar projeto' : 'Novo projeto'),
+    !p && modelos.length > 0 && [sec('Começar de um modelo (opcional)'), h('div', { class: 'g2' }, c('Modelo', f.modelo), c('Início do projeto', f.inicioModelo)), f.previa],
     sec('Identificação'), h('div', { class: 'g2' }, c('Nome do projeto *', f.nome), c('Código', f.codigo), c('Tipo', f.tipo), c('Prioridade', f.prio), c('Gerente do projeto', f.ger), c('Situação', f.sit)),
     sec('Cliente contratante'), h('div', { class: 'g2' }, c('Empresa', f.empresa), c('Nome do contato', f.cnome), c('E-mail do contato', f.cemail), c('Telefone do contato', f.ctel)),
     sec('Prazos e valores'), h('div', { class: 'g2' }, c('Início previsto', f.ini), c('Término contratado', f.fim), c('Valor do projeto (R$) · interno', f.valor), c('ID do negócio no Bitrix24 · interno', f.neg)),
@@ -437,7 +450,7 @@ async function modalProjeto(p, pre) {
     h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn pri', onclick: async () => {
       try {
         const b = { nome: f.nome.value, codigo: f.codigo.value, tipo: f.tipo.value, prioridade: f.prio.value, gerente: f.ger.value, situacao: f.sit.value, empresa: f.empresa.value, contatoNome: f.cnome.value, contatoEmail: f.cemail.value, contatoTelefone: f.ctel.value,
-          inicioPrevisto: f.ini.value, fimPrevisto: f.fim.value, valor: f.valor.value, negocioBitrix: f.neg.value, descricao: f.desc.value, link: f.link.value, obsInternas: f.obs.value, diasUteis: f.uteis.checked, feriadosExtras: f.feriados.value, clientes: [...sel] };
+          inicioPrevisto: f.ini.value, fimPrevisto: f.fim.value, valor: f.valor.value, negocioBitrix: f.neg.value, descricao: f.desc.value, link: f.link.value, obsInternas: f.obs.value, diasUteis: f.uteis.checked, feriadosExtras: f.feriados.value, clientes: [...sel] }; if (!p && f.modelo.value) { b.modeloId = f.modelo.value; b.inicioModelo = f.inicioModelo.value; }
         const r = p ? await api('PATCH', '/api/projetos/' + p.id, b) : await api('POST', '/api/projetos', b); v.remove(); go({ nome: 'projeto', id: r.projeto.id });
       } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
     } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), p && U.admin && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir o projeto e todas as atividades, registros e arquivos?')) { await api('DELETE', '/api/projetos/' + p.id); v.remove(); go({ nome: 'projetos' }); } } }, 'Excluir'))));
