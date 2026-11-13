@@ -123,6 +123,29 @@ async function telaProjetos(m) {
     h('div', { class: 'row small muted' }, h('span', { class: 'grow' }, `${p.resumo.progresso}% concluído · ${p.resumo.concluidas}/${p.resumo.total} atividades`), p.resumo.fim && h('span', {}, 'até ' + fmt(p.resumo.fim)))))));
 }
 
+// ---------- histórico / log de alterações ----------
+const fv = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? fmt(v) : v;
+const fmtDia = s => { const x = new Date(s).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }); return x.charAt(0).toUpperCase() + x.slice(1); };
+function entradaLog(e, comProjeto) {
+  return h('div', { class: 'log-item ' + e.categoria }, h('i', { class: 'log-ponto', title: e.categoria === 'acessos' ? 'Acesso' : e.categoria === 'comunicacao' ? 'Comunicação' : 'Alteração' }),
+    h('div', { class: 'grow' }, h('div', {}, h('b', {}, e.quem), ' ', h('span', { class: 'chip-mini ' + e.tipo }, e.tipo === 'equipe' ? 'Equipe' : 'Cliente'), ` ${e.rotulo}`, e.detalhe && [' ', h('b', {}, `“${e.detalhe}”`)], comProjeto && e.projeto && h('span', { class: 'muted' }, ` · ${e.projeto}`)),
+      e.motivo && h('div', { class: 'muted small' }, e.motivo),
+      e.diff && e.diff.length > 0 && h('ul', { class: 'diff' }, e.diff.map(d => h('li', {}, h('span', { class: 'muted' }, d.campo + ': '), h('s', {}, fv(d.de)), ' → ', h('b', {}, fv(d.para)), d.interno && h('span', { class: 'muted small' }, ' (interno)'))))),
+    h('div', { class: 'muted small log-hora' }, fmtTs(e.ts)));
+}
+function listaLog(itens, comProjeto) {
+  if (!itens.length) return h('div', { class: 'vazio' }, 'Nada registrado neste filtro.'); const out = []; let dia = '';
+  for (const e of itens) { const d = e.ts.slice(0, 10); if (d !== dia) { dia = d; out.push(h('h3', { class: 'log-dia' }, fmtDia(e.ts))); } out.push(entradaLog(e, comProjeto)); } return h('div', {}, out);
+}
+async function historicoProjeto(p) {
+  const eq = U.tipo === 'equipe'; const caixa = h('div', { class: 'card' }); let cat = view.cat || '';
+  const carrega = async () => { caixa.replaceChildren(h('div', { class: 'vazio' }, 'Carregando…')); try { const r = await api('GET', `/api/projetos/${p.id}/historico?limite=300${cat ? '&cat=' + cat : ''}`); caixa.replaceChildren(listaLog(r.itens, false)); } catch (e) { caixa.replaceChildren(h('div', { class: 'erro' }, e.message)); } };
+  const sel = eq && h('select', { style: 'width:auto', onchange: e => { cat = view.cat = e.target.value; carrega(); } }, [['', 'Tudo'], ['alteracoes', 'Alterações'], ['acessos', 'Acessos do cliente'], ['comunicacao', 'Comunicação']].map(([k, t]) => h('option', { value: k, selected: k === cat }, t)));
+  carrega();
+  return h('div', {}, h('div', { class: 'row', style: 'margin:4px 0 12px' }, h('p', { class: 'muted grow', style: 'margin:0' }, eq ? 'Tudo o que foi alterado, aberto e enviado neste projeto: quem, quando e de qual valor para qual.' : 'O que mudou no seu projeto e o que foi enviado, para todo mundo estar na mesma página. Registramos acessos e alterações por segurança e transparência.'),
+    sel, eq && h('button', { class: 'btn sm', onclick: () => go({ nome: 'acessos', projeto: p.id }) }, 'Ver no log completo')), caixa);
+}
+
 // ---------- projeto + gantt ----------
 
 const PRIO = { baixa: 'Baixa', media: 'Média', alta: 'Alta' };
@@ -133,7 +156,7 @@ function ficha(p) {
   const itens = [['Código', p.codigo], ['Tipo', p.tipo], ['Prioridade', PRIO[p.prioridade]], ['Empresa', p.empresa], ['Gerente do projeto', p.gerente],
     ['Contato do cliente', [p.contatoNome, p.contatoEmail, p.contatoTelefone].filter(Boolean).join(' · ')], ['Início previsto', fmt(p.inicioPrevisto)], ['Término contratado', prazo],
     ['Pasta de documentos', p.link ? h('a', { href: p.link, target: '_blank', rel: 'noopener noreferrer' }, 'Abrir link') : ''],
-    ...(eq ? [['Valor do projeto (interno)', brl(p.valor)], ['Negócio no Bitrix24', p.negocioBitrix ? '#' + p.negocioBitrix : ''], ['Clientes com acesso', p.clientes.map(c => c.nome).join(', ') || 'nenhum']] : [])].filter(x => x[1]);
+    ...(eq ? [['Valor do projeto (interno)', brl(p.valor)], ['Negócio no Bitrix24', p.negocioBitrix ? '#' + p.negocioBitrix : ''], ['Clientes com acesso', p.clientes.map(c => c.nome).join(', ') || 'nenhum'], ['Acessos do cliente ao projeto', (p.acessosClientes || []).map(a => a.ultimo ? `${a.nome}: último acesso ${fmtTs(a.ultimo)} (${a.total} visita(s))` : `${a.nome}: ainda não acessou`).join(' · ')]] : [])].filter(x => x[1]);
   return h('div', { class: 'card ficha' }, h('h3', {}, 'Dados do projeto'),
     p.descricao && h('p', { class: 'escopo' }, h('span', { class: 'muted small' }, 'Objetivo e escopo'), h('br'), p.descricao),
     h('dl', {}, itens.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, v)))),
@@ -147,10 +170,10 @@ async function telaProjeto(m) {
     p.resumo.total > 0 && p.resumo.concluidas === p.resumo.total && h('div', { class: 'parabens' }, h('b', {}, 'Projeto concluído! '), 'Obrigado pela parceria. ', !eq && h('a', { onclick: () => go({ nome: 'solicitacoes' }) }, 'Precisa de algo? Abra um chamado →')),
     h('div', { class: 'kpis' }, [['Progresso', p.resumo.progresso + '%'], ['Atividades', `${p.resumo.concluidas}/${p.resumo.total} concluídas`], ['No prazo', p.resumo.verde], ['Em alerta', p.resumo.amarelo], ['Atrasadas', p.resumo.vermelho], ['Previsão de término', fmt(p.resumo.fim) || '—']].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', { style: 'font-size:20px' }, n)))),
     ficha(p));
-  const tabs = h('div', { class: 'tabs' }, [['gantt', 'Cronograma (Gantt)'], ['lista', 'Lista de atividades']].map(([k, t]) => h('a', { class: aba === k ? 'on' : '', onclick: () => { view.aba = k; render(); } }, t)));
+  const tabs = h('div', { class: 'tabs' }, [['gantt', 'Cronograma (Gantt)'], ['lista', 'Lista de atividades'], ['historico', 'Histórico']].map(([k, t]) => h('a', { class: aba === k ? 'on' : '', onclick: () => { view.aba = k; render(); } }, t)));
   if (view.abrir) { const t0 = p.tarefas.find(x => x.id === view.abrir); view.abrir = null; if (t0) setTimeout(() => drawer(p, t0), 50); }
-  juntar(m, tabs); if (!p.tarefas.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
-  if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, U.tipo === 'equipe' ? 'Arraste o bloco para mover as datas · arraste as pontas para mudar início ou término · clique para abrir' : 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
+  juntar(m, tabs); if (aba === 'historico') return juntar(m, await historicoProjeto(p)); if (!p.tarefas.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
+  if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, U.tipo === 'equipe' ? 'Arraste o bloco para mover as datas · arraste as pontas para mudar início/término · arraste do círculo de uma atividade até outra para criar a dependência · clique na seta para remover' : 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
   else juntar(m, h('div', { class: 'card' }, h('table', {}, h('thead', {}, h('tr', {}, ['Atividade', 'Início', 'Término', '%', 'Responsável', 'Status', ...(eq ? [''] : [])].map(t => h('th', {}, t)))),
     h('tbody', {}, p.tarefas.map(t => h('tr', { style: 'cursor:pointer', onclick: () => drawer(p, t) }, h('td', {}, t.nome, t.interna && h('span', { class: 'muted small' }, ' (interna)')), h('td', {}, fmt(t.inicio)), h('td', {}, fmt(t.fim)), h('td', {}, t.progresso + '%'), h('td', {}, t.responsavel || '—'), h('td', {}, chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', {}, chip('amarelo', eq ? (t.respondidoEm ? 'Cliente respondeu' : 'Aguardando cliente') : 'Aguardando você'))), eq && h('td', {}, h('button', { class: 'btn sm', onclick: e => { e.stopPropagation(); modalTarefa(p, t); } }, 'Editar'))))))));
 }
@@ -175,13 +198,17 @@ function gantt(p) {
     const a = pos.get(d.de), b = pos.get(t.id); if (!a) continue; const ya = 48 + a.i * RH + RH / 2, yb = 48 + b.i * RH + RH / 2;
     const [x1, x2] = d.tipo === 'SS' ? [a.l, b.l] : [a.r, b.l]; const mx = d.tipo === 'SS' ? Math.min(x1, x2) - 10 : x1 + 8;
     const path = document.createElementNS(NS, 'path'); path.setAttribute('d', `M${x1},${ya} H${mx} V${yb} H${x2 - 1}`); path.setAttribute('fill', 'none'); path.setAttribute('stroke', '#7d8aa8'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('marker-end', 'url(#ar)'); svg.append(path);
+    if (eq) { const hit = document.createElementNS(NS, 'path'); hit.setAttribute('d', path.getAttribute('d')); hit.setAttribute('class', 'dep-hit'); hit.style.pointerEvents = 'stroke'; hit.setAttribute('role', 'button'); hit.setAttribute('aria-label', 'Dependência: clique para alterar ou remover');
+      const tit = document.createElementNS(NS, 'title'); tit.textContent = 'Clique para alterar ou remover esta dependência'; hit.append(tit); hit.addEventListener('click', () => menuDep(p, ts.find(y => y.id === d.de), t, d)); svg.append(hit); }
   }
   juntar(cv, svg, h('div', { class: 'g-hoje', style: `left:${x(p.hoje) + DW / 2}px` }));
   for (const t of ts) {
     const i = pos.get(t.id).i, w = Math.max(DW, x(t.fim) + DW - x(t.inicio));
     const b = h('div', { class: 'g-bloco ' + t.status.cor + (t.aguardaCliente && t.progresso < 100 ? ' aguarda' : ''), style: `left:${x(t.inicio)}px;width:${w - 2}px;top:${48 + i * RH + 9}px`, tabindex: 0, role: 'button', 'aria-label': `${t.nome}: ${t.status.rotulo}`, onclick: eq ? undefined : () => drawer(p, t), onkeydown: e => e.key === 'Enter' && drawer(p, t) },
-      h('div', { class: 'pg', style: `width:${t.progresso}%` }), h('span', {}, w > 90 ? `${t.nome}` : ''), eq && h('i', { class: 'alca esq', title: 'Arraste para mudar o início' }), eq && h('i', { class: 'alca dir', title: 'Arraste para mudar o término' }));
-    if (eq) arrasto(b, t, p, DW);
+      h('div', { class: 'miolo' }, h('div', { class: 'pg', style: `width:${t.progresso}%` }), h('span', {}, w > 90 ? `${t.nome}` : '')), eq && h('i', { class: 'alca esq', title: 'Arraste para mudar o início' }), eq && h('i', { class: 'alca dir', title: 'Arraste para mudar o término' }),
+      eq && h('i', { class: 'cx ini', title: 'Arraste até outra atividade: as duas começam juntas' }), eq && h('i', { class: 'cx fim', title: 'Arraste até outra atividade: ela só começa quando esta terminar' }));
+    b.dataset.id = t.id;
+    if (eq) { arrasto(b, t, p, DW); for (const cx of b.querySelectorAll('.cx')) conecta(cx, b, t, p, cv, svg, NS); }
     b.addEventListener('mousemove', e => { if (!arrastando) tip(e, t); }); b.addEventListener('mouseleave', () => $tip.hidden = true); b.addEventListener('focus', () => { const r = b.getBoundingClientRect(); tip({ clientX: r.left, clientY: r.bottom }, t); }); b.addEventListener('blur', () => $tip.hidden = true);
     juntar(cv, b);
   }
@@ -191,6 +218,44 @@ function gantt(p) {
   return h('div', { class: 'gantt' }, nomes, sc);
 }
 let arrastando = false;
+// Cria dependência arrastando do círculo de uma atividade até outra: círculo do fim = a outra só começa quando esta terminar; círculo do início = começam juntas.
+function conecta(cx, b, t, p, cv, svg, NS) {
+  cx.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0) return; ev.preventDefault(); ev.stopPropagation(); const origem = cx.classList.contains('fim') ? 'fim' : 'ini';
+    arrastando = true; $tip.hidden = true; cx.setPointerCapture(ev.pointerId); cv.classList.add('conectando');
+    const rc = cv.getBoundingClientRect(), bb = b.getBoundingClientRect(), x1 = (origem === 'fim' ? bb.right : bb.left) - rc.left, y1 = bb.top + bb.height / 2 - rc.top;
+    const linha = document.createElementNS(NS, 'path'); linha.setAttribute('class', 'dep-nova'); svg.append(linha); let alvo = null;
+    const mover = e => {
+      const x2 = e.clientX - rc.left, y2 = e.clientY - rc.top; linha.setAttribute('d', `M${x1},${y1} C${x1 + 50},${y1} ${x2 - 50},${y2} ${x2},${y2}`);
+      const el = document.elementFromPoint(e.clientX, e.clientY), nb = el && el.closest ? el.closest('.g-bloco') : null, novo = nb && nb.dataset.id !== t.id ? nb : null;
+      if (novo !== alvo) { if (alvo) alvo.classList.remove('alvo'); alvo = novo; if (alvo) alvo.classList.add('alvo'); }
+      $tip.replaceChildren(h('b', {}, alvo ? 'Solte para criar a dependência' : origem === 'fim' ? 'Solte sobre a atividade que só começa depois desta terminar' : 'Solte sobre a atividade que começa junto com esta')); $tip.hidden = false;
+      $tip.style.left = Math.min(e.clientX + 14, innerWidth - $tip.offsetWidth - 8) + 'px'; $tip.style.top = Math.min(e.clientY + 18, innerHeight - $tip.offsetHeight - 8) + 'px';
+    };
+    const limpa = () => { cx.removeEventListener('pointermove', mover); cx.removeEventListener('pointerup', solta); cx.removeEventListener('pointercancel', cancela); linha.remove(); cv.classList.remove('conectando'); if (alvo) alvo.classList.remove('alvo'); $tip.hidden = true; arrastando = false; };
+    const cancela = () => limpa();
+    const solta = async () => {
+      const dest = alvo; limpa(); if (!dest) return; const suc = p.tarefas.find(y => y.id === dest.dataset.id); if (!suc) return;
+      const tipo = origem === 'fim' ? 'FS' : 'SS', deps = (suc.deps || []).map(d => ({ ...d })), ja = deps.find(d => d.de === t.id);
+      if (ja && ja.tipo === tipo) return toast(`“${suc.nome}” já depende de “${t.nome}” desse jeito.`);
+      if (ja) ja.tipo = tipo; else deps.push({ de: t.id, tipo, lag: 0 });
+      try { const r = await api('PATCH', '/api/tarefas/' + suc.id, { deps }); toast(`${tipo === 'FS' ? `“${suc.nome}” só começa quando “${t.nome}” terminar.` : `“${suc.nome}” começa junto com “${t.nome}”.`}`, 5000); avisaAjustes(r.ajustes); } catch (err) { toast(err.message, 6000); } render();
+    };
+    cx.addEventListener('pointermove', mover); cx.addEventListener('pointerup', solta); cx.addEventListener('pointercancel', cancela);
+  });
+}
+// Clicar na seta: trocar o tipo, ajustar a defasagem ou remover a dependência.
+function menuDep(p, pred, suc, dep) {
+  if (!pred || !suc) return; const v = overlay(true), err = h('div'); const lag = h('input', { type: 'number', value: dep.lag || 0, style: 'width:90px' });
+  const salva = async novas => { try { const r = await api('PATCH', '/api/tarefas/' + suc.id, { deps: novas }); v.remove(); avisaAjustes(r.ajustes); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); } };
+  const outras = (suc.deps || []).filter(d => d.de !== dep.de).map(d => ({ ...d }));
+  juntar(v, h('div', { class: 'modal', style: 'max-width:480px' }, h('h2', {}, 'Dependência'), h('p', {}, h('b', {}, pred.nome), ' → ', h('b', {}, suc.nome)),
+    h('p', { class: 'muted' }, dep.tipo === 'SS' ? 'As duas começam juntas.' : `“${suc.nome}” só começa quando “${pred.nome}” terminar.`),
+    h('label', {}, 'Defasagem em dias (positivo = espera mais; negativo = adianta)'), lag, err,
+    h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri sm', onclick: () => salva([...outras, { de: dep.de, tipo: dep.tipo, lag: Math.round(+lag.value) || 0 }]) }, 'Salvar defasagem'),
+      h('button', { class: 'btn sm', onclick: () => salva([...outras, { de: dep.de, tipo: dep.tipo === 'SS' ? 'FS' : 'SS', lag: Math.round(+lag.value) || 0 }]) }, dep.tipo === 'SS' ? 'Mudar para “termina → começa”' : 'Mudar para “começam juntas”'),
+      h('button', { class: 'btn sm perigo', onclick: () => salva(outras) }, 'Remover dependência'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar'))));
+}
 const somaDias = (s, n) => iso(ms(s) + n * DAY);
 // Arrastar (mover), ou puxar as pontas (início/término). Dia a dia; as dependências reagendam as seguintes.
 function arrasto(b, t, p, DW) {
@@ -431,8 +496,15 @@ async function telaIntegracao(m) {
 }
 
 async function telaLog(m) {
-  const { logs } = await api('GET', '/api/logs'); juntar(m, h('h1', {}, 'Acessos e atividade'), h('p', { class: 'muted' }, 'Últimos 300 eventos: logins, projetos abertos, comentários, documentos e solicitações.'));
-  juntar(m, h('div', { class: 'card', style: 'margin-top:16px;overflow:auto' }, h('table', {}, h('thead', {}, h('tr', {}, ['Quando', 'Quem', 'Ação', 'Projeto', 'Detalhe'].map(t => h('th', {}, t)))),
-    h('tbody', {}, logs.map(l => h('tr', {}, h('td', {}, fmtTs(l.ts)), h('td', {}, l.quem, h('span', { class: 'muted small' }, l.tipo === 'cliente' ? ' · cliente' : ' · equipe')), h('td', {}, l.acao.replace(/_/g, ' ')), h('td', {}, l.projeto || ''), h('td', { class: 'muted' }, l.detalhe)))))));
+  const { projetos } = await api('GET', '/api/projetos'); const f = view.f = view.f || { projeto: '', tipo: '', cat: '', dias: '30', q: '' }; if (view.projeto) { f.projeto = view.projeto; view.projeto = null; }
+  const qs = () => new URLSearchParams(Object.fromEntries(Object.entries({ projeto: f.projeto, tipo: f.tipo, cat: f.cat, dias: f.dias, q: f.q, limite: 500 }).filter(([, v]) => v))).toString();
+  const out = h('div', { class: 'card' }), cont = h('span', { class: 'muted small' }); let tmr;
+  const carrega = async () => { try { const { logs } = await api('GET', '/api/logs?' + qs()); cont.textContent = `${logs.length} registro(s)${logs.length >= 500 ? ' (mostrando os 500 mais recentes; exporte para ver tudo)' : ''}`; out.replaceChildren(listaLog(logs, true)); } catch (e) { out.replaceChildren(h('div', { class: 'erro' }, e.message)); } };
+  const sel = (k, op) => h('select', { style: 'width:auto', onchange: e => { f[k] = e.target.value; carrega(); } }, op.map(([v, t]) => h('option', { value: v, selected: v === f[k] }, t)));
+  juntar(m, h('h1', {}, 'Acessos e log'), h('p', { class: 'muted' }, 'Registro permanente de tudo: alterações (de → para), acessos do cliente, documentos e chamados. Guardado também em arquivo no servidor.'),
+    h('div', { class: 'toolbar' }, h('div', { class: 'filtros' }, sel('projeto', [['', 'Todos os projetos'], ...projetos.map(p => [p.id, p.nome])]), sel('tipo', [['', 'Equipe e cliente'], ['equipe', 'Só equipe'], ['cliente', 'Só cliente']]), sel('cat', [['', 'Tudo'], ['alteracoes', 'Alterações'], ['acessos', 'Acessos'], ['comunicacao', 'Comunicação']]), sel('dias', [['7', 'Últimos 7 dias'], ['30', 'Últimos 30 dias'], ['90', 'Últimos 90 dias'], ['', 'Todo o período']])),
+      h('div', { class: 'filtros' }, h('input', { class: 'busca', type: 'search', placeholder: 'Buscar pessoa, atividade ou valor', value: f.q, oninput: e => { f.q = e.target.value; clearTimeout(tmr); tmr = setTimeout(carrega, 300); } }),
+        h('button', { class: 'btn sm', onclick: async ev => { ev.target.disabled = true; try { const r = await fetch('/api/logs.csv?' + qs(), { credentials: 'same-origin' }); if (!r.ok) throw new Error('Não foi possível exportar.'); const u = URL.createObjectURL(await r.blob()); const a = h('a', { href: u, download: 'log-projetos-m4.csv' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); } catch (e) { toast(e.message); } ev.target.disabled = false; } }, 'Exportar CSV'))), cont, out);
+  await carrega();
 }
 boot();

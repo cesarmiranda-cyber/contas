@@ -1,6 +1,6 @@
 'use strict';
 const http = require('http'); const fs = require('fs'); const path = require('path');
-const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const A = require('./lib/auth'); const S = require('./lib/schedule');
+const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const Audit = require('./lib/auditoria'); const A = require('./lib/auth'); const S = require('./lib/schedule');
 
 const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -22,6 +22,7 @@ const SEC = {
 const bad = (c, m) => Object.assign(new Error(m), { status: c });
 const send = (res, c, o, extra = {}) => { res.writeHead(c, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...extra }); res.end(JSON.stringify(o)); };
 const readBody = (req, max = 1e6) => new Promise((ok, no) => {
+  if (req.method === 'DELETE' && !req.headers['content-length'] && !req.headers['transfer-encoding']) { req.resume(); return ok({}); } // DELETE não tem corpo
   if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return no(bad(415, 'Content-Type deve ser application/json.'));
   const ch = []; let n = 0, dead = false;
   req.on('data', c => { n += c.length; if (n > max) { dead = true; ch.length = 0; no(bad(413, 'Corpo grande demais.')); req.resume(); } else if (!dead) ch.push(c); });
@@ -78,6 +79,13 @@ function validarProjeto(p) {
   if (p.codigo && db.projetos.some(x => x.id !== p.id && x.codigo === p.codigo)) throw bad(409, 'Já existe um projeto com este código.');
 }
 for (const p of db.projetos) if (!p.codigo) { p.codigo = proximoCodigo(); store.save(); } // projetos criados antes do campo
+// registro de alterações (quem, o quê, de → para); 'uid' = id do usuário no Bitrix24 ou do cliente
+const reg = (u, acao, detalhe = '', projetoId = null, extra = {}) => store.log(u.nome, u.tipo, acao, detalhe, projetoId, { uid: u.id, ...extra });
+const vistos = new Map(); // evita encher o registro quando a mesma tela é aberta várias vezes seguidas
+const regUnico = (u, chave, ms, ...args) => { const k = `${u.id}|${chave}`; if (Date.now() - (vistos.get(k) || 0) < ms) return; vistos.set(k, Date.now()); reg(u, ...args); };
+const snapT = t => ({ ...t, deps: (t.deps || []).map(d => ({ ...d })) });
+const nomeTarefa = id => (db.tarefas.find(x => x.id === id) || {}).nome || '(atividade removida)';
+const nomeCliente = id => (db.clientes.find(c => c.id === id) || {}).nome || id;
 const tarefasDe = pid => db.tarefas.filter(t => t.projetoId === pid);
 const projetoDe = id => db.projetos.find(p => p.id === id);
 const hoje = () => S.hojeSP();
@@ -97,6 +105,7 @@ function projetoView(p, u, comTarefas) {
     inicioPrevisto: p.inicioPrevisto || '', fimPrevisto: p.fimPrevisto || '', link: p.link || '',
     desvioDias: desvio };
   if (u.tipo === 'equipe') { // campos internos: o cliente nunca recebe
+    out.acessosClientes = p.clientes.map(id => { let ultimo = null, total = 0; for (const l of db.logs) if (l.uid === id && l.projetoId === p.id && l.acao === 'abriu_projeto') { total++; ultimo = l.ts; } return { nome: nomeCliente(id), ultimo, total }; });
     out.valor = p.valor ?? null; out.negocioBitrix = p.negocioBitrix || ''; out.obsInternas = p.obsInternas || '';
     out.clientes = p.clientes.map(id => { const c = db.clientes.find(x => x.id === id); return c ? { id, nome: c.nome, email: c.email, empresa: c.empresa } : null; }).filter(Boolean);
   }
@@ -131,6 +140,11 @@ function aplicarTarefas(pid, mexe) {
   }
 }
 
+// uma entrada para cada atividade que as dependências reagendaram (além da que o usuário editou)
+function registraReagendadas(u, ids, antes, causa) {
+  for (const id of ids) { if (id === causa.id) continue; const x = db.tarefas.find(y => y.id === id); if (!x) continue; const dx = Audit.diff(antes.get(id) || {}, x, { inicio: 'Início', fim: 'Término' });
+    if (dx.length) reg(u, 'reagendada_dependencia', x.nome, x.projetoId, { tarefaId: x.id, interna: !!x.interna, diff: dx, motivo: `por causa da atividade “${causa.nome}”` }); }
+}
 const ajustesDe = ids => ids.map(id => db.tarefas.find(x => x.id === id)).filter(Boolean).map(x => ({ id: x.id, nome: x.nome, inicio: x.inicio, fim: x.fim })); // atividades cujas datas as dependências alteraram
 // ---- rotas --------------------------------------------------------------------
 const R = [];
@@ -142,7 +156,7 @@ rota('POST', '/api/auth/cadastro', async (req, res, _m, b) => {
   if (String(b.senha || '').length < 8) throw bad(400, 'A senha deve ter ao menos 8 caracteres.');
   if (db.clientes.some(c => c.email === email)) throw bad(409, 'Já existe uma conta com este e-mail.');
   const c = { id: store.id(), nome, email, empresa: str(b.empresa, 120), telefone: str(b.telefone, 40), senha: A.hash(String(b.senha)), criadoEm: store.agora(), ativo: true };
-  db.clientes.push(c); store.log(nome, 'cliente', 'cadastro', email); store.save();
+  db.clientes.push(c); store.log(nome, 'cliente', 'cadastro', email, null, { uid: c.id }); store.save();
   send(res, 201, { ok: true }, { 'Set-Cookie': cookie(req, A.emitir(store.secret, c.id), A.TTL / 1000) });
 });
 const falhas = new Map();
@@ -151,10 +165,10 @@ rota('POST', '/api/auth/login', async (req, res, _m, b) => {
   if (f.n >= 5 && Date.now() < f.ate) throw bad(429, 'Muitas tentativas. Tente novamente em alguns minutos.');
   const c = db.clientes.find(x => x.email === email && x.ativo !== false);
   if (!c || !A.confere(String(b.senha || ''), c.senha)) { falhas.set(email, { n: f.n + 1, ate: Date.now() + 15 * 60e3 }); store.log(email || '?', 'cliente', 'login_falhou'); throw bad(401, 'E-mail ou senha incorretos.'); }
-  falhas.delete(email); store.log(c.nome, 'cliente', 'login', c.email);
+  falhas.delete(email); store.log(c.nome, 'cliente', 'login', c.email, null, { uid: c.id });
   send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, A.emitir(store.secret, c.id), A.TTL / 1000) });
 });
-rota('POST', '/api/auth/logout', async (req, res) => send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, '', 0) }));
+rota('POST', '/api/auth/logout', async (req, res, _m, _b, u) => { if (u) reg(u, 'saiu'); send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, '', 0) }); });
 rota('GET', '/api/me', async (req, res, _m, _b, u) => send(res, 200, { usuario: u }));
 
 rota('GET', '/api/projetos', async (req, res, _m, _b, u) => {
@@ -163,7 +177,7 @@ rota('GET', '/api/projetos', async (req, res, _m, _b, u) => {
 });
 rota('GET', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   exigir(u); const p = projetoDe(m[1]); if (!p || !podeVer(u, p)) throw bad(404, 'Projeto não encontrado.');
-  if (u.tipo === 'cliente') store.log(u.nome, 'cliente', 'abriu_projeto', p.nome, p.id);
+  if (u.tipo === 'cliente') regUnico(u, 'proj' + p.id, 10 * 60e3, 'abriu_projeto', p.nome, p.id);
   send(res, 200, { projeto: projetoView(p, u, true) });
 });
 rota('POST', '/api/projetos', async (req, res, _m, b, u) => {
@@ -172,13 +186,14 @@ rota('POST', '/api/projetos', async (req, res, _m, b, u) => {
   const p = { situacao: 'andamento', prioridade: 'media', ...d, id: store.id(), gerente: d.gerente || u.nome, descricao: d.descricao || '', clientes: [], criadoEm: store.agora(), criadoPor: u.nome };
   p.codigo = p.codigo || proximoCodigo(); validarProjeto(p);
   if (Array.isArray(b.clientes)) p.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
-  db.projetos.push(p); store.log(u.nome, 'equipe', 'criou_projeto', p.nome, p.id); store.save(); send(res, 201, { projeto: projetoView(p, u, true) });
+  db.projetos.push(p); reg(u, 'criou_projeto', p.nome, p.id, { diff: Audit.diff({}, p, Audit.CAMPOS_PROJETO, nomeCliente, Audit.INTERNOS_PROJETO) }); store.save(); send(res, 201, { projeto: projetoView(p, u, true) });
 });
 rota('PATCH', '/api/projetos/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
   const novo = { ...p, ...lerProjeto(b, true) }; validarProjeto(novo);
   if (Array.isArray(b.clientes)) novo.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
-  Object.assign(p, novo); store.log(u.nome, 'equipe', 'editou_projeto', p.nome, p.id); store.save(); send(res, 200, { projeto: projetoView(p, u, true) });
+  const antesP = { ...p, clientes: [...p.clientes] }; Object.assign(p, novo);
+  const dp = Audit.diff(antesP, p, Audit.CAMPOS_PROJETO, nomeCliente, Audit.INTERNOS_PROJETO); if (dp.length) reg(u, 'editou_projeto', p.nome, p.id, { diff: dp }); store.save(); send(res, 200, { projeto: projetoView(p, u, true) });
 });
 rota('DELETE', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   exigir(u, 'equipe'); if (!u.admin) throw bad(403, 'Somente administradores excluem projetos.');
@@ -187,25 +202,34 @@ rota('DELETE', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   for (const a of db.arquivos.filter(a => tids.has(a.tarefaId))) fs.rm(store.file(a.id), () => {});
   db.arquivos = db.arquivos.filter(a => !tids.has(a.tarefaId)); db.itens = db.itens.filter(i => !tids.has(i.tarefaId));
   db.tarefas = db.tarefas.filter(t => t.projetoId !== p.id); db.projetos = db.projetos.filter(x => x.id !== p.id);
-  store.log(u.nome, 'equipe', 'excluiu_projeto', p.nome); store.save(); send(res, 200, { ok: true });
+  reg(u, 'excluiu_projeto', p.nome); store.save(); send(res, 200, { ok: true });
 });
 rota('POST', '/api/projetos/([0-9a-f]+)/tarefas', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
   const d = lerTarefa(b, false); const t = { id: store.id(), projetoId: p.id, progresso: 0, responsavel: '', descricao: '', interna: false, deps: [], ...d, ordem: tarefasDe(p.id).length };
-  const mudou = aplicarTarefas(p.id, () => db.tarefas.push(t)); if (t.aguardaCliente) store.log(u.nome, 'equipe', 'pediu_cliente', t.nome, p.id);
-  store.log(u.nome, 'equipe', 'criou_tarefa', t.nome, p.id); store.save(); send(res, 201, { tarefa: t.id, reagendadas: mudou, ajustes: ajustesDe(mudou) });
+  const snaps = new Map(tarefasDe(p.id).map(x => [x.id, snapT(x)])); const mudou = aplicarTarefas(p.id, () => db.tarefas.push(t));
+  reg(u, 'criou_tarefa', t.nome, p.id, { tarefaId: t.id, interna: !!t.interna, diff: Audit.diff({}, t, Audit.CAMPOS_TAREFA, nomeTarefa), snap: { inicio: t.inicio, fim: t.fim } });
+  if (t.aguardaCliente) reg(u, 'pediu_cliente', t.nome, p.id, { tarefaId: t.id, interna: !!t.interna, diff: [{ campo: 'Pedido ao cliente', de: '—', para: t.pedido || '(sem texto)' }] });
+  registraReagendadas(u, mudou, snaps, t); store.save(); send(res, 201, { tarefa: t.id, reagendadas: mudou, ajustes: ajustesDe(mudou) });
 });
 rota('PATCH', '/api/tarefas/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const t = db.tarefas.find(x => x.id === m[1]); if (!t) throw bad(404, 'Tarefa não encontrada.');
-  const d = lerTarefa(b, true); const mudou = aplicarTarefas(t.projetoId, () => Object.assign(t, d));
-  store.log(u.nome, 'equipe', 'editou_tarefa', t.nome, t.projetoId); store.save(); send(res, 200, { ok: true, reagendadas: mudou, ajustes: ajustesDe(mudou) });
+  const d = lerTarefa(b, true); const pedia = !!t.aguardaCliente, antesT = snapT(t), snaps = new Map(tarefasDe(t.projetoId).map(x => [x.id, snapT(x)])); const mudou = aplicarTarefas(t.projetoId, () => Object.assign(t, d));
+  if (d.aguardaCliente === false) t.respondidoEm = null;
+  if (d.aguardaCliente && !pedia) { t.respondidoEm = null; reg(u, 'pediu_cliente', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: [{ campo: 'Pedido ao cliente', de: '—', para: t.pedido || '(sem texto)' }] }); }
+  const dt = Audit.diff(antesT, t, Audit.CAMPOS_TAREFA, nomeTarefa).filter(x => !(x.campo === 'Aguardando o cliente' && x.para === 'Sim')); // o pedido já tem registro próprio
+  if (dt.length) reg(u, 'editou_tarefa', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: dt, snap: { inicio: t.inicio, fim: t.fim } });
+  registraReagendadas(u, mudou, snaps, t); store.save(); send(res, 200, { ok: true, reagendadas: mudou, ajustes: ajustesDe(mudou) });
 });
 rota('DELETE', '/api/tarefas/([0-9a-f]+)', async (req, res, m, _b, u) => {
   exigir(u, 'equipe'); const t = db.tarefas.find(x => x.id === m[1]); if (!t) throw bad(404, 'Tarefa não encontrada.');
   for (const a of db.arquivos.filter(a => a.tarefaId === t.id)) fs.rm(store.file(a.id), () => {});
   db.arquivos = db.arquivos.filter(a => a.tarefaId !== t.id); db.itens = db.itens.filter(i => i.tarefaId !== t.id);
+  const snapsDeps = new Map(tarefasDe(t.projetoId).map(x => [x.id, snapT(x)]));
   db.tarefas = db.tarefas.filter(x => x.id !== t.id); for (const o of db.tarefas) o.deps = (o.deps || []).filter(d => d.de !== t.id);
-  store.log(u.nome, 'equipe', 'excluiu_tarefa', t.nome, t.projetoId); store.save(); send(res, 200, { ok: true });
+  reg(u, 'excluiu_tarefa', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: Audit.diff(t, {}, { nome: 'Atividade', inicio: 'Início', fim: 'Término' }) });
+  for (const o of tarefasDe(t.projetoId)) { const dd = Audit.diff(snapsDeps.get(o.id), o, { deps: 'Dependências' }, id => id === t.id ? t.nome : nomeTarefa(id)); if (dd.length) reg(u, 'editou_tarefa', o.nome, o.projetoId, { tarefaId: o.id, interna: !!o.interna, diff: dd, snap: { inicio: o.inicio, fim: o.fim } }); }
+  store.save(); send(res, 200, { ok: true });
 });
 
 function tarefaAcessivel(u, id) {
@@ -213,7 +237,7 @@ function tarefaAcessivel(u, id) {
   if (!t || !p || !podeVer(u, p) || (t.interna && u.tipo !== 'equipe')) throw bad(404, 'Atividade não encontrada.'); return [t, p];
 }
 rota('GET', '/api/tarefas/([0-9a-f]+)/itens', async (req, res, m, _b, u) => {
-  const [t] = tarefaAcessivel(u, m[1]);
+  const [t] = tarefaAcessivel(u, m[1]); if (u.tipo === 'cliente') regUnico(u, 'ativ' + t.id, 10 * 60e3, 'abriu_atividade', t.nome, t.projetoId, { tarefaId: t.id });
   send(res, 200, { itens: db.itens.filter(i => i.tarefaId === t.id).map(i => ({ ...i, arquivo: i.arquivoId ? db.arquivos.find(a => a.id === i.arquivoId) && { id: i.arquivoId, nome: db.arquivos.find(a => a.id === i.arquivoId).nome, tamanho: db.arquivos.find(a => a.id === i.arquivoId).tamanho } : undefined })) });
 });
 rota('POST', '/api/tarefas/([0-9a-f]+)/itens', async (req, res, m, b, u) => {
@@ -227,11 +251,11 @@ rota('POST', '/api/tarefas/([0-9a-f]+)/itens', async (req, res, m, b, u) => {
   }
   if (!item.texto && !item.arquivoId) throw bad(400, 'Escreva um texto ou anexe um documento.');
   if (u.tipo === 'cliente' && t.aguardaCliente) t.respondidoEm = item.ts;
-  db.itens.push(item); store.log(u.nome, u.tipo, item.arquivoId ? 'enviou_arquivo' : 'comentou', `${t.nome}`, p.id); store.save(); send(res, 201, { ok: true });
+  db.itens.push(item); reg(u, item.arquivoId ? 'enviou_arquivo' : 'comentou', `${t.nome}`, p.id); store.save(); send(res, 201, { ok: true });
 });
 function enviarArquivo(res, a, u) {
   let buf; try { buf = fs.readFileSync(store.file(a.id)); } catch { throw bad(404, 'Arquivo não encontrado.'); }
-  store.log(u ? u.nome : 'Link assinado', u ? u.tipo : 'equipe', 'baixou_arquivo', a.nome);
+  const tt = a.tarefaId && db.tarefas.find(x => x.id === a.tarefaId); store.log(u ? u.nome : 'Link assinado (Bitrix24)', u ? u.tipo : 'equipe', 'baixou_arquivo', a.nome, tt ? tt.projetoId : null, { uid: u ? u.id : null });
   res.writeHead(200, { ...SEC, 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(a.nome)}`, 'Content-Length': buf.length, 'Cache-Control': 'private, no-store' }); res.end(buf);
 }
 rota('GET', '/api/arquivos/([0-9a-f]+)', async (req, res, m, _b, u) => {
@@ -256,7 +280,7 @@ function solView(s, u) {
   return u.tipo === 'equipe' ? { ...base, cliente: s.cliente, empresa: s.empresa, email: s.email, telefone: s.telefone, bitrix: s.bitrix ? { status: s.bitrix.status, erro: s.bitrix.erro, dealId: s.bitrix.dealId, tentativas: s.bitrix.tentativas, url: cardUrl(s) } : null } : base;
 }
 rota('GET', '/api/solicitacoes', async (req, res, _m, _b, u) => {
-  exigir(u); await suporte.sincronizarSeVelho(); // etapa do card sempre fresca (no máx. 1 consulta/min)
+  exigir(u); if (u.tipo === 'cliente') regUnico(u, 'suporte', 30 * 60e3, 'abriu_suporte'); await suporte.sincronizarSeVelho(); // etapa do card sempre fresca (no máx. 1 consulta/min)
   const l = db.solicitacoes.filter(s => u.tipo === 'equipe' || s.clienteId === u.id).map(s => solView(s, u));
   send(res, 200, { solicitacoes: l.sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)), categorias: CAT, prioridades: PRIO });
 });
@@ -266,18 +290,18 @@ rota('POST', '/api/solicitacoes', async (req, res, _m, b, u) => {
   const conta = db.clientes.find(c => c.id === u.id) || {};
   const s = { id: store.id(), protocolo: protocolo(), clienteId: u.id, cliente: u.nome, empresa: u.empresa || '', email: conta.email || '', telefone: str(b.telefone, 40) || conta.telefone || '', projetoId: pid, categoria: b.categoria || 'duvida', prioridade: b.prioridade || 'media',
     assunto: str(b.assunto, 160, true, 'Assunto'), texto: str(b.texto, 4000, true, 'Descrição'), status: 'nova', resposta: '', mensagens: [], criadoEm: store.agora(), bitrix: { status: 'pendente', tentativas: 0 } };
-  db.solicitacoes.push(s); store.log(u.nome, 'cliente', 'solicitou', `${s.protocolo} · ${s.assunto}`, pid, { cliente: u.id }); store.save();
+  db.solicitacoes.push(s); reg(u, 'solicitou', `${s.protocolo} · ${s.assunto}`, pid, { cliente: u.id }); store.save();
   suporte.enviar(s).catch(() => {}); // cria o card em segundo plano; se falhar, a fila reenvia
   send(res, 201, { ok: true, protocolo: s.protocolo, id: s.id });
 });
 rota('PATCH', '/api/solicitacoes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const s = db.solicitacoes.find(x => x.id === m[1]); if (!s) throw bad(404, 'Solicitação não encontrada.');
   if (['nova', 'em_analise', 'aprovada', 'recusada', 'concluida'].includes(b.status)) s.status = b.status; if ('resposta' in b) s.resposta = str(b.resposta, 4000);
-  store.log(u.nome, 'equipe', 'atualizou_solicitacao', `${s.protocolo} · ${s.assunto}`, s.projetoId); store.save(); send(res, 200, { ok: true });
+  reg(u, 'atualizou_solicitacao', `${s.protocolo} · ${s.assunto}`, s.projetoId); store.save(); send(res, 200, { ok: true });
 });
 rota('POST', '/api/solicitacoes/([0-9a-f]+)/reenviar', async (req, res, m, _b, u) => {
   exigir(u, 'equipe'); const s = db.solicitacoes.find(x => x.id === m[1]); if (!s) throw bad(404, 'Solicitação não encontrada.');
-  suporte.aplicar(); const r = await suporte.enviar(s); store.log(u.nome, 'equipe', 'reenviou_chamado', s.protocolo, s.projetoId); send(res, 200, { bitrix: { status: r.status, erro: r.erro, dealId: r.dealId, url: cardUrl(s) } });
+  suporte.aplicar(); const r = await suporte.enviar(s); reg(u, 'reenviou_chamado', s.protocolo, s.projetoId); send(res, 200, { bitrix: { status: r.status, erro: r.erro, dealId: r.dealId, url: cardUrl(s) } });
 });
 
 const solAcessivel = (u, id) => { exigir(u); const s = db.solicitacoes.find(x => x.id === id); if (!s || (u.tipo === 'cliente' && s.clienteId !== u.id)) throw bad(404, 'Chamado não encontrado.'); return s; };
@@ -290,14 +314,14 @@ rota('POST', '/api/solicitacoes/([0-9a-f]+)/mensagens', async (req, res, m, b, u
   }
   if (!msg.texto && !msg.arquivoId) throw bad(400, 'Escreva uma mensagem ou anexe um documento.');
   (s.mensagens = s.mensagens || []).push(msg); if (u.tipo === 'equipe' && s.status === 'nova') s.status = 'em_analise';
-  store.log(u.nome, u.tipo, u.tipo === 'cliente' ? 'complementou_chamado' : 'respondeu_chamado', `${s.protocolo} · ${s.assunto}`, s.projetoId, { cliente: s.clienteId }); store.save();
+  reg(u, u.tipo === 'cliente' ? 'complementou_chamado' : 'respondeu_chamado', `${s.protocolo} · ${s.assunto}`, s.projetoId, { cliente: s.clienteId }); store.save();
   suporte.flushMensagens(s).catch(() => {}); send(res, 201, { ok: true });
 });
 rota('POST', '/api/solicitacoes/([0-9a-f]+)/avaliar', async (req, res, m, b, u) => {
   exigir(u, 'cliente'); const s = solAcessivel(u, m[1]); const nota = Math.round(+b.nota);
   if (!(nota >= 1 && nota <= 5)) throw bad(400, 'A nota deve ser de 1 a 5.'); if (s.avaliacao) throw bad(409, 'Este atendimento já foi avaliado.');
   if (!(s.status === 'concluida' || (s.etapa && s.etapa.semantica === 'S'))) throw bad(400, 'Você poderá avaliar quando o atendimento for concluído.');
-  s.avaliacao = { nota, comentario: str(b.comentario, 1000), ts: store.agora() }; store.log(u.nome, 'cliente', 'avaliou_atendimento', `${s.protocolo} · ${nota}/5`, s.projetoId, { cliente: u.id }); store.save();
+  s.avaliacao = { nota, comentario: str(b.comentario, 1000), ts: store.agora() }; reg(u, 'avaliou_atendimento', `${s.protocolo} · ${nota}/5`, s.projetoId, { cliente: u.id }); store.save();
   suporte.avaliacaoBitrix(s).catch(() => {}); send(res, 201, { ok: true });
 });
 
@@ -342,7 +366,7 @@ rota('POST', '/api/config/suporte', async (req, res, _m, b, u) => {
   if (!suporte.webhook()) throw bad(400, 'Informe o webhook do Bitrix24.'); suporte.aplicar();
   if (b.categoriaId == null || !b.estagioId) throw bad(400, 'Escolha o funil e a etapa inicial.');
   db.config.suporte = { categoriaId: +b.categoriaId, estagioId: str(b.estagioId, 60, true, 'Etapa'), funilNome: str(b.funilNome, 120), etapaNome: str(b.etapaNome, 120) };
-  store.log(u.nome, 'equipe', 'configurou_suporte', `${db.config.suporte.funilNome} / ${db.config.suporte.etapaNome}`); store.save();
+  reg(u, 'configurou_suporte', `${db.config.suporte.funilNome} / ${db.config.suporte.etapaNome}`); store.save();
   const n = await suporte.processarPendentes(); send(res, 200, { ...estadoSuporte(), reenviados: n });
 });
 rota('POST', '/api/config/suporte/reenviar', async (req, res, _m, _b, u) => { exigirAdmin(u); suporte.aplicar(); const n = await suporte.processarPendentes(); send(res, 200, { ...estadoSuporte(), reenviados: n }); });
@@ -360,17 +384,37 @@ rota('POST', '/api/clientes/([0-9a-f]+)/projetos', async (req, res, m, b, u) => 
   if (!Array.isArray(b.projetos)) throw bad(400, 'Informe a lista de projetos.');
   const alvo = new Set(b.projetos.map(String)); if ([...alvo].some(id => !projetoDe(id))) throw bad(400, 'Projeto inválido.');
   const antes = db.projetos.filter(p => p.clientes.includes(c.id)).length;
-  for (const p of db.projetos) { const tem = p.clientes.includes(c.id); if (alvo.has(p.id) && !tem) p.clientes.push(c.id); else if (!alvo.has(p.id) && tem) p.clientes = p.clientes.filter(x => x !== c.id); }
-  store.log(u.nome, 'equipe', antes === 0 && alvo.size ? 'ativou_cliente' : 'alterou_acesso_cliente', `${c.nome} → ${alvo.size} projeto(s)`); store.save(); send(res, 200, { ok: true, projetos: alvo.size });
+  let primeira = antes === 0;
+  for (const p of db.projetos) { const tem = p.clientes.includes(c.id); if (alvo.has(p.id) === tem) continue; const ant = [...p.clientes];
+    if (alvo.has(p.id)) p.clientes.push(c.id); else p.clientes = p.clientes.filter(x => x !== c.id);
+    reg(u, alvo.has(p.id) && primeira ? 'ativou_cliente' : 'alterou_acesso_cliente', `${c.nome} ${alvo.has(p.id) ? 'ganhou acesso' : 'perdeu acesso'} a “${p.nome}”`, p.id, { cliente: c.id, diff: Audit.diff({ clientes: ant }, p, { clientes: 'Clientes com acesso' }, nomeCliente, Audit.INTERNOS_PROJETO) }); if (alvo.has(p.id)) primeira = false; }
+  store.save(); send(res, 200, { ok: true, projetos: alvo.size });
 });
 rota('PATCH', '/api/clientes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.');
-  if ('ativo' in b) c.ativo = !!b.ativo; store.log(u.nome, 'equipe', c.ativo ? 'reativou_cliente' : 'bloqueou_cliente', c.email); store.save(); send(res, 200, { ok: true });
+  if ('ativo' in b) c.ativo = !!b.ativo; reg(u, c.ativo ? 'reativou_cliente' : 'bloqueou_cliente', c.email); store.save(); send(res, 200, { ok: true });
 });
-rota('GET', '/api/logs', async (req, res, _m, _b, u) => {
-  exigir(u, 'equipe'); const q = new URL(req.url, 'http://x').searchParams, pid = q.get('projeto'), tipo = q.get('tipo');
-  const l = db.logs.filter(x => (!pid || x.projetoId === pid) && (!tipo || x.tipo === tipo)).slice(-300).reverse().map(x => ({ ...x, projeto: (projetoDe(x.projetoId) || {}).nome }));
-  send(res, 200, { logs: l });
+function filtraLogs(q) {
+  const pid = q.get('projeto'), tipo = q.get('tipo'), cat = q.get('cat'), busca = (q.get('q') || '').trim().toLowerCase(), dias = +q.get('dias') || 0, lim = Math.min(+q.get('limite') || 300, 5000);
+  const desde = dias ? Date.now() - dias * 86400e3 : 0; const out = [];
+  for (let i = db.logs.length - 1; i >= 0 && out.length < lim; i--) {
+    const l = db.logs[i]; if (pid && l.projetoId !== pid) continue; if (tipo && l.tipo !== tipo) continue; if (desde && Date.parse(l.ts) < desde) continue;
+    const e = Audit.paraEquipe(l); if (cat && e.categoria !== cat) continue;
+    if (busca && ![e.quem, e.detalhe, e.rotulo, e.motivo, ...e.diff.map(d => `${d.campo} ${d.de} ${d.para}`)].join(' ').toLowerCase().includes(busca)) continue; out.push({ ...e, projeto: (projetoDe(l.projetoId) || {}).nome || '' });
+  }
+  return out;
+}
+rota('GET', '/api/logs', async (req, res, _m, _b, u) => { exigir(u, 'equipe'); send(res, 200, { logs: filtraLogs(new URL(req.url, 'http://x').searchParams) }); });
+rota('GET', '/api/logs\\.csv', async (req, res, _m, _b, u) => {
+  exigir(u, 'equipe'); const q = new URL(req.url, 'http://x').searchParams; if (!q.get('limite')) q.set('limite', '5000'); const lista = filtraLogs(q); const txt = Audit.csv(lista, id => (projetoDe(id) || {}).nome || ''); reg(u, 'exportou_log', `${lista.length} linha(s)`);
+  res.writeHead(200, { ...SEC, 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="log-projetos-m4.csv"', 'Cache-Control': 'no-store' }); res.end(txt);
+});
+// Histórico do projeto: a equipe vê tudo; o cliente vê só o que mudou no cronograma/dados públicos e o que foi enviado (sem atividades internas nem valores).
+rota('GET', '/api/projetos/([0-9a-f]+)/historico', async (req, res, m, _b, u) => {
+  exigir(u); const p = projetoDe(m[1]); if (!p || !podeVer(u, p)) throw bad(404, 'Projeto não encontrado.'); const q = new URL(req.url, 'http://x').searchParams;
+  if (u.tipo === 'equipe') { q.set('projeto', p.id); return send(res, 200, { itens: filtraLogs(q), completo: true }); }
+  const itens = []; for (let i = db.logs.length - 1; i >= 0 && itens.length < 300; i--) { const l = db.logs[i]; if (l.projetoId !== p.id) continue; const e = Audit.paraCliente(l); if (e) itens.push(e); }
+  send(res, 200, { itens, completo: false });
 });
 rota('GET', '/api/painel', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe'); const ps = db.projetos.map(p => projetoView(p, u, false));

@@ -18,5 +18,14 @@ O card leva protocolo, cliente, empresa, e-mail, telefone, projeto, categoria, p
 Mensagens e anexos do chamado viram comentários na linha do tempo do card (anexo = link assinado, válido por 30 dias). A etapa do card volta ao portal (consulta a cada 2 min e ao abrir Suporte, no máx. 1/min). Etapa de sucesso = chamado concluído (libera a avaliação do cliente).
 Falha ou webhook ausente: o chamado fica na fila e é reenviado (até 8 vezes) ou pelo botão "Reenviar ao Bitrix24". Criar o card é idempotente (procura o protocolo antes).
 
+## Registro de alterações (auditoria)
+- Cada alteração grava **quem, quando, o quê e de → para** (datas, andamento, responsável, dependências, dados do projeto, acesso de clientes, chamados) e também os acessos do cliente (abriu projeto/atividade/Suporte, downloads, login). Atividades reagendadas por dependência ganham um registro próprio com o motivo.
+- **Aba Histórico** em cada projeto: a equipe vê tudo (com filtros); o cliente vê só o que mudou no cronograma e nos dados públicos e o que foi enviado — nunca atividades internas, valor, observações internas, acessos ou a lista de clientes.
+- **Acessos e log** (equipe): filtros por projeto, perfil, categoria, período e busca; exporta CSV (protegido contra fórmulas do Excel).
+- Os registros ficam em `db.json` (últimos 20 mil) e em `DATA_DIR/auditoria.jsonl` (append-only, nunca apagado).
+
+## Gantt (equipe)
+Arrastar o bloco move as datas; as pontas mudam início/término; arrastar do círculo de uma atividade até outra cria a dependência (círculo do fim = termina→começa; círculo do início = começam juntas); clicar na seta altera a defasagem, troca o tipo ou remove. As atividades seguintes só são empurradas para frente.
+
 ## Dados
 `DATA_DIR` (padrão `./data`): `db.json` (JSON atômico), `files/`, `secret` (assinatura de sessões/links), `secrets.json`. Faça backup desse diretório.

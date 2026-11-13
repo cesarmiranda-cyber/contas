@@ -79,9 +79,9 @@ table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:9px 10p
 .g-fds{position:absolute;top:48px;bottom:0;background:rgba(127,140,170,.07)}
 .g-lin{position:absolute;left:0;right:0;height:44px;border-bottom:1px solid var(--linha)}
 .g-hoje{position:absolute;top:0;bottom:0;width:2px;background:var(--destaque);z-index:3} .g-hoje::after{content:"Hoje";position:absolute;top:2px;left:4px;font-size:10px;font-weight:700;color:var(--destaque)}
-.g-bloco{position:absolute;height:26px;border-radius:8px;cursor:pointer;z-index:2;overflow:hidden;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.g-bloco{position:absolute;height:26px;border-radius:8px;cursor:pointer;z-index:2;display:flex;align-items:center;padding:0;color:#fff;font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .g-bloco.verde{background:var(--verde)} .g-bloco.amarelo{background:var(--amarelo);color:#3a2d00} .g-bloco.vermelho{background:var(--vermelho)}
-.g-bloco .pg{position:absolute;left:0;top:0;bottom:0;background:rgba(0,0,0,.22)} .g-bloco span{position:relative;overflow:hidden;text-overflow:ellipsis}
+.g-bloco .miolo{position:absolute;inset:0;border-radius:inherit;overflow:hidden;display:flex;align-items:center;padding:0 8px}.g-bloco .pg{position:absolute;left:0;top:0;bottom:0;background:rgba(0,0,0,.22)} .g-bloco span{position:relative;overflow:hidden;text-overflow:ellipsis}
 .g-bloco:hover{filter:brightness(1.08);outline:2px solid var(--marca-2)}
 .g-svg{position:absolute;left:0;top:0;pointer-events:none;z-index:1}
 .legenda{display:flex;gap:16px;margin:12px 0;flex-wrap:wrap}
@@ -166,3 +166,17 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 /* arrastar blocos do Gantt (equipe) */
 .g-bloco.arrasta{cursor:grab;touch-action:none;user-select:none}.g-bloco.arrasta:active{cursor:grabbing}
 .alca{position:absolute;top:0;bottom:0;width:30%;max-width:9px;cursor:ew-resize;z-index:3}.alca.esq{left:0}.alca.dir{right:0}.g-bloco.arrasta:hover .alca{background:rgba(255,255,255,.38)}
+
+/* histórico / log */
+.log-dia{margin:18px 0 6px;font-size:13px;color:var(--tinta-2);letter-spacing:0}.log-dia:first-child{margin-top:0}
+.log-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--linha)}.log-dia+.log-item{border-top:0}
+.log-ponto{flex:none;width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--marca-2)}.log-item.acessos .log-ponto{background:#9aa6c2}.log-item.comunicacao .log-ponto{background:var(--verde)}
+.log-hora{white-space:nowrap;margin-top:2px}.diff{margin:6px 0 0;padding-left:18px;font-size:13px}.diff li{margin:2px 0}.diff s{color:var(--tinta-2)}
+.chip-mini{display:inline-block;border-radius:99px;padding:0 8px;font-size:11px;font-weight:700;background:var(--marca-fundo);color:var(--marca-2)}.chip-mini.cliente{background:#fff2ea;color:#c2410c}
+
+/* dependências por arrasto */
+.cx{position:absolute;top:50%;width:13px;height:13px;margin-top:-6.5px;border-radius:50%;background:#fff;border:2px solid var(--destaque);cursor:crosshair;z-index:5;opacity:0;transition:opacity .12s;touch-action:none}.cx.ini{left:-15px}.cx.fim{right:-15px} /* fora do bloco: não cobrem as alças de redimensionar */
+.g-bloco:hover .cx,.g-canvas.conectando .cx{opacity:1}.cx:hover{background:var(--destaque)}@media(hover:none){.cx{opacity:.85}}
+.g-bloco.alvo{outline:3px solid var(--destaque);filter:brightness(1.1)}
+.dep-nova{fill:none;stroke:var(--destaque);stroke-width:2.5;stroke-dasharray:6 4}
+.dep-hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}.dep-hit:hover{stroke:rgba(255,106,43,.35)}

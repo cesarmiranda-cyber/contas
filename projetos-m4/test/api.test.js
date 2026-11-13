@@ -147,7 +147,7 @@ test('chamado: conversa, anexo com link assinado, etapa do card e avaliação', 
   assert.ok(cm.COMMENT.includes('Segue o contrato') && cm.COMMENT.includes('Anexo: contrato.pdf') && cm.COMMENT.includes(r.j.protocolo));
   const link = /https:\/\/app\.example\.com(\/api\/baixar\/[0-9a-f]+\?e=\d+&t=[0-9a-f]{64})/.exec(cm.COMMENT); assert.ok(link, 'link assinado no card');
   assert.strictEqual(await (await fetch(base + link[1])).text(), 'conteudo'); // equipe baixa pelo card, sem login
-  assert.strictEqual((await fetch(base + link[1].replace(/t=[0-9a-f]/, 't=0'))).status, 403); // assinatura adulterada
+  assert.strictEqual((await fetch(base + link[1].replace(/t=([0-9a-f])/, (m, c) => 't=' + (c === '0' ? '1' : '0')))).status, 403); // assinatura adulterada
   assert.strictEqual((await fetch(base + link[1].replace(/e=\d+/, 'e=1'))).status, 403); // validade alterada
   const arqId = /baixar\/([0-9a-f]+)/.exec(link[1])[1]; assert.strictEqual((await fetch(base + '/api/arquivos/' + arqId, { headers: ko })).status, 404); assert.strictEqual((await fetch(base + '/api/arquivos/' + arqId, { headers: k })).status, 200);
   assert.strictEqual((await call('POST', `/api/solicitacoes/${sol().id}/mensagens`, { texto: 'invasor' }, ko)).s, 404); assert.strictEqual((await call('POST', `/api/solicitacoes/${sol().id}/mensagens`, { texto: '' }, k)).s, 400);
@@ -200,4 +200,65 @@ test('datas: a API informa quais atividades foram reagendadas pelas dependência
   const m2 = await call('PATCH', '/api/tarefas/' + r.j.tarefa, { inicio: '2030-01-18', fim: '2030-01-18' }, EQ); assert.deepStrictEqual(m2.j.ajustes, []); // datas válidas: nada a avisar
   assert.strictEqual((await call('PATCH', '/api/tarefas/' + a, { inicio: '2030-01-20', fim: '2030-01-19' }, EQ)).s, 400); // término antes do início
   const t = (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas; assert.strictEqual(t.find(x => x.id === a).inicio, '2030-01-14'); // erro não altera nada
+});
+
+test('registro de alterações: quem mudou o quê (de → para), visão do cliente e acessos', async () => {
+  const fs2 = require('fs'); const Sch = require('../lib/schedule'); const d = n => Sch.addDays('2030-03-04', n);
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Vera Lopes', email: 'vera@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'vera@x.com').id;
+  const p = (await call('POST', '/api/projetos', { nome: 'Projeto Log', valor: 1000, clientes: [cid] }, EQ)).j.projeto;
+  const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Levantar', inicio: d(0), fim: d(2) }, EQ)).j.tarefa;
+  const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Configurar', inicio: d(3), fim: d(4), deps: [{ de: A_, tipo: 'FS' }] }, EQ)).j.tarefa;
+  const I_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Reunião interna', inicio: d(0), fim: d(0), interna: true }, EQ)).j.tarefa;
+  const hist = async (h) => (await call('GET', `/api/projetos/${p.id}/historico`, null, h)).j.itens;
+  // editar datas e andamento → de → para; sucessora reagendada com motivo
+  await call('PATCH', '/api/tarefas/' + A_, { inicio: d(5), fim: d(7), progresso: 30 }, EQ);
+  let eq = await hist(EQ); const ed = eq.find(x => x.acao === 'editou_tarefa' && x.detalhe === 'Levantar');
+  assert.deepStrictEqual(ed.diff.map(x => [x.campo, x.de, x.para]), [['Início', d(0), d(5)], ['Término', d(2), d(7)], ['Andamento', '0%', '30%']]); assert.strictEqual(ed.quem, 'Ana Souza'); assert.strictEqual(ed.uid, '7');
+  const rg = eq.find(x => x.acao === 'reagendada_dependencia'); assert.strictEqual(rg.detalhe, 'Configurar'); assert.match(rg.motivo, /Levantar/); assert.deepStrictEqual(rg.diff.map(x => x.para), [d(8), d(9)]);
+  // dependência criada/removida aparece com nomes
+  await call('PATCH', '/api/tarefas/' + B_, { deps: [] }, EQ); eq = await hist(EQ); assert.ok(eq.some(x => x.detalhe === 'Configurar' && x.diff.some(y => y.campo === 'Dependências' && y.de.includes('Levantar') && y.para === '—')));
+  await call('PATCH', '/api/tarefas/' + B_, { deps: [{ de: A_, tipo: 'SS', lag: 1 }] }, EQ); eq = await hist(EQ); assert.ok(eq.some(x => x.diff.some(y => y.campo === 'Dependências' && y.para.includes('começam juntas, +1d'))));
+  // campos internos do projeto: a equipe vê, o cliente não
+  await call('PATCH', '/api/projetos/' + p.id, { valor: 2500, obsInternas: 'margem baixa' }, EQ); await call('PATCH', '/api/projetos/' + p.id, { nome: 'Projeto Log 2', valor: 3000 }, EQ);
+  eq = await hist(EQ); assert.ok(eq.some(x => x.acao === 'editou_projeto' && x.diff.some(y => y.campo === 'Valor do projeto' && y.para === 'R$ 2.500,00'.replace(/ /g, ' ')) || x.diff.some(y => y.campo === 'Observações internas')));
+  // atividade interna: nada aparece para o cliente
+  await call('PATCH', '/api/tarefas/' + I_, { fim: d(1), responsavel: 'Segredo' }, EQ);
+  let cl = await hist(k); const txt = JSON.stringify(cl); for (const proibido of ['Reunião interna', 'Valor do projeto', 'margem', 'Segredo', 'uid', 'R$']) assert.ok(!txt.includes(proibido), `vazou para o cliente: ${proibido}`);
+  assert.ok(cl.some(x => x.acao === 'editou_tarefa' && x.detalhe === 'Levantar')); assert.ok(cl.some(x => x.acao === 'editou_projeto' && x.diff.some(y => y.campo === 'Nome' && y.para === 'Projeto Log 2')));
+  assert.ok(!cl.some(x => ['abriu_projeto', 'login', 'ativou_cliente', 'alterou_acesso_cliente'].includes(x.acao)));
+  // atividade interna que passa a ser visível: o cliente vê como nova atividade
+  await call('PATCH', '/api/tarefas/' + I_, { interna: false }, EQ); cl = await hist(k); assert.ok(cl.some(x => x.acao === 'criou_tarefa' && x.detalhe === 'Reunião interna'));
+  // pedido ao cliente: registro, "respondeu" limpo ao pedir de novo (regressão)
+  await call('PATCH', '/api/tarefas/' + A_, { aguardaCliente: true, pedido: 'Envie o contrato' }, EQ); assert.ok((await hist(k)).some(x => x.acao === 'pediu_cliente' && x.diff[0].para === 'Envie o contrato'));
+  await call('POST', `/api/tarefas/${A_}/itens`, { texto: 'Segue' }, k); const tv = async () => (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas.find(x => x.id === A_);
+  assert.ok((await tv()).respondidoEm); await call('PATCH', '/api/tarefas/' + A_, { aguardaCliente: false }, EQ); assert.strictEqual((await tv()).respondidoEm, null);
+  await call('PATCH', '/api/tarefas/' + A_, { aguardaCliente: true, pedido: 'Agora o anexo' }, EQ); assert.strictEqual((await tv()).respondidoEm, null); // novo pedido começa sem "respondeu"
+  // o que o cliente faz fica registrado para a equipe (sem repetir a cada recarga)
+  await call('GET', '/api/projetos/' + p.id, null, k); await call('GET', '/api/projetos/' + p.id, null, k); await call('GET', `/api/tarefas/${A_}/itens`, null, k); await call('GET', `/api/tarefas/${A_}/itens`, null, k);
+  const ac = (await call('GET', `/api/projetos/${p.id}/historico?cat=acessos`, null, EQ)).j.itens; assert.strictEqual(ac.filter(x => x.acao === 'abriu_projeto' && x.quem === 'Vera Lopes').length, 1); assert.strictEqual(ac.filter(x => x.acao === 'abriu_atividade' && x.detalhe === 'Levantar').length, 1);
+  assert.ok((await hist(k)).some(x => x.acao === 'comentou' && x.quem === 'Vera Lopes')); // o que o cliente enviou ele mesmo vê
+  // excluir atividade registra dependências afetadas
+  await call('DELETE', '/api/tarefas/' + A_, null, EQ); eq = await hist(EQ); assert.ok(eq.some(x => x.acao === 'excluiu_tarefa' && x.detalhe === 'Levantar')); assert.ok(eq.some(x => x.acao === 'editou_tarefa' && x.detalhe === 'Configurar' && x.diff.some(y => y.campo === 'Dependências' && y.para === '—')));
+  // tela de log da equipe: filtros, CSV, permissões e arquivo permanente
+  const f = (qs) => call('GET', '/api/logs?' + qs, null, EQ);
+  assert.ok((await f(`projeto=${p.id}&tipo=cliente&cat=acessos`)).j.logs.every(x => x.tipo === 'cliente' && x.categoria === 'acessos'));
+  assert.ok((await f('q=Vera+Lopes')).j.logs.length > 0); assert.strictEqual((await f('q=naoexisteesseTermo')).j.logs.length, 0); assert.strictEqual((await call('GET', '/api/logs', null, k)).s, 403);
+  await call('PATCH', '/api/projetos/' + p.id, { nome: '=HYPERLINK("x")' }, EQ);
+  const csv = await fetch(base + `/api/logs.csv?projeto=${p.id}`, { headers: EQ }); assert.strictEqual(csv.status, 200); assert.match(csv.headers.get('content-type'), /text\/csv/); const bytes = Buffer.from(await csv.arrayBuffer()); assert.deepStrictEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]); /* BOM p/ o Excel */ const ct = bytes.toString('utf8'); assert.ok(ct.includes('Data/hora;Quem')); assert.ok(ct.includes("'=HYPERLINK")); assert.ok(!/;=HYPERLINK/.test(ct));
+  assert.strictEqual((await fetch(base + '/api/logs.csv', { headers: k })).status, 403);
+  await new Promise(r => setTimeout(r, 150)); const arq = fs2.readFileSync(require('path').join(process.env.DATA_DIR, 'auditoria.jsonl'), 'utf8'); assert.ok(arq.includes('"acao":"editou_tarefa"') && arq.includes('"Início"'));
+  assert.strictEqual((await call('GET', `/api/projetos/${p.id}/historico`)).s, 401);
+});
+
+test('excluir atividade e projeto funciona (DELETE sem corpo) e respeita permissões', async () => {
+  const p = (await call('POST', '/api/projetos', { nome: 'Para excluir' }, EQ)).j.projeto;
+  const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Tarefa', inicio: '2030-01-01', fim: '2030-01-02' }, EQ)).j.tarefa;
+  assert.strictEqual((await fetch(base + '/api/tarefas/' + t, { method: 'DELETE', headers: EQ })).status, 200);
+  assert.strictEqual((await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas.length, 0);
+  assert.strictEqual((await fetch(base + '/api/projetos/' + p.id, { method: 'DELETE', headers: MEMBRO })).status, 403); // só administrador
+  assert.strictEqual((await fetch(base + '/api/projetos/' + p.id, { method: 'DELETE', headers: EQ })).status, 200);
+  assert.strictEqual((await call('GET', '/api/projetos/' + p.id, null, EQ)).s, 404);
+  assert.strictEqual((await fetch(base + '/api/projetos/' + p.id, { method: 'DELETE' })).status, 401); // anônimo
+  assert.strictEqual((await fetch(base + '/api/tarefas/' + t, { method: 'DELETE', headers: { ...EQ, 'sec-fetch-site': 'cross-site' } })).status, 403); // outro site
 });

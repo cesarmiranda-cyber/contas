@@ -20,7 +20,8 @@ function createStore(dir) {
   try { secret = fs.readFileSync(sf, 'utf8').trim(); } catch { secret = crypto.randomBytes(32).toString('hex'); fs.writeFileSync(sf, secret, { mode: 0o600 }); }
   const log = (quem, tipo, acao, detalhe = '', projetoId = null, extra = {}) => {
     db.logs.push({ id: id(), ts: agora(), quem, tipo, acao, detalhe: String(detalhe).slice(0, 300), projetoId, ...extra });
-    if (db.logs.length > 5000) db.logs.splice(0, db.logs.length - 5000);
+    fs.appendFile(path.join(dir, 'auditoria.jsonl'), JSON.stringify(db.logs[db.logs.length - 1]) + '\n', { mode: 0o600 }, () => {}); // trilha permanente, nunca apagada
+    if (db.logs.length > 20000) db.logs.splice(0, db.logs.length - 20000);
     save();
   };
   return { db, save, flush, id, agora, log, secret, dir, file: n => path.join(dir, 'files', n) };
