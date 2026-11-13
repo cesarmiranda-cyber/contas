@@ -308,3 +308,28 @@ test('permissões: o cliente não altera prazos, atividades nem projetos; só a 
   assert.strictEqual((await call('PATCH', '/api/tarefas/' + t, { inicio: '2031-01-12', fim: '2031-01-16' }, EQ)).s, 200); // a equipe pode
   assert.strictEqual((await call('GET', '/api/me', null, { 'x-vibe-user-id': 'net_123', 'x-vibe-user-role': 'ADMIN' })).j.usuario, null); // id não numérico nunca é equipe
 });
+
+test('mover antes do que a dependência permite: o app explica e deixa escolher (defasagem, remover, empurrar)', async () => {
+  const mk = async () => { const p = (await call('POST', '/api/projetos', { nome: 'Bloqueio' }, EQ)).j.projeto;
+    const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Reunião', inicio: '2032-01-05', fim: '2032-01-09' }, EQ)).j.tarefa;
+    const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Cadastro', inicio: '2032-01-10', fim: '2032-01-12', deps: [{ de: A_, tipo: 'FS', lag: 100 }] }, EQ)).j.tarefa; // +100d: começa em 20/04
+    const get = async id => (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas.find(x => x.id === id); return { p, A_, B_, get }; };
+  let { p, A_, B_, get } = await mk(); assert.strictEqual((await get(B_)).inicio, '2032-04-19'); // 09/01 + 1 + 100
+  // sem escolha: 409 com o motivo, e nada muda
+  const r = await call('PATCH', '/api/tarefas/' + B_, { inicio: '2032-01-15', fim: '2032-01-17' }, EQ); assert.strictEqual(r.s, 409); assert.strictEqual(r.j.codigo, 'BLOQUEADA_POR_DEPENDENCIA'); assert.strictEqual(r.j.minimo, '2032-04-19'); assert.strictEqual(r.j.inicio, '2032-01-15');
+  assert.deepStrictEqual(r.j.motivos.map(x => [x.nome, x.tipo, x.lag, x.base]), [['Reunião', 'FS', 100, '2032-01-10']]); assert.strictEqual((await get(B_)).inicio, '2032-04-19');
+  // mover mais tarde ou mudar só o término não é bloqueio
+  assert.strictEqual((await call('PATCH', '/api/tarefas/' + B_, { inicio: '2032-04-25', fim: '2032-04-26' }, EQ)).s, 200); assert.strictEqual((await call('PATCH', '/api/tarefas/' + B_, { fim: '2032-04-30' }, EQ)).s, 200);
+  // "mesmo assim": a data pedida vale e a defasagem se ajusta (a dependência continua)
+  assert.strictEqual((await call('PATCH', '/api/tarefas/' + B_, { inicio: '2032-01-15', fim: '2032-01-17', dependencia: 'defasagem' }, EQ)).s, 200); let b = await get(B_); assert.deepStrictEqual([b.inicio, b.fim], ['2032-01-15', '2032-01-17']); assert.deepStrictEqual(b.deps.map(x => [x.de, x.tipo, x.lag]), [[A_, 'FS', 5]]);
+  const hist = (await call('GET', `/api/projetos/${p.id}/historico`, null, EQ)).j.itens; assert.ok(hist.some(x => x.diff.some(y => y.campo === 'Dependências' && y.de.includes('+100d') && y.para.includes('+5d')))); // fica registrado
+  await call('PATCH', '/api/tarefas/' + B_, { inicio: '2032-01-08', fim: '2032-01-09', dependencia: 'defasagem' }, EQ); b = await get(B_); assert.strictEqual(b.inicio, '2032-01-08'); assert.strictEqual(b.deps[0].lag, -2); // antecipa (defasagem negativa)
+  // "remover a dependência"
+  ({ p, A_, B_, get } = await mk()); assert.strictEqual((await call('PATCH', '/api/tarefas/' + B_, { inicio: '2032-01-15', fim: '2032-01-17', dependencia: 'remover' }, EQ)).s, 200); b = await get(B_); assert.deepStrictEqual([b.inicio, b.deps.length], ['2032-01-15', 0]);
+  // "empurrar": aceita a data mínima (comportamento antigo)
+  ({ p, A_, B_, get } = await mk()); assert.strictEqual((await call('PATCH', '/api/tarefas/' + B_, { inicio: '2032-01-15', fim: '2032-01-17', dependencia: 'empurrar' }, EQ)).s, 200); b = await get(B_); assert.strictEqual(b.inicio, '2032-04-19'); assert.strictEqual(b.deps[0].lag, 100);
+  // defasagem impossível (< -365) é recusada; cliente não usa isso
+  ({ p, A_, B_, get } = await mk()); assert.strictEqual((await call('PATCH', '/api/tarefas/' + B_, { inicio: '2030-01-01', fim: '2030-01-02', dependencia: 'defasagem' }, EQ)).s, 400); assert.strictEqual((await get(B_)).inicio, '2032-04-19');
+  // início de tarefa SEM dependência nunca é bloqueado
+  const livre = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Livre', inicio: '2032-06-01', fim: '2032-06-02' }, EQ)).j.tarefa; assert.strictEqual((await call('PATCH', '/api/tarefas/' + livre, { inicio: '2031-01-01', fim: '2031-01-02' }, EQ)).s, 200);
+});

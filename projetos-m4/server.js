@@ -145,6 +145,12 @@ function registraReagendadas(u, ids, antes, causa) {
   for (const id of ids) { if (id === causa.id) continue; const x = db.tarefas.find(y => y.id === id); if (!x) continue; const dx = Audit.diff(antes.get(id) || {}, x, { inicio: 'Início', fim: 'Término' });
     if (dx.length) reg(u, 'reagendada_dependencia', x.nome, x.projetoId, { tarefaId: x.id, interna: !!x.interna, diff: dx, motivo: `por causa da atividade “${causa.nome}”` }); }
 }
+// Dependências que impedem a atividade de começar na data pedida (início mínimo = fim da anterior + 1 + defasagem, ou início da anterior + defasagem).
+function depsBloqueio(deps, inicio, todas) {
+  const out = []; for (const d of deps || []) { const p = todas.find(x => x.id === d.de); if (!p) continue; const base = d.tipo === 'SS' ? p.inicio : S.addDays(p.fim, 1), minimo = S.addDays(base, +d.lag || 0);
+    if (inicio < minimo) out.push({ de: p.id, nome: p.nome, tipo: d.tipo, lag: +d.lag || 0, base, minimo, predInicio: p.inicio, predFim: p.fim }); }
+  return out;
+}
 const ajustesDe = ids => ids.map(id => db.tarefas.find(x => x.id === id)).filter(Boolean).map(x => ({ id: x.id, nome: x.nome, inicio: x.inicio, fim: x.fim })); // atividades cujas datas as dependências alteraram
 // ---- rotas --------------------------------------------------------------------
 const R = [];
@@ -214,7 +220,16 @@ rota('POST', '/api/projetos/([0-9a-f]+)/tarefas', async (req, res, m, b, u) => {
 });
 rota('PATCH', '/api/tarefas/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const t = db.tarefas.find(x => x.id === m[1]); if (!t) throw bad(404, 'Tarefa não encontrada.');
-  const d = lerTarefa(b, true); const pedia = !!t.aguardaCliente, antesT = snapT(t), snaps = new Map(tarefasDe(t.projetoId).map(x => [x.id, snapT(x)])); const mudou = aplicarTarefas(t.projetoId, () => Object.assign(t, d));
+  const d = lerTarefa(b, true);
+  // mover para antes do que as dependências permitem: avisa o motivo e deixa a equipe escolher (defasagem, remover ou empurrar)
+  const modo = ['defasagem', 'remover', 'empurrar'].includes(b.dependencia) ? b.dependencia : null; const depsAtuais = d.deps || t.deps || [];
+  if ('inicio' in d && depsAtuais.length) {
+    const bloq = depsBloqueio(depsAtuais, d.inicio, tarefasDe(t.projetoId));
+    if (bloq.length && !modo) throw Object.assign(bad(409, 'Esta atividade depende de outra e não pode começar nessa data.'), { extra: { codigo: 'BLOQUEADA_POR_DEPENDENCIA', inicio: d.inicio, minimo: bloq.map(x => x.minimo).sort().pop(), motivos: bloq } });
+    if (bloq.length && modo === 'remover') d.deps = depsAtuais.filter(x => !bloq.some(y => y.de === x.de));
+    if (bloq.length && modo === 'defasagem') d.deps = depsAtuais.map(x => { const y = bloq.find(z => z.de === x.de); if (!y) return x; const lag = S.diffDays(y.base, d.inicio); if (lag < -365) throw bad(400, 'A defasagem ficaria menor que -365 dias. Remova a dependência.'); return { ...x, lag }; });
+  }
+  const pedia = !!t.aguardaCliente, antesT = snapT(t), snaps = new Map(tarefasDe(t.projetoId).map(x => [x.id, snapT(x)])); const mudou = aplicarTarefas(t.projetoId, () => Object.assign(t, d));
   if (d.aguardaCliente === false) t.respondidoEm = null;
   if (d.aguardaCliente && !pedia) { t.respondidoEm = null; reg(u, 'pediu_cliente', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: [{ campo: 'Pedido ao cliente', de: '—', para: t.pedido || '(sem texto)' }] }); }
   const dt = Audit.diff(antesT, t, Audit.CAMPOS_TAREFA, nomeTarefa).filter(x => !(x.campo === 'Aguardando o cliente' && x.para === 'Sim')); // o pedido já tem registro próprio
@@ -464,7 +479,7 @@ const server = http.createServer(async (req, res) => {
     if (!hit) return send(res, 404, { erro: 'Rota não encontrada.' });
     let b = {}; if (req.method !== 'GET') { if (!mesmaOrigem(req)) throw bad(403, 'Origem não permitida.'); b = await readBody(req, /(itens|mensagens)$/.test(pathname) ? 16e6 : 1e6); }
     await hit[2](req, res, hit[1], b, quem(req));
-  } catch (e) { if (!e.status) console.error(e); send(res, e.status || 500, { erro: e.status ? e.message : 'Erro interno.' }); }
+  } catch (e) { if (!e.status) console.error(e); send(res, e.status || 500, { erro: e.status ? e.message : 'Erro interno.', ...(e.extra || {}) }); }
 });
 if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); setInterval(() => suporte.ciclo(), 2 * 60e3).unref(); setTimeout(() => suporte.ciclo(), 5e3).unref(); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }
 module.exports = { server, store, suporte, bitrix, secrets };

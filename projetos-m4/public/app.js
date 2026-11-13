@@ -12,7 +12,7 @@ function h(tag, attrs, ...kids) {
 }
 const api = async (m, url, body) => {
   const r = await fetch(url, { method: m, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
-  const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.erro || 'Erro inesperado.'), { status: r.status }); return j;
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.erro || 'Erro inesperado.'), { status: r.status, dados: j }); return j;
 };
 const fmt = s => s ? s.split('-').reverse().join('/') : '';
 const fmtTs = s => new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -255,8 +255,9 @@ function gantt(p) {
     const a = pos.get(d.de), b = pos.get(t.id); if (!a) continue; const ya = 48 + a.i * RH + RH / 2, yb = 48 + b.i * RH + RH / 2;
     const [x1, x2] = d.tipo === 'SS' ? [a.l, b.l] : [a.r, b.l]; const mx = d.tipo === 'SS' ? Math.min(x1, x2) - 10 : x1 + 8;
     const path = document.createElementNS(NS, 'path'); path.setAttribute('d', `M${x1},${ya} H${mx} V${yb} H${x2 - 1}`); path.setAttribute('fill', 'none'); path.setAttribute('stroke', '#7d8aa8'); path.setAttribute('stroke-width', '1.5'); path.setAttribute('marker-end', 'url(#ar)'); svg.append(path);
+    if (eq && d.lag) { const tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', Math.max(x1, x2 - 8)); tx.setAttribute('y', yb - 5); tx.setAttribute('text-anchor', 'end'); tx.setAttribute('class', 'dep-lag'); tx.textContent = `${d.lag > 0 ? '+' : ''}${d.lag}d`; svg.append(tx); }
     if (eq) { const hit = document.createElementNS(NS, 'path'); hit.setAttribute('d', path.getAttribute('d')); hit.setAttribute('class', 'dep-hit'); hit.style.pointerEvents = 'stroke'; hit.setAttribute('role', 'button'); hit.setAttribute('aria-label', 'Dependência: clique para alterar ou remover');
-      const tit = document.createElementNS(NS, 'title'); tit.textContent = 'Clique para alterar ou remover esta dependência'; hit.append(tit); hit.addEventListener('click', () => menuDep(p, ts.find(y => y.id === d.de), t, d)); svg.append(hit); }
+      const tit = document.createElementNS(NS, 'title'); tit.textContent = `${ts.find(y => y.id === d.de) ? ts.find(y => y.id === d.de).nome : ''} → ${t.nome} · ${d.tipo === 'SS' ? 'começam juntas' : 'termina → começa'}${d.lag ? `, defasagem ${d.lag > 0 ? '+' : ''}${d.lag} dia(s)` : ''}. Clique para alterar ou remover.`; hit.append(tit); hit.addEventListener('click', () => menuDep(p, ts.find(y => y.id === d.de), t, d)); svg.append(hit); }
   }
   juntar(cv, svg, h('div', { class: 'g-hoje', style: `left:${x(p.hoje) + DW / 2}px` }));
   for (const t of ts) {
@@ -273,6 +274,31 @@ function gantt(p) {
     ts.map(t => h('div', { class: 'g-nome', title: t.nome, onclick: () => drawer(p, t) }, h('i', { class: 'dot ' + t.status.cor }), h('span', {}, t.nome))));
   const sc = h('div', { class: 'g-scroll' }, cv); setTimeout(() => { sc.scrollLeft = view.scrollX != null ? view.scrollX : Math.max(0, x(p.hoje) - 160); sc.addEventListener('scroll', () => { view.scrollX = sc.scrollLeft; }); }, 0); // mantém a posição após cada ajuste
   return h('div', { class: 'gantt' }, nomes, sc);
+}
+// Salva datas/campos de uma atividade. Se as dependências impedem a data pedida, explica o motivo e deixa escolher o que fazer.
+async function patchTarefa(t, body) {
+  try { const r = await api('PATCH', '/api/tarefas/' + t.id, body); avisaAjustes(r.ajustes); return true; }
+  catch (e) {
+    if (!(e.dados && e.dados.codigo === 'BLOQUEADA_POR_DEPENDENCIA')) throw e;
+    const modo = await dialogoBloqueio(t, body, e.dados); if (!modo) return false;
+    const r = await api('PATCH', '/api/tarefas/' + t.id, { ...body, dependencia: modo }); avisaAjustes(r.ajustes); if (modo === 'defasagem') toast('Data mantida. A defasagem da dependência foi ajustada.', 5000); return true;
+  }
+}
+function dialogoBloqueio(t, pedido, d) {
+  return new Promise(resolve => {
+    const v = overlay(true); let resolvido = false; const fim = x => { if (resolvido) return; resolvido = true; v.remove(); resolve(x); }; v.addEventListener('mousedown', e => { if (e.target === v) fim(null); });
+    const sinal = n => (n > 0 ? '+' : '') + n; const novaLag = m => Math.round((Date.parse(pedido.inicio) - Date.parse(m.base)) / DAY);
+    const opcao = (rot, desc, cls, modo) => h('button', { class: 'opcao ' + cls, onclick: () => fim(modo) }, h('b', {}, rot), h('span', { class: 'small' }, desc));
+    juntar(v, h('div', { class: 'modal', style: 'max-width:580px' }, h('h2', {}, 'Esta atividade depende de outra'),
+      h('p', {}, `“${t.nome}” não pode começar em `, h('b', {}, fmt(pedido.inicio)), '. A data mais cedo permitida é ', h('b', {}, fmt(d.minimo)), ', porque:'),
+      h('ul', { class: 'diff' }, d.motivos.map(m => h('li', {}, `depende de “${m.nome}” (${m.tipo === 'SS' ? 'começam juntas' : 'só começa quando termina'}; ${m.tipo === 'SS' ? 'a anterior começa' : 'a anterior termina'} em ${fmt(m.tipo === 'SS' ? m.predInicio : m.predFim)}) com defasagem de `, h('b', {}, `${sinal(m.lag)} dia(s)`), '.'))),
+      h('p', { class: 'muted small' }, 'O que você quer fazer?'),
+      h('div', { class: 'opcoes' },
+        opcao(`Começar em ${fmt(pedido.inicio)} mesmo assim`, `A dependência continua, com defasagem de ${d.motivos.map(m => sinal(novaLag(m)) + ' dia(s)').join(' e ')}.`, 'pri', 'defasagem'),
+        opcao('Remover a dependência', 'A atividade fica livre para ser movida.', '', 'remover'),
+        opcao(`Começar em ${fmt(d.minimo)}`, 'Respeita a dependência como está.', '', 'empurrar'),
+        h('button', { class: 'btn', onclick: () => fim(null) }, 'Cancelar'))));
+  });
 }
 let arrastando = false;
 // Cria dependência arrastando do círculo de uma atividade até outra: círculo do fim = a outra só começa quando esta terminar; círculo do início = começam juntas.
@@ -335,7 +361,7 @@ function arrasto(b, t, p, DW) {
     const cancela = () => { limpa(); volta(); };
     const solta = async () => {
       limpa(); if (!moveu) return drawer(p, t); if (delta === 0) return volta();
-      const [i, f] = novas(); try { const r = await api('PATCH', '/api/tarefas/' + t.id, { inicio: i, fim: f }); avisaAjustes(r.ajustes); } catch (err) { toast(err.message, 6000); } render();
+      const [i, f] = novas(); try { await patchTarefa(t, { inicio: i, fim: f }); } catch (err) { toast(err.message, 6000); } render();
     };
     b.addEventListener('pointermove', mover); b.addEventListener('pointerup', solta); b.addEventListener('pointercancel', cancela);
   });
@@ -419,13 +445,13 @@ function modalTarefa(p, t) {
   const depsBox = h('div'); const pintaDeps = () => depsBox.replaceChildren(...deps.map((d, i) => h('div', { class: 'row', style: 'margin:6px 0' },
     h('select', { onchange: e => d.de = e.target.value }, outras.map(o => h('option', { value: o.id, selected: o.id === d.de }, o.nome))),
     h('select', { style: 'width:auto', onchange: e => d.tipo = e.target.value }, [['FS', 'Espera terminar'], ['SS', 'Começa junto']].map(([k, tt]) => h('option', { value: k, selected: k === d.tipo }, tt))),
-    h('input', { type: 'number', style: 'width:80px', value: d.lag, title: 'Defasagem em dias', onchange: e => d.lag = +e.target.value }), h('button', { class: 'btn sm', onclick: () => { deps.splice(i, 1); pintaDeps(); } }, '✕')))); pintaDeps();
+    h('input', { type: 'number', style: 'width:80px', value: d.lag, min: -365, max: 365, title: 'Defasagem em dias: 0 = sem espera; 5 = espera mais 5 dias; negativo = adianta', onchange: e => d.lag = +e.target.value }), h('span', { class: 'muted small' }, 'dia(s) de defasagem'), h('button', { class: 'btn sm', onclick: () => { deps.splice(i, 1); pintaDeps(); } }, '✕')))); pintaDeps();
   juntar(v, h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, 'Duração (dias)'), f.dur), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
-    h('label', {}, 'Descrição'), f.desc, h('label', {}, 'Dependências (as datas se ajustam sozinhas)'), depsBox, outras.length > 0 && h('button', { class: 'btn sm', onclick: () => { deps.push({ de: outras[0].id, tipo: 'FS', lag: 0 }); pintaDeps(); } }, '+ Dependência'),
+    h('label', {}, 'Descrição'), f.desc, h('label', {}, 'Dependências (as datas se ajustam sozinhas) · defasagem: 0 = sem espera, 5 = espera mais 5 dias, negativo = adianta'), depsBox, outras.length > 0 && h('button', { class: 'btn sm', onclick: () => { deps.push({ de: outras[0].id, tipo: 'FS', lag: 0 }); pintaDeps(); } }, '+ Dependência'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.interna, 'Atividade interna (o cliente não vê)'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.aguarda, 'Aguardando o cliente (aparece em “Precisamos de você” para ele)'), f.pedido, err,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => {
-      try { const b = { nome: f.nome.value, inicio: f.inicio.value, fim: f.fim.value, progresso: f.prog.value, responsavel: f.resp.value, descricao: f.desc.value, interna: f.interna.checked, aguardaCliente: f.aguarda.checked, pedido: f.pedido.value, deps }; const r = t ? await api('PATCH', '/api/tarefas/' + t.id, b) : await api('POST', `/api/projetos/${p.id}/tarefas`, b); v.remove(); avisaAjustes(r.ajustes); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
+      try { const b = { nome: f.nome.value, inicio: f.inicio.value, fim: f.fim.value, progresso: f.prog.value, responsavel: f.resp.value, descricao: f.desc.value, interna: f.interna.checked, aguardaCliente: f.aguarda.checked, pedido: f.pedido.value, deps }; if (t) { if (!(await patchTarefa(t, b))) return; } else { const r = await api('POST', `/api/projetos/${p.id}/tarefas`, b); avisaAjustes(r.ajustes); } v.remove(); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
     } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), t && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir esta atividade?')) { await api('DELETE', '/api/tarefas/' + t.id); v.remove(); render(); } } }, 'Excluir'))));
 }
 
