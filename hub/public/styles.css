@@ -168,3 +168,8 @@ button.step { border: 0; font: inherit; cursor: default; } button.step.done { cu
 .modal { background: #fff; border-radius: 16px; padding: 24px; width: min(440px, 100%); box-shadow: 0 30px 80px rgba(0,0,0,.3); } .modal h3 { font-size: 19px; margin-bottom: 8px; }
 .f > .btn { align-self: end; justify-content: center; }
 @media (max-width: 720px) { #toasts { left: 50%; transform: translateX(-50%); width: calc(100vw - 32px); } }
+
+label.f.chk > span { display: flex; align-items: center; gap: 10px; font-weight: 600; padding-top: 28px; } label.f.chk input { width: 18px; height: 18px; accent-color: var(--navy); }
+label.f.wide { grid-column: 1 / -1; }
+details.more > summary { cursor: pointer; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
+select.in { appearance: auto; }

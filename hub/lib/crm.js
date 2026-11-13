@@ -66,8 +66,96 @@ function normContact(r) {
   };
 }
 
-function createCrm(vibe) {
+// Campos do formulário do Bitrix24 (editáveis), lidos do schema do portal.
+const STATUS_ENTITY = {
+  companies: { typeId: 'COMPANY_TYPE', industry: 'INDUSTRY', employees: 'EMPLOYEES' },
+  contacts: { typeId: 'CONTACT_TYPE', sourceId: 'SOURCE' },
+};
+const BASE_SKIP = ['id', 'title', 'phone', 'email', 'web', 'im', 'fm', 'createdTime', 'createdById', 'modifyById', 'updatedTime', 'leadId', 'originatorId', 'originId', 'originVersion', 'hasPhone', 'hasEmail', 'hasImol', 'isReturnCustomer', 'searchContentHash', 'webformId', 'lastActivityTime', 'lastActivityBy', 'utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm'];
+const SKIP = {
+  companies: new Set([...BASE_SKIP, 'logo', 'bankingDetails', 'address', 'addressLegal', 'registeredAddress']),
+  contacts: new Set([...BASE_SKIP, 'name', 'lastName', 'secondName', 'post', 'companyId', 'companyIds', 'photo', 'honorific', 'faceId', 'exportFlag']),
+};
+const lc = (o, a, b) => o?.[a] ?? o?.[b];
+const dateOnly = (v) => (v ? String(v).slice(0, 10) : '');
+function fieldKind(key, f) {
+  if (key === 'assignedById') return 'user';
+  if (f.multiple) return null;
+  if (f.options?.length) return 'select';
+  const t = String(f.type || '').toLowerCase();
+  if (t === 'boolean' || t === 'char') return 'bool';
+  if (['integer', 'double', 'float', 'number'].includes(t)) return 'number';
+  if (t === 'date') return 'date';
+  if (['string', 'text', 'url'].includes(t)) return key === 'comments' || t === 'text' ? 'textarea' : 'text';
+  return null;
+}
+
+function createCrm(vibe, shared = {}) {
+  const cache = shared.cache || (shared.cache = {});
   let schemaPromise = null;
+  const fixedKeys = new Set(Object.values(F));
+
+  async function loadOptions(entity, key, f) {
+    const items = f.items || f.options;
+    if (Array.isArray(items) && items.length) return items.map((i) => ({ value: String(lc(i, 'ID', 'id') ?? lc(i, 'VALUE', 'value')), label: str(lc(i, 'VALUE', 'value') ?? lc(i, 'name', 'NAME')) })).filter((o) => o.label);
+    const st = STATUS_ENTITY[entity]?.[key];
+    if (!st) return [];
+    try {
+      return rows(await vibe.get('/statuses', { 'filter[entityId]': st })).map((i) => ({ value: str(lc(i, 'statusId', 'STATUS_ID')), label: str(lc(i, 'name', 'NAME')) })).filter((o) => o.value && o.label);
+    } catch { return []; }
+  }
+  // Lista de campos do formulário: { key, label, kind, options?, mandatory }
+  async function formFields(entity) {
+    const hit = cache[entity];
+    if (hit && Date.now() - hit.at < 10 * 60_000) return hit.list;
+    const res = one(await vibe.get(`/${entity}/fields`));
+    const fields = res?.fields || {};
+    const list = [];
+    for (const [key, f] of Object.entries(fields)) {
+      if (f.readonly || SKIP[entity].has(key) || fixedKeys.has(key)) continue;
+      const withOpts = { ...f, options: await loadOptions(entity, key, f) };
+      const kind = fieldKind(key, withOpts);
+      if (!kind) continue;
+      list.push({ key, label: str(f.label || f.title || key), kind, options: withOpts.options, mandatory: !!(f.mandatory || f.required) });
+    }
+    list.sort((a, b) => (a.key === 'assignedById' ? -1 : b.key === 'assignedById' ? 1 : 0));
+    cache[entity] = { at: Date.now(), list };
+    return list;
+  }
+  function coerce(kind, v) {
+    if (v === null || v === undefined || v === '') return '';
+    if (kind === 'number') { const n = Number(String(v).replace(',', '.')); if (Number.isNaN(n)) throw bad('Há um campo numérico com valor inválido.'); return n; }
+    if (kind === 'bool') return v === true || v === 'true' || v === 'Y';
+    if (kind === 'date') { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v))) throw bad('Data inválida.'); return String(v); }
+    return str(v, 5000);
+  }
+  async function pickCampos(entity, campos) {
+    if (!campos || typeof campos !== 'object') return {};
+    const list = await formFields(entity), out = {};
+    for (const f of list) {
+      if (!(f.key in campos)) continue;
+      const v = coerce(f.kind === 'user' ? 'number' : f.kind, campos[f.key]);
+      if (f.mandatory && v === '') throw bad(`Preencha o campo “${f.label}”.`);
+      out[f.key] = v;
+    }
+    return out;
+  }
+  async function valuesOf(entity, raw) {
+    const list = await formFields(entity), out = {};
+    for (const f of list) {
+      const v = raw[f.key];
+      out[f.key] = f.kind === 'date' ? dateOnly(v) : f.kind === 'bool' ? (v === true || v === 'Y') : v === null || v === undefined ? '' : (typeof v === 'object' ? '' : String(v));
+    }
+    return out;
+  }
+  async function listUsers() {
+    if (cache.users && Date.now() - cache.users.at < 5 * 60_000) return cache.users.list;
+    const list = rows(await vibe.get('/users', { limit: 200 })).filter((u) => u.active !== false && u.active !== 'N')
+      .map((u) => ({ id: Number(u.id), nome: str(u.fullName || [u.name, u.lastName].filter(Boolean).join(' ') || u.email || `Usuário ${u.id}`) }))
+      .filter((u) => u.id).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    cache.users = { at: Date.now(), list };
+    return list;
+  }
 
   async function ensureEntityFields(entity, wanted) {
     const existing = new Set(rows(await vibe.get(`/userfields/${entity}`)).map((f) => String(f.fieldName || f.FIELD_NAME || '').toUpperCase()));
@@ -81,11 +169,12 @@ function createCrm(vibe) {
   }
   // Idempotente; em caso de falha, tenta de novo na próxima chamada.
   function ensureSchema() {
+    if (shared.schemaPromise) return shared.schemaPromise;
     if (!schemaPromise) {
-      schemaPromise = (async () => ({
+      schemaPromise = shared.schemaPromise = (async () => ({
         companies: await ensureEntityFields('companies', COMPANY_FIELDS),
         contacts: await ensureEntityFields('contacts', CONTACT_FIELDS),
-      }))().catch((e) => { schemaPromise = null; throw e; });
+      }))().catch((e) => { schemaPromise = shared.schemaPromise = null; throw e; });
     }
     return schemaPromise;
   }
@@ -123,6 +212,8 @@ function createCrm(vibe) {
     const data = one(res);
     const company = normCompany(data);
     company.contatos = (data._included?.contacts || []).map(normContact);
+    company.responsavelId = data.assignedById ?? null;
+    company.valores = await valuesOf('companies', data).catch(() => ({}));
     return company;
   }
 
@@ -183,7 +274,7 @@ function createCrm(vibe) {
       const dup = await findByCnpj(empresa.cnpj);
       if (dup) throw new HubError(409, 'CNPJ_DUPLICATE', `Já existe um cadastro com este CNPJ: ${dup.title}.`);
     }
-    const payload = companyPayload(empresa);
+    const payload = { ...companyPayload(empresa), ...(await pickCampos('companies', empresa.campos)) };
     contatos.forEach((c) => { if (!c.contactId) contactPayload(c); });   // valida tudo antes de gravar qualquer coisa
     const res = await vibe.post('/companies', { typeId: 'CUSTOMER', ...payload });
     const companyId = Number(one(res).id);
@@ -202,7 +293,7 @@ function createCrm(vibe) {
       const dup = await findByCnpj(empresa.cnpj);
       if (dup && dup.id !== Number(id)) throw new HubError(409, 'CNPJ_DUPLICATE', `Este CNPJ já pertence a ${dup.title}.`);
     }
-    const p = companyPayload({ ...empresa, telefones: undefined, emails: undefined, sites: undefined }, { requireTitle: false });
+    const p = { ...companyPayload({ ...empresa, telefones: undefined, emails: undefined, sites: undefined }, { requireTitle: false }), ...(await pickCampos('companies', empresa.campos)) };
     if (!p.title) delete p.title;
     const fm = {};
     if (empresa.telefones || empresa.emails) {
@@ -223,6 +314,7 @@ function createCrm(vibe) {
     await ensureSchema();
     const p = contactPayload({ ...spec, telefones: undefined, emails: undefined, telefone: undefined, email: undefined });
     delete p.companyId;
+    Object.assign(p, await pickCampos('contacts', spec.campos));
     const fm = {};
     if (spec.telefones || spec.emails) {
       const cur = one(await vibe.get(`/contacts/${Number(id)}`, { select: 'id,phone,email' }));
@@ -234,7 +326,11 @@ function createCrm(vibe) {
     if (!str(spec.cargo)) p.post = '';
     if (!str(spec.cpf)) p[F.cpf] = '';
     await vibe.patch(`/contacts/${Number(id)}`, p);
-    return normContact(one(await vibe.get(`/contacts/${Number(id)}`)));
+    return getContact(id);
+  }
+  async function getContact(id) {
+    const raw = one(await vibe.get(`/contacts/${Number(id)}`));
+    return { ...normContact(raw), responsavelId: raw.assignedById ?? null, valores: await valuesOf('contacts', raw).catch(() => ({})) };
   }
   async function deleteContact(id) { await vibe.del(`/contacts/${Number(id)}`); }
 
@@ -254,7 +350,7 @@ function createCrm(vibe) {
     await vibe.del(`/companies/${Number(companyId)}/contacts/${Number(contactId)}`);
   }
 
-  return { updateContact, deleteCompany, deleteContact, ensureSchema, listCompanies, findByCnpj, getCompany, createCompany, updateCompany, addContact, unlinkContact, searchContacts };
+  return { formFields, listUsers, getContact, updateContact, deleteCompany, deleteContact, ensureSchema, listCompanies, findByCnpj, getCompany, createCompany, updateCompany, addContact, unlinkContact, searchContacts };
 }
 
 module.exports = { createCrm, HubError, F, normCompany, normContact, COMPANY_FIELDS, CONTACT_FIELDS };

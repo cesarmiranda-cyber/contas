@@ -127,3 +127,24 @@ test('CRM: editar empresa/contato (trocar, apagar e adicionar telefone/e-mail) e
   assert.equal(db.companies.length, 0);
   await assert.rejects(crm.getCompany(r.id), { status: 404 });
 });
+
+test('Campos do formulário do Bitrix: schema dinâmico, responsável e atualização filtrada', async () => {
+  const { vibe, db } = createMockVibe(false);
+  const crm = createCrm(vibe);
+  const fields = await crm.formFields('companies');
+  const keys = fields.map((f) => f.key);
+  assert.equal(keys[0], 'assignedById');                                  // responsável primeiro
+  for (const k of ['typeId', 'industry', 'revenue', 'opened', 'comments', 'ufCrmContrato']) assert.ok(keys.includes(k), k);
+  for (const k of ['id', 'title', 'createdTime', 'logo', 'ufCrmTags', 'ufCrmHubCnpj']) assert.ok(!keys.includes(k), `não deveria listar ${k}`);
+  assert.deepEqual(fields.find((f) => f.key === 'typeId').options.map((o) => o.value), ['CUSTOMER', 'PARTNER']);
+  assert.deepEqual((await crm.listUsers()).map((u) => u.nome), ['Ana Silva', 'Bruno Costa']);   // inativo fora
+  const r = await crm.createCompany({ empresa: { title: 'Acme', cnpj: '11222333000181', campos: { assignedById: 7, industry: 'LAW' } } });
+  const c = await crm.getCompany(r.id);
+  assert.equal(c.responsavelId, 7); assert.equal(c.valores.industry, 'LAW');
+  const u = await crm.updateCompany(r.id, { campos: { assignedById: '1', revenue: '1500,50', opened: true, ufCrmContrato: '2026-05-01', id: 999, createdTime: 'x', ufCrmHubCnpj: 'hack' } });
+  assert.equal(u.responsavelId, 1); assert.equal(u.valores.revenue, '1500.5'); assert.equal(u.valores.opened, true); assert.equal(u.valores.ufCrmContrato, '2026-05-01');
+  assert.equal(db.companies[0].id, r.id);                                // campos de sistema ignorados
+  assert.equal(u.cnpj, '11.222.333/0001-81');
+  await assert.rejects(crm.updateCompany(r.id, { campos: { revenue: 'abc' } }), /numérico/);
+  await assert.rejects(crm.updateCompany(r.id, { campos: { ufCrmContrato: '01/05/2026' } }), /Data inválida/);
+});

@@ -80,6 +80,47 @@ function confirmDialog({ title, message, confirm = 'Confirmar', danger = true })
     document.addEventListener('keydown', key, true); document.body.append(w); w.querySelector('[data-r="0"]').focus();
   });
 }
+/* ---------- campos dinâmicos do formulário do Bitrix24 ---------- */
+const dynCache = {};
+async function loadForm(entity) {
+  if (!dynCache[entity]) {
+    const items = (await api(`/api/fields/${entity}`)).items;
+    dynCache[entity] = { items, users: items.some((f) => f.kind === 'user') ? (await api('/api/users').catch(() => ({ items: [] }))).items : [] };
+  }
+  return dynCache[entity];
+}
+function dynInput(f, users, value) {
+  const k = esc(f.key), req = f.mandatory ? ' required' : '';
+  if (f.kind === 'bool') return `<label class="f chk"><span><input type="checkbox" data-dk="${k}" ${value === true ? 'checked' : ''}> ${esc(f.label)}</span></label>`;
+  let inner;
+  if (f.kind === 'user') {
+    const list = users.some((u) => String(u.id) === String(value)) || !value ? users : [{ id: value, nome: `Usuário ${value}` }, ...users];
+    inner = `<select class="in" data-dk="${k}"${req}>${f.mandatory ? '' : '<option value="">— sem responsável —</option>'}${list.map((u) => `<option value="${u.id}" ${String(u.id) === String(value) ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}</select>`;
+  } else if (f.kind === 'select') {
+    inner = `<select class="in" data-dk="${k}"${req}><option value="">—</option>${f.options.map((o) => `<option value="${esc(o.value)}" ${String(o.value) === String(value) ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
+  } else if (f.kind === 'textarea') inner = `<textarea class="in" data-dk="${k}" rows="2"${req}>${esc(value)}</textarea>`;
+  else inner = `<input class="in" data-dk="${k}" type="${f.kind === 'number' ? 'number" step="any' : f.kind === 'date' ? 'date' : 'text'}" value="${esc(value)}"${req}>`;
+  return `<label class="f${f.kind === 'textarea' ? ' wide' : ''}"><span>${esc(f.label)}${f.mandatory ? ' *' : ''}</span>${inner}</label>`;
+}
+// devolve só o que mudou em relação aos valores originais
+function dynCollect(root, fields, values = {}) {
+  const out = {};
+  for (const f of fields) {
+    const el = root.querySelector(`[data-dk="${f.key}"]`); if (!el) continue;
+    const cur = f.kind === 'bool' ? el.checked : el.value;
+    const old = f.kind === 'bool' ? values[f.key] === true : String(values[f.key] ?? '');
+    if (cur !== old) out[f.key] = cur;
+  }
+  return out;
+}
+function dynDisplay(f, users, v) {
+  if (v === '' || v === undefined || v === null || v === false) return f.kind === 'bool' && v === false ? 'Não' : '';
+  if (f.kind === 'bool') return 'Sim';
+  if (f.kind === 'user') return users.find((u) => String(u.id) === String(v))?.nome || `Usuário ${v}`;
+  if (f.kind === 'select') return f.options.find((o) => String(o.value) === String(v))?.label || String(v);
+  if (f.kind === 'date') return String(v).split('-').reverse().join('/');
+  return String(v);
+}
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
 /* ---------- roteamento ---------- */
@@ -203,6 +244,7 @@ function stepEmpresa(box, w) {
   box.querySelector('#open-existing')?.addEventListener('click', () => { state.wizard = null; go('#/clientes'); openCompany(w.existing.id); });
   box.querySelector('#new-cnpj')?.addEventListener('click', () => { state.wizard = newWizard(); renderWizard(box.closest('main')); });
   bindEmpresaForm(box, w);
+  if (w.empresa && !w.existing) fillResponsavel(box, w);
 
   async function lookup() {
     if (w.status === 'loading') return;
@@ -216,6 +258,16 @@ function stepEmpresa(box, w) {
     } catch (e) { w.status = 'error'; w.msg = e.message; w.errCode = e.code; }
     stepEmpresa(box, w);
   }
+}
+async function fillResponsavel(box, w) {
+  const hold = box.querySelector('#resp-box'); if (!hold) return;
+  try {
+    const { items, users } = await loadForm('companies');
+    const f = items.find((i) => i.kind === 'user'); if (!f) return;
+    if (w.empresa.responsavel === undefined) { const me = state.me?.id; w.empresa.responsavel = users.some((u) => String(u.id) === String(me)) ? String(me) : ''; }
+    hold.innerHTML = `<div class="grid2">${dynInput(f, users, w.empresa.responsavel)}</div>`;
+    hold.querySelector('select').addEventListener('change', (e) => (w.empresa.responsavel = e.target.value));
+  } catch { /* sem usuários: o Bitrix usa o padrão */ }
 }
 function skeletonCard() {
   return `<section class="card card-p" aria-busy="true"><div class="stack"><div class="skel" style="width:40%;height:22px"></div><div class="skel" style="width:70%"></div><div class="grid2"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><p class="small muted">Consultando a Receita Federal e conferindo se o cliente já está cadastrado…</p></div></section>`;
@@ -238,6 +290,7 @@ function empresaForm(w) {
       <label class="f"><span>E-mail</span><input class="in" data-f="email" type="email" value="${esc(e.email)}"></label>
     </div>
     <label class="f"><span>Endereço</span><input class="in" data-f="endereco" value="${esc(e.endereco)}"></label>
+    <div id="resp-box"></div>
     <dl class="kv">
       <div><dt>Atividade principal</dt><dd>${esc(e.cnae) || '—'}</dd></div>
       <div><dt>Porte</dt><dd>${esc(e.porte) || '—'}</dd></div>
@@ -289,7 +342,7 @@ function personRow(c, right = '') {
   const sub = [c.cargo ? esc(c.cargo) : '', tel ? phoneLink(tel) : '', mail ? mailLink(mail) : ''].filter(Boolean).join(' · ');
   return `<div class="person"><span class="avatar" aria-hidden="true">${esc(initials(c.nome))}</span><div class="info"><b>${esc(c.nome)} ${c.contactId ? '<span class="badge info">Já cadastrado</span>' : ''}</b><span>${sub || 'Sem telefone ou e-mail'}</span></div><div class="row" style="gap:4px;flex:none">${right}</div></div>`;
 }
-function contactForm(panel, onSave, init = {}) {
+function contactForm(panel, onSave, init = {}, dynOpts = null) {
   const v = (k) => esc(init[k] ?? '');
   panel.innerHTML = `<form class="card card-p stack" style="box-shadow:none;background:#fafbfd" novalidate>
     <div class="section-t" style="margin:0">${init.nome ? 'Editar contato' : 'Novo contato'}</div>
@@ -300,18 +353,25 @@ function contactForm(panel, onSave, init = {}) {
       <label class="f"><span>E-mail</span><input class="in" name="email" type="email" value="${v('email')}"></label>
       <label class="f"><span>CPF <em>(opcional)</em></span><input class="in" name="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${v('cpf')}"></label>
     </div>
+    <div id="cf-dyn" class="grid2"></div>
     <p class="hint bad" id="cf-err" role="alert"></p>
     <div class="row"><button class="btn primary" type="submit">${init.nome ? 'Salvar alterações' : 'Adicionar contato'}</button><button class="btn ghost" type="button" id="cf-cancel">Cancelar</button></div></form>`;
   const f = panel.querySelector('form');
   f.telefone.addEventListener('input', () => (f.telefone.value = fmtPhone(f.telefone.value)));
   f.cpf.addEventListener('input', () => (f.cpf.value = fmtCpf(f.cpf.value)));
   f.nome.focus();
+  let dyn = { items: [], users: [] }, dynVals = {};
+  if (dynOpts) Promise.all([loadForm('contacts'), api(`/api/contacts/${dynOpts.id}`)]).then(([d, ct]) => {
+    dyn = d; dynVals = ct.valores || {};
+    const box = panel.querySelector('#cf-dyn'); if (box) box.innerHTML = d.items.map((i) => dynInput(i, d.users, dynVals[i.key])).join('');
+  }).catch(() => {});
   panel.querySelector('#cf-cancel').onclick = () => (panel.innerHTML = '');
   f.onsubmit = (e) => {
     e.preventDefault();
     const c = { nome: f.nome.value.trim(), cargo: f.cargo.value.trim(), telefone: f.telefone.value.trim(), email: f.email.value.trim(), cpf: f.cpf.value.trim() };
     const err = !c.nome ? 'Informe o nome do contato.' : c.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email) ? 'E-mail inválido.' : c.cpf && !validCpf(c.cpf) ? 'CPF inválido.' : '';
     if (err) { panel.querySelector('#cf-err').textContent = err; return; }
+    if (dynOpts) c.campos = dynCollect(panel.querySelector('#cf-dyn'), dyn.items, dynVals);
     onSave(c);
   };
 }
@@ -353,6 +413,8 @@ function stepRevisao(box, w) {
     try {
       const empresa = { ...e, cnpj: e.cnpj || undefined, telefones: e.telefone ? [e.telefone] : [], emails: e.email ? [e.email] : [], validadoEm: w.receita ? new Date().toLocaleDateString('pt-BR') : undefined };
       delete empresa.telefone; delete empresa.email;
+      if (e.responsavel) empresa.campos = { assignedById: e.responsavel };
+      delete empresa.responsavel;
       w.result = await api('/api/companies', { method: 'POST', body: { empresa, contatos: w.contatos } });
       w.result.nome = e.title;
     } catch (err) { w.saveErr = err.message; }
@@ -447,6 +509,7 @@ function paintDrawer(dr, c) {
         <div><dt>Atividade principal</dt><dd>${esc(c.cnae) || '—'}</dd></div><div><dt>Porte</dt><dd>${esc(c.porte) || '—'}</dd></div>
         <div><dt>Abertura</dt><dd>${esc(c.abertura) || '—'}</dd></div><div><dt>Validado na Receita</dt><dd>${esc(c.validadoEm) || 'Não validado'}</dd></div>
       </dl>
+      <div id="d-extra"></div>
       ${!c.cnpj ? `<div class="banner warn">${icon('alert')}<div><b>Cadastro sem CNPJ</b>Edite o cadastro e informe o CNPJ para validar este cliente.</div></div>` : ''}
       <div class="row"><button class="btn primary sm" id="d-edit">${icon('pencil')} Editar</button>${state.portal ? `<button class="btn ghost sm" id="d-bx">${icon('ext')} Abrir no Bitrix24</button>` : ''}<button class="btn danger sm" id="d-del" style="margin-left:auto">${icon('trash')} Excluir</button></div>
     </section>
@@ -457,6 +520,11 @@ function paintDrawer(dr, c) {
       <div id="d-panel"></div>
     </section>`;
   body.querySelector('#d-copy')?.addEventListener('click', () => copyText(c.cnpj, 'CNPJ copiado'));
+  loadForm('companies').then(({ items, users }) => {
+    const rowsH = items.map((f) => [f, dynDisplay(f, users, c.valores?.[f.key])]).filter(([, v]) => v);
+    const box = body.querySelector('#d-extra'); if (!box || !rowsH.length) return;
+    box.innerHTML = `<dl class="kv">${rowsH.map(([f, v]) => `<div><dt>${esc(f.label)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
+  }).catch(() => {});
   body.querySelector('#d-edit').onclick = () => { paintDrawerEdit(dr, c); dr.scrollTop = 0; };
   body.querySelector('#d-del').onclick = () => askDeleteCompany(c, dr);
   body.querySelector('#d-bx')?.addEventListener('click', () => openInBitrix(`/crm/company/details/${c.id}/`));
@@ -468,7 +536,7 @@ function paintDrawer(dr, c) {
   body.querySelectorAll('[data-ced]').forEach((b) => (b.onclick = () => {
     const p = c.contatos.find((x) => x.id === +b.dataset.ced);
     contactForm(panel, (ct) => api(`/api/contacts/${p.id}`, { method: 'PATCH', body: { ...ct, telefones: ct.telefone ? [ct.telefone] : [], emails: ct.email ? [ct.email] : [] } })
-      .then(() => api(`/api/companies/${c.id}`)).then((r) => after(r, 'Contato atualizado.'), fail), { ...p, telefone: p.telefones[0] || '', email: p.emails[0] || '' });
+      .then(() => api(`/api/companies/${c.id}`)).then((r) => after(r, 'Contato atualizado.'), fail), { ...p, telefone: p.telefones[0] || '', email: p.emails[0] || '' }, { id: p.id });
     panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }));
   body.querySelectorAll('[data-un]').forEach((b) => (b.onclick = async () => {
@@ -497,9 +565,16 @@ function paintDrawerEdit(dr, c) {
       <label class="f"><span>E-mails <em>(um por linha)</em></span><textarea class="in" name="emails" rows="2">${esc(x.emails)}</textarea></label>
     </div>
     <label class="f"><span>Endereço</span><input class="in" name="endereco" value="${esc(x.endereco)}"></label>
+    <div id="dyn" class="stack"><div class="skel" style="height:44px"></div><p class="small muted">Carregando os demais campos do Bitrix24…</p></div>
     <p class="hint bad" id="e-err" role="alert"></p>
     <div class="row"><button class="btn primary" type="submit" id="e-save">Salvar alterações</button><button class="btn ghost" type="button" id="e-cancel">Cancelar</button></div></form>`;
   const f = body.querySelector('#ef'), err = (m) => (body.querySelector('#e-err').textContent = m);
+  let dyn = { items: [], users: [] };
+  loadForm('companies').then((d) => {
+    dyn = d; const box = body.querySelector('#dyn'); if (!box) return;
+    const resp = d.items.filter((i) => i.kind === 'user'), others = d.items.filter((i) => i.kind !== 'user');
+    box.innerHTML = `${resp.length ? `<div class="grid2">${resp.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div>` : ''}${others.length ? `<details class="more" open><summary>Outros campos do Bitrix24 (${others.length})</summary><div class="grid2" style="margin-top:14px">${others.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div></details>` : ''}`;
+  }).catch((e) => { const box = body.querySelector('#dyn'); if (box) box.innerHTML = `<div class="banner warn">${icon('alert')}<div><b>Não foi possível carregar os demais campos</b>${esc(e.message)} Você ainda pode salvar os dados acima.</div></div>`; });
   f.title.focus();
   f.title.addEventListener('input', () => (body.querySelector('#eh').textContent = f.title.value || 'Sem nome'));
   f.cnpj.addEventListener('input', () => (f.cnpj.value = fmtCnpj(f.cnpj.value)));
@@ -529,7 +604,7 @@ function paintDrawerEdit(dr, c) {
     if (emails.some((m) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m))) return err('Há um e-mail inválido na lista.');
     const btn = body.querySelector('#e-save'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Salvando…';
     try {
-      const empresa = { title: f.title.value.trim(), razaoSocial: f.razaoSocial.value.trim(), cnpj: f.cnpj.value.trim(), endereco: f.endereco.value.trim(), telefones: lines(f.telefones.value), emails, ...extra };
+      const empresa = { title: f.title.value.trim(), razaoSocial: f.razaoSocial.value.trim(), cnpj: f.cnpj.value.trim(), endereco: f.endereco.value.trim(), telefones: lines(f.telefones.value), emails, ...extra, campos: dynCollect(body.querySelector('#dyn'), dyn.items, c.valores) };
       const upd = await api(`/api/companies/${c.id}`, { method: 'PATCH', body: { empresa } });
       syncList(upd); paintDrawer(dr, upd); dr.scrollTop = 0; toast('Cadastro atualizado.');
     } catch (e2) { err(e2.message); btn.disabled = false; btn.textContent = 'Salvar alterações'; }
