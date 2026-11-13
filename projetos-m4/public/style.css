@@ -218,3 +218,6 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 .g-fer{background:rgba(242,106,33,.10)}
 
 .modelo{padding:12px 0;border-top:1px solid var(--linha)}.modelo:first-child{border-top:0}
+
+.callout.ok{background:var(--verde-bg);border-color:#b9e6c9}.callout.ok b{color:#14633a}
+.g-bloco.aprovada::after{content:"✓";position:absolute;right:-6px;top:-6px;width:16px;height:16px;border-radius:50%;background:#fff;color:var(--verde);font-weight:800;font-size:11px;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.3);z-index:6}

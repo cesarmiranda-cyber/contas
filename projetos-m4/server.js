@@ -245,6 +245,7 @@ rota('PATCH', '/api/tarefas/([0-9a-f]+)', async (req, res, m, b, u) => {
     if (bloq.length && modo === 'defasagem') d.deps = depsAtuais.map(x => { const y = bloq.find(z => z.de === x.de); if (!y) return x; const lag = calT.diffUteis(y.base, d.inicio); if (lag < -365) throw bad(400, 'A defasagem ficaria menor que -365 dias. Remova a dependência.'); return { ...x, lag }; });
   }
   const pedia = !!t.aguardaCliente, antesT = snapT(t), snaps = new Map(tarefasDe(t.projetoId).map(x => [x.id, snapT(x)])); const mudou = aplicarTarefas(t.projetoId, () => Object.assign(t, d));
+  if (d.requerAprovacao === false) t.aprovacao = null;
   if (d.aguardaCliente === false) t.respondidoEm = null;
   if (d.aguardaCliente && !pedia) { t.respondidoEm = null; reg(u, 'pediu_cliente', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: [{ campo: 'Pedido ao cliente', de: '—', para: t.pedido || '(sem texto)' }] }); }
   const dt = Audit.diff(antesT, t, Audit.CAMPOS_TAREFA, nomeTarefa).filter(x => !(x.campo === 'Aguardando o cliente' && x.para === 'Sim')); // o pedido já tem registro próprio
@@ -260,6 +261,25 @@ rota('DELETE', '/api/tarefas/([0-9a-f]+)', async (req, res, m, _b, u) => {
   reg(u, 'excluiu_tarefa', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: Audit.diff(t, {}, { nome: 'Atividade', inicio: 'Início', fim: 'Término' }) });
   for (const o of tarefasDe(t.projetoId)) { const dd = Audit.diff(snapsDeps.get(o.id), o, { deps: 'Dependências' }, id => id === t.id ? t.nome : nomeTarefa(id)); if (dd.length) reg(u, 'editou_tarefa', o.nome, o.projetoId, { tarefaId: o.id, interna: !!o.interna, diff: dd, snap: { inicio: o.inicio, fim: o.fim } }); }
   store.save(); send(res, 200, { ok: true });
+});
+
+// ---- aprovação de entrega pelo cliente ----
+const ROT_APROV = { pendente: 'Aguardando aprovação', aprovada: 'Aprovada', ajustes: 'Ajustes solicitados' };
+const logAprov = (u, acao, t, de, para, extra = {}) => reg(u, acao, t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: [{ campo: 'Aprovação da entrega', de, para }], ...extra });
+rota('POST', '/api/tarefas/([0-9a-f]+)/aprovacao/solicitar', async (req, res, m, _b, u) => {
+  exigir(u, 'equipe'); const t = db.tarefas.find(x => x.id === m[1]); if (!t) throw bad(404, 'Atividade não encontrada.'); const ant = t.aprovacao ? ROT_APROV[t.aprovacao.estado] : '—';
+  if (t.aprovacao && t.aprovacao.estado === 'aprovada') throw bad(409, 'Esta entrega já foi aprovada.'); if (t.aprovacao && t.aprovacao.estado === 'pendente') throw bad(409, 'Esta entrega já está aguardando aprovação.');
+  t.requerAprovacao = true; t.aprovacao = { estado: 'pendente', solicitadaEm: store.agora(), solicitadaPor: u.nome }; logAprov(u, 'solicitou_aprovacao', t, ant, ROT_APROV.pendente); store.save(); send(res, 200, { ok: true, aprovacao: t.aprovacao });
+});
+rota('POST', '/api/tarefas/([0-9a-f]+)/aprovacao', async (req, res, m, b, u) => {
+  exigir(u, 'cliente'); const [t] = tarefaAcessivel(u, m[1]); const a = t.aprovacao; if (!a || a.estado !== 'pendente') throw bad(409, 'Esta entrega não está aguardando a sua aprovação.');
+  const comentario = str(b.comentario, 1000); const agora = store.agora();
+  if (b.decisao === 'aprovar') { t.aprovacao = { ...a, estado: 'aprovada', decididaEm: agora, por: u.nome, uid: u.id, comentario }; t.progresso = 100; logAprov(u, 'aprovou_entrega', t, ROT_APROV.pendente, `Aprovada por ${u.nome}`, { cliente: u.id }); }
+  else if (b.decisao === 'ajustes') {
+    if (comentario.length < 3) throw bad(400, 'Descreva o que precisa ser ajustado.'); t.aprovacao = { ...a, estado: 'ajustes', decididaEm: agora, por: u.nome, uid: u.id, comentario }; t.progresso = Math.min(+t.progresso || 0, 90);
+    db.itens.push({ id: store.id(), tarefaId: t.id, autor: u.nome, tipoAutor: 'cliente', ts: agora, texto: `Pedido de ajustes na entrega: ${comentario}` }); t.respondidoEm = agora; logAprov(u, 'pediu_ajustes_entrega', t, ROT_APROV.pendente, ROT_APROV.ajustes, { cliente: u.id });
+  } else throw bad(400, 'Decisão inválida.');
+  store.save(); send(res, 200, { ok: true, aprovacao: t.aprovacao });
 });
 
 function tarefaAcessivel(u, id) {
@@ -358,13 +378,13 @@ rota('POST', '/api/solicitacoes/([0-9a-f]+)/avaliar', async (req, res, m, b, u) 
 });
 
 // ---- início do cliente: o que precisa dele, o que está acontecendo e novidades ----
-const ROTULO = { criou_tarefa: d => `Nova atividade: ${d}`, editou_tarefa: d => `Atividade atualizada: ${d}`, comentou: d => `A equipe comentou em ${d}`, enviou_arquivo: d => `A equipe enviou um documento em ${d}`, pediu_cliente: d => `A equipe precisa de você em ${d}`,
+const ROTULO = { criou_tarefa: d => `Nova atividade: ${d}`, editou_tarefa: d => `Atividade atualizada: ${d}`, comentou: d => `A equipe comentou em ${d}`, enviou_arquivo: d => `A equipe enviou um documento em ${d}`, pediu_cliente: d => `A equipe precisa de você em ${d}`, solicitou_aprovacao: d => `Entrega aguardando a sua aprovação: ${d}`,
   editou_projeto: () => 'Dados do projeto atualizados', respondeu_chamado: d => `A equipe respondeu o chamado ${d}`, etapa_chamado: d => `Chamado: ${d}` };
 function novidadesDe(u) {
   const c = db.clientes.find(x => x.id === u.id) || {}; const meus = new Set(db.projetos.filter(p => p.clientes.includes(u.id)).map(p => p.id)); const desde = Date.now() - 30 * 86400e3; const vistas = new Map();
   for (const l of [...db.logs].reverse()) {
     if (l.tipo !== 'equipe' || !ROTULO[l.acao] || Date.parse(l.ts) < desde) continue; if (!(l.cliente === u.id || (l.projetoId && meus.has(l.projetoId)))) continue;
-    if (['criou_tarefa', 'editou_tarefa', 'pediu_cliente', 'comentou', 'enviou_arquivo'].includes(l.acao) && db.tarefas.some(x => x.projetoId === l.projetoId && x.nome === l.detalhe && x.interna)) continue; // atividade interna nunca aparece
+    if (['criou_tarefa', 'editou_tarefa', 'pediu_cliente', 'solicitou_aprovacao', 'comentou', 'enviou_arquivo'].includes(l.acao) && db.tarefas.some(x => x.projetoId === l.projetoId && x.nome === l.detalhe && x.interna)) continue; // atividade interna nunca aparece
     const k = l.acao + '|' + l.detalhe + '|' + (l.projetoId || ''); const ant = vistas.get(k); if (ant && Math.abs(Date.parse(ant.ts) - Date.parse(l.ts)) < 3600e3) continue; vistas.set(k, l);
   }
   const itens = [...vistas.values()].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 20).map(l => ({ ts: l.ts, texto: ROTULO[l.acao](l.detalhe), projeto: (projetoDe(l.projetoId) || {}).nome || '' }));
@@ -373,9 +393,10 @@ function novidadesDe(u) {
 rota('GET', '/api/novidades', async (req, res, _m, _b, u) => { exigir(u, 'cliente'); send(res, 200, novidadesDe(u)); });
 rota('POST', '/api/novidades/lido', async (req, res, _m, _b, u) => { exigir(u, 'cliente'); const c = db.clientes.find(x => x.id === u.id); if (c) { c.vistoEm = store.agora(); store.save(); } send(res, 200, { ok: true }); });
 rota('GET', '/api/inicio', async (req, res, _m, _b, u) => {
-  exigir(u, 'cliente'); const h = hoje(); const meus = db.projetos.filter(p => p.clientes.includes(u.id)); const pendencias = [], agora = [], proximas = []; let proxima = null;
+  exigir(u, 'cliente'); const h = hoje(); const meus = db.projetos.filter(p => p.clientes.includes(u.id)); const pendencias = [], aprovacoes = [], agora = [], proximas = []; let proxima = null;
   for (const p of meus) for (const t of tarefasDe(p.id).filter(x => !x.interna)) {
     const st = S.status(t, tarefasDe(p.id).filter(x => !x.interna), h); const item = { projetoId: p.id, projeto: p.nome, tarefaId: t.id, tarefa: t.nome, inicio: t.inicio, fim: t.fim, progresso: t.progresso, status: st };
+    if (t.aprovacao && t.aprovacao.estado === 'pendente') aprovacoes.push({ ...item, solicitadaEm: t.aprovacao.solicitadaEm });
     if (t.aguardaCliente && (+t.progresso || 0) < 100) pendencias.push({ ...item, pedido: t.pedido || '', respondidoEm: t.respondidoEm || null });
     if (st.codigo !== 'concluida' && (!proxima || t.fim < proxima.fim)) proxima = { ...item, atrasada: t.fim < h };
     if (st.codigo !== 'concluida' && t.inicio <= h) agora.push(item); else if (st.codigo !== 'concluida' && S.diffDays(h, t.inicio) <= 14) proximas.push(item);
@@ -387,7 +408,7 @@ rota('GET', '/api/inicio', async (req, res, _m, _b, u) => {
   const sols = db.solicitacoes.filter(x => x.clienteId === u.id).map(x => solView(x, u)).sort((a, b) => b.atualizadoEm.localeCompare(a.atualizadoEm));
   const suporte = { total: sols.length, abertos: sols.filter(x => x.aberto).length, aguardandoVoce: sols.filter(x => x.vezDe === 'cliente').length, ultimo: sols[0] ? { id: sols[0].id, protocolo: sols[0].protocolo, assunto: sols[0].assunto, etapa: sols[0].etapa, aberto: sols[0].aberto, atualizadoEm: sols[0].atualizadoEm } : null };
   const nv = novidadesDe(u);
-  send(res, 200, { pendencias: pendencias.sort(por), agora: agora.sort(por).slice(0, 6), proximas: proximas.sort((a, b) => a.inicio.localeCompare(b.inicio)).slice(0, 5), novidades: nv.novas, novidadesLista: nv.itens.slice(0, 5), projetos, suporte });
+  send(res, 200, { aprovacoes: aprovacoes.sort(por), pendencias: pendencias.sort(por), agora: agora.sort(por).slice(0, 6), proximas: proximas.sort((a, b) => a.inicio.localeCompare(b.inicio)).slice(0, 5), novidades: nv.novas, novidadesLista: nv.itens.slice(0, 5), projetos, suporte });
 });
 // Todos os documentos enviados nas atividades do projeto, em um só lugar (o cliente não vê os de atividades internas).
 rota('GET', '/api/projetos/([0-9a-f]+)/documentos', async (req, res, m, _b, u) => {

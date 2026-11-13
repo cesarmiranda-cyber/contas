@@ -379,3 +379,29 @@ test('modelos de projeto: embutidos, criar projeto a partir do modelo, salvar e 
   assert.strictEqual((await call('POST', `/api/projetos/${vazio.id}/aplicar-modelo`, { modeloId: 'treinamento', inicio: '2031-02-03' }, EQ)).j.atividades, 5); assert.strictEqual((await call('GET', '/api/projetos/' + vazio.id, null, EQ)).j.projeto.tarefas.length, 5);
   assert.strictEqual((await call('DELETE', '/api/modelos/' + salvo.j.modelo.id, null, EQ)).s, 200); assert.strictEqual((await call('GET', '/api/modelos', null, EQ)).j.modelos.some(m => m.nome === 'Meu modelo'), false); assert.strictEqual((await call('DELETE', '/api/modelos/xyz', null, EQ)).s, 404);
 });
+
+test('aprovação de entrega: só o cliente do projeto decide; aprovar ou pedir ajustes, com autor, data e registro', async () => {
+  const c1 = await call('POST', '/api/auth/cadastro', { nome: 'Paula Dias', email: 'paula@x.com', senha: 'senha1234' }), c2 = await call('POST', '/api/auth/cadastro', { nome: 'Outra Pessoa', email: 'outra@x.com', senha: 'senha1234' }); const k1 = { cookie: c1.c.split(';')[0] }, k2 = { cookie: c2.c.split(';')[0] };
+  const id1 = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'paula@x.com').id; const p = (await call('POST', '/api/projetos', { nome: 'Aprovações', clientes: [id1] }, EQ)).j.projeto;
+  const mk = b => call('POST', `/api/projetos/${p.id}/tarefas`, { inicio: '2031-02-03', fim: '2031-02-05', ...b }, EQ).then(r => r.j.tarefa);
+  const t = await mk({ nome: 'Homologação', requerAprovacao: true }), interna = await mk({ nome: 'Interna', interna: true, requerAprovacao: true });
+  const tv = async (h = EQ) => (await call('GET', '/api/projetos/' + p.id, null, h)).j.projeto.tarefas.find(x => x.id === t); assert.strictEqual((await tv()).requerAprovacao, true);
+  // ninguém decide antes de a equipe enviar; cliente não envia; só o cliente do projeto decide
+  assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'aprovar' }, k1)).s, 409); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao/solicitar`, {}, k1)).s, 403);
+  assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao/solicitar`, {}, EQ)).s, 200); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao/solicitar`, {}, EQ)).s, 409); assert.strictEqual((await tv(k1)).aprovacao.estado, 'pendente');
+  assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'aprovar' }, k2)).s, 404); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'aprovar' }, EQ)).s, 403); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'aprovar' })).s, 401);
+  const ini = (await call('GET', '/api/inicio', null, k1)).j; assert.deepStrictEqual(ini.aprovacoes.map(x => x.tarefa), ['Homologação']); assert.ok(!JSON.stringify(ini).includes('Interna'));
+  // pedir ajustes: exige comentário, vira conversa e baixa o andamento
+  assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'ajustes', comentario: ' ' }, k1)).s, 400); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'talvez' }, k1)).s, 400);
+  await call('PATCH', '/api/tarefas/' + t, { progresso: 100 }, EQ); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'ajustes', comentario: 'Falta o funil de pós-venda' }, k1)).s, 200);
+  let v = await tv(); assert.strictEqual(v.aprovacao.estado, 'ajustes'); assert.strictEqual(v.aprovacao.por, 'Paula Dias'); assert.ok(v.progresso <= 90); assert.ok(v.respondidoEm);
+  assert.ok((await call('GET', `/api/tarefas/${t}/itens`, null, EQ)).j.itens.some(i => /Falta o funil/.test(i.texto) && i.tipoAutor === 'cliente')); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'aprovar' }, k1)).s, 409); // já decidido
+  // equipe reenvia e o cliente aprova
+  assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao/solicitar`, {}, EQ)).s, 200); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao`, { decisao: 'aprovar', comentario: 'Tudo certo' }, k1)).s, 200);
+  v = await tv(k1); assert.deepStrictEqual([v.aprovacao.estado, v.aprovacao.por, v.progresso], ['aprovada', 'Paula Dias', 100]); assert.ok(v.aprovacao.decididaEm); assert.strictEqual((await call('POST', `/api/tarefas/${t}/aprovacao/solicitar`, {}, EQ)).s, 409); // aprovada não reabre
+  assert.strictEqual((await call('GET', '/api/inicio', null, k1)).j.aprovacoes.length, 0);
+  // registro: quem pediu, quem aprovou e quando; o cliente vê no histórico
+  const hist = (await call('GET', `/api/projetos/${p.id}/historico`, null, k1)).j.itens; for (const a of ['solicitou_aprovacao', 'pediu_ajustes_entrega', 'aprovou_entrega']) assert.ok(hist.some(x => x.acao === a && x.detalhe === 'Homologação'), a); assert.ok(hist.some(x => x.acao === 'aprovou_entrega' && x.quem === 'Paula Dias' && x.diff[0].para === 'Aprovada por Paula Dias'));
+  // deixar de exigir aprovação limpa o estado
+  await call('PATCH', '/api/tarefas/' + t, { requerAprovacao: false }, EQ); v = await tv(); assert.ok(!v.requerAprovacao && !v.aprovacao); assert.ok(interna);
+});
