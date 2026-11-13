@@ -40,7 +40,7 @@ function createApp({ vibeFactory, lookup, portal = process.env.BITRIX_PORTAL || 
     if (req.method !== 'GET' && req.headers['x-hub'] !== '1') throw new HubError(403, 'CSRF', 'Requisição não permitida.');
     const vibe = vibeFactory(req.headers['x-vibe-authorization']);
     const user = await currentUser(req, vibe);
-    const crm = createCrm(vibe, shared);
+    const crm = createCrm(vibe, shared, String(user.id));
     const p = url.pathname, m = req.method, q = url.searchParams;
     let r;
 
@@ -73,7 +73,8 @@ function createApp({ vibeFactory, lookup, portal = process.env.BITRIX_PORTAL || 
       return send(res, 200, await crm.getCompany(r[1]));
     }
     if (m === 'GET' && p === '/api/users') return send(res, 200, { items: await crm.listUsers() });
-    if (m === 'GET' && (r = /^\/api\/fields\/(companies|contacts)$/.exec(p))) { const { list, ignored } = await crm.formFields(r[1], true); return send(res, 200, { items: list, ignored }); }
+    if (m === 'GET' && (r = /^\/api\/fields\/(companies|contacts)$/.exec(p))) { const { list, ignored, layout } = await crm.formFields(r[1], true); return send(res, 200, { items: list, ignored, layout }); }
+    if (m === 'GET' && p === '/api/mapping') return send(res, 200, await crm.mapping());
     if (m === 'GET' && (r = /^\/api\/contacts\/(\d+)$/.exec(p))) return send(res, 200, await crm.getContact(r[1]));
     if (m === 'GET' && p === '/api/contacts') return send(res, 200, { items: await crm.searchContacts(q.get('q') || '') });
     throw new HubError(404, 'NOT_FOUND', 'Rota não encontrada.');

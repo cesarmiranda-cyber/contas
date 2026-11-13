@@ -85,9 +85,14 @@ const dynCache = {};
 async function loadForm(entity) {
   if (!dynCache[entity]) {
     const r = await api(`/api/fields/${entity}`), items = r.items;
-    dynCache[entity] = { items, ignored: r.ignored || [], users: items.some((f) => f.kind === 'user') ? (await api('/api/users').catch(() => ({ items: [] }))).items : [] };
+    dynCache[entity] = { items, ignored: r.ignored || [], layout: r.layout || null, users: items.some((f) => f.kind === 'user') ? (await api('/api/users').catch(() => ({ items: [] }))).items : [] };
   }
   return dynCache[entity];
+}
+function dynSections(items, users, values) {
+  const groups = [];
+  items.forEach((f) => { const t = f.section || ''; const g = groups[groups.length - 1]; if (g && g.t === t) g.f.push(f); else groups.push({ t, f: [f] }); });
+  return groups.map((g) => `${g.t ? `<div class="section-t" style="margin:6px 0 -4px">${esc(g.t)}</div>` : ''}<div class="grid2">${g.f.map((f) => dynInput(f, users, values?.[f.key])).join('')}</div>`).join('');
 }
 function dynInput(f, users, value) {
   const k = esc(f.key), req = f.mandatory ? ' required' : '';
@@ -237,6 +242,7 @@ function stepEmpresa(box, w) {
       </div>
       <p class="hint ${full ? (ok ? 'good' : 'bad') : ''}" id="cnpj-hint">${full ? (ok ? '✓ CNPJ válido' : 'CNPJ inválido: confira os dígitos.') : 'Somente números — a formatação é automática.'}</p>
     </section>
+    ${mappingBanner()}
     ${w.status === 'loading' ? skeletonCard() : ''}
     ${w.status === 'error' ? `<div class="banner ${w.errCode === 'CNPJ_NOT_FOUND' ? 'bad' : 'warn'}">${icon('alert')}<div><b>${esc(w.msg)}</b>${w.errCode === 'CNPJ_NOT_FOUND' ? 'Confira o número com o cliente. ' : ''}<button class="btn sm ghost" id="manual" style="margin-top:10px">Preencher manualmente</button></div></div>` : ''}
     ${w.existing ? duplicateBanner(w.existing) : ''}
@@ -280,6 +286,11 @@ async function fillResponsavel(box, w) {
     hold.innerHTML = `<div class="grid2">${dynInput(f, users, w.empresa.responsavel)}</div>`;
     hold.querySelector('select').addEventListener('change', (e) => (w.empresa.responsavel = e.target.value));
   } catch { /* sem usuários: o Bitrix usa o padrão */ }
+}
+function mappingBanner() {
+  const miss = state.mapping?.missing || []; if (!miss.length) return '';
+  const cnpj = miss.some((m) => m.key === 'cnpj');
+  return `<div class="banner ${cnpj ? 'bad' : 'warn'}">${icon('alert')}<div><b>${cnpj ? 'O Bitrix24 não tem um campo “CNPJ” nas empresas' : 'Alguns dados não serão gravados'}</b>${cnpj ? 'Sem esse campo o CNPJ não é salvo e a verificação de duplicidade não funciona. ' : ''}Campos não encontrados nas empresas/contatos: ${miss.map((m) => esc(m.label)).join(', ')}. Crie-os em Bitrix24 → CRM → Configurações → Campos personalizados (com esses nomes) e recarregue o app.</div></div>`;
 }
 function skeletonCard() {
   return `<section class="card card-p" aria-busy="true"><div class="stack"><div class="skel" style="width:40%;height:22px"></div><div class="skel" style="width:70%"></div><div class="grid2"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><p class="small muted">Consultando a Receita Federal e conferindo se o cliente já está cadastrado…</p></div></section>`;
@@ -584,9 +595,9 @@ function paintDrawerEdit(dr, c) {
   let dyn = { items: [], users: [] };
   loadForm('companies').then((d) => {
     dyn = d; const box = body.querySelector('#dyn'); if (!box) return;
-    const resp = d.items.filter((i) => i.kind === 'user'), others = d.items.filter((i) => i.kind !== 'user');
-    const ign = d.ignored?.length ? `<p class="small muted" title="${esc(d.ignored.map((i) => `${i.label} (${i.type})`).join(', '))}">${d.ignored.length} campo(s) do Bitrix24 não podem ser editados aqui (${esc(d.ignored.slice(0, 3).map((i) => i.label).join(', '))}${d.ignored.length > 3 ? '…' : ''}) — edite-os direto no Bitrix24.</p>` : '';
-    box.innerHTML = `${resp.length ? `<div class="grid2">${resp.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div>` : ''}${others.length ? `<details class="more" open><summary>Outros campos do Bitrix24 (${others.length})</summary><div class="grid2" style="margin-top:14px">${others.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div></details>` : ''}${ign}`;
+    const ign = d.ignored?.length ? `<p class="small muted" title="${esc(d.ignored.map((i) => `${i.label} (${i.type})`).join(', '))}">${d.ignored.length} campo(s) do formulário não podem ser editados aqui (${esc(d.ignored.slice(0, 3).map((i) => i.label).join(', '))}${d.ignored.length > 3 ? '…' : ''}) — edite-os direto no Bitrix24.</p>` : '';
+    const note = d.layout ? '' : `<p class="small muted">Não foi possível ler o layout do formulário do Bitrix24; mostrando todos os campos editáveis.</p>`;
+    box.innerHTML = `${d.items.length ? dynSections(d.items, d.users, c.valores) : ''}${ign}${note}`;
   }).catch((e) => { const box = body.querySelector('#dyn'); if (box) box.innerHTML = `<div class="banner warn">${icon('alert')}<div><b>Não foi possível carregar os demais campos</b>${esc(e.message)} Você ainda pode salvar os dados acima.</div></div>`; });
   f.title.focus();
   f.title.addEventListener('input', () => (body.querySelector('#eh').textContent = f.title.value || 'Sem nome'));
@@ -627,6 +638,7 @@ function paintDrawerEdit(dr, c) {
 /* ---------- início ---------- */
 (async function init() {
   render();
+  api('/api/mapping').then((m) => { state.mapping = m; if (state.wizard) render(); }).catch(() => {});
   try { const m = await api('/api/me'); state.me = m.user; state.portal = m.portal || ''; if ((location.hash || '#/') === '#/') renderHub(); }
   catch (e) {
     if (e.status === 401) $app.innerHTML = `<div class="hub"><div class="hub-body" style="margin-top:80px"><div class="card card-p stack" style="max-width:520px;margin:auto;text-align:center"><div class="empty"><div class="ico">${icon('shield')}</div><h2>Entre pelo Bitrix24</h2><p>Para usar o Hub, abra o app pelo menu do Bitrix24 ou conceda o acesso quando solicitado.</p></div></div></div></div>`;

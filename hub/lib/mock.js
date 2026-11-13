@@ -1,7 +1,7 @@
 'use strict';
 // CRM em memória que imita o trecho usado da API Vibe. Serve aos testes e ao modo demonstração (MOCK=1).
 function createMockVibe(seed = true) {
-  const db = { companies: [], contacts: [], links: [], userfields: { companies: [], contacts: [] }, seq: 100 };
+  const db = { layout: null, companies: [], contacts: [], links: [], userfields: { companies: [], contacts: [] }, seq: 100 };
   let rid = 0; const mf = (v) => (v || []).map((x) => ({ id: ++rid, value: x.value, typeId: x.typeId }));
   const match = (rec, filter = {}) => Object.entries(filter).every(([k, cond]) => {
     const v = rec[k];
@@ -45,8 +45,12 @@ function createMockVibe(seed = true) {
     }
     if (path === '/users') return ok([{ id: 1, name: 'Ana', lastName: 'Silva', active: true }, { id: 7, name: 'Bruno', lastName: 'Costa', active: true }, { id: 9, name: 'Inativo', lastName: 'X', active: false }]);
     if (path === '/statuses') return ok(({ COMPANY_TYPE: [{ statusId: 'CUSTOMER', name: 'Cliente' }, { statusId: 'PARTNER', name: 'Parceiro' }], INDUSTRY: [{ statusId: 'IT', name: 'Tecnologia' }, { statusId: 'LAW', name: 'Jurídico' }], CONTACT_TYPE: [{ statusId: 'CLIENT', name: 'Cliente' }], SOURCE: [{ statusId: 'WEB', name: 'Site' }] })[query['filter[entityId]']] || []);
-    if (path === '/companies/fields') return ok({ fields: { id: { type: 'integer', readonly: true, label: 'ID' }, title: { type: 'string', label: 'Nome' }, assignedById: { type: 'user', label: 'Responsável' }, typeId: { type: 'crm_status', label: 'Tipo de empresa' }, industry: { type: 'crm_status', label: 'Setor' }, revenue: { type: 'double', label: 'Receita anual' }, opened: { type: 'boolean', label: 'Disponível para todos' }, comments: { type: 'string', label: 'Comentário' }, createdTime: { type: 'datetime', readonly: true, label: 'Criado' }, logo: { type: 'file', label: 'Logo' }, ufCrmTags: { type: 'string', multiple: true, label: 'Tags' }, ufCrmHubCnpj: { type: 'string', label: 'CNPJ' }, ufCrmContrato: { type: 'date', label: 'Início do contrato' }, ufCrmPrioridade: { type: 'enumeration', label: 'Prioridade' }, ufCrmAreas: { type: 'enumeration', multiple: true, label: 'Áreas de atuação' }, ufCrmArquivo: { type: 'file', label: 'Contrato (PDF)' } } });
-    if (path === '/contacts/fields') return ok({ fields: { id: { type: 'integer', readonly: true, label: 'ID' }, name: { type: 'string', label: 'Nome' }, assignedById: { type: 'user', label: 'Responsável' }, sourceId: { type: 'crm_status', label: 'Origem' }, birthdate: { type: 'date', label: 'Aniversário' } } });
+    if (path === '/companies/fields') return ok({ fields: { id: { type: 'integer', readonly: true, label: 'ID' }, title: { type: 'string', label: 'Nome' }, assignedById: { type: 'user', label: 'Responsável' }, typeId: { type: 'crm_status', label: 'Tipo de empresa' }, industry: { type: 'crm_status', label: 'Setor' }, revenue: { type: 'double', label: 'Receita anual' }, opened: { type: 'boolean', label: 'Disponível para todos' }, comments: { type: 'string', label: 'Comentário' }, createdTime: { type: 'datetime', readonly: true, label: 'Criado' }, logo: { type: 'file', label: 'Logo' }, ufCrmTags: { type: 'string', multiple: true, label: 'Tags' }, ufCrmHubCnpj: { type: 'string', label: 'CNPJ' }, ufCrmHubRazao: { type: 'string', label: 'Razão social' }, ufCrmCnpjCliente: { type: 'string', label: 'CNPJ' }, ufCrmRazaoSocial: { type: 'string', label: 'Razão social' }, ufCrmSituacaoCadastral: { type: 'string', label: 'Situação cadastral' }, ufCrmCnae: { type: 'string', label: 'CNAE' }, ufCrmPorte: { type: 'string', label: 'Porte' }, ufCrmNaturezaJuridica: { type: 'string', label: 'Natureza jurídica' }, ufCrmDataAbertura: { type: 'string', label: 'Data de abertura' }, ufCrmEnderecoCompleto: { type: 'string', label: 'Endereço completo' }, ufCrmContrato: { type: 'date', label: 'Início do contrato' }, ufCrmPrioridade: { type: 'enumeration', label: 'Prioridade' }, ufCrmAreas: { type: 'enumeration', multiple: true, label: 'Áreas de atuação' }, ufCrmArquivo: { type: 'file', label: 'Contrato (PDF)' } } });
+    if (path === '/contacts/fields') return ok({ fields: { id: { type: 'integer', readonly: true, label: 'ID' }, name: { type: 'string', label: 'Nome' }, ufCrmCpf: { type: 'string', label: 'CPF' }, assignedById: { type: 'user', label: 'Responsável' }, sourceId: { type: 'crm_status', label: 'Origem' }, birthdate: { type: 'date', label: 'Aniversário' } } });
+    if ((m = /^\/crm\/card-config\/(\d+)$/.exec(path))) {
+      if (m[1] !== '4' || !db.layout || query.scope !== db.layout.scope) return ok(null);
+      return ok(db.layout.sections);
+    }
     if (path === '/companies/search') return ok(db.companies.filter((c) => match(c, body.filter)).sort((a, b) => b.id - a.id).slice(body.offset || 0, (body.offset || 0) + (body.limit || 50)));
     if (path === '/contacts/search') return ok(db.contacts.filter((c) => match(c, body.filter)).slice(0, body.limit || 50));
     if (path === '/companies' && method === 'POST') return ok(add('companies', body));
@@ -81,11 +85,8 @@ function createMockVibe(seed = true) {
     patch: (p, b) => route('PATCH', p, { body: b }), put: (p, b) => route('PUT', p, { body: b }), del: (p) => route('DELETE', p),
   };
   if (seed) {
-    const F = require('./crm').F;
-    ['HUB_CNPJ', 'HUB_RAZAO', 'HUB_SITUACAO', 'HUB_CNAE', 'HUB_PORTE', 'HUB_NATUREZA', 'HUB_ABERTURA', 'HUB_ENDERECO', 'HUB_VALIDADO'].forEach((n) => db.userfields.companies.push(n));
-    db.userfields.contacts.push('HUB_CPF');
-    const a = add('companies', { title: 'Almeida & Pinheiro Advogados', [F.cnpj]: '11.222.333/0001-81', [F.razao]: 'Almeida E Pinheiro Sociedade De Advogados', [F.situacao]: 'Ativa', [F.cnae]: '6911-7/01 · Serviços advocatícios', [F.porte]: 'Demais', [F.endereco]: 'Av. Paulista, 1000, Bela Vista, São Paulo/SP, 01310-100', phone: [{ value: '(11) 3000-1000', typeId: 'WORK' }], email: [{ value: 'contato@almeidapinheiro.com.br', typeId: 'WORK' }] });
-    const b = add('companies', { title: 'Construtora Horizonte', [F.cnpj]: '00.000.000/0001-91', [F.situacao]: 'Suspensa', [F.endereco]: 'Rua das Flores, 45, Centro, Curitiba/PR' });
+    const a = add('companies', { title: 'Almeida & Pinheiro Advogados', ufCrmCnpjCliente: '11.222.333/0001-81', ufCrmRazaoSocial: 'Almeida E Pinheiro Sociedade De Advogados', ufCrmSituacaoCadastral: 'Ativa', ufCrmCnae: '6911-7/01 · Serviços advocatícios', ufCrmPorte: 'Demais', ufCrmEnderecoCompleto: 'Av. Paulista, 1000, Bela Vista, São Paulo/SP, 01310-100', phone: [{ value: '(11) 3000-1000', typeId: 'WORK' }], email: [{ value: 'contato@almeidapinheiro.com.br', typeId: 'WORK' }] });
+    const b = add('companies', { title: 'Construtora Horizonte', ufCrmCnpjCliente: '00.000.000/0001-91', ufCrmSituacaoCadastral: 'Suspensa', ufCrmEnderecoCompleto: 'Rua das Flores, 45, Centro, Curitiba/PR' });
     const c1 = add('contacts', { name: 'Mariana', lastName: 'Almeida', post: 'Sócia', phone: [{ value: '(11) 99999-0001', typeId: 'MOBILE' }], email: [{ value: 'mariana@almeidapinheiro.com.br', typeId: 'WORK' }] });
     link(a.id, c1.id);
     add('contacts', { name: 'Ricardo', lastName: 'Souza', post: 'Diretor financeiro' });

@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const cnpj = require('../lib/cnpj');
-const { createCrm, F } = require('../lib/crm');
+const { createCrm } = require('../lib/crm');
 const { createMockVibe, fakeLookup } = require('../lib/mock');
 const { createApp } = require('../server');
 
@@ -48,13 +48,14 @@ test('CRM: cria campos uma vez, cadastra empresa + contatos, bloqueia CNPJ dupli
   const empresa = { title: 'Acme', razaoSocial: 'Acme Ltda', cnpj: '11222333000181', situacao: 'Ativa', telefones: ['(11) 3000-1000'], emails: ['a@acme.com'] };
   const r = await crm.createCompany({ empresa, contatos: [{ nome: 'Maria Souza', cargo: 'Sócia', telefone: '(11) 99999-0000', cpf: '529.982.247-25' }] });
   assert.ok(r.id && r.contatos[0].ok);
-  assert.equal(db.userfields.companies.length, 9);
-  await crm.ensureSchema();
-  assert.equal(db.userfields.companies.length, 9);
+  assert.equal(db.userfields.companies.length, 0);               // o app não cria campos no Bitrix24
+  assert.equal(db.companies[0].ufCrmCnpjCliente, '11.222.333/0001-81');   // grava no campo do portal, não no ufCrmHub*
+  assert.equal(db.companies[0].ufCrmHubCnpj, undefined);
   const c = await crm.getCompany(r.id);
   assert.equal(c.cnpj, '11.222.333/0001-81');
   assert.equal(c.contatos.length, 1);
   assert.equal(c.contatos[0].cpf, '529.982.247-25');
+  assert.equal(db.contacts[0].ufCrmCpf, '529.982.247-25');
   assert.equal((await crm.findByCnpj('11.222.333/0001-81')).id, r.id);
   await assert.rejects(crm.createCompany({ empresa }), { code: 'CNPJ_DUPLICATE', status: 409 });
 });
@@ -153,4 +154,30 @@ test('Campos do formulário do Bitrix: schema dinâmico, responsável e atualiza
   assert.equal(u.cnpj, '11.222.333/0001-81');
   await assert.rejects(crm.updateCompany(r.id, { campos: { revenue: 'abc' } }), /numérico/);
   await assert.rejects(crm.updateCompany(r.id, { campos: { ufCrmContrato: '01/05/2026' } }), /Data inválida/);
+});
+
+test('Mapeamento: usa os campos do portal (não os ufCrmHub*) e informa o que não existe', async () => {
+  const { vibe } = createMockVibe(false);
+  const m = await createCrm(vibe).mapping();
+  assert.equal(m.map.cnpj, 'ufCrmCnpjCliente'); assert.equal(m.map.razao, 'ufCrmRazaoSocial');
+  assert.equal(m.map.endereco, 'ufCrmEnderecoCompleto'); assert.equal(m.map.cpf, 'ufCrmCpf');
+  assert.deepEqual(m.missing.map((x) => x.key), ['validado']);
+});
+
+test('Layout do cartão: só campos visíveis, na ordem e por seção (pessoal → comum)', async () => {
+  const { vibe, db } = createMockVibe(false);
+  db.layout = { scope: 'C', sections: [
+    { name: 's1', title: 'Dados do cliente', elements: [{ name: 'TITLE' }, { name: 'ASSIGNED_BY_ID' }, { name: 'TYPE_ID' }, { name: 'COMMENTS' }, { name: 'UF_CRM_CNPJ_CLIENTE' }] },
+    { name: 's2', title: 'Jurídico', elements: [{ name: 'UF_CRM_PRIORIDADE' }, { name: 'UF_CRM_AREAS' }, { name: 'REVENUE_WITH_CURRENCY' }] },
+  ] };
+  const crm = createCrm(vibe);
+  const r = await crm.formFields('companies', true);
+  assert.equal(r.layout, 'common');
+  assert.deepEqual(r.list.map((f) => f.key), ['assignedById', 'typeId', 'comments', 'ufCrmPrioridade', 'ufCrmAreas', 'revenue']);
+  assert.equal(r.list[0].section, 'Dados do cliente'); assert.equal(r.list[3].section, 'Jurídico');
+  assert.ok(!r.list.some((f) => f.key === 'industry' || f.key === 'opened' || /^ufCrmHub/.test(f.key)));   // fora do layout / duplicado
+  assert.deepEqual(r.ignored, []);                                // ignorados só os que estão visíveis
+  db.layout = null;                                               // sem layout legível → mostra todos os editáveis
+  const fresh = await createCrm(vibe, {}).formFields('companies', true);
+  assert.equal(fresh.layout, null); assert.ok(fresh.list.some((f) => f.key === 'industry'));
 });

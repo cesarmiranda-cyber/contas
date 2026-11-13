@@ -10,7 +10,7 @@ Tela inicial (hub) para o cliente escolher a ferramenta que vai usar. O primeiro
 - Alerta visível quando a situação cadastral não é "Ativa" (suspensa, inapta, baixada…).
 
 ## Dados no Bitrix24
-Entidades **Empresa** e **Contato** (API Vibe `/v1/companies`, `/v1/contacts`). Na primeira utilização o app cria, uma única vez, campos personalizados (`UF_CRM_HUB_*`): CNPJ, razão social, situação, CNAE, porte, natureza, abertura, endereço e data de validação na empresa; CPF no contato. Cadastros novos entram como tipo *Cliente*.
+Entidades **Empresa** e **Contato** (API Vibe `/v1/companies`, `/v1/contacts`). O app **não cria campos**: localiza pelo nome de exibição os campos que já existem no portal (CNPJ, Razão social, Situação cadastral, CNAE, Porte, Natureza jurídica, Data de abertura, Endereço; CPF no contato), preferindo os que não são `ufCrmHub*`. Campos que não existirem não são gravados e o app avisa. O formulário de edição mostra só os campos visíveis no layout do cartão (pessoal, senão comum), na ordem e por seção.
 
 ## Segurança
 - A identidade vem do gateway da Vibecode (`X-Vibe-*`); o token da sessão nunca chega ao navegador. Sem identidade → 401.
