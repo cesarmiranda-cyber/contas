@@ -150,11 +150,12 @@ async function telaProjeto(m) {
   const tabs = h('div', { class: 'tabs' }, [['gantt', 'Cronograma (Gantt)'], ['lista', 'Lista de atividades']].map(([k, t]) => h('a', { class: aba === k ? 'on' : '', onclick: () => { view.aba = k; render(); } }, t)));
   if (view.abrir) { const t0 = p.tarefas.find(x => x.id === view.abrir); view.abrir = null; if (t0) setTimeout(() => drawer(p, t0), 50); }
   juntar(m, tabs); if (!p.tarefas.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
-  if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
+  if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, U.tipo === 'equipe' ? 'Arraste o bloco para mover as datas · arraste as pontas para mudar início ou término · clique para abrir' : 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
   else juntar(m, h('div', { class: 'card' }, h('table', {}, h('thead', {}, h('tr', {}, ['Atividade', 'Início', 'Término', '%', 'Responsável', 'Status', ...(eq ? [''] : [])].map(t => h('th', {}, t)))),
     h('tbody', {}, p.tarefas.map(t => h('tr', { style: 'cursor:pointer', onclick: () => drawer(p, t) }, h('td', {}, t.nome, t.interna && h('span', { class: 'muted small' }, ' (interna)')), h('td', {}, fmt(t.inicio)), h('td', {}, fmt(t.fim)), h('td', {}, t.progresso + '%'), h('td', {}, t.responsavel || '—'), h('td', {}, chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', {}, chip('amarelo', eq ? (t.respondidoEm ? 'Cliente respondeu' : 'Aguardando cliente') : 'Aguardando você'))), eq && h('td', {}, h('button', { class: 'btn sm', onclick: e => { e.stopPropagation(); modalTarefa(p, t); } }, 'Editar'))))))));
 }
 function gantt(p) {
+  const eq = U.tipo === 'equipe';
   const ts = [...p.tarefas].sort((a, b) => a.inicio.localeCompare(b.inicio) || a.fim.localeCompare(b.fim)); const RH = 44, DW = view.dw || 26;
   const min = Math.min(...ts.map(t => ms(t.inicio)), ms(p.hoje)) - 3 * DAY, max = Math.max(...ts.map(t => ms(t.fim)), ms(p.hoje)) + 10 * DAY;
   const dias = Math.round((max - min) / DAY) + 1, W = dias * DW, x = s => Math.round((ms(s) - min) / DAY) * DW;
@@ -178,15 +179,44 @@ function gantt(p) {
   juntar(cv, svg, h('div', { class: 'g-hoje', style: `left:${x(p.hoje) + DW / 2}px` }));
   for (const t of ts) {
     const i = pos.get(t.id).i, w = Math.max(DW, x(t.fim) + DW - x(t.inicio));
-    const b = h('div', { class: 'g-bloco ' + t.status.cor + (t.aguardaCliente && t.progresso < 100 ? ' aguarda' : ''), style: `left:${x(t.inicio)}px;width:${w - 2}px;top:${48 + i * RH + 9}px`, tabindex: 0, role: 'button', 'aria-label': `${t.nome}: ${t.status.rotulo}`, onclick: () => drawer(p, t), onkeydown: e => e.key === 'Enter' && drawer(p, t) },
-      h('div', { class: 'pg', style: `width:${t.progresso}%` }), h('span', {}, w > 90 ? `${t.nome}` : ''));
-    b.addEventListener('mousemove', e => tip(e, t)); b.addEventListener('mouseleave', () => $tip.hidden = true); b.addEventListener('focus', () => { const r = b.getBoundingClientRect(); tip({ clientX: r.left, clientY: r.bottom }, t); }); b.addEventListener('blur', () => $tip.hidden = true);
+    const b = h('div', { class: 'g-bloco ' + t.status.cor + (t.aguardaCliente && t.progresso < 100 ? ' aguarda' : ''), style: `left:${x(t.inicio)}px;width:${w - 2}px;top:${48 + i * RH + 9}px`, tabindex: 0, role: 'button', 'aria-label': `${t.nome}: ${t.status.rotulo}`, onclick: eq ? undefined : () => drawer(p, t), onkeydown: e => e.key === 'Enter' && drawer(p, t) },
+      h('div', { class: 'pg', style: `width:${t.progresso}%` }), h('span', {}, w > 90 ? `${t.nome}` : ''), eq && h('i', { class: 'alca esq', title: 'Arraste para mudar o início' }), eq && h('i', { class: 'alca dir', title: 'Arraste para mudar o término' }));
+    if (eq) arrasto(b, t, p, DW);
+    b.addEventListener('mousemove', e => { if (!arrastando) tip(e, t); }); b.addEventListener('mouseleave', () => $tip.hidden = true); b.addEventListener('focus', () => { const r = b.getBoundingClientRect(); tip({ clientX: r.left, clientY: r.bottom }, t); }); b.addEventListener('blur', () => $tip.hidden = true);
     juntar(cv, b);
   }
-  const nomes = h('div', { class: 'g-nomes' }, h('div', { class: 'g-head' }, h('select', { style: 'width:auto;padding:3px 6px;font-size:12px', onchange: e => { view.dw = +e.target.value; render(); } }, [[26, 'Dias'], [10, 'Semanas'], [4, 'Meses']].map(([v, t]) => h('option', { value: v, selected: v === DW }, t)))),
+  const nomes = h('div', { class: 'g-nomes' }, h('div', { class: 'g-head' }, h('select', { style: 'width:auto;padding:3px 6px;font-size:12px', onchange: e => { view.dw = +e.target.value; view.scrollX = null; render(); } }, [[26, 'Dias'], [10, 'Semanas'], [4, 'Meses']].map(([v, t]) => h('option', { value: v, selected: v === DW }, t)))),
     ts.map(t => h('div', { class: 'g-nome', title: t.nome, onclick: () => drawer(p, t) }, h('i', { class: 'dot ' + t.status.cor }), h('span', {}, t.nome))));
-  const sc = h('div', { class: 'g-scroll' }, cv); setTimeout(() => { sc.scrollLeft = Math.max(0, x(p.hoje) - 160); }, 0);
+  const sc = h('div', { class: 'g-scroll' }, cv); setTimeout(() => { sc.scrollLeft = view.scrollX != null ? view.scrollX : Math.max(0, x(p.hoje) - 160); sc.addEventListener('scroll', () => { view.scrollX = sc.scrollLeft; }); }, 0); // mantém a posição após cada ajuste
   return h('div', { class: 'gantt' }, nomes, sc);
+}
+let arrastando = false;
+const somaDias = (s, n) => iso(ms(s) + n * DAY);
+// Arrastar (mover), ou puxar as pontas (início/término). Dia a dia; as dependências reagendam as seguintes.
+function arrasto(b, t, p, DW) {
+  b.classList.add('arrasta');
+  b.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0) return; ev.preventDefault();
+    const modo = ev.target.classList.contains('esq') ? 'ini' : ev.target.classList.contains('dir') ? 'fim' : 'mover';
+    const x0 = ev.clientX, l0 = parseFloat(b.style.left), w0 = parseFloat(b.style.width), dur = Math.round((ms(t.fim) - ms(t.inicio)) / DAY); let delta = 0, moveu = false;
+    arrastando = true; $tip.hidden = true; b.setPointerCapture(ev.pointerId);
+    const novas = () => modo === 'mover' ? [somaDias(t.inicio, delta), somaDias(t.fim, delta)] : modo === 'ini' ? [somaDias(t.inicio, delta), t.fim] : [t.inicio, somaDias(t.fim, delta)];
+    const volta = () => { b.style.left = l0 + 'px'; b.style.width = w0 + 'px'; };
+    const mover = e => {
+      const dx = e.clientX - x0; if (!moveu && Math.abs(dx) < 4) return; moveu = true;
+      delta = Math.round(dx / DW); if (modo === 'ini') delta = Math.min(delta, dur); if (modo === 'fim') delta = Math.max(delta, -dur);
+      if (modo === 'mover') b.style.left = (l0 + delta * DW) + 'px'; else if (modo === 'ini') { b.style.left = (l0 + delta * DW) + 'px'; b.style.width = (w0 - delta * DW) + 'px'; } else b.style.width = (w0 + delta * DW) + 'px';
+      const [i, f] = novas(); $tip.replaceChildren(h('b', {}, `${fmt(i)} → ${fmt(f)}`), h('div', {}, `${Math.round((ms(f) - ms(i)) / DAY) + 1} dia(s)`)); $tip.hidden = false;
+      $tip.style.left = Math.min(e.clientX + 14, innerWidth - $tip.offsetWidth - 8) + 'px'; $tip.style.top = Math.min(e.clientY + 18, innerHeight - $tip.offsetHeight - 8) + 'px';
+    };
+    const limpa = () => { b.removeEventListener('pointermove', mover); b.removeEventListener('pointerup', solta); b.removeEventListener('pointercancel', cancela); $tip.hidden = true; arrastando = false; };
+    const cancela = () => { limpa(); volta(); };
+    const solta = async () => {
+      limpa(); if (!moveu) return drawer(p, t); if (delta === 0) return volta();
+      const [i, f] = novas(); try { const r = await api('PATCH', '/api/tarefas/' + t.id, { inicio: i, fim: f }); avisaAjustes(r.ajustes); } catch (err) { toast(err.message, 6000); } render();
+    };
+    b.addEventListener('pointermove', mover); b.addEventListener('pointerup', solta); b.addEventListener('pointercancel', cancela);
+  });
 }
 function tip(e, t) {
   $tip.replaceChildren(h('b', {}, t.nome), chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', { style: 'margin-top:4px;color:#ffd33d' }, (U.tipo === 'equipe' ? 'Aguardando o cliente: ' : 'Aguardando você: ') + (t.pedido || 'retorno pendente')), h('div', {}, `${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}%`), h('div', {}, 'Quem está trabalhando: ' + (t.responsavel || 'a definir')), t.itens ? h('div', {}, `${t.itens} registro(s) · clique para abrir`) : h('div', {}, 'Clique para abrir'));
@@ -256,17 +286,24 @@ async function modalProjeto(p, pre) {
 }
 function modalTarefa(p, t) {
   const v = overlay(true), err = h('div'); const outras = p.tarefas.filter(x => !t || x.id !== t.id); const deps = (t ? t.deps || [] : []).map(d => ({ ...d }));
-  const f = { nome: h('input', { value: t ? t.nome : '' }), inicio: h('input', { type: 'date', value: t ? t.inicio : p.hoje }), fim: h('input', { type: 'date', value: t ? t.fim : p.hoje }), prog: h('input', { type: 'number', min: 0, max: 100, value: t ? t.progresso : 0 }), resp: h('input', { value: t ? t.responsavel : '', placeholder: 'Quem está trabalhando nela' }), desc: h('textarea', { rows: 3 }, t ? t.descricao : ''), interna: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.interna }), aguarda: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.aguardaCliente }), pedido: h('textarea', { rows: 2, maxlength: 500, placeholder: 'O que você precisa do cliente? Ex.: lista de usuários e permissões' }, t ? t.pedido || '' : '') };
+  const f = { nome: h('input', { value: t ? t.nome : '' }), inicio: h('input', { type: 'date', value: t ? t.inicio : p.hoje }), fim: h('input', { type: 'date', value: t ? t.fim : p.hoje }), dur: h('input', { type: 'number', min: 1, step: 1 }), prog: h('input', { type: 'number', min: 0, max: 100, value: t ? t.progresso : 0 }), resp: h('input', { value: t ? t.responsavel : '', placeholder: 'Quem está trabalhando nela' }), desc: h('textarea', { rows: 3 }, t ? t.descricao : ''), interna: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.interna }), aguarda: h('input', { type: 'checkbox', style: 'width:auto', checked: t && t.aguardaCliente }), pedido: h('textarea', { rows: 2, maxlength: 500, placeholder: 'O que você precisa do cliente? Ex.: lista de usuários e permissões' }, t ? t.pedido || '' : '') };
+  // datas: mudar o início leva o término junto (mantém a duração); mudar a duração muda o término
+  const dd = (a, b) => Math.round((ms(b) - ms(a)) / DAY); let ini0 = f.inicio.value;
+  const pintaDur = () => { f.dur.value = f.inicio.value && f.fim.value ? Math.max(1, dd(f.inicio.value, f.fim.value) + 1) : ''; f.fim.min = f.inicio.value; };
+  f.inicio.addEventListener('change', () => { if (!f.inicio.value) return; if (f.fim.value && ini0) f.fim.value = somaDias(f.fim.value, dd(ini0, f.inicio.value)); ini0 = f.inicio.value; pintaDur(); });
+  f.fim.addEventListener('change', () => { if (f.fim.value && f.inicio.value && f.fim.value < f.inicio.value) { f.inicio.value = f.fim.value; ini0 = f.inicio.value; } pintaDur(); });
+  f.dur.addEventListener('input', () => { const n = Math.max(1, Math.round(+f.dur.value) || 1); if (f.inicio.value) { f.fim.value = somaDias(f.inicio.value, n - 1); f.fim.min = f.inicio.value; } });
+  pintaDur();
   const depsBox = h('div'); const pintaDeps = () => depsBox.replaceChildren(...deps.map((d, i) => h('div', { class: 'row', style: 'margin:6px 0' },
     h('select', { onchange: e => d.de = e.target.value }, outras.map(o => h('option', { value: o.id, selected: o.id === d.de }, o.nome))),
     h('select', { style: 'width:auto', onchange: e => d.tipo = e.target.value }, [['FS', 'Espera terminar'], ['SS', 'Começa junto']].map(([k, tt]) => h('option', { value: k, selected: k === d.tipo }, tt))),
     h('input', { type: 'number', style: 'width:80px', value: d.lag, title: 'Defasagem em dias', onchange: e => d.lag = +e.target.value }), h('button', { class: 'btn sm', onclick: () => { deps.splice(i, 1); pintaDeps(); } }, '✕')))); pintaDeps();
-  juntar(v, h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
+  juntar(v, h('div', { class: 'modal' }, h('h2', {}, t ? 'Editar atividade' : 'Nova atividade'), h('label', {}, 'Nome'), f.nome, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Início'), f.inicio), h('div', {}, h('label', {}, 'Término'), f.fim), h('div', {}, h('label', {}, 'Duração (dias)'), f.dur), h('div', {}, h('label', {}, '% concluído'), f.prog), h('div', {}, h('label', {}, 'Responsável'), f.resp)),
     h('label', {}, 'Descrição'), f.desc, h('label', {}, 'Dependências (as datas se ajustam sozinhas)'), depsBox, outras.length > 0 && h('button', { class: 'btn sm', onclick: () => { deps.push({ de: outras[0].id, tipo: 'FS', lag: 0 }); pintaDeps(); } }, '+ Dependência'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta)' }, f.interna, 'Atividade interna (o cliente não vê)'),
     h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:600;color:var(--tinta)' }, f.aguarda, 'Aguardando o cliente (aparece em “Precisamos de você” para ele)'), f.pedido, err,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => {
-      try { const b = { nome: f.nome.value, inicio: f.inicio.value, fim: f.fim.value, progresso: f.prog.value, responsavel: f.resp.value, descricao: f.desc.value, interna: f.interna.checked, aguardaCliente: f.aguarda.checked, pedido: f.pedido.value, deps }; if (t) await api('PATCH', '/api/tarefas/' + t.id, b); else await api('POST', `/api/projetos/${p.id}/tarefas`, b); v.remove(); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
+      try { const b = { nome: f.nome.value, inicio: f.inicio.value, fim: f.fim.value, progresso: f.prog.value, responsavel: f.resp.value, descricao: f.desc.value, interna: f.interna.checked, aguardaCliente: f.aguarda.checked, pedido: f.pedido.value, deps }; const r = t ? await api('PATCH', '/api/tarefas/' + t.id, b) : await api('POST', `/api/projetos/${p.id}/tarefas`, b); v.remove(); avisaAjustes(r.ajustes); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
     } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), t && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir esta atividade?')) { await api('DELETE', '/api/tarefas/' + t.id); v.remove(); render(); } } }, 'Excluir'))));
 }
 
@@ -274,7 +311,9 @@ function modalTarefa(p, t) {
 const SOL = { nova: 'Nova', em_analise: 'Em análise', aprovada: 'Aprovada', recusada: 'Recusada', concluida: 'Concluída' };
 const CATS = { duvida: 'Dúvida', problema: 'Problema / erro', mudanca: 'Solicitação de mudança', acesso: 'Acesso e usuários', financeiro: 'Financeiro', outro: 'Outro' };
 const PRIOS = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
-function toast(msg) { const e = h('div', { class: 'toast', role: 'status' }, msg); document.body.append(e); setTimeout(() => e.remove(), 4200); }
+function toast(msg, ms = 4200) { const e = h('div', { class: 'toast', role: 'status' }, msg); document.body.append(e); setTimeout(() => e.remove(), ms); }
+// Explica quando as dependências mudaram datas (para não parecer que "não salvou").
+function avisaAjustes(ajustes) { if (ajustes && ajustes.length) toast('Datas ajustadas pelas dependências: ' + ajustes.map(a => `${a.nome} (${fmt(a.inicio)} a ${fmt(a.fim)})`).join('; '), 9000); }
 function trilha(s) {
   if (!s.historico.length) return null;
   return h('div', { class: 'trilha', role: 'list', 'aria-label': 'Andamento do chamado' }, s.historico.map((x, k) => h('div', { class: 'passo' + (k === s.historico.length - 1 ? ' atual' : ' feito'), role: 'listitem' }, h('i', {}), h('b', {}, x.etapa), h('span', { class: 'small muted' }, fmtTs(x.ts)))));

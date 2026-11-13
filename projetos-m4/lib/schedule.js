@@ -49,10 +49,10 @@ function status(t, tarefas, hoje) {
   if (p >= 100) return { cor: 'verde', codigo: 'concluida', rotulo: 'Concluída' };
   if (t.fim < hoje) return { cor: 'vermelho', codigo: 'atrasada', rotulo: `Atrasada ${diffDays(t.fim, hoje)} dia(s)` };
   if (t.inicio <= hoje) {
-    const dur = diffDays(t.inicio, t.fim) + 1, passou = diffDays(t.inicio, hoje) + 1;
+    const dur = diffDays(t.inicio, t.fim) + 1, passou = diffDays(t.inicio, hoje); // dias completos já decorridos (o dia de hoje ainda está em curso)
     const esperado = Math.min(100, (passou / dur) * 100);
     if (p < esperado - 25) return { cor: 'amarelo', codigo: 'alerta', rotulo: 'Em alerta: abaixo do ritmo esperado' };
-    if (diffDays(hoje, t.fim) <= 2 && p < 80) return { cor: 'amarelo', codigo: 'alerta', rotulo: 'Em alerta: prazo próximo' };
+    if (dur >= 3 && diffDays(hoje, t.fim) <= 2 && p < 80) return { cor: 'amarelo', codigo: 'alerta', rotulo: 'Em alerta: prazo próximo' };
     return { cor: 'verde', codigo: 'no_prazo', rotulo: p > 0 ? 'Em andamento, no prazo' : 'No prazo' };
   }
   const byId = new Map(tarefas.map(x => [x.id, x]));

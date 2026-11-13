@@ -162,3 +162,7 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 .conversa-env{display:flex;gap:8px;align-items:center}
 
 .rapido{margin:14px 0;padding:12px 14px;background:var(--marca-fundo);border-radius:12px}.rapido label{margin:0 0 6px}.rapido input[type=range]{flex:1;padding:0;accent-color:var(--destaque);min-width:140px}
+
+/* arrastar blocos do Gantt (equipe) */
+.g-bloco.arrasta{cursor:grab;touch-action:none;user-select:none}.g-bloco.arrasta:active{cursor:grabbing}
+.alca{position:absolute;top:0;bottom:0;width:30%;max-width:9px;cursor:ew-resize;z-index:3}.alca.esq{left:0}.alca.dir{right:0}.g-bloco.arrasta:hover .alca{background:rgba(255,255,255,.38)}

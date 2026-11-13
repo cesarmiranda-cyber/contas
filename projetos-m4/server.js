@@ -131,6 +131,7 @@ function aplicarTarefas(pid, mexe) {
   }
 }
 
+const ajustesDe = ids => ids.map(id => db.tarefas.find(x => x.id === id)).filter(Boolean).map(x => ({ id: x.id, nome: x.nome, inicio: x.inicio, fim: x.fim })); // atividades cujas datas as dependências alteraram
 // ---- rotas --------------------------------------------------------------------
 const R = [];
 const rota = (m, re, fn) => R.push([m, new RegExp(`^${re}$`), fn]);
@@ -192,12 +193,12 @@ rota('POST', '/api/projetos/([0-9a-f]+)/tarefas', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
   const d = lerTarefa(b, false); const t = { id: store.id(), projetoId: p.id, progresso: 0, responsavel: '', descricao: '', interna: false, deps: [], ...d, ordem: tarefasDe(p.id).length };
   const mudou = aplicarTarefas(p.id, () => db.tarefas.push(t)); if (t.aguardaCliente) store.log(u.nome, 'equipe', 'pediu_cliente', t.nome, p.id);
-  store.log(u.nome, 'equipe', 'criou_tarefa', t.nome, p.id); store.save(); send(res, 201, { tarefa: t.id, reagendadas: mudou });
+  store.log(u.nome, 'equipe', 'criou_tarefa', t.nome, p.id); store.save(); send(res, 201, { tarefa: t.id, reagendadas: mudou, ajustes: ajustesDe(mudou) });
 });
 rota('PATCH', '/api/tarefas/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const t = db.tarefas.find(x => x.id === m[1]); if (!t) throw bad(404, 'Tarefa não encontrada.');
   const d = lerTarefa(b, true); const mudou = aplicarTarefas(t.projetoId, () => Object.assign(t, d));
-  store.log(u.nome, 'equipe', 'editou_tarefa', t.nome, t.projetoId); store.save(); send(res, 200, { ok: true, reagendadas: mudou });
+  store.log(u.nome, 'equipe', 'editou_tarefa', t.nome, t.projetoId); store.save(); send(res, 200, { ok: true, reagendadas: mudou, ajustes: ajustesDe(mudou) });
 });
 rota('DELETE', '/api/tarefas/([0-9a-f]+)', async (req, res, m, _b, u) => {
   exigir(u, 'equipe'); const t = db.tarefas.find(x => x.id === m[1]); if (!t) throw bad(404, 'Tarefa não encontrada.');

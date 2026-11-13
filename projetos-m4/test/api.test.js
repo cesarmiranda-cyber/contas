@@ -189,3 +189,15 @@ test('início do cliente: pendências, o que está acontecendo e novidades', asy
   assert.strictEqual((await call('GET', '/api/novidades', null, ko)).j.itens.length, 0); assert.strictEqual((await call('GET', '/api/novidades', null, EQ)).s, 403);
   await call('POST', '/api/novidades/lido', {}, k); assert.strictEqual((await call('GET', '/api/novidades', null, k)).j.novas, 0);
 });
+
+test('datas: a API informa quais atividades foram reagendadas pelas dependências', async () => {
+  const p = (await call('POST', '/api/projetos', { nome: 'Datas' }, EQ)).j.projeto;
+  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Primeira', inicio: '2030-01-07', fim: '2030-01-09' }, EQ)).j.tarefa;
+  const r = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Segunda', inicio: '2030-01-07', fim: '2030-01-08', deps: [{ de: a, tipo: 'FS' }] }, EQ);
+  assert.deepStrictEqual(r.j.ajustes.map(x => [x.nome, x.inicio, x.fim]), [['Segunda', '2030-01-10', '2030-01-11']]); // a própria atividade foi empurrada: o usuário é avisado
+  const m = await call('PATCH', '/api/tarefas/' + a, { inicio: '2030-01-14', fim: '2030-01-16' }, EQ); // mover a primeira empurra a segunda
+  assert.deepStrictEqual(m.j.ajustes.map(x => [x.nome, x.inicio]), [['Segunda', '2030-01-17']]);
+  const m2 = await call('PATCH', '/api/tarefas/' + r.j.tarefa, { inicio: '2030-01-18', fim: '2030-01-18' }, EQ); assert.deepStrictEqual(m2.j.ajustes, []); // datas válidas: nada a avisar
+  assert.strictEqual((await call('PATCH', '/api/tarefas/' + a, { inicio: '2030-01-20', fim: '2030-01-19' }, EQ)).s, 400); // término antes do início
+  const t = (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas; assert.strictEqual(t.find(x => x.id === a).inicio, '2030-01-14'); // erro não altera nada
+});

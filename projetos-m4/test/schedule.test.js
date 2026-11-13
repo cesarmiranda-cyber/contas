@@ -32,6 +32,11 @@ test('status: verde, amarelo e vermelho', () => {
   const atras = T('p', '2026-03-01', '2026-03-05'), fut = T('f', '2026-03-15', '2026-03-20', { deps: [{ de: 'p', tipo: 'FS' }] });
   assert.strictEqual(S.status(fut, [atras, fut], hoje).cor, 'amarelo');
 });
+test('atividade de um dia, no próprio dia, não fica em alerta com andamento parcial', () => {
+  assert.strictEqual(S.status(T('x', '2026-03-10', '2026-03-10', { progresso: 50 }), [], '2026-03-10').cor, 'verde');
+  assert.strictEqual(S.status(T('x', '2026-03-10', '2026-03-10', { progresso: 0 }), [], '2026-03-10').cor, 'verde');
+  assert.strictEqual(S.status(T('x', '2026-03-10', '2026-03-10', { progresso: 50 }), [], '2026-03-11').cor, 'vermelho'); // passou o dia sem concluir
+});
 test('resumo do projeto', () => {
   const r = S.resumo([T('a', '2026-03-01', '2026-03-09'), T('b', '2026-03-20', '2026-03-25')], '2026-03-10');
   assert.strictEqual(r.cor, 'vermelho'); assert.strictEqual(r.vermelho, 1); assert.strictEqual(r.fim, '2026-03-25');
