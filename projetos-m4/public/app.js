@@ -29,6 +29,12 @@ const NS_SVG = 'http://www.w3.org/2000/svg';
 const juntar = (el, ...kids) => el.append(...kids.flat().filter(c => c != null && c !== false));
 const lerArquivo = async f => { if (f.size > 10 * 1024 * 1024) throw new Error(`“${f.name}” passa de 10 MB.`); const buf = new Uint8Array(await f.arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode(...buf.subarray(i, i + 32768)); return { nome: f.name, base64: btoa(s) }; };
 const estrelas = n => '★'.repeat(n) + '☆'.repeat(5 - n);
+const VERSAO = (document.querySelector('meta[name=versao]') || {}).content || '';
+// Avisa quando há uma versão nova publicada (evita ficar usando uma cópia antiga em cache).
+async function checaVersao() {
+  try { const r = await (await fetch('/api/versao', { cache: 'no-store' })).json(); if (r.versao && VERSAO && r.versao !== VERSAO && !document.querySelector('.nova-versao')) document.body.append(h('div', { class: 'nova-versao', role: 'status' }, 'Há uma nova versão do portal. ', h('button', { class: 'btn sm pri', onclick: () => location.reload() }, 'Atualizar agora'))); } catch { /* offline */ }
+}
+setInterval(checaVersao, 3 * 60e3); document.addEventListener('visibilitychange', () => { if (!document.hidden) checaVersao(); });
 let U = null, view = { nome: 'projetos' };
 const go = v => { view = v; render(); };
 
@@ -43,7 +49,7 @@ function render() {
     h('nav', {}, nav.map(([k, t]) => h('a', { class: view.nome === k || (k === 'projetos' && view.nome === 'projeto') ? 'on' : '', onclick: () => go({ nome: k }) }, t))),
     h('span', { class: 'muted small' }, `${U.nome}${eq ? ' · equipe' : ''}`),
     !eq && sino(), !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); U = null; render(); } }, 'Sair'));
-  const main = h('main', { class: 'wrap' }); $app.append(top, main);
+  const main = h('main', { class: 'wrap' }); $app.append(top, main, h('footer', { class: 'rodape' }, `Projetos M4 · ${eq ? 'visão da equipe' : 'área do cliente'} · versão ${VERSAO || '—'}`));
   ({ projetos: telaProjetos, projeto: telaProjeto, solicitacoes: telaSolic, clientes: telaClientes, acessos: telaLog, integracao: telaIntegracao }[view.nome])(main).catch(e => main.append(h('div', { class: 'erro' }, e.message)));
 }
 

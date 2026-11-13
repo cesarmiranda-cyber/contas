@@ -180,3 +180,7 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 .g-bloco.alvo{outline:3px solid var(--destaque);filter:brightness(1.1)}
 .dep-nova{fill:none;stroke:var(--destaque);stroke-width:2.5;stroke-dasharray:6 4}
 .dep-hit{fill:none;stroke:transparent;stroke-width:14;cursor:pointer}.dep-hit:hover{stroke:rgba(255,106,43,.35)}
+
+.rodape{text-align:center;color:var(--tinta-2);font-size:12px;padding:18px 12px 24px}
+.nova-versao{position:fixed;top:0;left:0;right:0;z-index:300;background:var(--tinta);color:#fff;text-align:center;padding:10px 14px;font-weight:500}.nova-versao .btn{margin-left:10px}
+@media print{.rodape,.nova-versao{display:none}}

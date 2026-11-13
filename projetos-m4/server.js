@@ -425,17 +425,25 @@ rota('GET', '/api/painel', async (req, res, _m, _b, u) => {
 });
 
 // ---- estáticos ----------------------------------------------------------------
+// Versão do front-end = hash dos arquivos publicados. Vai na URL de cada arquivo (cache-busting) e é consultada pelo navegador para avisar de versão nova.
+const VERSAO = crypto.createHash('sha1').update(['index.html', 'app.js', 'style.css'].map(f => fs.readFileSync(path.join(PUB, f))).join('\0')).digest('hex').slice(0, 8);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
 function estatico(req, res) {
-  let p = decodeURIComponent(new URL(req.url, 'http://x').pathname); if (p === '/') p = '/index.html';
+  const url = new URL(req.url, 'http://x'); let p = decodeURIComponent(url.pathname); if (p === '/') p = '/index.html';
   const f = path.join(PUB, path.normalize(p)); if (!f.startsWith(PUB + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) return send(res, 404, { erro: 'Não encontrado.' });
-  res.writeHead(200, { ...SEC, 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' }); fs.createReadStream(f).pipe(res);
+  const tipo = MIME[path.extname(f)] || 'application/octet-stream';
+  if (p === '/index.html') { // a página nunca é guardada em cache: sempre aponta para a versão atual dos arquivos
+    const html = fs.readFileSync(f, 'utf8').replace(/__VERSAO__/g, VERSAO); res.writeHead(200, { ...SEC, 'Content-Type': tipo, 'Cache-Control': 'no-store' }); return res.end(html);
+  }
+  const cache = url.searchParams.get('v') === VERSAO ? 'public, max-age=31536000, immutable' : 'no-cache, must-revalidate'; // com ?v=versão atual é seguro guardar; sem, sempre revalida
+  res.writeHead(200, { ...SEC, 'Content-Type': tipo, 'Cache-Control': cache }); fs.createReadStream(f).pipe(res);
 }
 
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x'); const pathname = url.pathname;
     if (pathname === '/health') return send(res, 200, { ok: true });
+    if (pathname === '/api/versao') return send(res, 200, { versao: VERSAO });
     if (!pathname.startsWith('/api/')) return estatico(req, res);
     const hit = R.map(([m, re, fn]) => [m, re.exec(pathname), fn]).find(([m, mm]) => mm && m === req.method);
     if (!hit) return send(res, 404, { erro: 'Rota não encontrada.' });

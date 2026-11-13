@@ -262,3 +262,11 @@ test('excluir atividade e projeto funciona (DELETE sem corpo) e respeita permiss
   assert.strictEqual((await fetch(base + '/api/projetos/' + p.id, { method: 'DELETE' })).status, 401); // anônimo
   assert.strictEqual((await fetch(base + '/api/tarefas/' + t, { method: 'DELETE', headers: { ...EQ, 'sec-fetch-site': 'cross-site' } })).status, 403); // outro site
 });
+
+test('cache: a página aponta para a versão atual dos arquivos e nunca é guardada', async () => {
+  const idx = await fetch(base + '/'); const html = await idx.text(); assert.strictEqual(idx.headers.get('cache-control'), 'no-store');
+  const v = (await (await fetch(base + '/api/versao')).json()).versao; assert.match(v, /^[0-9a-f]{8}$/); assert.ok(html.includes(`/app.js?v=${v}`) && html.includes(`/style.css?v=${v}`) && html.includes(`<meta name="versao" content="${v}">`)); assert.ok(!html.includes('__VERSAO__'));
+  const js = await fetch(base + `/app.js?v=${v}`); assert.match(js.headers.get('cache-control'), /immutable/); // versão atual: pode guardar
+  assert.match((await fetch(base + '/app.js?v=antiga')).headers.get('cache-control'), /no-cache/); assert.match((await fetch(base + '/style.css')).headers.get('cache-control'), /no-cache/); // versão desconhecida: sempre revalida
+  assert.strictEqual((await fetch(base + '/../server.js')).status, 404);
+});
