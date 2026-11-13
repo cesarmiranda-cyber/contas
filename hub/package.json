@@ -1,0 +1,9 @@
+{
+  "name": "hub-escritorio",
+  "version": "1.0.0",
+  "description": "Hub do escritório: módulo Validador de Cadastro (Receita Federal → Bitrix24)",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "demo": "MOCK=1 node server.js", "test": "node --test" },
+  "engines": { "node": ">=20" }
+}
