@@ -24,6 +24,8 @@ label{display:block;font-size:12px;font-weight:600;color:var(--tinta-2);margin:1
 .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:.04em}
 .logo svg{width:34px;height:34px;flex:none}
 .login .brand .logo{font-size:22px}
+.login .brand .tit{font-size:30px;letter-spacing:-.02em;margin:14px 0 4px;text-align:center}.login .brand .sub{margin:0;opacity:.9;text-align:center;max-width:560px;font-size:15px}
+.login .nota a.site{color:var(--marca-2);font-weight:600;text-decoration:none}.login .nota a.site:hover{text-decoration:underline}
 /* login (modelo: topo azul com onda, ilustração à esquerda, cartão flutuante à direita) */
 .login{min-height:100vh;position:relative;background:#fff;overflow:hidden}
 .login .onda{position:absolute;top:0;left:0;width:100%;height:min(62vh,520px)}
@@ -38,7 +40,7 @@ label{display:block;font-size:12px;font-weight:600;color:var(--tinta-2);margin:1
 .login .cartao .btn{width:100%;margin-top:18px;padding:12px}
 .login .troca{text-align:center;margin:16px 0 0} .login .troca a{color:var(--marca-2);cursor:pointer;font-weight:600}
 .login .nota{text-align:center;margin:12px 0 0}
-@media(max-width:860px){.login .cena{grid-template-columns:1fr;grid-template-areas:"brand" "cartao" "esq";max-width:460px;padding:18px 16px 40px}.login .onda{height:340px}.login .cartao{margin-top:8px}.login .esq{padding-top:8px}.login .ilus{max-width:300px}}
+@media(max-width:860px){.login .brand .tit{font-size:22px}.login .cena{grid-template-columns:1fr;grid-template-areas:"brand" "cartao" "esq";max-width:460px;padding:18px 16px 40px}.login .onda{height:400px}.login .cartao{margin-top:8px}.login .esq{padding-top:8px}.login .ilus{max-width:300px}}
 @media(prefers-color-scheme:dark){.login{background:var(--fundo)}.login .cartao{background:var(--card)}}
 
 /* shell */

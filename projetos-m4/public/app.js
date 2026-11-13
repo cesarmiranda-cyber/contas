@@ -31,8 +31,8 @@ function render() {
   $app.replaceChildren(); $tip.hidden = true;
   if (!U) return $app.append(telaLogin());
   const eq = U.tipo === 'equipe';
-  const nav = [['projetos', 'Projetos'], ['solicitacoes', 'Solicitações'], ...(eq ? [['clientes', 'Clientes'], ['acessos', 'Acessos e log']] : [])];
-  const top = h('header', { class: 'top' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4 · Projetos'),
+  const nav = [['projetos', 'Projetos'], ['solicitacoes', 'Suporte'], ...(eq ? [['clientes', 'Clientes'], ['acessos', 'Acessos e log']] : [])];
+  const top = h('header', { class: 'top' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4 · Projetos e Suporte'),
     h('nav', {}, nav.map(([k, t]) => h('a', { class: view.nome === k || (k === 'projetos' && view.nome === 'projeto') ? 'on' : '', onclick: () => go({ nome: k }) }, t))),
     h('span', { class: 'muted small' }, `${U.nome}${eq ? ' · equipe' : ''}`),
     !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); U = null; render(); } }, 'Sair'));
@@ -60,17 +60,17 @@ function telaLogin(modo = 'login') {
   const box = h('form', { class: 'cartao', onsubmit: async ev => {
     ev.preventDefault(); err.replaceChildren(); const bt = ev.submitter; bt.disabled = true;
     try { await api('POST', cad ? '/api/auth/cadastro' : '/api/auth/login', Object.fromEntries(Object.entries(campos).map(([k, v]) => [k, v.value]))); await boot(); } catch (e) { err.append(h('div', { class: 'erro' }, e.message)); bt.disabled = false; }
-  } }, h('h2', {}, cad ? 'Criar sua conta' : 'Acessar o portal'), h('p', { class: 'muted small' }, cad ? 'Grátis para clientes Manda4. Leva menos de um minuto.' : 'Acompanhe o andamento do seu projeto.'),
+  } }, h('h2', {}, cad ? 'Criar sua conta de cliente' : 'Entrar na área do cliente'), h('p', { class: 'muted small' }, cad ? 'Use o e-mail que a equipe Manda4 tem no seu cadastro. Leva menos de um minuto.' : 'Projetos, documentos e suporte em um só lugar.'),
     cad && f('nome', 'Nome completo', 'text', 'name'), cad && h('div', {}, h('label', {}, 'Empresa'), (campos.empresa = h('input', { autocomplete: 'organization' }))),
     f('email', 'E-mail profissional', 'email', 'email'), f('senha', cad ? 'Senha (mín. 8 caracteres)' : 'Senha', 'password', cad ? 'new-password' : 'current-password'),
     err, h('button', { class: 'btn pri', type: 'submit' }, cad ? 'Criar conta' : 'Entrar'),
     h('p', { class: 'troca muted small' }, cad ? 'Já tem conta? ' : 'Ainda não tem conta? ', h('a', { tabindex: 0, onclick: () => $app.replaceChildren(telaLogin(cad ? 'login' : 'cadastro')) }, cad ? 'Entrar' : 'Criar conta')),
-    h('p', { class: 'nota muted small' }, 'Equipe Manda4? Abra o app "Projetos M4" dentro do Bitrix24.'));
+    h('p', { class: 'nota muted small' }, 'Equipe Manda4? Abra o app "Projetos M4" dentro do Bitrix24.'), h('p', { class: 'nota small' }, h('a', { class: 'site', href: 'https://manda4.com.br/', target: '_blank', rel: 'noopener noreferrer' }, '← Voltar ao site manda4.com.br')));
   const onda = document.createElementNS(NS_SVG, 'svg'); onda.setAttribute('class', 'onda'); onda.setAttribute('viewBox', '0 0 1440 520'); onda.setAttribute('preserveAspectRatio', 'none'); onda.setAttribute('aria-hidden', 'true');
   onda.innerHTML = '<defs><linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f6fd6"/><stop offset="1" stop-color="#0a3f94"/></linearGradient></defs><path d="M0 0H1440V250C1180 170 940 330 700 380C460 430 230 340 0 400Z" fill="url(#gb)"/>';
-  return h('div', { class: 'login' }, onda, h('div', { class: 'cena' }, h('div', { class: 'brand' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4'), h('span', { class: 'small' }, 'Portal do Cliente')),
+  return h('div', { class: 'login' }, onda, h('div', { class: 'cena' }, h('div', { class: 'brand' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4'), h('h1', { class: 'tit' }, 'Área de Projetos e Suporte'), h('p', { class: 'sub' }, 'Acompanhe o andamento do seu projeto Bitrix24 e fale com o suporte da Manda4.')),
     h('div', { class: 'esq' }, ilustracao(), h('p', { class: 'conf' }, 'Parceiro Gold Bitrix24 · Centro de Treinamento Autorizado'),
-      h('ul', { class: 'bene' }, ['Veja o cronograma do seu projeto em um Gantt', 'Status por cor: no prazo, alerta ou atrasado', 'Envie documentos e informações direto na atividade', 'Abra novas solicitações para a equipe Manda4'].map(t => h('li', {}, t)))), box));
+      h('ul', { class: 'bene' }, ['Projetos: veja o cronograma e o status de cada atividade (no prazo, alerta ou atrasado)', 'Envie documentos e informações direto na atividade, sem e-mail e sem planilha', 'Suporte: abra chamados e acompanhe as respostas da equipe Manda4', 'Tudo com a equipe que implanta e acompanha o seu Bitrix24'].map(t => h('li', {}, t)))), box));
 }
 
 // ---------- projetos ----------
@@ -78,7 +78,7 @@ async function telaProjetos(m) {
   const { projetos } = await api('GET', '/api/projetos'); let painel = null;
   if (U.tipo === 'equipe') painel = await api('GET', '/api/painel');
   m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, U.tipo === 'equipe' ? 'Projetos' : 'Meus projetos'), U.tipo === 'equipe' && h('button', { class: 'btn pri', onclick: () => modalProjeto() }, '+ Novo projeto')));
-  if (painel) m.append(h('div', { class: 'kpis' }, [['Projetos', painel.projetos], ['No prazo', painel.verde], ['Em alerta', painel.amarelo], ['Atrasados', painel.vermelho], ['Solicitações novas', painel.solicitacoesNovas], ['Clientes', painel.clientes]].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', {}, n)))));
+  if (painel) m.append(h('div', { class: 'kpis' }, [['Projetos', painel.projetos], ['No prazo', painel.verde], ['Em alerta', painel.amarelo], ['Atrasados', painel.vermelho], ['Chamados novos', painel.solicitacoesNovas], ['Clientes', painel.clientes]].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', {}, n)))));
   if (!projetos.length) return m.append(h('div', { class: 'card vazio' }, U.tipo === 'equipe' ? 'Nenhum projeto ainda. Crie o primeiro.' : 'Você ainda não tem projetos associados. Assim que a equipe Manda4 vincular, ele aparece aqui.'));
   m.append(h('div', { class: 'cards' }, projetos.map(p => h('div', { class: 'card click', onclick: () => go({ nome: 'projeto', id: p.id }) },
     h('div', { class: 'row' }, h('h3', { class: 'grow' }, p.nome), chip(p.resumo.cor, COR[p.resumo.cor])),
@@ -192,8 +192,8 @@ function modalTarefa(p, t) {
 const SOL = { nova: 'Nova', em_analise: 'Em análise', aprovada: 'Aprovada', recusada: 'Recusada', concluida: 'Concluída' };
 async function telaSolic(m) {
   const { solicitacoes } = await api('GET', '/api/solicitacoes'); const eq = U.tipo === 'equipe';
-  m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Solicitações'), !eq && h('button', { class: 'btn pri', onclick: novaSolic }, '+ Nova solicitação')));
-  if (!solicitacoes.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhuma solicitação.'));
+  m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Suporte e solicitações'), !eq && h('button', { class: 'btn pri', onclick: novaSolic }, '+ Abrir chamado')));
+  if (!solicitacoes.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhum chamado por aqui. Precisa de algo? Abra um chamado de suporte.'));
   m.append(h('div', { class: 'cards' }, solicitacoes.map(s => {
     const st = h('select', { onchange: e => api('PATCH', '/api/solicitacoes/' + s.id, { status: e.target.value }).then(render) }, Object.entries(SOL).map(([k, t]) => h('option', { value: k, selected: k === s.status }, t)));
     const rs = h('textarea', { rows: 2, placeholder: 'Resposta ao cliente' }, s.resposta);
@@ -205,7 +205,7 @@ async function telaSolic(m) {
 async function novaSolic() {
   const v = overlay(true), err = h('div'); const { projetos } = await api('GET', '/api/projetos');
   const pj = h('select', {}, h('option', { value: '' }, 'Geral (sem projeto)'), projetos.map(p => h('option', { value: p.id }, p.nome))), as = h('input', { maxlength: 160 }), tx = h('textarea', { rows: 5 });
-  v.append(h('div', { class: 'modal' }, h('h2', {}, 'Nova solicitação'), h('label', {}, 'Projeto'), pj, h('label', {}, 'Assunto'), as, h('label', {}, 'Descreva o que precisa'), tx, err,
+  v.append(h('div', { class: 'modal' }, h('h2', {}, 'Abrir chamado de suporte'), h('label', {}, 'Projeto'), pj, h('label', {}, 'Assunto'), as, h('label', {}, 'Descreva o que você precisa (dúvida, problema ou nova solicitação)'), tx, err,
     h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => { try { await api('POST', '/api/solicitacoes', { projetoId: pj.value, assunto: as.value, texto: tx.value }); v.remove(); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); } } }, 'Enviar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'))));
 }
 
