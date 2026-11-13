@@ -221,3 +221,5 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 
 .callout.ok{background:var(--verde-bg);border-color:#b9e6c9}.callout.ok b{color:#14633a}
 .g-bloco.aprovada::after{content:"✓";position:absolute;right:-6px;top:-6px;width:16px;height:16px;border-radius:50%;background:#fff;color:var(--verde);font-weight:800;font-size:11px;display:grid;place-items:center;box-shadow:0 1px 3px rgba(0,0,0,.3);z-index:6}
+
+.log-dir{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}

@@ -158,12 +158,20 @@ async function telaProjetos(m) {
 // ---------- histórico / log de alterações ----------
 const fv = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? fmt(v) : v;
 const fmtDia = s => { const x = new Date(s).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }); return x.charAt(0).toUpperCase() + x.slice(1); };
+async function desfazerLog(e) {
+  if (!confirm('Desfazer esta alteração? Os valores voltam ao que eram antes dela.')) return;
+  try { const r = await api('POST', `/api/logs/${e.id}/desfazer`, {}); avisaAjustes(r.ajustes); toast('Alteração desfeita. Ela fica registrada no histórico.'); render(); }
+  catch (er) {
+    if (er.dados && er.dados.codigo === 'ALTERADO_DEPOIS') { if (!confirm(`${er.dados.campos.join(', ')} foi alterado depois desta mudança. Desfazer mesmo assim? Os valores voltarão ao que eram antes dela.`)) return; try { const r = await api('POST', `/api/logs/${e.id}/desfazer`, { forcar: true }); avisaAjustes(r.ajustes); toast('Alteração desfeita.'); render(); } catch (e2) { toast(e2.message, 6000); } }
+    else toast(er.message, 6000);
+  }
+}
 function entradaLog(e, comProjeto) {
   return h('div', { class: 'log-item ' + e.categoria }, h('i', { class: 'log-ponto', title: e.categoria === 'acessos' ? 'Acesso' : e.categoria === 'comunicacao' ? 'Comunicação' : 'Alteração' }),
     h('div', { class: 'grow' }, h('div', {}, h('b', {}, e.quem), ' ', h('span', { class: 'chip-mini ' + e.tipo }, e.tipo === 'equipe' ? 'Equipe' : 'Cliente'), ` ${e.rotulo}`, e.detalhe && [' ', h('b', {}, `“${e.detalhe}”`)], comProjeto && e.projeto && h('span', { class: 'muted' }, ` · ${e.projeto}`)),
       e.motivo && h('div', { class: 'muted small' }, e.motivo),
       e.diff && e.diff.length > 0 && h('ul', { class: 'diff' }, e.diff.map(d => h('li', {}, h('span', { class: 'muted' }, d.campo + ': '), h('s', {}, fv(d.de)), ' → ', h('b', {}, fv(d.para)), d.interno && h('span', { class: 'muted small' }, ' (interno)'))))),
-    h('div', { class: 'muted small log-hora' }, fmtTs(e.ts)));
+    h('div', { class: 'log-dir' }, h('div', { class: 'muted small log-hora' }, fmtTs(e.ts)), U.tipo === 'equipe' && e.podeDesfazer && h('button', { class: 'btn sm', title: 'Volta aos valores de antes desta alteração', onclick: () => desfazerLog(e) }, 'Desfazer'), e.desfeito && h('span', { class: 'chip-mini', title: 'Desfeita por ' + e.desfeitoPor }, 'Desfeita')));
 }
 function listaLog(itens, comProjeto) {
   if (!itens.length) return h('div', { class: 'vazio' }, 'Nada registrado neste filtro.'); const out = []; let dia = '';

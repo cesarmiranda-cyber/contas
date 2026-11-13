@@ -405,3 +405,26 @@ test('aprovação de entrega: só o cliente do projeto decide; aprovar ou pedir 
   // deixar de exigir aprovação limpa o estado
   await call('PATCH', '/api/tarefas/' + t, { requerAprovacao: false }, EQ); v = await tv(); assert.ok(!v.requerAprovacao && !v.aprovacao); assert.ok(interna);
 });
+
+test('desfazer pelo log: restaura o valor original, avisa se mudou depois e registra', async () => {
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Un', email: 'un@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] }; const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'un@x.com').id;
+  const p = (await call('POST', '/api/projetos', { nome: 'Desfazer', valor: 1000, clientes: [cid] }, EQ)).j.projeto; const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Etapa A', inicio: '2031-02-03', fim: '2031-02-05' }, EQ)).j.tarefa;
+  const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Etapa B', inicio: '2031-02-06', fim: '2031-02-07', deps: [{ de: A_, tipo: 'FS', lag: 0 }] }, EQ)).j.tarefa;
+  const hist = async (h = EQ) => (await call('GET', `/api/projetos/${p.id}/historico`, null, h)).j.itens; const get = async id => (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas.find(x => x.id === id);
+  // editar a atividade: o registro guarda como desfazer
+  await call('PATCH', '/api/tarefas/' + A_, { fim: '2031-02-10', progresso: 40, responsavel: 'Bruno' }, EQ); let h = await hist(); const ed = h.find(x => x.acao === 'editou_tarefa' && x.detalhe === 'Etapa A' && x.diff.some(d => d.campo === 'Término')); assert.ok(ed.podeDesfazer); assert.ok(h.some(x => x.acao === 'reagendada_dependencia' && x.podeDesfazer));
+  assert.strictEqual((await call('POST', `/api/logs/${ed.id}/desfazer`, {}, k)).s, 403); assert.strictEqual((await call('POST', `/api/logs/${ed.id}/desfazer`, {})).s, 401); assert.strictEqual((await call('POST', '/api/logs/ffffffffffffffff/desfazer', {}, EQ)).s, 404);
+  // mudou depois: pede confirmação com os campos; com "forcar" desfaz
+  await call('PATCH', '/api/tarefas/' + A_, { progresso: 60 }, EQ); const conf = await call('POST', `/api/logs/${ed.id}/desfazer`, {}, EQ); assert.strictEqual(conf.s, 409); assert.strictEqual(conf.j.codigo, 'ALTERADO_DEPOIS'); assert.deepStrictEqual(conf.j.campos, ['Andamento']); assert.strictEqual((await get(A_)).fim, '2031-02-10');
+  assert.strictEqual((await call('POST', `/api/logs/${ed.id}/desfazer`, { forcar: true }, EQ)).s, 200); let a = await get(A_); assert.deepStrictEqual([a.fim, a.progresso, a.responsavel], ['2031-02-05', 0, '']);
+  h = await hist(); assert.ok(h.find(x => x.id === ed.id).desfeito); assert.strictEqual((await call('POST', `/api/logs/${ed.id}/desfazer`, {}, EQ)).s, 409); const feito = h.find(x => x.acao === 'desfez_alteracao'); assert.ok(feito.diff.some(d => d.campo === 'Término' && d.de === '2031-02-10' && d.para === '2031-02-05') && feito.podeDesfazer);
+  // desfazer o desfazer (refazer)
+  assert.strictEqual((await call('POST', `/api/logs/${feito.id}/desfazer`, {}, EQ)).s, 200); assert.strictEqual((await get(A_)).fim, '2031-02-10');
+  // projeto: campos internos voltam, e o cliente não vê o valor
+  await call('PATCH', '/api/projetos/' + p.id, { nome: 'Desfazer 2', valor: 5000 }, EQ); h = await hist(); const ep = h.find(x => x.acao === 'editou_projeto' && x.diff.some(d => d.campo === 'Valor do projeto')); assert.strictEqual((await call('POST', `/api/logs/${ep.id}/desfazer`, {}, EQ)).s, 200);
+  const pv = (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto; assert.deepStrictEqual([pv.nome, pv.valor], ['Desfazer', 1000]); const txt = JSON.stringify(await hist(k)); assert.ok(!txt.includes('5000') && !txt.includes('Valor do projeto') && !txt.includes('R$')); assert.ok((await hist(k)).some(x => x.acao === 'desfez_alteracao' && x.diff.some(d => d.campo === 'Nome'))); // o cliente vê que o nome voltou
+  // atividade excluída: não dá para desfazer
+  await call('PATCH', '/api/tarefas/' + B_, { responsavel: 'Zé' }, EQ); const eb = (await hist()).find(x => x.acao === 'editou_tarefa' && x.detalhe === 'Etapa B' && x.diff.some(d => d.campo === 'Responsável')); await call('DELETE', '/api/tarefas/' + B_, null, EQ); assert.strictEqual((await call('POST', `/api/logs/${eb.id}/desfazer`, {}, EQ)).s, 409);
+  // registros antigos (sem valores brutos) não oferecem o botão
+  assert.ok((await hist()).filter(x => x.acao === 'criou_tarefa' || x.acao === 'excluiu_tarefa').every(x => !x.podeDesfazer));
+});

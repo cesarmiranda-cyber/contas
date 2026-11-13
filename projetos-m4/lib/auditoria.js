@@ -26,24 +26,32 @@ function diff(antes, depois, campos, nomeDe = x => x, internos = new Set()) {
   return out;
 }
 
+const UNDO_TAREFA = ['nome', 'inicio', 'fim', 'progresso', 'responsavel', 'descricao', 'interna', 'aguardaCliente', 'requerAprovacao', 'pedido', 'deps'];
+const UNDO_PROJETO = ['nome', 'descricao', 'gerente', 'codigo', 'tipo', 'prioridade', 'empresa', 'contatoNome', 'contatoEmail', 'contatoTelefone', 'inicioPrevisto', 'fimPrevisto', 'link', 'situacao', 'valor', 'negocioBitrix', 'obsInternas', 'diasUteis', 'feriadosExtras'];
+const igual = (campo, a, b) => JSON.stringify(norm(campo, a)) === JSON.stringify(norm(campo, b));
+// {antes, depois} só dos campos que mudaram (valores originais, para desfazer); null se nada mudou
+function bruto(antes, depois, campos) {
+  const a = {}, d = {}; for (const k of campos) if (!igual(k, antes[k], depois[k])) { a[k] = JSON.parse(JSON.stringify(antes[k] ?? (BOOL.has(k) ? false : ''))); d[k] = JSON.parse(JSON.stringify(depois[k] ?? (BOOL.has(k) ? false : ''))); }
+  return Object.keys(a).length ? { antes: a, depois: d } : null;
+}
 const ROTULO = { login: 'entrou no portal', login_falhou: 'errou a senha ao tentar entrar', cadastro: 'criou a conta', saiu: 'saiu do portal', abriu_projeto: 'abriu o projeto', abriu_atividade: 'abriu a atividade', abriu_suporte: 'abriu a aba Suporte', baixou_arquivo: 'baixou o arquivo',
-  comentou: 'comentou na atividade', enviou_arquivo: 'enviou um documento na atividade', criou_projeto: 'criou o projeto', solicitou_aprovacao: 'enviou para aprovação a entrega', aprovou_entrega: 'aprovou a entrega', pediu_ajustes_entrega: 'pediu ajustes na entrega', aplicou_modelo: 'aplicou o modelo', salvou_modelo: 'salvou um modelo de projeto', excluiu_modelo: 'excluiu um modelo de projeto', editou_projeto: 'alterou os dados do projeto', excluiu_projeto: 'excluiu o projeto', criou_tarefa: 'criou a atividade', editou_tarefa: 'alterou a atividade', excluiu_tarefa: 'removeu a atividade',
+  comentou: 'comentou na atividade', enviou_arquivo: 'enviou um documento na atividade', criou_projeto: 'criou o projeto', desfez_alteracao: 'desfez uma alteração', solicitou_aprovacao: 'enviou para aprovação a entrega', aprovou_entrega: 'aprovou a entrega', pediu_ajustes_entrega: 'pediu ajustes na entrega', aplicou_modelo: 'aplicou o modelo', salvou_modelo: 'salvou um modelo de projeto', excluiu_modelo: 'excluiu um modelo de projeto', editou_projeto: 'alterou os dados do projeto', excluiu_projeto: 'excluiu o projeto', criou_tarefa: 'criou a atividade', editou_tarefa: 'alterou a atividade', excluiu_tarefa: 'removeu a atividade',
   reagendada_dependencia: 'teve as datas ajustadas por dependência', pediu_cliente: 'pediu uma informação ao cliente na atividade', ativou_cliente: 'ativou o acesso do cliente', alterou_acesso_cliente: 'alterou o acesso do cliente', bloqueou_cliente: 'bloqueou o cliente', reativou_cliente: 'reativou o cliente',
   solicitou: 'abriu o chamado', complementou_chamado: 'complementou o chamado', respondeu_chamado: 'respondeu o chamado', atualizou_solicitacao: 'atualizou o chamado', etapa_chamado: 'mudou a etapa do chamado', avaliou_atendimento: 'avaliou o atendimento', reenviou_chamado: 'reenviou o chamado ao Bitrix24', configurou_suporte: 'configurou a integração de suporte' };
 const ACESSOS = new Set(['login', 'login_falhou', 'cadastro', 'saiu', 'abriu_projeto', 'abriu_atividade', 'abriu_suporte', 'baixou_arquivo']);
 const COMUNICACAO = new Set(['comentou', 'enviou_arquivo', 'solicitou', 'complementou_chamado', 'respondeu_chamado', 'avaliou_atendimento', 'etapa_chamado', 'atualizou_solicitacao']);
 const categoria = acao => ACESSOS.has(acao) ? 'acessos' : COMUNICACAO.has(acao) ? 'comunicacao' : 'alteracoes';
-const VISIVEL_CLIENTE = new Set(['solicitou_aprovacao', 'aprovou_entrega', 'pediu_ajustes_entrega', 'criou_projeto', 'editou_projeto', 'criou_tarefa', 'editou_tarefa', 'excluiu_tarefa', 'reagendada_dependencia', 'pediu_cliente', 'comentou', 'enviou_arquivo']);
+const VISIVEL_CLIENTE = new Set(['desfez_alteracao', 'solicitou_aprovacao', 'aprovou_entrega', 'pediu_ajustes_entrega', 'criou_projeto', 'editou_projeto', 'criou_tarefa', 'editou_tarefa', 'excluiu_tarefa', 'reagendada_dependencia', 'pediu_cliente', 'comentou', 'enviou_arquivo']);
 
 const base = l => ({ id: l.id, ts: l.ts, quem: l.quem, tipo: l.tipo, acao: l.acao, rotulo: ROTULO[l.acao] || l.acao.replace(/_/g, ' '), categoria: categoria(l.acao), detalhe: l.detalhe, projetoId: l.projetoId, motivo: l.motivo || '', diff: l.diff || [] });
-const paraEquipe = l => ({ ...base(l), uid: l.uid || null });
+const paraEquipe = l => ({ ...base(l), uid: l.uid || null, podeDesfazer: !!l.desfazer && !l.desfeito, desfeito: !!l.desfeito, desfeitoPor: l.desfeitoPor || '' });
 // O que o cliente pode ver: alterações de cronograma e dados públicos do projeto, sem atividades internas, valores ou observações internas.
 function paraCliente(l) {
   if (!VISIVEL_CLIENTE.has(l.acao) || l.interna) return null; const e = base(l);
   e.diff = e.diff.filter(d => !d.interno && d.campo !== 'Atividade interna'); delete e.motivo;
   const virouVisivel = l.acao === 'editou_tarefa' && (l.diff || []).some(d => d.campo === 'Atividade interna' && d.para === 'Não');
   if (virouVisivel) return { ...e, acao: 'criou_tarefa', rotulo: ROTULO.criou_tarefa, diff: [{ campo: 'Início', de: '—', para: (l.snap || {}).inicio || '—' }, { campo: 'Término', de: '—', para: (l.snap || {}).fim || '—' }] };
-  if (['editou_projeto', 'editou_tarefa', 'reagendada_dependencia'].includes(l.acao) && !e.diff.length) return null;
+  if (['editou_projeto', 'editou_tarefa', 'reagendada_dependencia', 'desfez_alteracao'].includes(l.acao) && !e.diff.length) return null;
   return e;
 }
 const csvCel = v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // evita fórmula ao abrir no Excel
@@ -53,4 +61,4 @@ function csv(entradas, nomeProjeto = () => '') {
   for (const e of entradas) linhas.push([new Date(e.ts).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), e.quem, e.tipo, e.rotulo, nomeProjeto(e.projetoId), e.detalhe, e.diff.map(d => `${d.campo}: ${d.de} → ${d.para}`).join(' | ')].map(csvCel).join(';'));
   return '﻿' + linhas.join('\r\n') + '\r\n';
 }
-module.exports = { CAMPOS_TAREFA, CAMPOS_PROJETO, INTERNOS_PROJETO, diff, ROTULO, categoria, paraEquipe, paraCliente, csv };
+module.exports = { UNDO_TAREFA, UNDO_PROJETO, igual, bruto, CAMPOS_TAREFA, CAMPOS_PROJETO, INTERNOS_PROJETO, diff, ROTULO, categoria, paraEquipe, paraCliente, csv };

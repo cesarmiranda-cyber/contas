@@ -87,6 +87,7 @@ const vistos = new Map(); // evita encher o registro quando a mesma tela é aber
 const regUnico = (u, chave, ms, ...args) => { const k = `${u.id}|${chave}`; if (Date.now() - (vistos.get(k) || 0) < ms) return; vistos.set(k, Date.now()); reg(u, ...args); };
 const snapT = t => ({ ...t, deps: (t.deps || []).map(d => ({ ...d })) });
 const nomeTarefa = id => (db.tarefas.find(x => x.id === id) || {}).nome || '(atividade removida)';
+const desfazerDe = (alvo, id, antes, depois, campos) => { const b = Audit.bruto(antes, depois, campos); return b ? { alvo, id, ...b } : undefined; };
 const nomeCliente = id => (db.clientes.find(c => c.id === id) || {}).nome || id;
 const tarefasDe = pid => db.tarefas.filter(t => t.projetoId === pid);
 const projetoDe = id => db.projetos.find(p => p.id === id);
@@ -154,7 +155,7 @@ function aplicarModelo(u, p, modelo, inicio) {
 }
 function registraReagendadas(u, ids, antes, causa) {
   for (const id of ids) { if (id === causa.id) continue; const x = db.tarefas.find(y => y.id === id); if (!x) continue; const dx = Audit.diff(antes.get(id) || {}, x, { inicio: 'Início', fim: 'Término' });
-    if (dx.length) reg(u, 'reagendada_dependencia', x.nome, x.projetoId, { tarefaId: x.id, interna: !!x.interna, diff: dx, motivo: causa.motivo || `por causa da atividade “${causa.nome}”` }); }
+    if (dx.length) reg(u, 'reagendada_dependencia', x.nome, x.projetoId, { tarefaId: x.id, interna: !!x.interna, diff: dx, desfazer: desfazerDe('tarefa', x.id, antes.get(id) || {}, x, ['inicio', 'fim']), motivo: causa.motivo || `por causa da atividade “${causa.nome}”` }); }
 }
 // Dependências que impedem a atividade de começar na data pedida (início mínimo = fim da anterior + 1 + defasagem, ou início da anterior + defasagem).
 function depsBloqueio(deps, inicio, todas, cal = S.CAL_CORRIDOS) {
@@ -213,7 +214,7 @@ rota('PATCH', '/api/projetos/([0-9a-f]+)', async (req, res, m, b, u) => {
   if (Array.isArray(b.clientes)) novo.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
   const antesP = { ...p, clientes: [...p.clientes] }; const snapsCal = new Map(tarefasDe(p.id).map(x => [x.id, snapT(x)])); Object.assign(p, novo);
   if (JSON.stringify([antesP.diasUteis, antesP.feriadosExtras]) !== JSON.stringify([p.diasUteis, p.feriadosExtras])) { const mudouCal = aplicarTarefas(p.id, () => {}); registraReagendadas(u, mudouCal, snapsCal, { id: null, nome: '', motivo: 'por mudança no calendário do projeto (dias úteis e feriados)' }); }
-  const dp = Audit.diff(antesP, p, Audit.CAMPOS_PROJETO, nomeCliente, Audit.INTERNOS_PROJETO); if (dp.length) reg(u, 'editou_projeto', p.nome, p.id, { diff: dp }); store.save(); send(res, 200, { projeto: projetoView(p, u, true) });
+  const dp = Audit.diff(antesP, p, Audit.CAMPOS_PROJETO, nomeCliente, Audit.INTERNOS_PROJETO); if (dp.length) reg(u, 'editou_projeto', p.nome, p.id, { diff: dp, desfazer: desfazerDe('projeto', p.id, antesP, p, Audit.UNDO_PROJETO) }); store.save(); send(res, 200, { projeto: projetoView(p, u, true) });
 });
 rota('DELETE', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   exigir(u, 'equipe'); if (!u.admin) throw bad(403, 'Somente administradores excluem projetos.');
@@ -249,7 +250,7 @@ rota('PATCH', '/api/tarefas/([0-9a-f]+)', async (req, res, m, b, u) => {
   if (d.aguardaCliente === false) t.respondidoEm = null;
   if (d.aguardaCliente && !pedia) { t.respondidoEm = null; reg(u, 'pediu_cliente', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: [{ campo: 'Pedido ao cliente', de: '—', para: t.pedido || '(sem texto)' }] }); }
   const dt = Audit.diff(antesT, t, Audit.CAMPOS_TAREFA, nomeTarefa).filter(x => !(x.campo === 'Aguardando o cliente' && x.para === 'Sim')); // o pedido já tem registro próprio
-  if (dt.length) reg(u, 'editou_tarefa', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: dt, snap: { inicio: t.inicio, fim: t.fim } });
+  if (dt.length) reg(u, 'editou_tarefa', t.nome, t.projetoId, { tarefaId: t.id, interna: !!t.interna, diff: dt, snap: { inicio: t.inicio, fim: t.fim }, desfazer: desfazerDe('tarefa', t.id, antesT, t, Audit.UNDO_TAREFA) });
   registraReagendadas(u, mudou, snaps, t); store.save(); send(res, 200, { ok: true, reagendadas: mudou, ajustes: ajustesDe(mudou) });
 });
 rota('DELETE', '/api/tarefas/([0-9a-f]+)', async (req, res, m, _b, u) => {
@@ -459,6 +460,20 @@ rota('POST', '/api/clientes/([0-9a-f]+)/projetos', async (req, res, m, b, u) => 
 rota('PATCH', '/api/clientes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.');
   if ('ativo' in b) c.ativo = !!b.ativo; reg(u, c.ativo ? 'reativou_cliente' : 'bloqueou_cliente', c.email); store.save(); send(res, 200, { ok: true });
+});
+// Desfaz uma alteração restaurando os valores originais. Se algo mudou depois, avisa (e só desfaz com confirmação).
+rota('POST', '/api/logs/([0-9a-f]+)/desfazer', async (req, res, m, b, u) => {
+  exigir(u, 'equipe'); const l = db.logs.find(x => x.id === m[1]); if (!l || !l.desfazer) throw bad(404, 'Esta alteração não pode ser desfeita (registro antigo ou de outro tipo).'); if (l.desfeito) throw bad(409, 'Esta alteração já foi desfeita.');
+  const { alvo, id, antes, depois } = l.desfazer; const campos = alvo === 'tarefa' ? Audit.CAMPOS_TAREFA : Audit.CAMPOS_PROJETO; const forcar = !!b.forcar;
+  const entidade = alvo === 'tarefa' ? db.tarefas.find(x => x.id === id) : projetoDe(id); if (!entidade) throw bad(409, alvo === 'tarefa' ? 'A atividade foi excluída.' : 'O projeto foi excluído.');
+  const mudouDepois = Object.keys(depois).filter(k => !Audit.igual(k, entidade[k], depois[k])); if (mudouDepois.length && !forcar) throw Object.assign(bad(409, 'Esta informação foi alterada depois.'), { extra: { codigo: 'ALTERADO_DEPOIS', campos: mudouDepois.map(k => campos[k] || k) } });
+  const pid = alvo === 'tarefa' ? entidade.projetoId : entidade.id; const antesE = alvo === 'tarefa' ? snapT(entidade) : { ...entidade, clientes: [...entidade.clientes] }; const volta = JSON.parse(JSON.stringify(antes)); let ajustes = [];
+  if (alvo === 'tarefa') { const snaps = new Map(tarefasDe(pid).map(x => [x.id, snapT(x)])); const mud = aplicarTarefas(pid, () => Object.assign(entidade, volta)); registraReagendadas(u, mud, snaps, entidade); ajustes = ajustesDe(mud); }
+  else { const novo = { ...entidade, ...volta }; validarProjeto(novo); const snapsCal = new Map(tarefasDe(pid).map(x => [x.id, snapT(x)])); Object.assign(entidade, volta);
+    if (JSON.stringify([antesE.diasUteis, antesE.feriadosExtras]) !== JSON.stringify([entidade.diasUteis, entidade.feriadosExtras])) { const mc = aplicarTarefas(pid, () => {}); registraReagendadas(u, mc, snapsCal, { id: null, nome: '', motivo: 'por mudança no calendário do projeto (dias úteis e feriados)' }); } }
+  const dif = Audit.diff(antesE, entidade, campos, alvo === 'tarefa' ? nomeTarefa : nomeCliente, alvo === 'projeto' ? Audit.INTERNOS_PROJETO : new Set());
+  reg(u, 'desfez_alteracao', entidade.nome, pid, { ...(alvo === 'tarefa' ? { tarefaId: entidade.id, interna: !!entidade.interna } : {}), diff: dif, desfazDe: l.id, desfazer: desfazerDe(alvo, id, antesE, entidade, alvo === 'tarefa' ? Audit.UNDO_TAREFA : Audit.UNDO_PROJETO) });
+  l.desfeito = true; l.desfeitoPor = u.nome; l.desfeitoEm = store.agora(); store.save(); send(res, 200, { ok: true, ajustes });
 });
 function filtraLogs(q) {
   const pid = q.get('projeto'), tipo = q.get('tipo'), cat = q.get('cat'), busca = (q.get('q') || '').trim().toLowerCase(), dias = +q.get('dias') || 0, lim = Math.min(+q.get('limite') || 300, 5000);
