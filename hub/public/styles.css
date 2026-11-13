@@ -173,3 +173,6 @@ label.f.chk > span { display: flex; align-items: center; gap: 10px; font-weight:
 label.f.wide { grid-column: 1 / -1; }
 details.more > summary { cursor: pointer; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); }
 select.in { appearance: auto; }
+
+fieldset.f.multi { border: 1px solid #cdd5e1; border-radius: 10px; padding: 10px 12px 12px; margin: 0; min-width: 0; } fieldset.f.multi legend { padding: 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.opts { display: flex; flex-wrap: wrap; gap: 8px 16px; } .opt { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 14px; cursor: pointer; } .opt input { width: 17px; height: 17px; accent-color: var(--navy); }

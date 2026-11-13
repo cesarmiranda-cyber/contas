@@ -84,8 +84,8 @@ function confirmDialog({ title, message, confirm = 'Confirmar', danger = true })
 const dynCache = {};
 async function loadForm(entity) {
   if (!dynCache[entity]) {
-    const items = (await api(`/api/fields/${entity}`)).items;
-    dynCache[entity] = { items, users: items.some((f) => f.kind === 'user') ? (await api('/api/users').catch(() => ({ items: [] }))).items : [] };
+    const r = await api(`/api/fields/${entity}`), items = r.items;
+    dynCache[entity] = { items, ignored: r.ignored || [], users: items.some((f) => f.kind === 'user') ? (await api('/api/users').catch(() => ({ items: [] }))).items : [] };
   }
   return dynCache[entity];
 }
@@ -93,6 +93,11 @@ function dynInput(f, users, value) {
   const k = esc(f.key), req = f.mandatory ? ' required' : '';
   if (f.kind === 'bool') return `<label class="f chk"><span><input type="checkbox" data-dk="${k}" ${value === true ? 'checked' : ''}> ${esc(f.label)}</span></label>`;
   let inner;
+  if (f.kind === 'multiselect') {
+    const sel = new Set((Array.isArray(value) ? value : []).map(String));
+    return `<fieldset class="f multi wide" data-dk="${k}"><legend>${esc(f.label)}${f.mandatory ? ' *' : ''}</legend><div class="opts">${f.options.map((o) => `<label class="opt"><input type="checkbox" value="${esc(o.value)}" ${sel.has(String(o.value)) ? 'checked' : ''}> ${esc(o.label)}</label>`).join('')}</div></fieldset>`;
+  }
+  if (f.kind === 'multitext') return `<label class="f wide"><span>${esc(f.label)} <em>(um por linha)</em></span><textarea class="in" data-dk="${k}" rows="2">${esc((Array.isArray(value) ? value : []).join('\n'))}</textarea></label>`;
   if (f.kind === 'user') {
     const list = users.some((u) => String(u.id) === String(value)) || !value ? users : [{ id: value, nome: `Usuário ${value}` }, ...users];
     inner = `<select class="in" data-dk="${k}"${req}>${f.mandatory ? '' : '<option value="">— sem responsável —</option>'}${list.map((u) => `<option value="${u.id}" ${String(u.id) === String(value) ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}</select>`;
@@ -107,6 +112,12 @@ function dynCollect(root, fields, values = {}) {
   const out = {};
   for (const f of fields) {
     const el = root.querySelector(`[data-dk="${f.key}"]`); if (!el) continue;
+    if (f.kind === 'multiselect' || f.kind === 'multitext') {
+      const cur = f.kind === 'multiselect' ? [...el.querySelectorAll('input:checked')].map((i) => i.value) : el.value.split('\n').map((t) => t.trim()).filter(Boolean);
+      const old = (Array.isArray(values[f.key]) ? values[f.key] : []).map(String);
+      if (cur.join('\u0001') !== old.join('\u0001')) out[f.key] = cur;
+      continue;
+    }
     const cur = f.kind === 'bool' ? el.checked : el.value;
     const old = f.kind === 'bool' ? values[f.key] === true : String(values[f.key] ?? '');
     if (cur !== old) out[f.key] = cur;
@@ -114,6 +125,7 @@ function dynCollect(root, fields, values = {}) {
   return out;
 }
 function dynDisplay(f, users, v) {
+  if (Array.isArray(v)) return v.map((x) => (f.kind === 'multiselect' ? f.options.find((o) => String(o.value) === String(x))?.label || x : x)).join(', ');
   if (v === '' || v === undefined || v === null || v === false) return f.kind === 'bool' && v === false ? 'Não' : '';
   if (f.kind === 'bool') return 'Sim';
   if (f.kind === 'user') return users.find((u) => String(u.id) === String(v))?.nome || `Usuário ${v}`;
@@ -573,7 +585,8 @@ function paintDrawerEdit(dr, c) {
   loadForm('companies').then((d) => {
     dyn = d; const box = body.querySelector('#dyn'); if (!box) return;
     const resp = d.items.filter((i) => i.kind === 'user'), others = d.items.filter((i) => i.kind !== 'user');
-    box.innerHTML = `${resp.length ? `<div class="grid2">${resp.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div>` : ''}${others.length ? `<details class="more" open><summary>Outros campos do Bitrix24 (${others.length})</summary><div class="grid2" style="margin-top:14px">${others.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div></details>` : ''}`;
+    const ign = d.ignored?.length ? `<p class="small muted" title="${esc(d.ignored.map((i) => `${i.label} (${i.type})`).join(', '))}">${d.ignored.length} campo(s) do Bitrix24 não podem ser editados aqui (${esc(d.ignored.slice(0, 3).map((i) => i.label).join(', '))}${d.ignored.length > 3 ? '…' : ''}) — edite-os direto no Bitrix24.</p>` : '';
+    box.innerHTML = `${resp.length ? `<div class="grid2">${resp.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div>` : ''}${others.length ? `<details class="more" open><summary>Outros campos do Bitrix24 (${others.length})</summary><div class="grid2" style="margin-top:14px">${others.map((i) => dynInput(i, d.users, c.valores?.[i.key])).join('')}</div></details>` : ''}${ign}`;
   }).catch((e) => { const box = body.querySelector('#dyn'); if (box) box.innerHTML = `<div class="banner warn">${icon('alert')}<div><b>Não foi possível carregar os demais campos</b>${esc(e.message)} Você ainda pode salvar os dados acima.</div></div>`; });
   f.title.focus();
   f.title.addEventListener('input', () => (body.querySelector('#eh').textContent = f.title.value || 'Sem nome'));

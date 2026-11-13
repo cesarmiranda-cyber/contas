@@ -73,7 +73,7 @@ function createApp({ vibeFactory, lookup, portal = process.env.BITRIX_PORTAL || 
       return send(res, 200, await crm.getCompany(r[1]));
     }
     if (m === 'GET' && p === '/api/users') return send(res, 200, { items: await crm.listUsers() });
-    if (m === 'GET' && (r = /^\/api\/fields\/(companies|contacts)$/.exec(p))) return send(res, 200, { items: await crm.formFields(r[1]) });
+    if (m === 'GET' && (r = /^\/api\/fields\/(companies|contacts)$/.exec(p))) { const { list, ignored } = await crm.formFields(r[1], true); return send(res, 200, { items: list, ignored }); }
     if (m === 'GET' && (r = /^\/api\/contacts\/(\d+)$/.exec(p))) return send(res, 200, await crm.getContact(r[1]));
     if (m === 'GET' && p === '/api/contacts') return send(res, 200, { items: await crm.searchContacts(q.get('q') || '') });
     throw new HubError(404, 'NOT_FOUND', 'Rota não encontrada.');
@@ -87,7 +87,7 @@ function createApp({ vibeFactory, lookup, portal = process.env.BITRIX_PORTAL || 
       if (path.extname(rel)) return send(res, 404, { error: 'not_found' });
       return serveStatic(req, res, new URL('/', 'http://x'));          // SPA
     }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': file.endsWith('.html') ? 'no-cache' : 'public, max-age=300', 'X-Content-Type-Options': 'nosniff' });
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
     fs.createReadStream(file).pipe(res);
   }
 

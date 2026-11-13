@@ -80,7 +80,10 @@ const lc = (o, a, b) => o?.[a] ?? o?.[b];
 const dateOnly = (v) => (v ? String(v).slice(0, 10) : '');
 function fieldKind(key, f) {
   if (key === 'assignedById') return 'user';
-  if (f.multiple) return null;
+  if (f.multiple) {
+    if (f.options?.length) return 'multiselect';
+    return ['string', 'text', 'integer', 'double', 'float', 'number'].includes(String(f.type || '').toLowerCase()) ? 'multitext' : null;
+  }
   if (f.options?.length) return 'select';
   const t = String(f.type || '').toLowerCase();
   if (t === 'boolean' || t === 'char') return 'bool';
@@ -95,34 +98,47 @@ function createCrm(vibe, shared = {}) {
   let schemaPromise = null;
   const fixedKeys = new Set(Object.values(F));
 
+  // Campo personalizado de lista: as opções vêm de /userfields/:entidade (campo `list`).
+  async function userfieldOptions(entity, key) {
+    if (!cache[`uf:${entity}`]) {
+      try { cache[`uf:${entity}`] = rows(await vibe.get(`/userfields/${entity}`)); } catch { cache[`uf:${entity}`] = []; }
+    }
+    const norm = (n) => String(n || '').replace(/^UF_CRM_/i, '').replace(/^ufCrm/, '').replace(/_/g, '').toLowerCase();
+    const uf = cache[`uf:${entity}`].find((u) => norm(u.fieldName || u.FIELD_NAME) === norm(key));
+    return (uf?.list || []).map((i) => ({ value: String(lc(i, 'ID', 'id') ?? ''), label: str(lc(i, 'VALUE', 'value')) })).filter((o) => o.value && o.label);
+  }
   async function loadOptions(entity, key, f) {
     const items = f.items || f.options;
     if (Array.isArray(items) && items.length) return items.map((i) => ({ value: String(lc(i, 'ID', 'id') ?? lc(i, 'VALUE', 'value')), label: str(lc(i, 'VALUE', 'value') ?? lc(i, 'name', 'NAME')) })).filter((o) => o.label);
     const st = STATUS_ENTITY[entity]?.[key];
-    if (!st) return [];
+    if (!st) return userfieldOptions(entity, key);
     try {
       return rows(await vibe.get('/statuses', { 'filter[entityId]': st })).map((i) => ({ value: str(lc(i, 'statusId', 'STATUS_ID')), label: str(lc(i, 'name', 'NAME')) })).filter((o) => o.value && o.label);
     } catch { return []; }
   }
   // Lista de campos do formulário: { key, label, kind, options?, mandatory }
-  async function formFields(entity) {
+  async function formFields(entity, withIgnored = false) {
     const hit = cache[entity];
-    if (hit && Date.now() - hit.at < 10 * 60_000) return hit.list;
+    if (hit && Date.now() - hit.at < 10 * 60_000) return withIgnored ? { list: hit.list, ignored: hit.ignored } : hit.list;
     const res = one(await vibe.get(`/${entity}/fields`));
     const fields = res?.fields || {};
-    const list = [];
+    const list = [], ignored = [];
     for (const [key, f] of Object.entries(fields)) {
       if (f.readonly || SKIP[entity].has(key) || fixedKeys.has(key)) continue;
       const withOpts = { ...f, options: await loadOptions(entity, key, f) };
       const kind = fieldKind(key, withOpts);
-      if (!kind) continue;
+      if (!kind) { ignored.push({ key, label: str(f.label || f.title || key), type: str(f.type) + (f.multiple ? '[]' : '') }); continue; }
       list.push({ key, label: str(f.label || f.title || key), kind, options: withOpts.options, mandatory: !!(f.mandatory || f.required) });
     }
     list.sort((a, b) => (a.key === 'assignedById' ? -1 : b.key === 'assignedById' ? 1 : 0));
-    cache[entity] = { at: Date.now(), list };
-    return list;
+    cache[entity] = { at: Date.now(), list, ignored };
+    return withIgnored ? { list, ignored } : list;
   }
   function coerce(kind, v) {
+    if (kind === 'multiselect' || kind === 'multitext') {
+      const arr = (Array.isArray(v) ? v : String(v ?? '').split(/\n/)).map((x) => str(x, 1000)).filter(Boolean);
+      return arr;
+    }
     if (v === null || v === undefined || v === '') return '';
     if (kind === 'number') { const n = Number(String(v).replace(',', '.')); if (Number.isNaN(n)) throw bad('Há um campo numérico com valor inválido.'); return n; }
     if (kind === 'bool') return v === true || v === 'true' || v === 'Y';
@@ -135,7 +151,7 @@ function createCrm(vibe, shared = {}) {
     for (const f of list) {
       if (!(f.key in campos)) continue;
       const v = coerce(f.kind === 'user' ? 'number' : f.kind, campos[f.key]);
-      if (f.mandatory && v === '') throw bad(`Preencha o campo “${f.label}”.`);
+      if (f.mandatory && (v === '' || (Array.isArray(v) && !v.length))) throw bad(`Preencha o campo “${f.label}”.`);
       out[f.key] = v;
     }
     return out;
@@ -144,7 +160,7 @@ function createCrm(vibe, shared = {}) {
     const list = await formFields(entity), out = {};
     for (const f of list) {
       const v = raw[f.key];
-      out[f.key] = f.kind === 'date' ? dateOnly(v) : f.kind === 'bool' ? (v === true || v === 'Y') : v === null || v === undefined ? '' : (typeof v === 'object' ? '' : String(v));
+      out[f.key] = Array.isArray(v) ? v.map((x) => String(x)) : f.kind === 'date' ? dateOnly(v) : f.kind === 'bool' ? (v === true || v === 'Y') : v === null || v === undefined ? '' : (typeof v === 'object' ? '' : String(v));
     }
     return out;
   }

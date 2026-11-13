@@ -135,14 +135,20 @@ test('Campos do formulário do Bitrix: schema dinâmico, responsável e atualiza
   const keys = fields.map((f) => f.key);
   assert.equal(keys[0], 'assignedById');                                  // responsável primeiro
   for (const k of ['typeId', 'industry', 'revenue', 'opened', 'comments', 'ufCrmContrato']) assert.ok(keys.includes(k), k);
-  for (const k of ['id', 'title', 'createdTime', 'logo', 'ufCrmTags', 'ufCrmHubCnpj']) assert.ok(!keys.includes(k), `não deveria listar ${k}`);
+  for (const k of ['id', 'title', 'createdTime', 'logo', 'ufCrmHubCnpj']) assert.ok(!keys.includes(k), `não deveria listar ${k}`);
+  const prio = fields.find((f) => f.key === 'ufCrmPrioridade'), areas = fields.find((f) => f.key === 'ufCrmAreas'), tags = fields.find((f) => f.key === 'ufCrmTags');
+  assert.equal(prio.kind, 'select'); assert.deepEqual(prio.options.map((o) => o.label), ['Alta', 'Baixa']);   // lista sem opções no schema: vem de /userfields
+  assert.equal(areas.kind, 'multiselect'); assert.equal(areas.options.length, 2);
+  assert.equal(tags.kind, 'multitext');
+  assert.deepEqual((await crm.formFields('companies', true)).ignored.map((i) => i.key).sort(), ['ufCrmArquivo']);
   assert.deepEqual(fields.find((f) => f.key === 'typeId').options.map((o) => o.value), ['CUSTOMER', 'PARTNER']);
   assert.deepEqual((await crm.listUsers()).map((u) => u.nome), ['Ana Silva', 'Bruno Costa']);   // inativo fora
   const r = await crm.createCompany({ empresa: { title: 'Acme', cnpj: '11222333000181', campos: { assignedById: 7, industry: 'LAW' } } });
   const c = await crm.getCompany(r.id);
   assert.equal(c.responsavelId, 7); assert.equal(c.valores.industry, 'LAW');
-  const u = await crm.updateCompany(r.id, { campos: { assignedById: '1', revenue: '1500,50', opened: true, ufCrmContrato: '2026-05-01', id: 999, createdTime: 'x', ufCrmHubCnpj: 'hack' } });
+  const u = await crm.updateCompany(r.id, { campos: { ufCrmPrioridade: '12', ufCrmAreas: ['21', '22'], ufCrmTags: 'a\nb', assignedById: '1', revenue: '1500,50', opened: true, ufCrmContrato: '2026-05-01', id: 999, createdTime: 'x', ufCrmHubCnpj: 'hack' } });
   assert.equal(u.responsavelId, 1); assert.equal(u.valores.revenue, '1500.5'); assert.equal(u.valores.opened, true); assert.equal(u.valores.ufCrmContrato, '2026-05-01');
+  assert.equal(u.valores.ufCrmPrioridade, '12'); assert.deepEqual(u.valores.ufCrmAreas, ['21', '22']); assert.deepEqual(u.valores.ufCrmTags, ['a', 'b']);
   assert.equal(db.companies[0].id, r.id);                                // campos de sistema ignorados
   assert.equal(u.cnpj, '11.222.333/0001-81');
   await assert.rejects(crm.updateCompany(r.id, { campos: { revenue: 'abc' } }), /numérico/);
