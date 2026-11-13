@@ -417,8 +417,8 @@ const somaDias = (s, n) => iso(ms(s) + n * DAY);
 // Arrastar (mover), ou puxar as pontas (início/término). Dia a dia; as dependências reagendam as seguintes.
 function arrasto(b, t, p, DW) {
   b.classList.add('arrasta');
-  b.addEventListener('pointerdown', ev => {
-    if (ev.button !== 0) return; ev.preventDefault();
+  const iniciar = ev => {
+    if (ev.button !== 0) return; ev.preventDefault(); ev.stopPropagation();
     const modo = ev.target.classList.contains('esq') ? 'ini' : ev.target.classList.contains('dir') ? 'fim' : 'mover';
     const x0 = ev.clientX, l0 = parseFloat(b.style.left), w0 = parseFloat(b.style.width), dur = Math.round((ms(t.fim) - ms(t.inicio)) / DAY); let delta = 0, moveu = false;
     arrastando = true; $tip.hidden = true; b.setPointerCapture(ev.pointerId);
@@ -438,7 +438,9 @@ function arrasto(b, t, p, DW) {
       const [i, f] = novas(); try { await patchTarefa(t, { inicio: i, fim: f }); } catch (err) { toast(err.message, 6000); } render();
     };
     b.addEventListener('pointermove', mover); b.addEventListener('pointerup', solta); b.addEventListener('pointercancel', cancela);
-  });
+  };
+  // as alças têm ouvinte próprio: no toque o navegador escolhe o alvo mais próximo que tenha ouvinte (senão o círculo de dependência ganharia)
+  b.addEventListener('pointerdown', iniciar); for (const al of b.querySelectorAll('.alca')) al.addEventListener('pointerdown', iniciar);
 }
 function tip(e, t) {
   $tip.replaceChildren(h('b', {}, t.nome), chip(t.status.cor, t.status.rotulo), t.aguardaCliente && t.progresso < 100 && h('div', { style: 'margin-top:4px;color:#ffd33d' }, (U.tipo === 'equipe' ? 'Aguardando o cliente: ' : 'Aguardando você: ') + (t.pedido || 'retorno pendente')), h('div', {}, `${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}%`), h('div', {}, 'Quem está trabalhando: ' + (t.responsavel || 'a definir')), t.itens ? h('div', {}, `${t.itens} registro(s) · clique para abrir`) : h('div', {}, 'Clique para abrir'));

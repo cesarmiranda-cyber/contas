@@ -239,3 +239,6 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 /* LGPD */
 .aceite{display:flex;gap:8px;align-items:flex-start;margin:14px 0 0;font-weight:400;color:var(--tinta-2);font-size:13px}.aceite input{margin-top:3px}
 .link-legal{color:var(--marca-2);cursor:pointer;text-decoration:underline}.legal-texto{white-space:pre-wrap;line-height:1.6;max-height:60vh;overflow:auto;padding:4px 2px}
+
+@media(hover:none){.alca{width:36%;max-width:18px}.cx{width:18px;height:18px;margin-top:-9px}.cx.ini{left:-26px}.cx.fim{right:-26px}}
+.alca{touch-action:none}
