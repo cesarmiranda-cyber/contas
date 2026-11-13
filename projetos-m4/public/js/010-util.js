@@ -12,7 +12,7 @@ function h(tag, attrs, ...kids) {
 }
 const api = async (m, url, body) => {
   const r = await fetch(url, { method: m, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' });
-  const j = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(j.erro || 'Erro inesperado.'), { status: r.status, dados: j }); return j;
+  const j = await r.json().catch(() => ({})); if (r.status === 401 && typeof U !== 'undefined' && U && U.tipo === 'cliente' && !url.startsWith('/api/auth/') && url !== '/api/me') sessaoExpirada('Sua sessão terminou. Entre novamente para continuar.'); if (!r.ok) throw Object.assign(new Error(j.erro || 'Erro inesperado.'), { status: r.status, dados: j }); return j;
 };
 const fmt = s => s ? s.split('-').reverse().join('/') : '';
 const fmtTs = s => new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });

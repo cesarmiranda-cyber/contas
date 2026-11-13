@@ -29,3 +29,12 @@ Arrastar o bloco move as datas; as pontas mudam início/término; arrastar do c�
 
 ## Dados
 `DATA_DIR` (padrão `./data`): `db.json` (JSON atômico), `files/`, `secret` (assinatura de sessões/links), `secrets.json`. Faça backup desse diretório.
+
+## Segurança do portal do cliente
+
+- **Senha**: mínimo de 8 caracteres com letra, número e caractere especial. A tela de cadastro e a troca de senha mostram os requisitos ao vivo; o servidor valida do mesmo jeito (`lib/auth.js`, `validarSenha`).
+- **Sessão**: 40 minutos desde o login, sem renovação. O cookie expira junto (HttpOnly, Secure, SameSite=Lax), o token é assinado com validade e sair (ou trocar a senha) revoga o cookie anterior. A tela avisa 2 minutos antes e desconecta sozinha.
+- **Bloqueio**: 3 senhas erradas bloqueiam o acesso até a equipe liberar (Clientes → “Liberar acesso”). Para e-mails sem conta a resposta é idêntica, sem revelar quem é cliente. Há também um limite por endereço (30 logins e 10 cadastros por janela). Em testes use `SEM_LIMITE_IP=1`.
+- **Esqueci a senha**: a equipe gera uma senha provisória (Clientes → “Nova senha”), exibida uma vez; o cliente é obrigado a trocá-la antes de usar o portal.
+- **Visibilidade**: o cliente só vê o que a equipe marcar. Atividades novas (e as criadas por modelo) nascem **ocultas**; marque “Visível ao cliente” ou use “Mostrar ao cliente” no projeto. Comentários e anexos têm “Só a equipe vê”. O histórico antigo de atividade oculta também some para o cliente.
+- Cabeçalhos: HSTS, CSP (sem objetos, `base-uri` e `form-action` fechados), Permissions-Policy, COOP e `nosniff`.

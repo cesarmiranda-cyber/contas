@@ -31,7 +31,9 @@ const server = http.createServer(async (req, res) => {
     const hit = R.map(([m, re, fn]) => [m, re.exec(pathname), fn]).find(([m, mm]) => mm && m === req.method);
     if (!hit) return send(res, 404, { erro: 'Rota não encontrada.' });
     let b = {}; if (req.method !== 'GET') { if (!mesmaOrigem(req)) throw bad(403, 'Origem não permitida.'); b = await readBody(req, /(itens|mensagens)$/.test(pathname) ? 16e6 : 1e6); }
-    await hit[2](req, res, hit[1], b, quem(req));
+    const u = quem(req);
+    if (u && u.trocarSenha && !/^\/api\/(me|eu\/senha|auth\/logout|legal)$/.test(req.url.split('?')[0])) throw bad(403, 'Troque a senha provisória para continuar.');
+    await hit[2](req, res, hit[1], b, u);
   } catch (e) { if (!e.status) console.error(e); send(res, e.status || 500, { erro: e.status ? e.message : 'Erro interno.', ...(e.extra || {}) }); }
 });
 if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); setInterval(() => suporte.ciclo(), 2 * 60e3).unref(); setInterval(() => { try { rodarRelatoriosSemanais(); } catch (e) { console.error('relatório semanal:', e.message); } }, 60 * 60e3).unref(); setTimeout(() => { try { rodarRelatoriosSemanais(); } catch { /* tenta de novo na próxima hora */ } }, 15e3).unref(); setTimeout(() => suporte.ciclo(), 5e3).unref(); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }

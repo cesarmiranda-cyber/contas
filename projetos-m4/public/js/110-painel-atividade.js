@@ -21,9 +21,9 @@ function blocoAprovacao(t, fecha) {
 }
 async function drawer(p, t) {
   $tip.hidden = true; const v = overlay(), box = h('aside', { class: 'drawer' }); juntar(v, box); const eq = U.tipo === 'equipe';
-  const fio = h('div', { class: 'fio' }), err = h('div'); const txt = h('textarea', { rows: 3, placeholder: 'Escreva uma informação, dúvida ou observação…' }); const file = h('input', { type: 'file' });
+  const fio = h('div', { class: 'fio' }), err = h('div'); const txt = h('textarea', { rows: 3, placeholder: 'Escreva uma informação, dúvida ou observação…' }); const file = h('input', { type: 'file' }); const soEq = eq && h('input', { type: 'checkbox', style: 'width:auto' });
   const carregar = async () => {
-    const { itens } = await api('GET', `/api/tarefas/${t.id}/itens`); fio.replaceChildren(...(itens.length ? itens.map(i => h('div', { class: 'msg' + (i.tipoAutor === 'equipe' ? ' eq' : '') }, h('div', { class: 'quem' }, `${i.autor} `, h('span', { class: 'muted' }, `${i.tipoAutor === 'equipe' ? 'Equipe Manda4' : 'Cliente'} · ${fmtTs(i.ts)}`)),
+    const { itens } = await api('GET', `/api/tarefas/${t.id}/itens`); fio.replaceChildren(...(itens.length ? itens.map(i => h('div', { class: 'msg' + (i.tipoAutor === 'equipe' ? ' eq' : '') + (i.interna ? ' nota' : '') }, h('div', { class: 'quem' }, `${i.autor} `, i.interna && h('span', { class: 'selo-int' }, 'só equipe '), h('span', { class: 'muted' }, `${i.tipoAutor === 'equipe' ? 'Equipe Manda4' : 'Cliente'} · ${fmtTs(i.ts)}`)),
       i.texto && h('p', {}, i.texto), i.arquivo && h('p', {}, h('a', { href: '/api/arquivos/' + i.arquivo.id, download: i.arquivo.nome }, '📎 ' + i.arquivo.nome), h('span', { class: 'muted small' }, ` (${Math.ceil(i.arquivo.tamanho / 1024)} KB)`)))) : [h('p', { class: 'muted' }, 'Nenhum registro ainda.')]));
   };
   juntar(box, h('div', { class: 'row' }, h('h2', { class: 'grow' }, t.nome), eq && h('button', { class: 'btn pri sm', onclick: () => { v.remove(); modalTarefa(p, t); } }, 'Editar atividade'), !eq && t.status.codigo !== 'concluida' && h('button', { class: 'btn sm', title: 'O prazo é ajustado pela equipe Manda4. Peça por aqui.', onclick: () => { v.remove(); novaSolic({ projetoId: p.id, categoria: 'mudanca', assunto: `Pedido de ajuste de prazo: ${t.nome}`, texto: `Gostaria de pedir um ajuste de prazo na atividade “${t.nome}” (hoje: ${fmt(t.inicio)} a ${fmt(t.fim)}).\n\nNovo prazo desejado:\nMotivo:` }); } }, 'Pedir ajuste de prazo'), h('button', { class: 'btn sm', onclick: () => v.remove() }, 'Fechar')), chip(t.status.cor, t.status.rotulo),
@@ -32,9 +32,9 @@ async function drawer(p, t) {
     h('p', { class: 'muted' }, t.descricao), h('p', {}, `📅 ${fmt(t.inicio)} → ${fmt(t.fim)} · ${t.progresso}% concluído`), h('p', {}, '👷 Quem está trabalhando: ', h('b', {}, t.responsavel || 'a definir')),
     (t.deps || []).length > 0 && h('p', { class: 'muted small' }, 'Depende de: ' + t.deps.map(d => { const o = p.tarefas.find(x => x.id === d.de); return o ? `${o.nome} (${d.tipo === 'SS' ? 'começam juntas' : 'espera terminar'}${d.lag ? ', ' + d.lag + 'd' : ''})` : null; }).filter(Boolean).join('; ')),
     eq && rapido(p, t, v),
-    h('h3', { style: 'margin-top:18px' }, 'Informações e documentos'), fio, h('label', {}, 'Adicionar texto'), txt, h('label', {}, 'Anexar documento (até 10 MB)'), file, err,
+    h('h3', { style: 'margin-top:18px' }, 'Informações e documentos'), fio, h('label', {}, 'Adicionar texto'), txt, h('label', {}, 'Anexar documento (até 10 MB)'), file, soEq && h('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:500;color:var(--tinta)' }, soEq, 'Só a equipe vê (o cliente não vê este registro nem o anexo)'), err,
     h('button', { class: 'btn pri', style: 'margin-top:12px', onclick: async ev => {
-      err.replaceChildren(); const body = { texto: txt.value }; const f = file.files[0]; ev.target.disabled = true;
+      err.replaceChildren(); const body = { texto: txt.value }; if (soEq && soEq.checked) body.interna = true; const f = file.files[0]; ev.target.disabled = true;
       try {
         if (f) { if (f.size > 10 * 1024 * 1024) throw new Error('Arquivo acima de 10 MB.'); const buf = new Uint8Array(await f.arrayBuffer()); let s = ''; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode(...buf.subarray(i, i + 32768)); body.arquivo = { nome: f.name, base64: btoa(s) }; }
         await api('POST', `/api/tarefas/${t.id}/itens`, body); txt.value = ''; file.value = ''; await carregar();

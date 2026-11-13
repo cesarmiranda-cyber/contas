@@ -4,7 +4,7 @@ module.exports = ctx => {
   const { A, Audit, bad, crypto, db, exigir, nomeCliente, projetoDe, reg, rota, send, store } = ctx;
 rota('GET', '/api/clientes', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe');
-  send(res, 200, { clientes: db.clientes.map(c => ({ id: c.id, nome: c.nome, email: c.email, empresa: c.empresa, telefone: c.telefone, criadoEm: c.criadoEm, ativo: c.ativo !== false, anonimizado: !!c.anonimizadoEm, aceite: c.aceite || null,
+  send(res, 200, { clientes: db.clientes.map(c => ({ id: c.id, nome: c.nome, email: c.email, empresa: c.empresa, telefone: c.telefone, criadoEm: c.criadoEm, ativo: c.ativo !== false, bloqueadoLogin: !!c.bloqueioLogin, bloqueadoEm: c.bloqueioLogin ? c.bloqueioLogin.em : null, anonimizado: !!c.anonimizadoEm, aceite: c.aceite || null,
     projetoIds: db.projetos.filter(p => p.clientes.includes(c.id)).map(p => p.id), projetos: db.projetos.filter(p => p.clientes.includes(c.id)).map(p => p.nome),
     chamados: db.solicitacoes.filter(x => x.clienteId === c.id).length,
     ultimoAcesso: [...db.logs].reverse().find(l => l.tipo === 'cliente' && (l.acao === 'login' || l.acao === 'cadastro') && l.detalhe === c.email)?.ts || null })) });
@@ -24,6 +24,17 @@ rota('POST', '/api/clientes/([0-9a-f]+)/projetos', async (req, res, m, b, u) => 
 rota('PATCH', '/api/clientes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.');
   if ('ativo' in b) c.ativo = !!b.ativo; reg(u, c.ativo ? 'reativou_cliente' : 'bloqueou_cliente', c.email); store.save(); send(res, 200, { ok: true });
+});
+rota('POST', '/api/clientes/([0-9a-f]+)/desbloquear', async (req, res, m, _b, u) => {
+  exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.');
+  c.bloqueioLogin = null; c.tentativasErradas = 0; reg(u, 'desbloqueou_cliente', c.email); store.save(); send(res, 200, { ok: true });
+});
+// Esqueceu a senha: a equipe gera uma senha provisória (mostrada uma única vez); o cliente é obrigado a trocá-la ao entrar.
+rota('POST', '/api/clientes/([0-9a-f]+)/redefinir-senha', async (req, res, m, _b, u) => {
+  exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c || c.anonimizadoEm) throw bad(404, 'Cliente não encontrado.');
+  const L = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz', N = '23456789', E = '!@#$%&*?'; const pick = (set, n) => Array.from({ length: n }, () => set[crypto.randomInt(set.length)]).join('');
+  const temp = pick(L, 6) + pick(N, 3) + pick(E, 2); const emb = temp.split('').sort(() => crypto.randomInt(3) - 1).join(''); const prov = A.validarSenha(emb) ? temp : emb;
+  c.senha = A.hash(prov); c.trocarSenha = true; c.bloqueioLogin = null; c.tentativasErradas = 0; c.sessoesRevogadasEm = Date.now(); reg(u, 'redefiniu_senha', c.email); store.save(); send(res, 200, { ok: true, senhaProvisoria: prov });
 });
 rota('POST', '/api/clientes/([0-9a-f]+)/anonimizar', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); if (!u.admin) throw bad(403, 'Somente administradores anonimizam clientes.'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.'); if (c.anonimizadoEm) throw bad(409, 'Este cliente já foi anonimizado.');

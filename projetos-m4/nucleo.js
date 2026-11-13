@@ -15,9 +15,9 @@ const suporte = createSuporte({ store, secrets, bitrix, publicUrl: PUBLIC_URL, l
 const MAX_FILE = 10 * 1024 * 1024;
 
 const SEC = {
-  'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
+  'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()', 'Cross-Origin-Opener-Policy': 'same-origin',
   // O portal do cliente abre direto no navegador; só o Bitrix24 pode embutir (iframe) a área da equipe.
-  'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
+  'Content-Security-Policy': "default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
 };
 const bad = (c, m) => Object.assign(new Error(m), { status: c });
 const send = (res, c, o, extra = {}) => { res.writeHead(c, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...extra }); res.end(JSON.stringify(o)); };
@@ -41,9 +41,10 @@ function quem(req) {
     if (!e || e.nome !== nomeFinal || Date.now() - Date.parse(e.visto) > 10 * 60e3) { db.equipe[uid] = { id: uid, nome: nomeFinal, visto: new Date().toISOString() }; store.save(); }
     return { tipo: 'equipe', id: uid, nome: nomeFinal, admin: String(h['x-vibe-user-role'] || '').toUpperCase() === 'ADMIN' };
   }
-  const cid = A.ler(store.secret, A.cookies(h.cookie).pm4);
-  const c = cid && db.clientes.find(x => x.id === cid && x.ativo !== false);
-  return c ? { tipo: 'cliente', id: c.id, nome: c.nome, email: c.email, empresa: c.empresa } : null;
+  const sess = A.ler(store.secret, A.cookies(h.cookie).pm4);
+  const c = sess && db.clientes.find(x => x.id === sess.uid && x.ativo !== false && !x.bloqueioLogin);
+  if (!c || (c.sessoesRevogadasEm && sess.emitidoEm <= c.sessoesRevogadasEm)) return null; // bloqueado, desativado ou saiu: o cookie antigo deixa de valer
+  return { tipo: 'cliente', id: c.id, nome: c.nome, email: c.email, empresa: c.empresa, sessaoExpiraEm: sess.expiraEm, trocarSenha: !!c.trocarSenha };
 }
 const exigir = (u, tipo) => { if (!u) throw bad(401, 'Faça login para continuar.'); if (tipo && u.tipo !== tipo) throw bad(403, 'Acesso negado.'); return u; };
 const cookie = (req, tok, max) => `pm4=${tok}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${max}${process.env.INSECURE_COOKIE ? '' : '; Secure'}`;
@@ -172,6 +173,15 @@ const rota = (m, re, fn) => R.push([m, new RegExp(`^${re}$`), fn]);
 
 const legal = () => { const l = (db.config && db.config.legal) || {}; return { termos: l.termos || '', privacidade: l.privacidade || '', versao: l.versao || 0, publicadoEm: l.publicadoEm || null }; };
 const falhas = new Map();
+const MAX_FALHAS = 3; // tentativas erradas de senha antes de bloquear o acesso
+// Limite por endereço (memória): protege cadastro e login contra rajadas automáticas.
+const janelaIp = new Map();
+function limitaIp(req, chave, max, janela) {
+  if (process.env.SEM_LIMITE_IP) return;
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?', k = chave + '|' + ip, agora = Date.now();
+  const j = (janelaIp.get(k) || []).filter(t => agora - t < janela); if (j.length >= max) throw bad(429, 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente de novo.');
+  j.push(agora); janelaIp.set(k, j); if (janelaIp.size > 5000) for (const [kk, v] of janelaIp) if (!v.some(t => agora - t < janela)) janelaIp.delete(kk);
+}
 
 // ---- aprovação de entrega pelo cliente ----
 const ROT_APROV = { pendente: 'Aguardando aprovação', aprovada: 'Aprovada', ajustes: 'Ajustes solicitados' };
@@ -210,7 +220,7 @@ function novidadesDe(u) {
   const c = db.clientes.find(x => x.id === u.id) || {}; const meus = new Set(db.projetos.filter(p => p.clientes.includes(u.id)).map(p => p.id)); const desde = Date.now() - 30 * 86400e3; const vistas = new Map();
   for (const l of [...db.logs].reverse()) {
     if (l.tipo !== 'equipe' || !ROTULO[l.acao] || Date.parse(l.ts) < desde) continue; if (!(l.cliente === u.id || (l.projetoId && meus.has(l.projetoId)))) continue;
-    if (['criou_tarefa', 'editou_tarefa', 'pediu_cliente', 'solicitou_aprovacao', 'comentou', 'enviou_arquivo'].includes(l.acao) && db.tarefas.some(x => x.projetoId === l.projetoId && x.nome === l.detalhe && x.interna)) continue; // atividade interna nunca aparece
+    if (l.interna) continue; if (['criou_tarefa', 'editou_tarefa', 'pediu_cliente', 'solicitou_aprovacao', 'comentou', 'enviou_arquivo'].includes(l.acao) && db.tarefas.some(x => x.projetoId === l.projetoId && x.nome === l.detalhe && x.interna)) continue; // atividade interna nunca aparece
     const k = l.acao + '|' + l.detalhe + '|' + (l.projetoId || ''); const ant = vistas.get(k); if (ant && Math.abs(Date.parse(ant.ts) - Date.parse(l.ts)) < 3600e3) continue; vistas.set(k, l);
   }
   const itens = [...vistas.values()].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 20).map(l => ({ ts: l.ts, texto: ROTULO[l.acao](l.detalhe), projeto: (projetoDe(l.projetoId) || {}).nome || '' }));
@@ -252,4 +262,4 @@ function filtraLogs(q) {
 const modeloView = m => ({ id: m.id, nome: m.nome, tipo: m.tipo || '', descricao: m.descricao || '', embutido: !!m.embutido, diasUteis: !!m.diasUteis, qtdTarefas: m.tarefas.length, tarefas: m.tarefas.map(t => ({ nome: t.nome, dur: t.dur })) });
 
 // Tudo o que as rotas e o servidor compartilham.
-module.exports = { http, fs, path, createStore, createSecrets, hint, checkWebhook, hostDe, createBitrix, createSuporte, CAT, PRIO, Audit, Modelos, SLA, Ajuda, Relat, A, S, PORT, DATA_DIR, store, db, PUB, secrets, bitrix, crypto, assinar, PUBLIC_URL, linkArquivo, suporte, MAX_FILE, SEC, bad, send, readBody, quem, exigir, cookie, mesmaOrigem, str, TIPOS, PRIORIDADES, lerProjeto, proximoCodigo, validarProjeto, reg, vistos, regUnico, snapT, nomeTarefa, desfazerDe, nomeCliente, tarefasDe, projetoDe, hoje, podeVer, tarefaView, projetoView, lerTarefa, calDe, aplicarTarefas, modeloPorId, aplicarModelo, registraReagendadas, depsBloqueio, ajustesDe, R, rota, legal, falhas, ROT_APROV, logAprov, tarefaAcessivel, enviarArquivo, protocolo, cardUrl, msgView, solView, solAcessivel, ROTULO, novidadesDe, exigirAdmin, estadoSuporte, RESPOSTAS_PADRAO, artigoPublico, gerarRelatorio, guardarRelatorio, rodarRelatoriosSemanais, semanaValida, filtraLogs, modeloView };
+module.exports = { MAX_FALHAS, limitaIp, http, fs, path, createStore, createSecrets, hint, checkWebhook, hostDe, createBitrix, createSuporte, CAT, PRIO, Audit, Modelos, SLA, Ajuda, Relat, A, S, PORT, DATA_DIR, store, db, PUB, secrets, bitrix, crypto, assinar, PUBLIC_URL, linkArquivo, suporte, MAX_FILE, SEC, bad, send, readBody, quem, exigir, cookie, mesmaOrigem, str, TIPOS, PRIORIDADES, lerProjeto, proximoCodigo, validarProjeto, reg, vistos, regUnico, snapT, nomeTarefa, desfazerDe, nomeCliente, tarefasDe, projetoDe, hoje, podeVer, tarefaView, projetoView, lerTarefa, calDe, aplicarTarefas, modeloPorId, aplicarModelo, registraReagendadas, depsBloqueio, ajustesDe, R, rota, legal, falhas, ROT_APROV, logAprov, tarefaAcessivel, enviarArquivo, protocolo, cardUrl, msgView, solView, solAcessivel, ROTULO, novidadesDe, exigirAdmin, estadoSuporte, RESPOSTAS_PADRAO, artigoPublico, gerarRelatorio, guardarRelatorio, rodarRelatoriosSemanais, semanaValida, filtraLogs, modeloView };

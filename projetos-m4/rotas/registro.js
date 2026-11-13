@@ -25,7 +25,8 @@ rota('GET', '/api/logs\\.csv', async (req, res, _m, _b, u) => {
 rota('GET', '/api/projetos/([0-9a-f]+)/historico', async (req, res, m, _b, u) => {
   exigir(u); const p = projetoDe(m[1]); if (!p || !podeVer(u, p)) throw bad(404, 'Projeto não encontrado.'); const q = new URL(req.url, 'http://x').searchParams;
   if (u.tipo === 'equipe') { q.set('projeto', p.id); return send(res, 200, { itens: filtraLogs(q), completo: true }); }
-  const itens = []; for (let i = db.logs.length - 1; i >= 0 && itens.length < 300; i--) { const l = db.logs[i]; if (l.projetoId !== p.id) continue; const e = Audit.paraCliente(l); if (e) itens.push(e); }
+  const ocultas = { ids: new Set(), nomes: new Set() }; for (const t of tarefasDe(p.id)) if (t.interna) { ocultas.ids.add(t.id); ocultas.nomes.add(t.nome); }
+  const itens = []; for (let i = db.logs.length - 1; i >= 0 && itens.length < 300; i--) { const l = db.logs[i]; if (l.projetoId !== p.id) continue; const e = Audit.paraCliente(l, ocultas); if (e) itens.push(e); }
   send(res, 200, { itens, completo: false });
 });
 };

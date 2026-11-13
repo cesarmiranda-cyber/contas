@@ -242,3 +242,15 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 
 @media(hover:none){.alca{width:36%;max-width:18px}.cx{width:18px;height:18px;margin-top:-9px}.cx.ini{left:-26px}.cx.fim{right:-26px}}
 .alca{touch-action:none}
+
+/* segurança: dica de senha, sessão e avisos */
+.dica-senha{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:3px;font-size:13px;color:var(--mudo,#5b6b7f)}
+.dica-senha li::before{content:'○';display:inline-block;width:18px;color:#9aa7b6}
+.dica-senha li.ok{color:var(--verde,#13795b);font-weight:500}
+.dica-senha li.ok::before{content:'✓';color:var(--verde,#13795b);font-weight:700}
+.campo-senha{display:flex;justify-content:flex-end;margin-top:2px}
+.ver-senha{background:none;border:0;padding:2px 0;color:var(--marca-2,#0b5cad);font:inherit;font-size:13px;cursor:pointer;text-decoration:underline}
+.aviso-sessao{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;background:#0b2a4a;color:#fff;padding:12px 16px;border-radius:12px;display:flex;gap:14px;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:calc(100vw - 32px)}
+.aviso-login{background:#fff4e5;color:#8a4b00;padding:10px 12px;border-radius:10px;margin-top:12px;border:1px solid #ffd9a8}
+.selo-int{background:#fff4e5;color:#8a4b00;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:600}
+.senha-prov{font:600 22px/1.2 ui-monospace,Menlo,monospace;background:#f1f5f9;border-radius:10px;padding:14px;text-align:center;letter-spacing:1px;user-select:all;margin:10px 0}

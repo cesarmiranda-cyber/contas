@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'); const assert = require('node:assert'); const fs = require('fs'); const os = require('os'); const path = require('path');
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pm4-')); process.env.INSECURE_COOKIE = '1'; process.env.PUBLIC_URL = 'https://app.example.com';
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pm4-')); process.env.INSECURE_COOKIE = '1'; process.env.SEM_LIMITE_IP = '1'; process.env.PUBLIC_URL = 'https://app.example.com';
 const { server, store } = require('../server');
 let base; test.before(() => new Promise(ok => server.listen(0, () => { base = 'http://127.0.0.1:' + server.address().port; ok(); })));
 test.after(() => { server.close(); store.flush(); });
@@ -8,19 +8,19 @@ const EQ = { 'x-vibe-user-id': '7', 'x-vibe-user-name-encoded': 'Ana%20Souza', '
 const call = async (m, u, body, headers = {}) => { const r = await fetch(base + u, { method: m, headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...headers }, body: body && JSON.stringify(body) }); return { s: r.status, j: await r.json().catch(() => ({})), c: r.headers.get('set-cookie') }; };
 
 test('fluxo completo equipe x clientes', async () => {
-  const c1 = await call('POST', '/api/auth/cadastro', { nome: 'Cli Um', email: 'um@x.com', senha: 'senha1234' }), c2 = await call('POST', '/api/auth/cadastro', { nome: 'Cli Dois', email: 'dois@x.com', senha: 'senha1234' });
+  const c1 = await call('POST', '/api/auth/cadastro', { nome: 'Cli Um', email: 'um@x.com', senha: 'Senha@1234' }), c2 = await call('POST', '/api/auth/cadastro', { nome: 'Cli Dois', email: 'dois@x.com', senha: 'Senha@1234' });
   assert.strictEqual(c1.s, 201); const k1 = { cookie: c1.c.split(';')[0] }, k2 = { cookie: c2.c.split(';')[0] };
-  assert.strictEqual((await call('POST', '/api/auth/cadastro', { nome: 'x', email: 'um@x.com', senha: 'senha1234' })).s, 409);
+  assert.strictEqual((await call('POST', '/api/auth/cadastro', { nome: 'x', email: 'um@x.com', senha: 'Senha@1234' })).s, 409);
   assert.strictEqual((await call('POST', '/api/projetos', { nome: 'P' }, k1)).s, 403); // cliente não cria projeto
   const clientes = (await call('GET', '/api/clientes', null, EQ)).j.clientes; const id1 = clientes.find(c => c.email === 'um@x.com').id;
   assert.strictEqual((await call('GET', '/api/painel', null, EQ)).j.aguardando, 2); // ninguém vinculado ainda
   const p = (await call('POST', '/api/projetos', { nome: 'Implantação Bitrix' }, EQ)).j.projeto;
   await call('PATCH', '/api/projetos/' + p.id, { clientes: [id1] }, EQ);
   assert.strictEqual((await call('GET', '/api/painel', null, EQ)).j.aguardando, 1);
-  const a = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Levantamento', inicio: '2026-01-05', fim: '2026-01-09' }, EQ);
-  const b = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Configuração', inicio: '2026-01-06', fim: '2026-01-08', deps: [{ de: a.j.tarefa, tipo: 'FS', lag: 0 }] }, EQ);
+  const a = await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Levantamento', inicio: '2026-01-05', fim: '2026-01-09' }, EQ);
+  const b = await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Configuração', inicio: '2026-01-06', fim: '2026-01-08', deps: [{ de: a.j.tarefa, tipo: 'FS', lag: 0 }] }, EQ);
   assert.deepStrictEqual(b.j.reagendadas, [b.j.tarefa]);
-  await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Reunião interna', inicio: '2026-01-05', fim: '2026-01-05', interna: true }, EQ);
+  await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Reunião interna', inicio: '2026-01-05', fim: '2026-01-05', interna: true }, EQ);
   assert.strictEqual((await call('PATCH', '/api/tarefas/' + a.j.tarefa, { deps: [{ de: b.j.tarefa }] }, EQ)).s, 400); // ciclo
   const v1 = (await call('GET', '/api/projetos/' + p.id, null, k1)).j.projeto; assert.strictEqual(v1.tarefas.length, 2); assert.strictEqual(v1.tarefas.find(t => t.nome === 'Configuração').inicio, '2026-01-10');
   assert.strictEqual((await call('GET', '/api/projetos/' + p.id, null, k2)).s, 404); assert.strictEqual((await call('GET', '/api/projetos', null, k2)).j.projetos.length, 0);
@@ -36,7 +36,7 @@ test('fluxo completo equipe x clientes', async () => {
 });
 
 test('campos do projeto: validação, código automático e campos internos ocultos ao cliente', async () => {
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cli Tres', email: 'tres@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cli Tres', email: 'tres@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] };
   const id = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'tres@x.com').id;
   assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', link: 'javascript:alert(1)' }, EQ)).s, 400);
   assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', inicioPrevisto: '2026-05-10', fimPrevisto: '2026-05-01' }, EQ)).s, 400);
@@ -46,7 +46,7 @@ test('campos do projeto: validação, código automático e campos internos ocul
   assert.strictEqual(r.s, 201); const p = r.j.projeto; assert.match(p.codigo, /^PRJ-\d{4}$/); assert.strictEqual(p.valor, 12500.5);
   assert.strictEqual((await call('POST', '/api/projetos', { nome: 'Dup', codigo: p.codigo }, EQ)).s, 409);
   await call('PATCH', '/api/projetos/' + p.id, { clientes: [id] }, EQ);
-  await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'T', inicio: '2026-01-05', fim: '2026-01-25' }, EQ);
+  await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'T', inicio: '2026-01-05', fim: '2026-01-25' }, EQ);
   const eq = (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto, cli = (await call('GET', '/api/projetos/' + p.id, null, k)).j.projeto;
   assert.strictEqual(eq.valor, 12500.5); assert.strictEqual(eq.obsInternas, 'margem apertada'); assert.strictEqual(eq.desvioDias, 5); assert.notStrictEqual(eq.resumo.cor, 'verde'); // previsão além do prazo contratado (com datas antigas a atividade também está atrasada)
   for (const campo of ['valor', 'obsInternas', 'negocioBitrix']) assert.ok(!(campo in cli), campo + ' vazou para o cliente');
@@ -79,7 +79,7 @@ const aguarda = async (fn, ms = 2000) => { const t = Date.now(); while (Date.now
 
 test('chamado de suporte vira card no funil: configuração, conteúdo, idempotência, erro e reenvio', async () => {
   const f = fakeBitrix();
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Joana Lima', email: 'joana@acme.com', senha: 'senha1234', empresa: 'Acme' }); const k = { cookie: c.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Joana Lima', email: 'joana@acme.com', senha: 'Senha@1234', empresa: 'Acme' }); const k = { cookie: c.c.split(';')[0] };
   // permissões da configuração
   assert.strictEqual((await call('GET', '/api/config/suporte', null, k)).s, 403);
   assert.strictEqual((await call('GET', '/api/config/suporte', null, MEMBRO)).s, 403);
@@ -119,7 +119,7 @@ test('chamado de suporte vira card no funil: configuração, conteúdo, idempot�
 });
 
 test('ativação do cliente: aguardando → vinculado → removido → bloqueado', async () => {
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Pedro Alves', email: 'pedro@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Pedro Alves', email: 'pedro@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] };
   const lista = async () => (await call('GET', '/api/clientes', null, EQ)).j.clientes; const cli = (await lista()).find(x => x.email === 'pedro@x.com');
   assert.strictEqual(cli.projetoIds.length, 0); assert.strictEqual((await call('GET', '/api/projetos', null, k)).j.projetos.length, 0); // aguardando ativação
   const p1 = (await call('POST', '/api/projetos', { nome: 'Projeto A' }, EQ)).j.projeto, p2 = (await call('POST', '/api/projetos', { nome: 'Projeto B' }, EQ)).j.projeto;
@@ -132,12 +132,12 @@ test('ativação do cliente: aguardando → vinculado → removido → bloqueado
   const novo = (await call('POST', '/api/projetos', { nome: 'Já com cliente', clientes: [cli.id] }, EQ)).j.projeto; assert.strictEqual(novo.clientes.length, 1); // criar projeto já vinculado
   assert.ok((await call('GET', '/api/logs', null, EQ)).j.logs.some(l => l.acao === 'alterou_acesso_cliente'));
   await call('PATCH', '/api/clientes/' + cli.id, { ativo: false }, EQ); assert.strictEqual((await call('GET', '/api/projetos', null, k)).s, 401); // bloqueado perde o acesso
-  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'pedro@x.com', senha: 'senha1234' })).s, 401);
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'pedro@x.com', senha: 'Senha@1234' })).s, 401);
 });
 
 test('chamado: conversa, anexo com link assinado, etapa do card e avaliação', async () => {
   const f = fakeBitrix(); const Sch = require('../lib/schedule');
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Rita Gomes', email: 'rita@x.com', senha: 'senha1234' }), o = await call('POST', '/api/auth/cadastro', { nome: 'Outro Cliente', email: 'outro@x.com', senha: 'senha1234' });
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Rita Gomes', email: 'rita@x.com', senha: 'Senha@1234' }), o = await call('POST', '/api/auth/cadastro', { nome: 'Outro Cliente', email: 'outro@x.com', senha: 'Senha@1234' });
   const k = { cookie: c.c.split(';')[0] }, ko = { cookie: o.c.split(';')[0] };
   const r = await call('POST', '/api/solicitacoes', { assunto: 'Preciso de ajuda', texto: 'Detalhes', categoria: 'duvida' }, k); const db = () => require('../server').store.db; const sol = () => db().solicitacoes.find(s => s.protocolo === r.j.protocolo);
   await aguarda(() => sol().bitrix.status === 'enviado'); assert.strictEqual(sol().etapa.nome, 'Novo chamado'); const deal = sol().bitrix.dealId;
@@ -169,12 +169,12 @@ test('chamado: conversa, anexo com link assinado, etapa do card e avaliação', 
 
 test('início do cliente: pendências, o que está acontecendo e novidades', async () => {
   const Sch = require('../lib/schedule'); const h = Sch.hojeSP(); const d = n => Sch.addDays(h, n);
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Lia Prado', email: 'lia@x.com', senha: 'senha1234' }), o = await call('POST', '/api/auth/cadastro', { nome: 'Sem Projeto', email: 'sem@x.com', senha: 'senha1234' });
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Lia Prado', email: 'lia@x.com', senha: 'Senha@1234' }), o = await call('POST', '/api/auth/cadastro', { nome: 'Sem Projeto', email: 'sem@x.com', senha: 'Senha@1234' });
   const k = { cookie: c.c.split(';')[0] }, ko = { cookie: o.c.split(';')[0] }; const id = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'lia@x.com').id;
   const p = (await call('POST', '/api/projetos', { nome: 'Projeto Lia', clientes: [id] }, EQ)).j.projeto;
-  const t1 = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Enviar acessos', inicio: d(-2), fim: d(5), aguardaCliente: true, pedido: 'Envie a lista de usuários' }, EQ)).j.tarefa;
-  await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Configurar CRM', inicio: d(-1), fim: d(8) }, EQ); await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Treinamento', inicio: d(6), fim: d(9) }, EQ);
-  await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Reunião interna secreta', inicio: d(0), fim: d(0), interna: true, aguardaCliente: true, pedido: 'não deveria aparecer' }, EQ);
+  const t1 = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Enviar acessos', inicio: d(-2), fim: d(5), aguardaCliente: true, pedido: 'Envie a lista de usuários' }, EQ)).j.tarefa;
+  await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Configurar CRM', inicio: d(-1), fim: d(8) }, EQ); await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Treinamento', inicio: d(6), fim: d(9) }, EQ);
+  await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Reunião interna secreta', inicio: d(0), fim: d(0), interna: true, aguardaCliente: true, pedido: 'não deveria aparecer' }, EQ);
   const ini = (await call('GET', '/api/inicio', null, k)).j;
   assert.deepStrictEqual(ini.pendencias.map(x => x.tarefa), ['Enviar acessos']); assert.strictEqual(ini.pendencias[0].pedido, 'Envie a lista de usuários'); assert.strictEqual(ini.pendencias[0].respondidoEm, null);
   assert.deepStrictEqual(ini.agora.map(x => x.tarefa).sort(), ['Configurar CRM', 'Enviar acessos']); assert.deepStrictEqual(ini.proximas.map(x => x.tarefa), ['Treinamento']); assert.ok(!JSON.stringify(ini).includes('secreta'));
@@ -192,8 +192,8 @@ test('início do cliente: pendências, o que está acontecendo e novidades', asy
 
 test('datas: a API informa quais atividades foram reagendadas pelas dependências', async () => {
   const p = (await call('POST', '/api/projetos', { nome: 'Datas' }, EQ)).j.projeto;
-  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Primeira', inicio: '2030-01-07', fim: '2030-01-09' }, EQ)).j.tarefa;
-  const r = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Segunda', inicio: '2030-01-07', fim: '2030-01-08', deps: [{ de: a, tipo: 'FS' }] }, EQ);
+  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Primeira', inicio: '2030-01-07', fim: '2030-01-09' }, EQ)).j.tarefa;
+  const r = await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Segunda', inicio: '2030-01-07', fim: '2030-01-08', deps: [{ de: a, tipo: 'FS' }] }, EQ);
   assert.deepStrictEqual(r.j.ajustes.map(x => [x.nome, x.inicio, x.fim]), [['Segunda', '2030-01-10', '2030-01-11']]); // a própria atividade foi empurrada: o usuário é avisado
   const m = await call('PATCH', '/api/tarefas/' + a, { inicio: '2030-01-14', fim: '2030-01-16' }, EQ); // mover a primeira empurra a segunda
   assert.deepStrictEqual(m.j.ajustes.map(x => [x.nome, x.inicio]), [['Segunda', '2030-01-17']]);
@@ -204,12 +204,12 @@ test('datas: a API informa quais atividades foram reagendadas pelas dependência
 
 test('registro de alterações: quem mudou o quê (de → para), visão do cliente e acessos', async () => {
   const fs2 = require('fs'); const Sch = require('../lib/schedule'); const d = n => Sch.addDays('2030-03-04', n);
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Vera Lopes', email: 'vera@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Vera Lopes', email: 'vera@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] };
   const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'vera@x.com').id;
   const p = (await call('POST', '/api/projetos', { nome: 'Projeto Log', valor: 1000, clientes: [cid] }, EQ)).j.projeto;
-  const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Levantar', inicio: d(0), fim: d(2) }, EQ)).j.tarefa;
-  const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Configurar', inicio: d(3), fim: d(4), deps: [{ de: A_, tipo: 'FS' }] }, EQ)).j.tarefa;
-  const I_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Reunião interna', inicio: d(0), fim: d(0), interna: true }, EQ)).j.tarefa;
+  const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Levantar', inicio: d(0), fim: d(2) }, EQ)).j.tarefa;
+  const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Configurar', inicio: d(3), fim: d(4), deps: [{ de: A_, tipo: 'FS' }] }, EQ)).j.tarefa;
+  const I_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Reunião interna', inicio: d(0), fim: d(0), interna: true }, EQ)).j.tarefa;
   const hist = async (h) => (await call('GET', `/api/projetos/${p.id}/historico`, null, h)).j.itens;
   // editar datas e andamento → de → para; sucessora reagendada com motivo
   await call('PATCH', '/api/tarefas/' + A_, { inicio: d(5), fim: d(7), progresso: 30 }, EQ);
@@ -253,7 +253,7 @@ test('registro de alterações: quem mudou o quê (de → para), visão do clien
 
 test('excluir atividade e projeto funciona (DELETE sem corpo) e respeita permissões', async () => {
   const p = (await call('POST', '/api/projetos', { nome: 'Para excluir' }, EQ)).j.projeto;
-  const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Tarefa', inicio: '2030-01-01', fim: '2030-01-02' }, EQ)).j.tarefa;
+  const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Tarefa', inicio: '2030-01-01', fim: '2030-01-02' }, EQ)).j.tarefa;
   assert.strictEqual((await fetch(base + '/api/tarefas/' + t, { method: 'DELETE', headers: EQ })).status, 200);
   assert.strictEqual((await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas.length, 0);
   assert.strictEqual((await fetch(base + '/api/projetos/' + p.id, { method: 'DELETE', headers: MEMBRO })).status, 403); // só administrador
@@ -273,12 +273,12 @@ test('cache: a página aponta para a versão atual dos arquivos e nunca é guard
 
 test('início do cliente (resumo de projetos e suporte), documentos do projeto e vez do chamado', async () => {
   const Sch = require('../lib/schedule'); const h = Sch.hojeSP(); const d = n => Sch.addDays(h, n);
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Nina Reis', email: 'nina@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Nina Reis', email: 'nina@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] };
   const vazio = (await call('GET', '/api/inicio', null, k)).j; assert.strictEqual(vazio.projetos.total, 0); assert.strictEqual(vazio.suporte.total, 0); assert.strictEqual(vazio.projetos.proxima, null); // aguardando ativação
   const id = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'nina@x.com').id;
   const p1 = (await call('POST', '/api/projetos', { nome: 'Projeto N1', clientes: [id] }, EQ)).j.projeto; const p2 = (await call('POST', '/api/projetos', { nome: 'Projeto N2', clientes: [id] }, EQ)).j.projeto;
-  const t1 = (await call('POST', `/api/projetos/${p1.id}/tarefas`, { nome: 'Entrega 1', inicio: d(-3), fim: d(4), progresso: 100 }, EQ)).j.tarefa; await call('POST', `/api/projetos/${p1.id}/tarefas`, { nome: 'Entrega 2', inicio: d(-2), fim: d(6), progresso: 20 }, EQ);
-  const ti = (await call('POST', `/api/projetos/${p1.id}/tarefas`, { nome: 'Interna', inicio: d(-1), fim: d(1), interna: true }, EQ)).j.tarefa;
+  const t1 = (await call('POST', `/api/projetos/${p1.id}/tarefas`, { interna: false, nome: 'Entrega 1', inicio: d(-3), fim: d(4), progresso: 100 }, EQ)).j.tarefa; await call('POST', `/api/projetos/${p1.id}/tarefas`, { interna: false, nome: 'Entrega 2', inicio: d(-2), fim: d(6), progresso: 20 }, EQ);
+  const ti = (await call('POST', `/api/projetos/${p1.id}/tarefas`, { interna: false, nome: 'Interna', inicio: d(-1), fim: d(1), interna: true }, EQ)).j.tarefa;
   const ini = (await call('GET', '/api/inicio', null, k)).j; assert.strictEqual(ini.projetos.total, 2); assert.strictEqual(ini.projetos.unicoId, null); assert.strictEqual(ini.projetos.proxima.tarefa, 'Entrega 2'); assert.ok(ini.projetos.proxima.fim === d(6) && !ini.projetos.proxima.atrasada);
   assert.strictEqual(ini.projetos.verde + ini.projetos.amarelo + ini.projetos.vermelho, 2); assert.ok(!JSON.stringify(ini).includes('Interna'));
   // documentos: do projeto, sem os de atividade interna para o cliente
@@ -295,12 +295,12 @@ test('início do cliente (resumo de projetos e suporte), documentos do projeto e
 });
 
 test('permissões: o cliente não altera prazos, atividades nem projetos; só a equipe', async () => {
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Curioso', email: 'curioso@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Curioso', email: 'curioso@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] };
   const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'curioso@x.com').id;
   const p = (await call('POST', '/api/projetos', { nome: 'Prazo protegido', clientes: [cid] }, EQ)).j.projeto;
-  const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Entrega', inicio: '2031-01-05', fim: '2031-01-09' }, EQ)).j.tarefa;
+  const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Entrega', inicio: '2031-01-05', fim: '2031-01-09' }, EQ)).j.tarefa;
   const antes = JSON.stringify((await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas);
-  const tentativas = [['PATCH', '/api/tarefas/' + t, { inicio: '2031-02-01', fim: '2031-02-05' }], ['PATCH', '/api/tarefas/' + t, { progresso: 100 }], ['PATCH', '/api/tarefas/' + t, { deps: [] }], ['POST', `/api/projetos/${p.id}/tarefas`, { nome: 'X', inicio: '2031-01-01', fim: '2031-01-02' }],
+  const tentativas = [['PATCH', '/api/tarefas/' + t, { inicio: '2031-02-01', fim: '2031-02-05' }], ['PATCH', '/api/tarefas/' + t, { progresso: 100 }], ['PATCH', '/api/tarefas/' + t, { deps: [] }], ['POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'X', inicio: '2031-01-01', fim: '2031-01-02' }],
     ['DELETE', '/api/tarefas/' + t], ['PATCH', '/api/projetos/' + p.id, { fimPrevisto: '2031-12-01' }], ['PATCH', '/api/projetos/' + p.id, { clientes: [] }], ['DELETE', '/api/projetos/' + p.id], ['POST', `/api/clientes/${cid}/projetos`, { projetos: [] }]];
   for (const [m, u, b] of tentativas) { const r = m === 'DELETE' ? await fetch(base + u, { method: m, headers: k }) : await call(m, u, b, k); assert.strictEqual(r.status ?? r.s, 403, `${m} ${u} deveria ser 403 para o cliente`); }
   assert.strictEqual(JSON.stringify((await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas), antes, 'nada mudou'); // prazos e atividades intactos
@@ -311,8 +311,8 @@ test('permissões: o cliente não altera prazos, atividades nem projetos; só a 
 
 test('mover antes do que a dependência permite: o app explica e deixa escolher (defasagem, remover, empurrar)', async () => {
   const mk = async () => { const p = (await call('POST', '/api/projetos', { nome: 'Bloqueio' }, EQ)).j.projeto;
-    const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Reunião', inicio: '2032-01-05', fim: '2032-01-09' }, EQ)).j.tarefa;
-    const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Cadastro', inicio: '2032-01-10', fim: '2032-01-12', deps: [{ de: A_, tipo: 'FS', lag: 100 }] }, EQ)).j.tarefa; // +100d: começa em 20/04
+    const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Reunião', inicio: '2032-01-05', fim: '2032-01-09' }, EQ)).j.tarefa;
+    const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Cadastro', inicio: '2032-01-10', fim: '2032-01-12', deps: [{ de: A_, tipo: 'FS', lag: 100 }] }, EQ)).j.tarefa; // +100d: começa em 20/04
     const get = async id => (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas.find(x => x.id === id); return { p, A_, B_, get }; };
   let { p, A_, B_, get } = await mk(); assert.strictEqual((await get(B_)).inicio, '2032-04-19'); // 09/01 + 1 + 100
   // sem escolha: 409 com o motivo, e nada muda
@@ -331,7 +331,7 @@ test('mover antes do que a dependência permite: o app explica e deixa escolher 
   // defasagem impossível (< -365) é recusada; cliente não usa isso
   ({ p, A_, B_, get } = await mk()); assert.strictEqual((await call('PATCH', '/api/tarefas/' + B_, { inicio: '2030-01-01', fim: '2030-01-02', dependencia: 'defasagem' }, EQ)).s, 400); assert.strictEqual((await get(B_)).inicio, '2032-04-19');
   // início de tarefa SEM dependência nunca é bloqueado
-  const livre = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Livre', inicio: '2032-06-01', fim: '2032-06-02' }, EQ)).j.tarefa; assert.strictEqual((await call('PATCH', '/api/tarefas/' + livre, { inicio: '2031-01-01', fim: '2031-01-02' }, EQ)).s, 200);
+  const livre = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Livre', inicio: '2032-06-01', fim: '2032-06-02' }, EQ)).j.tarefa; assert.strictEqual((await call('PATCH', '/api/tarefas/' + livre, { inicio: '2031-01-01', fim: '2031-01-02' }, EQ)).s, 200);
 });
 
 test('dias úteis no projeto: normaliza datas, respeita feriados e dependências, e registra a mudança de calendário', async () => {
@@ -339,18 +339,18 @@ test('dias úteis no projeto: normaliza datas, respeita feriados e dependências
   assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', feriadosExtras: 'amanhã' }, EQ)).s, 400);
   const get = async () => (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto;
   // sábado–domingo viram segunda; a API avisa o ajuste
-  const r = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Fim de semana', inicio: '2031-01-04', fim: '2031-01-05' }, EQ); assert.deepStrictEqual(r.j.ajustes.map(x => [x.inicio, x.fim]), [['2031-01-06', '2031-01-06']]);
-  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'A', inicio: '2031-01-06', fim: '2031-01-10' }, EQ)).j.tarefa;
-  const b = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'B', inicio: '2031-01-06', fim: '2031-01-07', deps: [{ de: a, tipo: 'FS', lag: 1 }] }, EQ)).j.tarefa; // a termina sexta; +1 dia útil de defasagem
+  const r = await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Fim de semana', inicio: '2031-01-04', fim: '2031-01-05' }, EQ); assert.deepStrictEqual(r.j.ajustes.map(x => [x.inicio, x.fim]), [['2031-01-06', '2031-01-06']]);
+  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'A', inicio: '2031-01-06', fim: '2031-01-10' }, EQ)).j.tarefa;
+  const b = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'B', inicio: '2031-01-06', fim: '2031-01-07', deps: [{ de: a, tipo: 'FS', lag: 1 }] }, EQ)).j.tarefa; // a termina sexta; +1 dia útil de defasagem
   let t = (await get()).tarefas.find(x => x.id === b); assert.deepStrictEqual([t.inicio, t.fim], ['2031-01-14', '2031-01-15']); // ter e qua (pula o fim de semana e a defasagem)
   // mover B para antes: o motivo e a defasagem são em dias úteis
   const bl = await call('PATCH', '/api/tarefas/' + b, { inicio: '2031-01-11', fim: '2031-01-14' }, EQ); assert.strictEqual(bl.s, 409); assert.strictEqual(bl.j.minimo, '2031-01-14'); assert.strictEqual(bl.j.motivos[0].base, '2031-01-13'); // sábado pedido → segunda (13) já é anterior ao mínimo
   assert.strictEqual((await call('PATCH', '/api/tarefas/' + b, { inicio: '2031-01-13', fim: '2031-01-14', dependencia: 'defasagem' }, EQ)).s, 200); t = (await get()).tarefas.find(x => x.id === b); assert.deepStrictEqual([t.inicio, t.deps[0].lag], ['2031-01-13', 0]);
   // feriados extras entram na contagem: carnaval (04 e 05/03)
-  const c = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Carnaval', inicio: '2031-03-03', fim: '2031-03-03' }, EQ)).j.tarefa; const d = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Depois', inicio: '2031-03-03', fim: '2031-03-03', deps: [{ de: c, tipo: 'FS', lag: 0 }] }, EQ)).j.tarefa;
+  const c = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Carnaval', inicio: '2031-03-03', fim: '2031-03-03' }, EQ)).j.tarefa; const d = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Depois', inicio: '2031-03-03', fim: '2031-03-03', deps: [{ de: c, tipo: 'FS', lag: 0 }] }, EQ)).j.tarefa;
   assert.strictEqual((await get()).tarefas.find(x => x.id === d).inicio, '2031-03-06'); assert.ok((await get()).feriados.includes('2031-03-04') && (await get()).feriados.includes('2031-04-21')); // feriados para o Gantt
   // ligar o calendário em um projeto existente normaliza as datas e deixa o registro
-  const q = (await call('POST', '/api/projetos', { nome: 'Corridos' }, EQ)).j.projeto; const e = (await call('POST', `/api/projetos/${q.id}/tarefas`, { nome: 'Sábado', inicio: '2031-01-04', fim: '2031-01-05' }, EQ)).j.tarefa; assert.strictEqual((await call('GET', '/api/projetos/' + q.id, null, EQ)).j.projeto.tarefas[0].inicio, '2031-01-04'); // corridos: sábado vale
+  const q = (await call('POST', '/api/projetos', { nome: 'Corridos' }, EQ)).j.projeto; const e = (await call('POST', `/api/projetos/${q.id}/tarefas`, { interna: false, nome: 'Sábado', inicio: '2031-01-04', fim: '2031-01-05' }, EQ)).j.tarefa; assert.strictEqual((await call('GET', '/api/projetos/' + q.id, null, EQ)).j.projeto.tarefas[0].inicio, '2031-01-04'); // corridos: sábado vale
   await call('PATCH', '/api/projetos/' + q.id, { diasUteis: true }, EQ); const q2 = (await call('GET', '/api/projetos/' + q.id, null, EQ)).j.projeto; assert.strictEqual(q2.tarefas[0].inicio, '2031-01-06'); assert.ok(q2.diasUteis);
   const hist = (await call('GET', `/api/projetos/${q.id}/historico`, null, EQ)).j.itens; assert.ok(hist.some(x => x.acao === 'editou_projeto' && x.diff.some(y => y.campo === 'Contar só dias úteis' && y.para === 'Sim'))); assert.ok(hist.some(x => x.acao === 'reagendada_dependencia' && /calendário/.test(x.motivo)));
   assert.ok(e);
@@ -358,7 +358,7 @@ test('dias úteis no projeto: normaliza datas, respeita feriados e dependências
 
 test('modelos de projeto: embutidos, criar projeto a partir do modelo, salvar e excluir modelo', async () => {
   const Sch = require('../lib/schedule');
-  assert.strictEqual((await call('GET', '/api/modelos')).s, 401); assert.strictEqual((await call('GET', '/api/modelos', null, { cookie: (await call('POST', '/api/auth/cadastro', { nome: 'Cli M', email: 'clim@x.com', senha: 'senha1234' })).c.split(';')[0] })).s, 403);
+  assert.strictEqual((await call('GET', '/api/modelos')).s, 401); assert.strictEqual((await call('GET', '/api/modelos', null, { cookie: (await call('POST', '/api/auth/cadastro', { nome: 'Cli M', email: 'clim@x.com', senha: 'Senha@1234' })).c.split(';')[0] })).s, 403);
   const lista = (await call('GET', '/api/modelos', null, EQ)).j.modelos; const impl = lista.find(m => m.id === 'implantacao-bitrix24'); assert.ok(impl.embutido && impl.qtdTarefas === 12 && impl.diasUteis);
   assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', modeloId: 'nao-existe' }, EQ)).s, 400); assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', modeloId: 'treinamento', inicioModelo: 'ontem' }, EQ)).s, 400);
   // projeto a partir do modelo (segunda-feira 2031-01-06)
@@ -381,9 +381,9 @@ test('modelos de projeto: embutidos, criar projeto a partir do modelo, salvar e 
 });
 
 test('aprovação de entrega: só o cliente do projeto decide; aprovar ou pedir ajustes, com autor, data e registro', async () => {
-  const c1 = await call('POST', '/api/auth/cadastro', { nome: 'Paula Dias', email: 'paula@x.com', senha: 'senha1234' }), c2 = await call('POST', '/api/auth/cadastro', { nome: 'Outra Pessoa', email: 'outra@x.com', senha: 'senha1234' }); const k1 = { cookie: c1.c.split(';')[0] }, k2 = { cookie: c2.c.split(';')[0] };
+  const c1 = await call('POST', '/api/auth/cadastro', { nome: 'Paula Dias', email: 'paula@x.com', senha: 'Senha@1234' }), c2 = await call('POST', '/api/auth/cadastro', { nome: 'Outra Pessoa', email: 'outra@x.com', senha: 'Senha@1234' }); const k1 = { cookie: c1.c.split(';')[0] }, k2 = { cookie: c2.c.split(';')[0] };
   const id1 = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'paula@x.com').id; const p = (await call('POST', '/api/projetos', { nome: 'Aprovações', clientes: [id1] }, EQ)).j.projeto;
-  const mk = b => call('POST', `/api/projetos/${p.id}/tarefas`, { inicio: '2031-02-03', fim: '2031-02-05', ...b }, EQ).then(r => r.j.tarefa);
+  const mk = b => call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, inicio: '2031-02-03', fim: '2031-02-05', ...b }, EQ).then(r => r.j.tarefa);
   const t = await mk({ nome: 'Homologação', requerAprovacao: true }), interna = await mk({ nome: 'Interna', interna: true, requerAprovacao: true });
   const tv = async (h = EQ) => (await call('GET', '/api/projetos/' + p.id, null, h)).j.projeto.tarefas.find(x => x.id === t); assert.strictEqual((await tv()).requerAprovacao, true);
   // ninguém decide antes de a equipe enviar; cliente não envia; só o cliente do projeto decide
@@ -407,9 +407,9 @@ test('aprovação de entrega: só o cliente do projeto decide; aprovar ou pedir 
 });
 
 test('desfazer pelo log: restaura o valor original, avisa se mudou depois e registra', async () => {
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Un', email: 'un@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] }; const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'un@x.com').id;
-  const p = (await call('POST', '/api/projetos', { nome: 'Desfazer', valor: 1000, clientes: [cid] }, EQ)).j.projeto; const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Etapa A', inicio: '2031-02-03', fim: '2031-02-05' }, EQ)).j.tarefa;
-  const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Etapa B', inicio: '2031-02-06', fim: '2031-02-07', deps: [{ de: A_, tipo: 'FS', lag: 0 }] }, EQ)).j.tarefa;
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Un', email: 'un@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] }; const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'un@x.com').id;
+  const p = (await call('POST', '/api/projetos', { nome: 'Desfazer', valor: 1000, clientes: [cid] }, EQ)).j.projeto; const A_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Etapa A', inicio: '2031-02-03', fim: '2031-02-05' }, EQ)).j.tarefa;
+  const B_ = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Etapa B', inicio: '2031-02-06', fim: '2031-02-07', deps: [{ de: A_, tipo: 'FS', lag: 0 }] }, EQ)).j.tarefa;
   const hist = async (h = EQ) => (await call('GET', `/api/projetos/${p.id}/historico`, null, h)).j.itens; const get = async id => (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto.tarefas.find(x => x.id === id);
   // editar a atividade: o registro guarda como desfazer
   await call('PATCH', '/api/tarefas/' + A_, { fim: '2031-02-10', progresso: 40, responsavel: 'Bruno' }, EQ); let h = await hist(); const ed = h.find(x => x.acao === 'editou_tarefa' && x.detalhe === 'Etapa A' && x.diff.some(d => d.campo === 'Término')); assert.ok(ed.podeDesfazer); assert.ok(h.some(x => x.acao === 'reagendada_dependencia' && x.podeDesfazer));
@@ -430,7 +430,7 @@ test('desfazer pelo log: restaura o valor original, avisa se mudou depois e regi
 });
 
 test('suporte profissional: responsável, SLA, nota interna, respostas prontas e artigos', async () => {
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Sônia Reis', email: 'sonia@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Sônia Reis', email: 'sonia@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] };
   const ANA = { ...EQ }, BRUNO = { 'x-vibe-user-id': '8', 'x-vibe-user-name-encoded': 'Bruno%20Lima', 'x-vibe-user-role': 'MEMBER' };
   await call('GET', '/api/me', null, BRUNO); const eqp = (await call('GET', '/api/equipe', null, EQ)).j.equipe; assert.ok(eqp.some(x => x.id === '8' && x.nome === 'Bruno Lima') && eqp.some(x => x.id === '7')); assert.strictEqual((await call('GET', '/api/equipe', null, k)).s, 403);
   const r = await call('POST', '/api/solicitacoes', { assunto: 'Urgente: CRM fora', texto: 'Não abre', categoria: 'problema', prioridade: 'urgente' }, k); const lista = async (h = EQ) => (await call('GET', '/api/solicitacoes', null, h)).j.solicitacoes.find(x => x.protocolo === r.j.protocolo);
@@ -465,9 +465,9 @@ test('suporte profissional: responsável, SLA, nota interna, respostas prontas e
 
 test('minha fila: tudo o que pede ação da equipe, em todos os projetos', async () => {
   const Sch = require('../lib/schedule'); const h = Sch.hojeSP(); const d = n => Sch.addDays(h, n); const { store } = require('../server');
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Fila', email: 'fila@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] }; assert.strictEqual((await call('GET', '/api/fila', null, k)).s, 403); assert.strictEqual((await call('GET', '/api/fila')).s, 401);
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente Fila', email: 'fila@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] }; assert.strictEqual((await call('GET', '/api/fila', null, k)).s, 403); assert.strictEqual((await call('GET', '/api/fila')).s, 401);
   const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'fila@x.com').id; const p = (await call('POST', '/api/projetos', { nome: 'Projeto da Fila', clientes: [cid] }, EQ)).j.projeto; const feito = (await call('POST', '/api/projetos', { nome: 'Projeto Concluído', situacao: 'concluido' }, EQ)).j.projeto;
-  const mk = (b, pid = p.id) => call('POST', `/api/projetos/${pid}/tarefas`, { inicio: d(1), fim: d(3), ...b }, EQ).then(r => r.j.tarefa);
+  const mk = (b, pid = p.id) => call('POST', `/api/projetos/${pid}/tarefas`, { interna: false, inicio: d(1), fim: d(3), ...b }, EQ).then(r => r.j.tarefa);
   await mk({ nome: 'Atrasada da Ana', inicio: d(-10), fim: d(-4), responsavel: 'Ana Souza' }); await mk({ nome: 'Atrasada do Bruno', inicio: d(-10), fim: d(-2), responsavel: 'Bruno' }); await mk({ nome: 'Vence amanhã', inicio: d(0), fim: d(1), responsavel: 'Ana' }); await mk({ nome: 'Daqui a um mês', inicio: d(30), fim: d(35) });
   const aguarda = await mk({ nome: 'Pedido ao cliente', aguardaCliente: true, pedido: 'Envie a lista' }); const resp = await mk({ nome: 'Cliente já respondeu', aguardaCliente: true, pedido: 'Envie o contrato' }); await call('POST', `/api/tarefas/${resp}/itens`, { texto: 'Enviado' }, k);
   const apr = await mk({ nome: 'Entrega pendente', requerAprovacao: true }); await call('POST', `/api/tarefas/${apr}/aprovacao/solicitar`, {}, EQ); const aju = await mk({ nome: 'Entrega com ajustes', requerAprovacao: true }); await call('POST', `/api/tarefas/${aju}/aprovacao/solicitar`, {}, EQ); await call('POST', `/api/tarefas/${aju}/aprovacao`, { decisao: 'ajustes', comentario: 'Falta o funil' }, k);
@@ -487,9 +487,9 @@ test('minha fila: tudo o que pede ação da equipe, em todos os projetos', async
 
 test('relatório semanal: sob demanda, guardado, versão do cliente e geração automática', async () => {
   const Sch = require('../lib/schedule'); const { rodarRelatoriosSemanais, store } = require('../server'); const h = Sch.hojeSP(); const seg = require('../lib/relatorio').segundaDe(h, Sch); const ant = Sch.addDays(seg, -7);
-  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente R', email: 'rel@x.com', senha: 'senha1234' }), o = await call('POST', '/api/auth/cadastro', { nome: 'Outro R', email: 'outror@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] }, ko = { cookie: o.c.split(';')[0] };
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cliente R', email: 'rel@x.com', senha: 'Senha@1234' }), o = await call('POST', '/api/auth/cadastro', { nome: 'Outro R', email: 'outror@x.com', senha: 'Senha@1234' }); const k = { cookie: c.c.split(';')[0] }, ko = { cookie: o.c.split(';')[0] };
   const cid = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'rel@x.com').id; const p = (await call('POST', '/api/projetos', { nome: 'Relatórios', valor: 777, clientes: [cid], fimPrevisto: Sch.addDays(h, 30) }, EQ)).j.projeto;
-  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Entrega visível', inicio: Sch.addDays(h, -3), fim: Sch.addDays(h, 3) }, EQ)).j.tarefa; await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Tarefa interna secreta', inicio: h, fim: Sch.addDays(h, 2), interna: true }, EQ);
+  const a = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Entrega visível', inicio: Sch.addDays(h, -3), fim: Sch.addDays(h, 3) }, EQ)).j.tarefa; await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Tarefa interna secreta', inicio: h, fim: Sch.addDays(h, 2), interna: true }, EQ);
   await call('PATCH', '/api/tarefas/' + a, { progresso: 100 }, EQ); await call('PATCH', '/api/projetos/' + p.id, { valor: 999 }, EQ);
   // sob demanda: semana atual (equipe e cliente)
   const eqr = (await call('GET', `/api/projetos/${p.id}/relatorio?semana=${seg}`, null, EQ)).j; assert.strictEqual(eqr.guardado, false); assert.strictEqual(eqr.relatorio.visao, 'equipe'); assert.ok(eqr.relatorio.concluidasNaSemana.some(x => x.nome === 'Entrega visível')); assert.strictEqual(eqr.relatorio.periodo.de, seg);
@@ -510,19 +510,19 @@ test('LGPD: termos com versão e aceite, meus dados, e anonimização feita por 
   const { store } = require('../server'); const BRUNO = { 'x-vibe-user-id': '8', 'x-vibe-user-name-encoded': 'Bruno%20Lima', 'x-vibe-user-role': 'MEMBER'};
   try {
     // antes de publicar: cadastro livre e /api/legal vazio e público
-    assert.deepStrictEqual(await (await fetch(base + '/api/legal')).json(), { termos: '', privacidade: '', versao: 0, publicadoEm: null }); const antigo = await call('POST', '/api/auth/cadastro', { nome: 'Titular Antigo', email: 'titular@x.com', senha: 'senha1234', empresa: 'Acme', telefone: '(11) 90000-0000' }); const ka = { cookie: antigo.c.split(';')[0] };
+    assert.deepStrictEqual(await (await fetch(base + '/api/legal')).json(), { termos: '', privacidade: '', versao: 0, publicadoEm: null }); const antigo = await call('POST', '/api/auth/cadastro', { nome: 'Titular Antigo', email: 'titular@x.com', senha: 'Senha@1234', empresa: 'Acme', telefone: '(11) 90000-0000' }); const ka = { cookie: antigo.c.split(';')[0] };
     assert.strictEqual((await call('GET', '/api/me', null, ka)).j.precisaAceitar, false);
     // publicar: só administrador; campos [entre colchetes] bloqueiam
     assert.strictEqual((await call('POST', '/api/config/legal', { termos: 'T', privacidade: 'P' }, BRUNO)).s, 403); const bl = await call('POST', '/api/config/legal', { termos: 'Termos da [RAZÃO SOCIAL].', privacidade: 'Privacidade. Contato: [E-MAIL DO ENCARREGADO]' }, EQ); assert.strictEqual(bl.s, 400); assert.match(bl.j.erro, /colchetes/);
     const pub = await call('POST', '/api/config/legal', { termos: 'Termos de uso da Manda4.', privacidade: 'Política de privacidade da Manda4. Usamos seus dados para prestar o serviço.' }, EQ); assert.strictEqual(pub.s, 200); assert.strictEqual(pub.j.versao, 1); assert.strictEqual((await (await fetch(base + '/api/legal')).json()).termos, 'Termos de uso da Manda4.');
     // cadastro passa a exigir o aceite e registra a versão; quem já tinha conta precisa aceitar
-    assert.strictEqual((await call('POST', '/api/auth/cadastro', { nome: 'Sem Aceite', email: 'semaceite@x.com', senha: 'senha1234' })).s, 400); const novo = await call('POST', '/api/auth/cadastro', { nome: 'Com Aceite', email: 'comaceite@x.com', senha: 'senha1234', aceite: true }); assert.strictEqual(novo.s, 201);
+    assert.strictEqual((await call('POST', '/api/auth/cadastro', { nome: 'Sem Aceite', email: 'semaceite@x.com', senha: 'Senha@1234' })).s, 400); const novo = await call('POST', '/api/auth/cadastro', { nome: 'Com Aceite', email: 'comaceite@x.com', senha: 'Senha@1234', aceite: true }); assert.strictEqual(novo.s, 201);
     const cl = (await call('GET', '/api/clientes', null, EQ)).j.clientes; assert.strictEqual(cl.find(x => x.email === 'comaceite@x.com').aceite.versao, 1); assert.strictEqual((await call('GET', '/api/me', null, { cookie: novo.c.split(';')[0] })).j.precisaAceitar, false);
     assert.strictEqual((await call('GET', '/api/me', null, ka)).j.precisaAceitar, true); assert.strictEqual((await call('POST', '/api/eu/aceite', { versao: 9 }, ka)).s, 400); assert.strictEqual((await call('POST', '/api/eu/aceite', { versao: 1 }, ka)).s, 200); assert.strictEqual((await call('GET', '/api/me', null, ka)).j.precisaAceitar, false);
     assert.strictEqual((await call('POST', '/api/eu/aceite', { versao: 1 }, EQ)).s, 403);
     // projeto, atividade e chamado do titular + dados de outra pessoa que não podem aparecer na exportação
-    const outro = await call('POST', '/api/auth/cadastro', { nome: 'Outra Pessoa', email: 'outrapessoa@x.com', senha: 'senha1234', aceite: true }); const ko = { cookie: outro.c.split(';')[0] }; const idsC = (await call('GET', '/api/clientes', null, EQ)).j.clientes; const idA = idsC.find(x => x.email === 'titular@x.com').id, idO = idsC.find(x => x.email === 'outrapessoa@x.com').id;
-    const p = (await call('POST', '/api/projetos', { nome: 'Projeto LGPD', valor: 31337, obsInternas: 'obs interna', clientes: [idA, idO] }, EQ)).j.projeto; const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Atividade LGPD', inicio: '2031-02-03', fim: '2031-02-05' }, EQ)).j.tarefa; const ti = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Interna LGPD', inicio: '2031-02-03', fim: '2031-02-05', interna: true }, EQ)).j.tarefa;
+    const outro = await call('POST', '/api/auth/cadastro', { nome: 'Outra Pessoa', email: 'outrapessoa@x.com', senha: 'Senha@1234', aceite: true }); const ko = { cookie: outro.c.split(';')[0] }; const idsC = (await call('GET', '/api/clientes', null, EQ)).j.clientes; const idA = idsC.find(x => x.email === 'titular@x.com').id, idO = idsC.find(x => x.email === 'outrapessoa@x.com').id;
+    const p = (await call('POST', '/api/projetos', { nome: 'Projeto LGPD', valor: 31337, obsInternas: 'obs interna', clientes: [idA, idO] }, EQ)).j.projeto; const t = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Atividade LGPD', inicio: '2031-02-03', fim: '2031-02-05' }, EQ)).j.tarefa; const ti = (await call('POST', `/api/projetos/${p.id}/tarefas`, { interna: false, nome: 'Interna LGPD', inicio: '2031-02-03', fim: '2031-02-05', interna: true }, EQ)).j.tarefa;
     await call('POST', `/api/tarefas/${t}/itens`, { texto: 'Mensagem do titular', arquivo: { nome: 'rg-titular.pdf', base64: Buffer.from('x').toString('base64') } }, ka); await call('POST', `/api/tarefas/${t}/itens`, { texto: 'Mensagem de outra pessoa' }, ko); await call('POST', `/api/tarefas/${ti}/itens`, { texto: 'conversa interna' }, EQ);
     const r = await call('POST', '/api/solicitacoes', { assunto: 'Chamado do titular', texto: 'Meu telefone é (11) 90000-0000', categoria: 'privacidade' }, ka); const sol = (await call('GET', '/api/solicitacoes', null, EQ)).j.solicitacoes.find(x => x.protocolo === r.j.protocolo);
     await call('POST', `/api/solicitacoes/${sol.id}/mensagens`, { texto: 'Resposta pública' }, EQ); await call('POST', `/api/solicitacoes/${sol.id}/mensagens`, { texto: 'nota interna sigilosa', interna: true }, EQ); await call('POST', '/api/solicitacoes', { assunto: 'Chamado de outra pessoa', texto: 'privado', categoria: 'duvida' }, ko);
@@ -535,9 +535,92 @@ test('LGPD: termos com versão e aceite, meus dados, e anonimização feita por 
     assert.strictEqual((await call('POST', `/api/clientes/${idA}/anonimizar`, { confirmar: true }, BRUNO)).s, 403); assert.strictEqual((await call('POST', `/api/clientes/${idA}/anonimizar`, { confirmar: true }, ka)).s, 403); assert.strictEqual((await call('POST', `/api/clientes/${idA}/anonimizar`, {}, EQ)).s, 400); assert.strictEqual((await call('POST', '/api/clientes/ffffffffffffffff/anonimizar', { confirmar: true }, EQ)).s, 404);
     assert.strictEqual((await call('POST', `/api/clientes/${idA}/anonimizar`, { confirmar: true }, EQ)).s, 200); assert.strictEqual((await call('POST', `/api/clientes/${idA}/anonimizar`, { confirmar: true }, EQ)).s, 409);
     const dep = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.id === idA); assert.deepStrictEqual([dep.nome, dep.empresa, dep.telefone, dep.ativo, dep.anonimizado, dep.projetoIds.length], ['Cliente removido', '', '', false, true, 0]); assert.ok(/^removido-/.test(dep.email));
-    assert.strictEqual((await call('GET', '/api/projetos', null, ka)).s, 401); assert.strictEqual((await call('POST', '/api/auth/login', { email: 'titular@x.com', senha: 'senha1234' })).s, 401); // sessão e login antigos não funcionam
+    assert.strictEqual((await call('GET', '/api/projetos', null, ka)).s, 401); assert.strictEqual((await call('POST', '/api/auth/login', { email: 'titular@x.com', senha: 'Senha@1234' })).s, 401); // sessão e login antigos não funcionam
     const tudo = JSON.stringify([store.db.solicitacoes, store.db.itens, store.db.logs, store.db.clientes]); for (const pessoal of ['Titular Antigo', 'titular@x.com', '(11) 90000-0000']) assert.ok(!tudo.includes(pessoal), 'sobrou dado pessoal: ' + pessoal); assert.ok(tudo.includes('Outra Pessoa') && tudo.includes('Chamado de outra pessoa')); // o resto fica
     assert.ok((await call('GET', '/api/logs?q=anonimizou', null, EQ)).j.logs.some(x => x.acao === 'anonimizou_cliente' && !x.detalhe.includes('Titular')));
     const solD = (await call('GET', '/api/solicitacoes', null, EQ)).j.solicitacoes.find(x => x.id === sol.id); assert.deepStrictEqual([solD.cliente, solD.email, solD.telefone], ['Cliente removido', '', '']); assert.ok(solD.mensagens.some(m => m.texto === 'Resposta pública')); // a conversa técnica fica, sem identificar
   } finally { delete store.db.config.legal; }
+});
+
+// ---- segurança do portal do cliente ----
+const cad = (email, senha) => call('POST', '/api/auth/cadastro', { nome: 'Seg ' + email, email, senha });
+const cliId = async email => (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(c => c.email === email).id;
+
+test('senha: 8+ caracteres com letra, número e caractere especial', async () => {
+  for (const ruim of ['curta1!', 'semnumero!!', '12345678!!', 'SemEspecial12', '']) { const r = await cad('ruim@x.com', ruim); assert.strictEqual(r.s, 400, ruim); assert.match(r.j.erro, /senha precisa ter/i); }
+  assert.strictEqual((await cad('boa@x.com', 'Boa#Senha9')).s, 201);
+});
+
+test('login: 3 tentativas erradas bloqueiam; só a equipe libera; cookie antigo deixa de valer', async () => {
+  const c = await cad('lock@x.com', 'Trava#123'); assert.strictEqual(c.s, 201); const ck = { cookie: c.c.split(';')[0] };
+  assert.strictEqual((await call('GET', '/api/projetos', null, ck)).s, 200);
+  const e1 = await call('POST', '/api/auth/login', { email: 'lock@x.com', senha: 'errada1!' }); assert.strictEqual(e1.s, 401); assert.match(e1.j.erro, /Restam 2/);
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'lock@x.com', senha: 'errada2!' })).s, 401);
+  const e3 = await call('POST', '/api/auth/login', { email: 'lock@x.com', senha: 'errada3!' }); assert.strictEqual(e3.s, 423);
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'lock@x.com', senha: 'Trava#123' })).s, 423); // nem com a senha certa
+  assert.strictEqual((await call('GET', '/api/projetos', null, ck)).s, 401); // a sessão aberta também cai
+  const lista = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'lock@x.com'); assert.strictEqual(lista.bloqueadoLogin, true);
+  const id = lista.id; const outro = await cad('terceiro-seg@x.com', 'Outro#1234'); assert.strictEqual((await call('POST', `/api/clientes/${id}/desbloquear`, {}, { cookie: outro.c.split(';')[0] })).s, 403); // cliente não se libera
+  assert.strictEqual((await call('POST', `/api/clientes/${id}/desbloquear`, {}, EQ)).s, 200);
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'lock@x.com', senha: 'Trava#123' })).s, 200);
+  // e-mail inexistente: mesma resposta, sem revelar que não há conta
+  for (let i = 0; i < 2; i++) assert.strictEqual((await call('POST', '/api/auth/login', { email: 'fantasma@x.com', senha: 'qualquer1!' })).s, 401);
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'fantasma@x.com', senha: 'qualquer1!' })).s, 423);
+});
+
+test('sessão de 40 minutos: cookie expira, token vencido ou adulterado é recusado e sair revoga', async () => {
+  const A = require('../lib/auth'); const c = await cad('sessao@x.com', 'Sessao#123'); const ck = c.c.split(';')[0]; assert.match(c.c, /Max-Age=2400\b/);
+  const me = (await call('GET', '/api/me', null, { cookie: ck })).j; assert.ok(me.usuario.sessaoExpiraEm - Date.now() <= 40 * 60e3 && me.usuario.sessaoExpiraEm - Date.now() > 39 * 60e3); assert.strictEqual(me.sessaoMin, 40);
+  const id = await cliId('sessao@x.com'); const velho = `${id}.${Date.now() - 1000}.`; const sig = require('crypto').createHmac('sha256', store.secret).update(velho.slice(0, -1)).digest('hex');
+  assert.strictEqual((await call('GET', '/api/projetos', null, { cookie: 'pm4=' + velho + sig })).s, 401); // assinado, mas vencido
+  const emitido41 = `${id}.${Date.now() + 60e3}`; const forjado = emitido41 + '.' + '0'.repeat(64); assert.strictEqual((await call('GET', '/api/projetos', null, { cookie: 'pm4=' + forjado })).s, 401);
+  assert.ok(A.TTL === 40 * 60e3);
+  assert.strictEqual((await call('POST', '/api/auth/logout', {}, { cookie: ck })).s, 200);
+  assert.strictEqual((await call('GET', '/api/projetos', null, { cookie: ck })).s, 401); // o cookie de antes não volta a funcionar
+});
+
+test('o cliente só vê o que foi marcado: atividade nova nasce oculta; registro só da equipe; publicar em massa', async () => {
+  const c = await cad('vis@x.com', 'Visao#1234'); const k = { cookie: c.c.split(';')[0] }; const id = await cliId('vis@x.com');
+  const p = (await call('POST', '/api/projetos', { nome: 'Visibilidade' }, EQ)).j.projeto; await call('PATCH', '/api/projetos/' + p.id, { clientes: [id] }, EQ);
+  const oculta = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Rascunho', inicio: '2026-03-02', fim: '2026-03-03' }, EQ)).j.tarefa;
+  const aberta = (await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Kickoff', inicio: '2026-03-02', fim: '2026-03-03', interna: false }, EQ)).j.tarefa;
+  let v = (await call('GET', '/api/projetos/' + p.id, null, k)).j.projeto; assert.deepStrictEqual(v.tarefas.map(t => t.nome), ['Kickoff']);
+  assert.strictEqual((await call('GET', `/api/tarefas/${oculta}/itens`, null, k)).s, 404);
+  assert.strictEqual((await call('PATCH', '/api/tarefas/' + aberta, { nome: 'x' }, k)).s, 403);
+  // registro e anexo "só equipe" na atividade visível
+  await call('POST', `/api/tarefas/${aberta}/itens`, { texto: 'Combinado com o cliente' }, EQ);
+  await call('POST', `/api/tarefas/${aberta}/itens`, { texto: 'Cliente é difícil, cuidado', interna: true, arquivo: { nome: 'interno.txt', base64: Buffer.from('segredo').toString('base64') } }, EQ);
+  const itC = (await call('GET', `/api/tarefas/${aberta}/itens`, null, k)).j.itens; assert.deepStrictEqual(itC.map(i => i.texto), ['Combinado com o cliente']);
+  const itE = (await call('GET', `/api/tarefas/${aberta}/itens`, null, EQ)).j.itens; assert.strictEqual(itE.length, 2); const anexo = itE.find(i => i.interna).arquivo.id;
+  assert.strictEqual((await fetch(base + '/api/arquivos/' + anexo, { headers: k })).status, 404);
+  assert.ok(!JSON.stringify((await call('GET', `/api/projetos/${p.id}/documentos`, null, k)).j).includes('interno.txt'));
+  assert.ok(!JSON.stringify((await call('GET', `/api/projetos/${p.id}/historico`, null, k)).j).includes('Rascunho'));
+  assert.ok(!JSON.stringify((await call('GET', '/api/novidades', null, k)).j).includes('difícil'));
+  assert.strictEqual((await call('POST', `/api/projetos/${p.id}/publicar`, { visivel: true }, k)).s, 403);
+  assert.strictEqual((await call('POST', `/api/projetos/${p.id}/publicar`, { visivel: true }, EQ)).j.alteradas, 1);
+  v = (await call('GET', '/api/projetos/' + p.id, null, k)).j.projeto; assert.strictEqual(v.tarefas.length, 2);
+  await call('POST', `/api/projetos/${p.id}/publicar`, { visivel: false }, EQ); assert.strictEqual((await call('GET', '/api/projetos/' + p.id, null, k)).j.projeto.tarefas.length, 0);
+  // o histórico antigo de uma atividade que voltou a ser oculta também some para o cliente
+  assert.ok(!JSON.stringify((await call('GET', `/api/projetos/${p.id}/historico`, null, k)).j).includes('Kickoff'));
+});
+
+test('senha provisória: a equipe gera, o cliente é obrigado a trocar antes de usar o portal', async () => {
+  const c = await cad('prov@x.com', 'Antiga#123'); const id = await cliId('prov@x.com'); const ck0 = { cookie: c.c.split(';')[0] };
+  assert.strictEqual((await call('POST', `/api/clientes/${id}/redefinir-senha`, {}, ck0)).s, 403);
+  const r = await call('POST', `/api/clientes/${id}/redefinir-senha`, {}, EQ); assert.strictEqual(r.s, 200); const prov = r.j.senhaProvisoria; assert.strictEqual(require('../lib/auth').validarSenha(prov), null);
+  assert.strictEqual((await call('GET', '/api/projetos', null, ck0)).s, 401); // sessão antiga caiu
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'prov@x.com', senha: 'Antiga#123' })).s, 401);
+  const l = await call('POST', '/api/auth/login', { email: 'prov@x.com', senha: prov }); assert.strictEqual(l.s, 200); const ck = { cookie: l.c.split(';')[0] };
+  assert.strictEqual((await call('GET', '/api/me', null, ck)).j.trocarSenha, true); assert.strictEqual((await call('GET', '/api/projetos', null, ck)).s, 403);
+  assert.strictEqual((await call('POST', '/api/eu/senha', { atual: prov, nova: 'fraca' }, ck)).s, 400);
+  assert.strictEqual((await call('POST', '/api/eu/senha', { atual: 'errada', nova: 'Nova#Senha1' }, ck)).s, 400);
+  const t = await call('POST', '/api/eu/senha', { atual: prov, nova: 'Nova#Senha1' }, ck); assert.strictEqual(t.s, 200); const ck2 = { cookie: t.c.split(';')[0] };
+  assert.strictEqual((await call('GET', '/api/projetos', null, ck2)).s, 200); assert.strictEqual((await call('GET', '/api/me', null, ck2)).j.trocarSenha, false);
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'prov@x.com', senha: 'Nova#Senha1' })).s, 200);
+});
+
+test('cabeçalhos de segurança e limite de tentativas por endereço', async () => {
+  delete process.env.SEM_LIMITE_IP; let ultimo; for (let i = 0; i < 32; i++) ultimo = (await call('POST', '/api/auth/login', { email: `bot${i}@x.com`, senha: 'x' }, { 'x-forwarded-for': '203.0.113.9' })).s; process.env.SEM_LIMITE_IP = '1'; assert.strictEqual(ultimo, 429);
+  const r = await fetch(base + '/api/legal'); for (const h of ['strict-transport-security', 'content-security-policy', 'x-content-type-options', 'permissions-policy']) assert.ok(r.headers.get(h), h);
+  assert.match(r.headers.get('content-security-policy'), /object-src 'none'/);
 });

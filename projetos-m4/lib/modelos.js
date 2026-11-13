@@ -39,7 +39,7 @@ function gerarTarefas(modelo, inicio, cal, S, novoId) {
   const ids = new Map(modelo.tarefas.map(t => [t.ref, novoId()])); const base = cal.proximoUtil(inicio);
   const tarefas = modelo.tarefas.map((t, i) => {
     const ini = cal.somaUteis(base, t.offset || 0), dur = Math.max(1, t.dur || 1);
-    return { id: ids.get(t.ref), nome: t.nome, inicio: ini, fim: cal.somaUteis(ini, dur - 1), progresso: 0, responsavel: '', descricao: t.descricao || '', interna: !!t.interna, aguardaCliente: !!t.aguardaCliente, pedido: t.pedido || '', requerAprovacao: !!t.requerAprovacao,
+    return { id: ids.get(t.ref), nome: t.nome, inicio: ini, fim: cal.somaUteis(ini, dur - 1), progresso: 0, responsavel: '', descricao: t.descricao || '', interna: t.visivel !== true, aguardaCliente: !!t.aguardaCliente, pedido: t.pedido || '', requerAprovacao: !!t.requerAprovacao,
       deps: (t.deps || []).filter(d => ids.has(d.ref)).map(d => ({ de: ids.get(d.ref), tipo: d.tipo === 'SS' ? 'SS' : 'FS', lag: +d.lag || 0 })), ordem: i };
   });
   S.reagendar(tarefas, cal); return tarefas;
@@ -48,6 +48,6 @@ function gerarTarefas(modelo, inicio, cal, S, novoId) {
 function modeloDoProjeto(tarefas, cal) {
   const ord = [...tarefas].sort((a, b) => a.inicio.localeCompare(b.inicio) || (a.ordem || 0) - (b.ordem || 0)); const ref = new Map(ord.map((t, i) => [t.id, 't' + (i + 1)])); const ini0 = ord.length ? ord[0].inicio : null;
   return ord.map(t => ({ ref: ref.get(t.id), nome: t.nome, dur: Math.max(1, cal.diffUteis(t.inicio, t.fim) + 1), deps: (t.deps || []).filter(d => ref.has(d.de)).map(d => ({ ref: ref.get(d.de), tipo: d.tipo, lag: +d.lag || 0 })),
-    ...((t.deps || []).length ? {} : { offset: Math.max(0, cal.diffUteis(ini0, t.inicio)) }), interna: !!t.interna, aguardaCliente: !!t.aguardaCliente, pedido: t.pedido || '', requerAprovacao: !!t.requerAprovacao, descricao: t.descricao || '' }));
+    ...((t.deps || []).length ? {} : { offset: Math.max(0, cal.diffUteis(ini0, t.inicio)) }), interna: t.visivel !== true, aguardaCliente: !!t.aguardaCliente, pedido: t.pedido || '', requerAprovacao: !!t.requerAprovacao, descricao: t.descricao || '' }));
 }
 module.exports = { EMBUTIDOS, gerarTarefas, modeloDoProjeto };

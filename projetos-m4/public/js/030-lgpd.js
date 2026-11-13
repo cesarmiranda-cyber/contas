@@ -30,9 +30,9 @@ function render() {
   const top = h('header', { class: 'top' }, h('div', { class: 'logo clicavel', role: 'link', tabindex: 0, 'aria-label': 'Manda4 · Projetos e Suporte (início)', onclick: () => go({ nome: eq ? 'projetos' : 'inicio' }) }, LOGO(), NOME, h('span', { class: 'logo-sub' }, 'Projetos e Suporte')),
     h('nav', {}, nav.map(([k, t]) => h('a', { 'data-k': k, class: view.nome === k || (k === 'projetos' && view.nome === 'projeto') ? 'on' : '', onclick: () => go({ nome: k }) }, t))),
     h('span', { class: 'muted small' }, `${U.nome}${eq ? ' · equipe' : ''}`),
-    !eq && sino(), !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); U = null; render(); } }, 'Sair'));
+    !eq && tagSessao(), !eq && sino(), !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); pararSessao(); U = null; render(); } }, 'Sair'));
   if (eq) api('GET', '/api/fila').then(f => { const a = top.querySelector('nav a[data-k=fila]'); if (a && f.total) a.append(h('span', { class: 'n' }, f.total)); }).catch(() => {});
-  const main = h('main', { class: 'wrap' }); $app.append(top, main, h('footer', { class: 'rodape' }, `Projetos M4 · ${eq ? 'visão da equipe' : 'área do cliente'} · versão ${VERSAO || '—'}`, !eq && [' · ', ...linksLegais(), LEGAL.versao > 0 && ' · ', h('a', { class: 'link-legal', onclick: () => modalMeusDados() }, 'Meus dados')]));
+  const main = h('main', { class: 'wrap' }); $app.append(top, main, h('footer', { class: 'rodape' }, `Projetos M4 · ${eq ? 'visão da equipe' : 'área do cliente'} · versão ${VERSAO || '—'}`, !eq && [' · ', ...linksLegais(), LEGAL.versao > 0 && ' · ', h('a', { class: 'link-legal', onclick: () => modalMeusDados() }, 'Meus dados'), ' · ', h('a', { class: 'link-legal', onclick: () => modalTrocarSenha(false) }, 'Alterar senha')]));
   ({ fila: telaFila, inicio: telaInicio, projetos: telaProjetos, projeto: telaProjeto, solicitacoes: telaSolic, ajuda: telaAjuda, clientes: telaClientes, acessos: telaLog, integracao: telaIntegracao }[view.nome])(main).catch(e => main.append(h('div', { class: 'erro' }, e.message)));
 }
 

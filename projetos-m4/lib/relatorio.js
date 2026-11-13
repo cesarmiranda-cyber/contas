@@ -8,7 +8,8 @@ function gerar({ projeto: p, tarefas, logs, solicitacoes, itens, arquivos, S, Au
   const de = semana, ate = S.addDays(semana, 6), ref = ate < hoje ? ate : hoje; const cli = visao === 'cliente';
   const vis = tarefas.filter(t => !cli || !t.interna), idsVis = new Set(vis.map(t => t.id)); const dentro = ts => { const d = diaBR(ts); return d >= de && d <= ate; };
   const resumoT = S.resumo(vis, ref), desvio = p.fimPrevisto && resumoT.fim ? S.diffDays(p.fimPrevisto, resumoT.fim) : null;
-  const eventos = logs.filter(l => l.projetoId === p.id && dentro(l.ts)).map(l => cli ? Audit.paraCliente(l) && { ...Audit.paraCliente(l), tarefaId: l.tarefaId } : { ...Audit.paraEquipe(l), tarefaId: l.tarefaId }).filter(Boolean).sort((a, b) => a.ts.localeCompare(b.ts));
+  const ocultas = { ids: new Set(tarefas.filter(t => t.interna).map(t => t.id)), nomes: new Set(tarefas.filter(t => t.interna).map(t => t.nome)) };
+  const eventos = logs.filter(l => l.projetoId === p.id && dentro(l.ts)).map(l => cli ? Audit.paraCliente(l, ocultas) && { ...Audit.paraCliente(l, ocultas), tarefaId: l.tarefaId } : { ...Audit.paraEquipe(l), tarefaId: l.tarefaId }).filter(Boolean).sort((a, b) => a.ts.localeCompare(b.ts));
   const concl = new Map(), andam = new Map(), datas = [];
   for (const e of eventos) {
     for (const d of e.diff || []) {

@@ -38,9 +38,15 @@ rota('DELETE', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   db.tarefas = db.tarefas.filter(t => t.projetoId !== p.id); db.projetos = db.projetos.filter(x => x.id !== p.id);
   reg(u, 'excluiu_projeto', p.nome); store.save(); send(res, 200, { ok: true });
 });
+// Mostra (ou oculta) de uma vez todas as atividades do projeto para o cliente.
+rota('POST', '/api/projetos/([0-9a-f]+)/publicar', async (req, res, m, b, u) => {
+  exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.'); const visivel = b.visivel !== false; let n = 0;
+  for (const t of tarefasDe(p.id)) if (!!t.interna === visivel) { t.interna = !visivel; n++; reg(u, 'editou_tarefa', t.nome, p.id, { tarefaId: t.id, interna: false, diff: [{ campo: 'Atividade interna', de: visivel ? 'Sim' : 'Não', para: visivel ? 'Não' : 'Sim' }], snap: { inicio: t.inicio, fim: t.fim } }); }
+  store.save(); send(res, 200, { ok: true, alteradas: n });
+});
 rota('POST', '/api/projetos/([0-9a-f]+)/tarefas', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
-  const d = lerTarefa(b, false); const t = { id: store.id(), projetoId: p.id, progresso: 0, responsavel: '', descricao: '', interna: false, deps: [], ...d, ordem: tarefasDe(p.id).length };
+  const d = lerTarefa(b, false); const t = { id: store.id(), projetoId: p.id, progresso: 0, responsavel: '', descricao: '', interna: true, deps: [], ...d, ordem: tarefasDe(p.id).length };
   const snaps = new Map(tarefasDe(p.id).map(x => [x.id, snapT(x)])); const mudou = aplicarTarefas(p.id, () => db.tarefas.push(t));
   reg(u, 'criou_tarefa', t.nome, p.id, { tarefaId: t.id, interna: !!t.interna, diff: Audit.diff({}, t, Audit.CAMPOS_TAREFA, nomeTarefa), snap: { inicio: t.inicio, fim: t.fim } });
   if (t.aguardaCliente) reg(u, 'pediu_cliente', t.nome, p.id, { tarefaId: t.id, interna: !!t.interna, diff: [{ campo: 'Pedido ao cliente', de: '—', para: t.pedido || '(sem texto)' }] });
@@ -93,11 +99,11 @@ rota('POST', '/api/tarefas/([0-9a-f]+)/aprovacao', async (req, res, m, b, u) => 
 });
 rota('GET', '/api/tarefas/([0-9a-f]+)/itens', async (req, res, m, _b, u) => {
   const [t] = tarefaAcessivel(u, m[1]); if (u.tipo === 'cliente') regUnico(u, 'ativ' + t.id, 10 * 60e3, 'abriu_atividade', t.nome, t.projetoId, { tarefaId: t.id });
-  send(res, 200, { itens: db.itens.filter(i => i.tarefaId === t.id).map(i => ({ ...i, arquivo: i.arquivoId ? db.arquivos.find(a => a.id === i.arquivoId) && { id: i.arquivoId, nome: db.arquivos.find(a => a.id === i.arquivoId).nome, tamanho: db.arquivos.find(a => a.id === i.arquivoId).tamanho } : undefined })) });
+  send(res, 200, { itens: db.itens.filter(i => i.tarefaId === t.id && (u.tipo === 'equipe' || !i.interna)).map(i => ({ ...i, arquivo: i.arquivoId ? db.arquivos.find(a => a.id === i.arquivoId) && { id: i.arquivoId, nome: db.arquivos.find(a => a.id === i.arquivoId).nome, tamanho: db.arquivos.find(a => a.id === i.arquivoId).tamanho } : undefined })) });
 });
 rota('POST', '/api/tarefas/([0-9a-f]+)/itens', async (req, res, m, b, u) => {
   const [t, p] = tarefaAcessivel(u, m[1]);
-  const item = { id: store.id(), tarefaId: t.id, autor: u.nome, tipoAutor: u.tipo, ts: store.agora(), texto: str(b.texto, 4000) };
+  const item = { id: store.id(), tarefaId: t.id, autor: u.nome, tipoAutor: u.tipo, ts: store.agora(), texto: str(b.texto, 4000) }; if (u.tipo === 'equipe' && b.interna === true) item.interna = true; // “só equipe”: nunca aparece para o cliente
   if (b.arquivo) {
     const nome = str(b.arquivo.nome, 160, true, 'Nome do arquivo').replace(/[\\/\0\r\n"]/g, '_'); const buf = Buffer.from(String(b.arquivo.base64 || ''), 'base64');
     if (!buf.length) throw bad(400, 'Arquivo vazio.'); if (buf.length > MAX_FILE) throw bad(413, 'Arquivo acima de 10 MB.');
@@ -106,11 +112,11 @@ rota('POST', '/api/tarefas/([0-9a-f]+)/itens', async (req, res, m, b, u) => {
   }
   if (!item.texto && !item.arquivoId) throw bad(400, 'Escreva um texto ou anexe um documento.');
   if (u.tipo === 'cliente' && t.aguardaCliente) t.respondidoEm = item.ts;
-  db.itens.push(item); reg(u, item.arquivoId ? 'enviou_arquivo' : 'comentou', `${t.nome}`, p.id); store.save(); send(res, 201, { ok: true });
+  db.itens.push(item); reg(u, item.arquivoId ? 'enviou_arquivo' : 'comentou', `${t.nome}`, p.id, item.interna ? { interna: true } : {}); store.save(); send(res, 201, { ok: true });
 });
 rota('GET', '/api/arquivos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   exigir(u); const a = db.arquivos.find(x => x.id === m[1]); if (!a) throw bad(404, 'Arquivo não encontrado.');
-  if (a.solicitacaoId) { const s = db.solicitacoes.find(x => x.id === a.solicitacaoId); if (!s || (u.tipo === 'cliente' && s.clienteId !== u.id)) throw bad(404, 'Arquivo não encontrado.'); } else tarefaAcessivel(u, a.tarefaId);
+  if (a.solicitacaoId) { const s = db.solicitacoes.find(x => x.id === a.solicitacaoId); if (!s || (u.tipo === 'cliente' && s.clienteId !== u.id)) throw bad(404, 'Arquivo não encontrado.'); } else { tarefaAcessivel(u, a.tarefaId); if (u.tipo !== 'equipe' && db.itens.some(i => i.arquivoId === a.id && i.interna)) throw bad(404, 'Arquivo não encontrado.'); }
   enviarArquivo(res, a, u);
 });
 // Link com assinatura e validade, colocado no card do Bitrix24 para a equipe baixar sem login no portal.
@@ -122,7 +128,7 @@ rota('GET', '/api/baixar/([0-9a-f]+)', async (req, res, m) => {
 // Todos os documentos enviados nas atividades do projeto, em um só lugar (o cliente não vê os de atividades internas).
 rota('GET', '/api/projetos/([0-9a-f]+)/documentos', async (req, res, m, _b, u) => {
   exigir(u); const p = projetoDe(m[1]); if (!p || !podeVer(u, p)) throw bad(404, 'Projeto não encontrado.'); const tarefas = new Map(tarefasDe(p.id).filter(t => u.tipo === 'equipe' || !t.interna).map(t => [t.id, t]));
-  const docs = db.itens.filter(i => i.arquivoId && tarefas.has(i.tarefaId)).map(i => { const a = db.arquivos.find(x => x.id === i.arquivoId); return a && { id: a.id, nome: a.nome, tamanho: a.tamanho, ts: i.ts, autor: i.autor, tipoAutor: i.tipoAutor, tarefa: tarefas.get(i.tarefaId).nome, tarefaId: i.tarefaId }; }).filter(Boolean);
+  const docs = db.itens.filter(i => i.arquivoId && tarefas.has(i.tarefaId) && (u.tipo === 'equipe' || !i.interna)).map(i => { const a = db.arquivos.find(x => x.id === i.arquivoId); return a && { id: a.id, nome: a.nome, tamanho: a.tamanho, ts: i.ts, autor: i.autor, tipoAutor: i.tipoAutor, tarefa: tarefas.get(i.tarefaId).nome, tarefaId: i.tarefaId }; }).filter(Boolean);
   send(res, 200, { documentos: docs.sort((a, b) => b.ts.localeCompare(a.ts)) });
 });
 };
