@@ -6,9 +6,9 @@
   --raio:12px; --sombra:0 1px 2px rgba(20,33,61,.06),0 6px 20px rgba(20,33,61,.06);
   --fonte:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
 }
-@media (prefers-color-scheme:dark){:root{--tinta:#e8edf8;--tinta-2:#9aa6c2;--linha:#26304a;--fundo:#0d1424;--card:#151e33;--marca-fundo:#16264a;--marca-2:#6ea2ff;--verde-bg:#12301f;--amarelo-bg:#3a3010;--vermelho-bg:#3d1717}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--fundo);color:var(--tinta);font:14px/1.5 var(--fonte)}
+html{color-scheme:light}
+body{margin:0;min-height:100vh;background:linear-gradient(135deg,#e3edfb 0%,#f1f6fd 38%,#f7f9fe 70%,#fdf6f0 100%) fixed;color:var(--tinta);font:15px/1.55 var(--fonte)}
 h1,h2,h3{margin:0;line-height:1.15;font-weight:800;letter-spacing:-.02em} h1{font-size:26px} h2{font-size:19px} h3{font-size:15px;font-weight:700}
 button,input,select,textarea{font:inherit;color:inherit}
 .muted{color:var(--tinta-2)} .small{font-size:12px}
@@ -60,7 +60,6 @@ label{display:block;font-size:12px;font-weight:600;color:var(--tinta-2);margin:1
 .chip{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:600}
 .chip::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
 .chip.verde{background:var(--verde-bg);color:var(--verde)} .chip.amarelo{background:var(--amarelo-bg);color:#a37800} .chip.vermelho{background:var(--vermelho-bg);color:var(--vermelho)}
-@media(prefers-color-scheme:dark){.chip.amarelo{color:#ffd33d}}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
 .kpi b{display:block;font-size:26px}
 table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--linha);vertical-align:top} th{font-size:12px;color:var(--tinta-2)}
@@ -99,3 +98,23 @@ table{width:100%;border-collapse:collapse} th,td{text-align:left;padding:9px 10p
 .msg .quem{font-size:12px;font-weight:600} .msg p{margin:4px 0 0;white-space:pre-wrap;word-break:break-word}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px} @media(max-width:560px){.g2{grid-template-columns:1fr}.wrap{padding:14px}.top{padding:10px 14px}.g-nomes{width:140px}}
 .vazio{text-align:center;padding:40px;color:var(--tinta-2)}
+
+/* área do cliente */
+.wrap>.card,.wrap>.row+.card{margin-top:16px}
+.top .logo{font-size:17px;color:#1b2030}.top .logo svg{width:30px;height:30px}
+.ola{margin:8px 0 22px}.ola h1{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-.035em;line-height:1.05}.ola h1 em{font-style:normal;color:var(--destaque)}.ola p{font-size:16px;color:var(--tinta-2);margin:8px 0 0}
+.secao{margin:26px 0 0;font-size:18px}
+.espera{text-align:center;padding:44px 28px;max-width:760px;margin:0 auto}
+.espera .ico{width:64px;height:64px;margin:0 auto 14px;border-radius:50%;background:var(--amarelo-bg);display:grid;place-items:center}
+.espera .ico svg{width:30px;height:30px}
+.espera h2{font-size:clamp(22px,3vw,28px);letter-spacing:-.025em;margin:14px 0 8px}
+.espera p{max-width:560px;margin:0 auto;color:var(--tinta-2);font-size:16px}
+.chip.pulso::before{animation:pulso 1.4s ease-in-out infinite}@keyframes pulso{50%{opacity:.25;transform:scale(1.4)}}
+@media(prefers-reduced-motion:reduce){.chip.pulso::before{animation:none}}
+.passos{list-style:none;margin:28px auto 6px;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:left}
+.passos li{border:1px solid var(--linha);border-radius:14px;padding:14px;background:#fff}
+.passos .n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;font-size:13px;font-weight:700;margin-bottom:8px;background:var(--linha);color:var(--tinta-2)}
+.passos .feito .n{background:var(--verde-bg);color:var(--verde)}.passos .agora{border-color:#f3d77a;background:#fffaf0}.passos .agora .n{background:var(--amarelo-bg);color:#a37800}
+.passos b{display:block;font-size:14px}.passos span.s{font-size:12px;color:var(--tinta-2)}
+.espera .acoes{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+@media(max-width:700px){.passos{grid-template-columns:1fr}}

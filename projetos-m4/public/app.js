@@ -24,6 +24,7 @@ const LOGO = () => { const d = document.createElementNS('http://www.w3.org/2000/
   const q = [[5, 3], [17.5, 3], [5, 15.5], [17.5, 15.5], [30, 15.5], [17.5, 28]]; // marca da Manda4: 2 + 3 + 1 quadrados arredondados
   d.innerHTML = '<g fill="#f5a400">' + q.map(([x, y]) => `<rect x="${x}" y="${y}" width="9" height="9" rx="3"/>`).join('') + '</g>'; return d; };
 const NOME = 'MAND\u039b4'; // "A" sem a barra, como no logotipo
+const NS_SVG = 'http://www.w3.org/2000/svg';
 let U = null, view = { nome: 'projetos' };
 const go = v => { view = v; render(); };
 
@@ -43,7 +44,6 @@ function render() {
 }
 
 // ---------- login / cadastro ----------
-const NS_SVG = 'http://www.w3.org/2000/svg';
 function telaLogin(modo = 'login') {
   const err = h('div'), campos = {};
   const f = (k, rot, tipo = 'text', ac) => { campos[k] = h('input', { type: tipo, autocomplete: ac, required: true }); return [h('label', {}, rot), campos[k]]; };
@@ -69,12 +69,26 @@ function telaLogin(modo = 'login') {
 }
 
 // ---------- projetos ----------
+const primeiroNome = n => String(n || '').trim().split(/\s+/)[0] || '';
+function espera(m) {
+  const ico = document.createElementNS(NS_SVG, 'svg'); ico.setAttribute('viewBox', '0 0 24 24'); ico.setAttribute('aria-hidden', 'true');
+  ico.innerHTML = '<path d="M6 2h12M6 22h12M7 2v4.5L12 12l5-5.5V2M7 22v-4.5L12 12l5 5.5V22" fill="none" stroke="#a37800" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>';
+  const passo = (cls, n, t, st) => h('li', { class: cls }, h('span', { class: 'n' }, cls === 'feito' ? '✓' : n), h('b', {}, t), h('span', { class: 's' }, st));
+  m.append(h('div', { class: 'card espera', role: 'status' }, h('div', { class: 'ico' }, ico), h('span', { class: 'chip amarelo pulso' }, 'Aguardando ativação'),
+    h('h2', {}, 'Sua conta foi criada. Estamos ativando o seu acesso.'),
+    h('p', {}, `Olá, ${primeiroNome(U.nome)}! A equipe Manda4 vai vincular você ao seu projeto. Assim que for ativado, o cronograma e o status aparecem aqui. Você não precisa fazer nada.`),
+    h('ol', { class: 'passos' }, passo('feito', 1, 'Conta criada', 'Concluído'), passo('agora', 2, 'Manda4 vincula seu projeto', 'Em andamento'), passo('', 3, 'Acompanhe e envie documentos', 'Em breve')),
+    h('div', { class: 'acoes' }, h('button', { class: 'btn pri', onclick: novaSolic }, 'Abrir chamado de suporte'), h('button', { class: 'btn', onclick: render }, 'Atualizar'), h('a', { class: 'btn', href: 'https://manda4.com.br/', target: '_blank', rel: 'noopener noreferrer' }, 'Conhecer a Manda4')),
+    h('p', { class: 'muted small', style: 'margin-top:18px' }, `Conta: ${U.email}`)));
+}
 async function telaProjetos(m) {
-  const { projetos } = await api('GET', '/api/projetos'); let painel = null;
-  if (U.tipo === 'equipe') painel = await api('GET', '/api/painel');
-  m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, U.tipo === 'equipe' ? 'Projetos' : 'Meus projetos'), U.tipo === 'equipe' && h('button', { class: 'btn pri', onclick: () => modalProjeto() }, '+ Novo projeto')));
-  if (painel) m.append(h('div', { class: 'kpis' }, [['Projetos', painel.projetos], ['No prazo', painel.verde], ['Em alerta', painel.amarelo], ['Atrasados', painel.vermelho], ['Chamados novos', painel.solicitacoesNovas], ['Clientes', painel.clientes]].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', {}, n)))));
-  if (!projetos.length) return m.append(h('div', { class: 'card vazio' }, U.tipo === 'equipe' ? 'Nenhum projeto ainda. Crie o primeiro.' : 'Você ainda não tem projetos associados. Assim que a equipe Manda4 vincular, ele aparece aqui.'));
+  const { projetos } = await api('GET', '/api/projetos'); const eq = U.tipo === 'equipe'; let painel = null;
+  if (eq) painel = await api('GET', '/api/painel');
+  if (!eq && !projetos.length) return espera(m);
+  if (eq) m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Projetos'), h('button', { class: 'btn pri', onclick: () => modalProjeto() }, '+ Novo projeto')));
+  else m.append(h('div', { class: 'ola' }, h('h1', {}, 'Olá, ', h('em', {}, primeiroNome(U.nome))), h('p', {}, 'Acompanhe os seus projetos e fale com o suporte da Manda4.')), h('h2', { class: 'secao', style: 'margin-top:0' }, 'Meus projetos'));
+  if (painel) m.append(h('div', { class: 'kpis' }, [['Projetos', painel.projetos], ['No prazo', painel.verde], ['Em alerta', painel.amarelo], ['Atrasados', painel.vermelho], ['Chamados novos', painel.solicitacoesNovas], ['Clientes aguardando ativação', painel.aguardando]].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', {}, n)))));
+  if (!projetos.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhum projeto ainda. Crie o primeiro.'));
   m.append(h('div', { class: 'cards' }, projetos.map(p => h('div', { class: 'card click', onclick: () => go({ nome: 'projeto', id: p.id }) },
     h('div', { class: 'row' }, h('h3', { class: 'grow' }, p.nome), chip(p.resumo.cor, COR[p.resumo.cor])),
     h('p', { class: 'muted' }, p.descricao || 'Sem descrição'), h('div', { class: 'bar' }, h('i', { style: `width:${p.resumo.progresso}%` })),
@@ -207,8 +221,8 @@ async function novaSolic() {
 // ---------- equipe: clientes e log ----------
 async function telaClientes(m) {
   const { clientes } = await api('GET', '/api/clientes'); m.append(h('h1', {}, 'Clientes do portal'), h('p', { class: 'muted' }, 'Quem criou conta no portal. Para dar acesso, abra o projeto → Editar projeto → marque o cliente.'));
-  m.append(h('div', { class: 'card', style: 'margin-top:16px;overflow:auto' }, clientes.length ? h('table', {}, h('thead', {}, h('tr', {}, ['Cliente', 'Empresa', 'Projetos', 'Último acesso', ''].map(t => h('th', {}, t)))), h('tbody', {}, clientes.map(c => h('tr', {},
-    h('td', {}, c.nome, h('div', { class: 'muted small' }, c.email)), h('td', {}, c.empresa || '—'), h('td', {}, c.projetos.join(', ') || h('span', { class: 'muted' }, 'sem projeto')), h('td', {}, c.ultimoAcesso ? fmtTs(c.ultimoAcesso) : 'nunca'),
+  m.append(h('div', { class: 'card', style: 'margin-top:16px;overflow:auto' }, clientes.length ? h('table', {}, h('thead', {}, h('tr', {}, ['Cliente', 'Empresa', 'Situação', 'Projetos', 'Último acesso', ''].map(t => h('th', {}, t)))), h('tbody', {}, clientes.map(c => h('tr', {},
+    h('td', {}, c.nome, h('div', { class: 'muted small' }, c.email)), h('td', {}, c.empresa || '—'), h('td', {}, !c.ativo ? chip('vermelho', 'Bloqueado') : c.projetos.length ? chip('verde', 'Ativo') : chip('amarelo', 'Aguardando ativação')), h('td', {}, c.projetos.join(', ') || h('span', { class: 'muted' }, 'sem projeto')), h('td', {}, c.ultimoAcesso ? fmtTs(c.ultimoAcesso) : 'nunca'),
     h('td', {}, h('button', { class: 'btn sm', onclick: () => api('PATCH', '/api/clientes/' + c.id, { ativo: !c.ativo }).then(render) }, c.ativo ? 'Bloquear' : 'Reativar')))))) : h('div', { class: 'vazio' }, 'Nenhum cliente cadastrado ainda.')));
 }
 async function telaLog(m) {

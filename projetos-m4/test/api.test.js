@@ -13,8 +13,10 @@ test('fluxo completo equipe x clientes', async () => {
   assert.strictEqual((await call('POST', '/api/auth/cadastro', { nome: 'x', email: 'um@x.com', senha: 'senha1234' })).s, 409);
   assert.strictEqual((await call('POST', '/api/projetos', { nome: 'P' }, k1)).s, 403); // cliente não cria projeto
   const clientes = (await call('GET', '/api/clientes', null, EQ)).j.clientes; const id1 = clientes.find(c => c.email === 'um@x.com').id;
+  assert.strictEqual((await call('GET', '/api/painel', null, EQ)).j.aguardando, 2); // ninguém vinculado ainda
   const p = (await call('POST', '/api/projetos', { nome: 'Implantação Bitrix' }, EQ)).j.projeto;
   await call('PATCH', '/api/projetos/' + p.id, { clientes: [id1] }, EQ);
+  assert.strictEqual((await call('GET', '/api/painel', null, EQ)).j.aguardando, 1);
   const a = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Levantamento', inicio: '2026-01-05', fim: '2026-01-09' }, EQ);
   const b = await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'Configuração', inicio: '2026-01-06', fim: '2026-01-08', deps: [{ de: a.j.tarefa, tipo: 'FS', lag: 0 }] }, EQ);
   assert.deepStrictEqual(b.j.reagendadas, [b.j.tarefa]);

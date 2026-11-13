@@ -203,7 +203,7 @@ rota('PATCH', '/api/solicitacoes/([0-9a-f]+)', async (req, res, m, b, u) => {
 
 rota('GET', '/api/clientes', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe');
-  send(res, 200, { clientes: db.clientes.map(c => ({ id: c.id, nome: c.nome, email: c.email, empresa: c.empresa, telefone: c.telefone, criadoEm: c.criadoEm, ativo: c.ativo !== false, projetos: db.projetos.filter(p => p.clientes.includes(c.id)).map(p => p.nome), ultimoAcesso: [...db.logs].reverse().find(l => l.tipo === 'cliente' && l.acao === 'login' && l.detalhe === c.email)?.ts || null })) });
+  send(res, 200, { clientes: db.clientes.map(c => ({ id: c.id, nome: c.nome, email: c.email, empresa: c.empresa, telefone: c.telefone, criadoEm: c.criadoEm, ativo: c.ativo !== false, projetos: db.projetos.filter(p => p.clientes.includes(c.id)).map(p => p.nome), ultimoAcesso: [...db.logs].reverse().find(l => l.tipo === 'cliente' && (l.acao === 'login' || l.acao === 'cadastro') && l.detalhe === c.email)?.ts || null })) });
 });
 rota('PATCH', '/api/clientes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.');
@@ -217,7 +217,8 @@ rota('GET', '/api/logs', async (req, res, _m, _b, u) => {
 rota('GET', '/api/painel', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe'); const ps = db.projetos.map(p => projetoView(p, u, false));
   send(res, 200, { projetos: ps.length, verde: ps.filter(p => p.resumo.cor === 'verde').length, amarelo: ps.filter(p => p.resumo.cor === 'amarelo').length, vermelho: ps.filter(p => p.resumo.cor === 'vermelho').length,
-    solicitacoesNovas: db.solicitacoes.filter(s => s.status === 'nova').length, clientes: db.clientes.length });
+    solicitacoesNovas: db.solicitacoes.filter(s => s.status === 'nova').length, clientes: db.clientes.length,
+    aguardando: db.clientes.filter(c => c.ativo !== false && !db.projetos.some(p => p.clientes.includes(c.id))).length });
 });
 
 // ---- estáticos ----------------------------------------------------------------
