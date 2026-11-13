@@ -43,6 +43,35 @@ const mesmaOrigem = req => { const s = req.headers['sec-fetch-site']; return !s 
 
 // ---- helpers de domínio -------------------------------------------------------
 const str = (v, max, obrig, campo) => { const s = String(v ?? '').trim(); if (obrig && !s) throw bad(400, `${campo} é obrigatório.`); return s.slice(0, max); };
+
+const TIPOS = ['Implantação Bitrix24', 'Treinamento', 'Integração / Automação', 'Customização', 'Suporte / Sustentação', 'Outro'];
+const PRIORIDADES = ['baixa', 'media', 'alta'];
+function lerProjeto(b, parcial) {
+  const o = {};
+  if (!parcial || 'nome' in b) o.nome = str(b.nome, 160, true, 'Nome');
+  if ('descricao' in b) o.descricao = str(b.descricao, 4000);
+  if ('gerente' in b) o.gerente = str(b.gerente, 120);
+  if ('codigo' in b) o.codigo = str(b.codigo, 30);
+  if ('tipo' in b) { const t = str(b.tipo, 60); if (t && !TIPOS.includes(t)) throw bad(400, 'Tipo de projeto inválido.'); o.tipo = t; }
+  if ('prioridade' in b) { if (b.prioridade && !PRIORIDADES.includes(b.prioridade)) throw bad(400, 'Prioridade inválida.'); o.prioridade = b.prioridade || 'media'; }
+  if ('empresa' in b) o.empresa = str(b.empresa, 120);
+  if ('contatoNome' in b) o.contatoNome = str(b.contatoNome, 120);
+  if ('contatoEmail' in b) { const e = str(b.contatoEmail, 160); if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw bad(400, 'E-mail do contato inválido.'); o.contatoEmail = e; }
+  if ('contatoTelefone' in b) o.contatoTelefone = str(b.contatoTelefone, 40);
+  for (const k of ['inicioPrevisto', 'fimPrevisto']) if (k in b) { const v = String(b[k] || ''); if (v && !S.isDate(v)) throw bad(400, 'Data inválida (AAAA-MM-DD).'); o[k] = v; }
+  if ('valor' in b) { if (b.valor === '' || b.valor == null) o.valor = null; else { const n = Number(b.valor); if (!Number.isFinite(n) || n < 0) throw bad(400, 'Valor inválido.'); o.valor = Math.round(n * 100) / 100; } }
+  if ('negocioBitrix' in b) { const v = str(b.negocioBitrix, 12); if (v && !/^\d+$/.test(v)) throw bad(400, 'O ID do negócio no Bitrix24 deve ser numérico.'); o.negocioBitrix = v; }
+  if ('link' in b) { const v = str(b.link, 500); if (v && !/^https?:\/\/\S+$/i.test(v)) throw bad(400, 'O link deve começar com http:// ou https://.'); o.link = v; }
+  if ('obsInternas' in b) o.obsInternas = str(b.obsInternas, 4000);
+  if ('situacao' in b && ['andamento', 'pausado', 'concluido'].includes(b.situacao)) o.situacao = b.situacao;
+  return o;
+}
+const proximoCodigo = () => 'PRJ-' + String(db.projetos.reduce((m, p) => Math.max(m, +(/^PRJ-(\d+)$/.exec(p.codigo || '') || [])[1] || 0), 0) + 1).padStart(4, '0');
+function validarProjeto(p) {
+  if (p.inicioPrevisto && p.fimPrevisto && p.fimPrevisto < p.inicioPrevisto) throw bad(400, 'O término previsto não pode ser antes do início previsto.');
+  if (p.codigo && db.projetos.some(x => x.id !== p.id && x.codigo === p.codigo)) throw bad(409, 'Já existe um projeto com este código.');
+}
+for (const p of db.projetos) if (!p.codigo) { p.codigo = proximoCodigo(); store.save(); } // projetos criados antes do campo
 const tarefasDe = pid => db.tarefas.filter(t => t.projetoId === pid);
 const projetoDe = id => db.projetos.find(p => p.id === id);
 const hoje = () => S.hojeSP();
@@ -54,8 +83,17 @@ function tarefaView(t, todas, h, u) {
 }
 function projetoView(p, u, comTarefas) {
   const h = hoje(); const all = tarefasDe(p.id); const vis = u.tipo === 'equipe' ? all : all.filter(t => !t.interna);
-  const out = { id: p.id, nome: p.nome, descricao: p.descricao, gerente: p.gerente, situacao: p.situacao, criadoEm: p.criadoEm, resumo: S.resumo(vis, h), hoje: h };
-  if (u.tipo === 'equipe') out.clientes = p.clientes.map(id => { const c = db.clientes.find(x => x.id === id); return c ? { id, nome: c.nome, email: c.email, empresa: c.empresa } : null; }).filter(Boolean);
+  const resumo = S.resumo(vis, h);
+  const desvio = p.fimPrevisto && resumo.fim ? S.diffDays(p.fimPrevisto, resumo.fim) : null;
+  if (desvio > 0 && resumo.cor !== 'vermelho') resumo.cor = desvio > 7 ? 'vermelho' : 'amarelo'; // previsão além do prazo contratado
+  const out = { id: p.id, nome: p.nome, descricao: p.descricao, gerente: p.gerente, situacao: p.situacao, criadoEm: p.criadoEm, resumo, hoje: h,
+    codigo: p.codigo || '', tipo: p.tipo || '', prioridade: p.prioridade || 'media', empresa: p.empresa || '', contatoNome: p.contatoNome || '', contatoEmail: p.contatoEmail || '', contatoTelefone: p.contatoTelefone || '',
+    inicioPrevisto: p.inicioPrevisto || '', fimPrevisto: p.fimPrevisto || '', link: p.link || '',
+    desvioDias: desvio };
+  if (u.tipo === 'equipe') { // campos internos: o cliente nunca recebe
+    out.valor = p.valor ?? null; out.negocioBitrix = p.negocioBitrix || ''; out.obsInternas = p.obsInternas || '';
+    out.clientes = p.clientes.map(id => { const c = db.clientes.find(x => x.id === id); return c ? { id, nome: c.nome, email: c.email, empresa: c.empresa } : null; }).filter(Boolean);
+  }
   if (comTarefas) out.tarefas = vis.map(t => tarefaView(t, vis, h, u));
   return out;
 }
@@ -121,15 +159,16 @@ rota('GET', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
 });
 rota('POST', '/api/projetos', async (req, res, _m, b, u) => {
   exigir(u, 'equipe');
-  const p = { id: store.id(), nome: str(b.nome, 160, true, 'Nome'), descricao: str(b.descricao, 2000), gerente: str(b.gerente, 120) || u.nome, situacao: 'andamento', clientes: [], criadoEm: store.agora(), criadoPor: u.nome };
+  const d = lerProjeto(b, false);
+  const p = { situacao: 'andamento', prioridade: 'media', ...d, id: store.id(), gerente: d.gerente || u.nome, descricao: d.descricao || '', clientes: [], criadoEm: store.agora(), criadoPor: u.nome };
+  p.codigo = p.codigo || proximoCodigo(); validarProjeto(p);
   db.projetos.push(p); store.log(u.nome, 'equipe', 'criou_projeto', p.nome, p.id); store.save(); send(res, 201, { projeto: projetoView(p, u, true) });
 });
 rota('PATCH', '/api/projetos/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.');
-  if ('nome' in b) p.nome = str(b.nome, 160, true, 'Nome'); if ('descricao' in b) p.descricao = str(b.descricao, 2000);
-  if ('gerente' in b) p.gerente = str(b.gerente, 120); if (['andamento', 'pausado', 'concluido'].includes(b.situacao)) p.situacao = b.situacao;
-  if (Array.isArray(b.clientes)) p.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
-  store.log(u.nome, 'equipe', 'editou_projeto', p.nome, p.id); store.save(); send(res, 200, { projeto: projetoView(p, u, true) });
+  const novo = { ...p, ...lerProjeto(b, true) }; validarProjeto(novo);
+  if (Array.isArray(b.clientes)) novo.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
+  Object.assign(p, novo); store.log(u.nome, 'equipe', 'editou_projeto', p.nome, p.id); store.save(); send(res, 200, { projeto: projetoView(p, u, true) });
 });
 rota('DELETE', '/api/projetos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   exigir(u, 'equipe'); if (!u.admin) throw bad(403, 'Somente administradores excluem projetos.');

@@ -91,17 +91,33 @@ async function telaProjetos(m) {
   if (!projetos.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhum projeto ainda. Crie o primeiro.'));
   m.append(h('div', { class: 'cards' }, projetos.map(p => h('div', { class: 'card click', onclick: () => go({ nome: 'projeto', id: p.id }) },
     h('div', { class: 'row' }, h('h3', { class: 'grow' }, p.nome), chip(p.resumo.cor, COR[p.resumo.cor])),
+    h('p', { class: 'muted small', style: 'margin:2px 0 0' }, [p.codigo, p.tipo, p.empresa].filter(Boolean).join(' · ')),
     h('p', { class: 'muted' }, p.descricao || 'Sem descrição'), h('div', { class: 'bar' }, h('i', { style: `width:${p.resumo.progresso}%` })),
     h('div', { class: 'row small muted' }, h('span', { class: 'grow' }, `${p.resumo.progresso}% concluído · ${p.resumo.concluidas}/${p.resumo.total} atividades`), p.resumo.fim && h('span', {}, 'até ' + fmt(p.resumo.fim)))))));
 }
 
 // ---------- projeto + gantt ----------
+
+const PRIO = { baixa: 'Baixa', media: 'Média', alta: 'Alta' };
+const brl = v => v == null || v === '' ? '' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+function ficha(p) {
+  const eq = U.tipo === 'equipe';
+  const prazo = p.fimPrevisto ? (p.desvioDias == null ? fmt(p.fimPrevisto) : h('span', {}, fmt(p.fimPrevisto), ' ', p.desvioDias > 0 ? chip(p.desvioDias > 7 ? 'vermelho' : 'amarelo', `previsão ${p.desvioDias} dia(s) além`) : chip('verde', 'previsão dentro do prazo'))) : '';
+  const itens = [['Código', p.codigo], ['Tipo', p.tipo], ['Prioridade', PRIO[p.prioridade]], ['Empresa', p.empresa], ['Gerente do projeto', p.gerente],
+    ['Contato do cliente', [p.contatoNome, p.contatoEmail, p.contatoTelefone].filter(Boolean).join(' · ')], ['Início previsto', fmt(p.inicioPrevisto)], ['Término contratado', prazo],
+    ['Pasta de documentos', p.link ? h('a', { href: p.link, target: '_blank', rel: 'noopener noreferrer' }, 'Abrir link') : ''],
+    ...(eq ? [['Valor do projeto (interno)', brl(p.valor)], ['Negócio no Bitrix24', p.negocioBitrix ? '#' + p.negocioBitrix : ''], ['Clientes com acesso', p.clientes.map(c => c.nome).join(', ') || 'nenhum']] : [])].filter(x => x[1]);
+  return h('div', { class: 'card ficha' }, h('h3', {}, 'Dados do projeto'),
+    p.descricao && h('p', { class: 'escopo' }, h('span', { class: 'muted small' }, 'Objetivo e escopo'), h('br'), p.descricao),
+    h('dl', {}, itens.map(([k, v]) => h('div', {}, h('dt', {}, k), h('dd', {}, v)))),
+    eq && p.obsInternas && h('p', { class: 'obs' }, h('span', { class: 'muted small' }, 'Observações internas (o cliente não vê)'), h('br'), p.obsInternas));
+}
 async function telaProjeto(m) {
   const { projeto: p } = await api('GET', '/api/projetos/' + view.id); const eq = U.tipo === 'equipe'; const aba = view.aba || 'gantt';
   m.append(h('div', { class: 'row' }, h('a', { class: 'btn sm', onclick: () => go({ nome: 'projetos' }) }, '← Projetos'), h('h1', { class: 'grow' }, p.nome), chip(p.resumo.cor, COR[p.resumo.cor]),
     eq && h('button', { class: 'btn sm', onclick: () => modalProjeto(p) }, 'Editar projeto'), eq && h('button', { class: 'btn pri sm', onclick: () => modalTarefa(p) }, '+ Atividade')),
-    h('p', { class: 'muted' }, p.descricao), h('div', { class: 'kpis' }, [['Progresso', p.resumo.progresso + '%'], ['Atividades', `${p.resumo.concluidas}/${p.resumo.total} concluídas`], ['No prazo', p.resumo.verde], ['Em alerta', p.resumo.amarelo], ['Atrasadas', p.resumo.vermelho], ['Previsão de término', fmt(p.resumo.fim) || '—']].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', { style: 'font-size:20px' }, n)))),
-    eq && h('p', { class: 'muted small' }, `Gerente: ${p.gerente || '—'} · Clientes com acesso: ${p.clientes.map(c => c.nome).join(', ') || 'nenhum'}`));
+    h('div', { class: 'kpis' }, [['Progresso', p.resumo.progresso + '%'], ['Atividades', `${p.resumo.concluidas}/${p.resumo.total} concluídas`], ['No prazo', p.resumo.verde], ['Em alerta', p.resumo.amarelo], ['Atrasadas', p.resumo.vermelho], ['Previsão de término', fmt(p.resumo.fim) || '—']].map(([t, n]) => h('div', { class: 'card kpi' }, h('span', { class: 'muted small' }, t), h('b', { style: 'font-size:20px' }, n)))),
+    ficha(p));
   const tabs = h('div', { class: 'tabs' }, [['gantt', 'Cronograma (Gantt)'], ['lista', 'Lista de atividades']].map(([k, t]) => h('a', { class: aba === k ? 'on' : '', onclick: () => { view.aba = k; render(); } }, t)));
   m.append(tabs); if (!p.tarefas.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
   if (aba === 'gantt') m.append(h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, 'Passe o mouse para detalhes · clique para abrir')), gantt(p));
@@ -173,13 +189,34 @@ async function drawer(p, t) {
 
 // ---------- equipe: projeto e tarefa ----------
 async function modalProjeto(p) {
-  const v = overlay(true), err = h('div'); const { clientes } = await api('GET', '/api/clientes'); const sel = new Set((p && p.clientes || []).map(c => c.id));
-  const nome = h('input', { value: p ? p.nome : '' }), desc = h('textarea', { rows: 3 }, p ? p.descricao : ''), ger = h('input', { value: p ? p.gerente : U.nome }), sit = h('select', {}, [['andamento', 'Em andamento'], ['pausado', 'Pausado'], ['concluido', 'Concluído']].map(([k, t]) => h('option', { value: k }, t)));
-  if (p) sit.value = p.situacao;
+  const v = overlay(true), err = h('div'); const { clientes } = await api('GET', '/api/clientes'); const sel = new Set((p && p.clientes || []).map(c => c.id)); const x = p || {};
+  const inp = (val, extra) => h('input', { value: val ?? '', ...extra });
+  const f = {
+    nome: inp(x.nome, { maxlength: 160 }), codigo: inp(x.codigo, { placeholder: 'Automático (PRJ-0001)' }),
+    tipo: h('select', {}, h('option', { value: '' }, 'Selecione…'), ['Implantação Bitrix24', 'Treinamento', 'Integração / Automação', 'Customização', 'Suporte / Sustentação', 'Outro'].map(t => h('option', { value: t }, t))),
+    prio: h('select', {}, Object.entries(PRIO).map(([k, t]) => h('option', { value: k }, t))), empresa: inp(x.empresa, { placeholder: 'Empresa contratante' }),
+    cnome: inp(x.contatoNome), cemail: inp(x.contatoEmail, { type: 'email' }), ctel: inp(x.contatoTelefone, { type: 'tel' }),
+    ini: inp(x.inicioPrevisto, { type: 'date' }), fim: inp(x.fimPrevisto, { type: 'date' }), valor: inp(x.valor, { type: 'number', min: 0, step: '0.01', placeholder: '0,00' }), neg: inp(x.negocioBitrix, { inputmode: 'numeric', placeholder: 'Ex.: 1234' }),
+    desc: h('textarea', { rows: 4, placeholder: 'O que será entregue, etapas e o que o cliente precisa fornecer' }, x.descricao || ''), link: inp(x.link, { type: 'url', placeholder: 'https://…' }),
+    obs: h('textarea', { rows: 3 }, x.obsInternas || ''), ger: inp(p ? x.gerente : U.nome),
+    sit: h('select', {}, [['andamento', 'Em andamento'], ['pausado', 'Pausado'], ['concluido', 'Concluído']].map(([k, t]) => h('option', { value: k }, t)))
+  };
+  f.tipo.value = x.tipo || ''; f.prio.value = x.prioridade || 'media'; f.sit.value = x.situacao || 'andamento';
+  const c = (rot, el) => h('div', {}, h('label', {}, rot), el); const sec = t => h('h3', { class: 'sec' }, t);
   const lista = h('div', { style: 'max-height:200px;overflow:auto;border:1px solid var(--linha);border-radius:10px;padding:6px 10px' }, clientes.length ? clientes.filter(c => c.ativo).map(c => h('label', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0;font-weight:400;color:var(--tinta)' }, h('input', { type: 'checkbox', style: 'width:auto', checked: sel.has(c.id), onchange: e => e.target.checked ? sel.add(c.id) : sel.delete(c.id) }), `${c.nome} · ${c.empresa || c.email}`)) : h('span', { class: 'muted' }, 'Nenhum cliente cadastrado no portal ainda.'));
-  v.append(h('div', { class: 'modal' }, h('h2', {}, p ? 'Editar projeto' : 'Novo projeto'), h('label', {}, 'Nome'), nome, h('label', {}, 'Descrição'), desc, h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Gerente'), ger), h('div', {}, h('label', {}, 'Situação'), sit)),
-    h('label', {}, 'Clientes com acesso a este projeto'), lista, err, h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => {
-      try { const b = { nome: nome.value, descricao: desc.value, gerente: ger.value, situacao: sit.value, clientes: [...sel] }; const r = p ? await api('PATCH', '/api/projetos/' + p.id, b) : await api('POST', '/api/projetos', b); v.remove(); go({ nome: 'projeto', id: r.projeto.id }); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
+  v.append(h('div', { class: 'modal' }, h('h2', {}, p ? 'Editar projeto' : 'Novo projeto'),
+    sec('Identificação'), h('div', { class: 'g2' }, c('Nome do projeto *', f.nome), c('Código', f.codigo), c('Tipo', f.tipo), c('Prioridade', f.prio), c('Gerente do projeto', f.ger), c('Situação', f.sit)),
+    sec('Cliente contratante'), h('div', { class: 'g2' }, c('Empresa', f.empresa), c('Nome do contato', f.cnome), c('E-mail do contato', f.cemail), c('Telefone do contato', f.ctel)),
+    sec('Prazos e valores'), h('div', { class: 'g2' }, c('Início previsto', f.ini), c('Término contratado', f.fim), c('Valor do projeto (R$) · interno', f.valor), c('ID do negócio no Bitrix24 · interno', f.neg)),
+    sec('Escopo'), c('Objetivo e escopo (o cliente vê)', f.desc), c('Link da pasta de documentos (o cliente vê)', f.link), c('Observações internas (o cliente não vê)', f.obs),
+    sec('Acesso dos clientes'), h('label', {}, 'Clientes com acesso a este projeto'), lista, err,
+    h('p', { class: 'muted small' }, 'Depois de salvar, adicione as atividades do projeto (botão “+ Atividade”).'),
+    h('div', { class: 'row', style: 'margin-top:12px' }, h('button', { class: 'btn pri', onclick: async () => {
+      try {
+        const b = { nome: f.nome.value, codigo: f.codigo.value, tipo: f.tipo.value, prioridade: f.prio.value, gerente: f.ger.value, situacao: f.sit.value, empresa: f.empresa.value, contatoNome: f.cnome.value, contatoEmail: f.cemail.value, contatoTelefone: f.ctel.value,
+          inicioPrevisto: f.ini.value, fimPrevisto: f.fim.value, valor: f.valor.value, negocioBitrix: f.neg.value, descricao: f.desc.value, link: f.link.value, obsInternas: f.obs.value, clientes: [...sel] };
+        const r = p ? await api('PATCH', '/api/projetos/' + p.id, b) : await api('POST', '/api/projetos', b); v.remove(); go({ nome: 'projeto', id: r.projeto.id });
+      } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); }
     } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), p && U.admin && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir o projeto e todas as atividades, registros e arquivos?')) { await api('DELETE', '/api/projetos/' + p.id); v.remove(); go({ nome: 'projetos' }); } } }, 'Excluir'))));
 }
 function modalTarefa(p, t) {

@@ -34,3 +34,23 @@ test('fluxo completo equipe x clientes', async () => {
   assert.strictEqual((await call('POST', '/api/auth/login', { email: 'um@x.com', senha: 'errada' })).s, 401);
   assert.strictEqual((await call('GET', '/api/projetos', null, { 'x-vibe-user-id': 'share:abc' })).s, 401); // id não numérico não é equipe
 });
+
+test('campos do projeto: validação, código automático e campos internos ocultos ao cliente', async () => {
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Cli Tres', email: 'tres@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const id = (await call('GET', '/api/clientes', null, EQ)).j.clientes.find(x => x.email === 'tres@x.com').id;
+  assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', link: 'javascript:alert(1)' }, EQ)).s, 400);
+  assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', inicioPrevisto: '2026-05-10', fimPrevisto: '2026-05-01' }, EQ)).s, 400);
+  assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', tipo: 'Inexistente' }, EQ)).s, 400);
+  assert.strictEqual((await call('POST', '/api/projetos', { nome: 'X', negocioBitrix: 'abc' }, EQ)).s, 400);
+  const r = await call('POST', '/api/projetos', { nome: 'Projeto Completo', tipo: 'Implantação Bitrix24', prioridade: 'alta', empresa: 'Acme', contatoNome: 'Maria', contatoEmail: 'm@acme.com', inicioPrevisto: '2026-01-05', fimPrevisto: '2026-01-20', valor: '12500.50', negocioBitrix: '321', link: 'https://drive.example.com/p', obsInternas: 'margem apertada', descricao: 'Escopo' }, EQ);
+  assert.strictEqual(r.s, 201); const p = r.j.projeto; assert.match(p.codigo, /^PRJ-\d{4}$/); assert.strictEqual(p.valor, 12500.5);
+  assert.strictEqual((await call('POST', '/api/projetos', { nome: 'Dup', codigo: p.codigo }, EQ)).s, 409);
+  await call('PATCH', '/api/projetos/' + p.id, { clientes: [id] }, EQ);
+  await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'T', inicio: '2026-01-05', fim: '2026-01-25' }, EQ);
+  const eq = (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto, cli = (await call('GET', '/api/projetos/' + p.id, null, k)).j.projeto;
+  assert.strictEqual(eq.valor, 12500.5); assert.strictEqual(eq.obsInternas, 'margem apertada'); assert.strictEqual(eq.desvioDias, 5); assert.strictEqual(eq.resumo.cor, 'amarelo');
+  for (const campo of ['valor', 'obsInternas', 'negocioBitrix']) assert.ok(!(campo in cli), campo + ' vazou para o cliente');
+  assert.strictEqual(cli.empresa, 'Acme'); assert.strictEqual(cli.link, 'https://drive.example.com/p');
+  assert.strictEqual((await call('PATCH', '/api/projetos/' + p.id, { fimPrevisto: '2025-01-01' }, EQ)).s, 400); // antes do início
+  assert.strictEqual((await call('PATCH', '/api/projetos/' + p.id, { prioridade: 'baixa' }, EQ)).j.projeto.prioridade, 'baixa');
+});
