@@ -502,6 +502,24 @@ rota('POST', '/api/artigos', async (req, res, _m, b, u) => { exigir(u, 'equipe')
 rota('PATCH', '/api/artigos/([0-9a-f]+)', async (req, res, m, b, u) => { exigir(u, 'equipe'); const a = db.artigos.find(x => x.id === m[1]); if (!a) throw bad(404, 'Artigo não encontrado.'); if ('titulo' in b) a.titulo = str(b.titulo, 140, true, 'Título'); if ('texto' in b) a.texto = str(b.texto, 8000, true, 'Texto'); if ('palavras' in b) a.palavras = str(b.palavras, 300); if ('categoria' in b) a.categoria = str(b.categoria, 60); if ('publicado' in b) a.publicado = !!b.publicado; a.atualizadoEm = store.agora(); store.save(); send(res, 200, { artigo: a }); });
 rota('DELETE', '/api/artigos/([0-9a-f]+)', async (req, res, m, _b, u) => { exigir(u, 'equipe'); if (!db.artigos.some(x => x.id === m[1])) throw bad(404, 'Artigo não encontrado.'); db.artigos = db.artigos.filter(x => x.id !== m[1]); store.save(); send(res, 200, { ok: true }); });
 rota('POST', '/api/artigos/([0-9a-f]+)/util', async (req, res, m, b, u) => { exigir(u, 'cliente'); const a = db.artigos.find(x => x.id === m[1] && x.publicado !== false); if (!a) throw bad(404, 'Artigo não encontrado.'); if (b.resolveu) a.uteis = (a.uteis || 0) + 1; else a.naoUteis = (a.naoUteis || 0) + 1; store.save(); send(res, 200, { ok: true }); });
+// Minha fila: o que precisa de ação da equipe, em todos os projetos (chamados, entregas, atrasos, retornos de clientes).
+rota('GET', '/api/fila', async (req, res, _m, _b, u) => {
+  exigir(u, 'equipe'); const soMeus = new URL(req.url, 'http://x').searchParams.get('so_meus') === '1'; const h = hoje(); const nomeMeu = Ajuda.palavras(u.nome)[0] || '';
+  const meuT = t => !soMeus || (!!nomeMeu && Ajuda.palavras(t.responsavel).includes(nomeMeu)); // responsável da atividade é texto livre: casa pelo primeiro nome
+  const cfg = SLA.config(db); const chamados = db.solicitacoes.filter(s => s.status !== 'concluida' && s.status !== 'recusada').map(s => solView(s, u)).filter(s => s.vezDe === 'equipe' && (!soMeus || (s.responsavel && s.responsavel.uid === u.id)))
+    .sort((a, b) => Date.parse(a.sla.prazo) - Date.parse(b.sla.prazo)).map(s => ({ id: s.id, protocolo: s.protocolo, assunto: s.assunto, cliente: s.cliente, empresa: s.empresa, prioridade: s.prioridade, sla: s.sla, responsavel: s.responsavel, atualizadoEm: s.atualizadoEm, status: s.status }));
+  const out = { chamados, clienteRespondeu: [], ajustes: [], atrasadas: [], vencemEm7: [], aguardandoCliente: [], aguardandoAprovacao: [] };
+  for (const p of db.projetos.filter(x => x.situacao !== 'concluido')) { const ts = tarefasDe(p.id);
+    for (const t of ts) { if (!meuT(t)) continue; const st = S.status(t, ts, h); if (st.codigo === 'concluida' && !(t.aprovacao && t.aprovacao.estado !== 'aprovada')) continue;
+      const item = { projetoId: p.id, projeto: p.nome, projetoCodigo: p.codigo || '', empresa: p.empresa || '', tarefaId: t.id, tarefa: t.nome, inicio: t.inicio, fim: t.fim, progresso: t.progresso, responsavel: t.responsavel || '', status: st, interna: !!t.interna, diasAtraso: t.fim < h ? S.diffDays(t.fim, h) : 0 };
+      const ap = t.aprovacao && t.aprovacao.estado; if (ap === 'ajustes') out.ajustes.push({ ...item, comentario: t.aprovacao.comentario, por: t.aprovacao.por }); else if (ap === 'pendente') out.aguardandoAprovacao.push({ ...item, desde: t.aprovacao.solicitadaEm });
+      if (st.codigo === 'concluida') continue;
+      if (t.aguardaCliente && (+t.progresso || 0) < 100) (t.respondidoEm ? out.clienteRespondeu : out.aguardandoCliente).push({ ...item, pedido: t.pedido || '', respondidoEm: t.respondidoEm || null });
+      if (st.codigo === 'atrasada') out.atrasadas.push(item); else if (S.diffDays(h, t.fim) <= 7) out.vencemEm7.push(item); } }
+  const porFim = (a, b) => a.fim.localeCompare(b.fim); for (const k of ['clienteRespondeu', 'ajustes', 'atrasadas', 'vencemEm7', 'aguardandoCliente', 'aguardandoAprovacao']) out[k].sort(porFim);
+  out.total = chamados.length + out.clienteRespondeu.length + out.ajustes.length + out.atrasadas.length; // o que pede ação da equipe agora
+  out.soMeus = soMeus; void cfg; send(res, 200, out);
+});
 function filtraLogs(q) {
   const pid = q.get('projeto'), tipo = q.get('tipo'), cat = q.get('cat'), busca = (q.get('q') || '').trim().toLowerCase(), dias = +q.get('dias') || 0, lim = Math.min(+q.get('limite') || 300, 5000);
   const desde = dias ? Date.now() - dias * 86400e3 : 0; const out = [];
