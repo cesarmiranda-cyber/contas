@@ -229,3 +229,9 @@ input[type=file]{padding:7px 10px;background:#fff}input[type=file]::file-selecto
 .msg.nota{background:var(--amarelo-bg);border-color:#f3d77a}.nota-ativa{background:var(--amarelo-bg);border-color:#f3d77a}.nota-chk{display:flex;gap:6px;align-items:center;margin:0;font-weight:600;color:var(--tinta);font-size:13px}
 .sug-caixa{margin-top:8px;padding:12px 14px;background:var(--marca-fundo);border:1px solid #bcd3f1;border-radius:12px}.sug-caixa details{margin-top:8px;padding:8px 0;border-top:1px solid #cfe0f6}.sug-caixa summary{cursor:pointer;font-weight:600;color:var(--marca-2)}
 .artigo{margin-bottom:10px;padding:14px 18px}.artigo summary{cursor:pointer;font-size:16px}
+
+/* relatório semanal */
+.relatorio{max-width:860px;margin:0 auto;padding:28px 32px}.rel-topo{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--linha);padding-bottom:12px}
+.rel-resumo{display:flex;gap:18px;align-items:center;margin:6px 0 10px}.rel-sec{margin-top:18px;break-inside:avoid}.rel-sec h3{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta-2);margin-bottom:6px}
+.rel-lista{margin:0;padding-left:18px}.rel-lista li{margin:4px 0}.rel-rodape{margin-top:22px;padding-top:10px;border-top:1px solid var(--linha)}
+@media print{@page{margin:14mm}.relatorio-aberto .proj-hero,.relatorio-aberto .tabs,.relatorio-aberto .precisa,.relatorio-aberto .parabens,.relatorio-aberto .so-print{display:none!important}.relatorio{border:0;box-shadow:none;padding:0;max-width:none}}

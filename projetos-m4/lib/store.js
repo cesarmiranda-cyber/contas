@@ -1,7 +1,7 @@
 'use strict';
 // Banco em arquivo JSON (sem dependências): em memória + gravação atômica com atraso curto.
 const fs = require('fs'); const path = require('path'); const crypto = require('crypto');
-const VAZIO = () => ({ clientes: [], projetos: [], tarefas: [], itens: [], arquivos: [], solicitacoes: [], logs: [], config: {}, modelos: [], equipe: {}, respostas: [], artigos: [] });
+const VAZIO = () => ({ clientes: [], projetos: [], tarefas: [], itens: [], arquivos: [], solicitacoes: [], logs: [], config: {}, modelos: [], equipe: {}, respostas: [], artigos: [], relatorios: [] });
 
 function createStore(dir) {
   fs.mkdirSync(path.join(dir, 'files'), { recursive: true, mode: 0o700 });

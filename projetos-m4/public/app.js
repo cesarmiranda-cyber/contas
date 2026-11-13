@@ -187,6 +187,35 @@ async function historicoProjeto(p) {
     sel, eq && h('button', { class: 'btn sm', onclick: () => go({ nome: 'acessos', projeto: p.id }) }, 'Ver no log completo')), caixa);
 }
 
+// ---------- relatório semanal ----------
+async function relatoriosProjeto(p) {
+  const eq = U.tipo === 'equipe'; if (view.relSemana) return relatorioAberto(p);
+  const { semanas } = await api('GET', `/api/projetos/${p.id}/relatorios`); const fd = s => s.split('-').reverse().slice(0, 2).join('/');
+  return h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Relatórios semanais'), eq && h('button', { class: 'btn sm', onclick: async ev => { ev.target.disabled = true; try { await api('POST', `/api/projetos/${p.id}/relatorios/gerar`, {}); toast('Relatório da semana anterior gerado e guardado.'); render(); } catch (e) { toast(e.message); ev.target.disabled = false; } } }, 'Gerar o da semana anterior')),
+    h('p', { class: 'muted small', style: 'margin:2px 0 8px' }, 'Todo semana o portal guarda o relatório da semana que passou: o que foi concluído, o que mudou, o que vem aí e o que depende do cliente. Abra e use “Imprimir / PDF” para guardar ou enviar.'),
+    semanas.map(s => h('div', { class: 'doc' }, h('span', { class: 'doc-ico' }, icone('doc')), h('div', { class: 'grow' }, h('b', {}, `Semana de ${fd(s.de)} a ${fd(s.ate)}/${s.ate.slice(0, 4)}`), h('div', { class: 'muted small' }, s.atual ? 'Semana em andamento (parcial)' : s.guardado ? `Guardado em ${fmtTs(s.geradoEm)}` : 'Gerado ao abrir')),
+      h('button', { class: 'btn sm' + (s.atual ? '' : ' pri'), onclick: () => { view.relSemana = s.semana; render(); } }, 'Abrir'))));
+}
+async function relatorioAberto(p) {
+  const eq = U.tipo === 'equipe'; const visao = eq && view.relCliente ? '&visao=cliente' : ''; const { relatorio: r, guardado, geradoEm } = await api('GET', `/api/projetos/${p.id}/relatorio?semana=${view.relSemana}${visao}`);
+  const fd = s => s.split('-').reverse().join('/'); const sec = (tit, itens, vazio) => itens && itens.length ? h('section', { class: 'rel-sec' }, h('h3', {}, tit), h('ul', { class: 'rel-lista' }, itens)) : vazio ? h('section', { class: 'rel-sec' }, h('h3', {}, tit), h('p', { class: 'muted small' }, vazio)) : null;
+  const li = (...c) => h('li', {}, ...c);
+  return h('div', {}, h('div', { class: 'row sem-print', style: 'margin-bottom:10px' }, h('button', { class: 'btn sm', onclick: () => { view.relSemana = null; view.relCliente = false; render(); } }, '← Todos os relatórios'), h('span', { class: 'grow' }),
+    eq && h('label', { class: 'nota-chk', style: 'font-weight:500' }, h('input', { type: 'checkbox', style: 'width:auto', checked: !!view.relCliente, onchange: e => { view.relCliente = e.target.checked; render(); } }), 'Ver como o cliente vê'),
+    eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', `/api/projetos/${p.id}/relatorios/gerar`, { semana: view.relSemana }); toast('Relatório atualizado e guardado.'); render(); } }, guardado ? 'Atualizar e guardar' : 'Guardar'),
+    h('button', { class: 'btn sm', disabled: true, title: 'O envio por e-mail fica disponível quando o e-mail do portal for configurado' }, 'Enviar por e-mail'), h('button', { class: 'btn pri sm', onclick: () => window.print() }, 'Imprimir / PDF')),
+    h('article', { class: 'card relatorio' }, h('div', { class: 'rel-topo' }, h('div', { class: 'logo' }, LOGO(), NOME), h('div', { class: 'muted small', style: 'text-align:right' }, 'Relatório semanal', h('br'), `${fd(r.periodo.de)} a ${fd(r.periodo.ate)}`)),
+      h('h2', { style: 'margin:14px 0 2px' }, r.projeto.nome), h('p', { class: 'muted', style: 'margin:0 0 12px' }, [r.projeto.codigo, r.projeto.tipo, r.projeto.empresa, r.projeto.gerente && 'Gerente: ' + r.projeto.gerente].filter(Boolean).join(' · ')),
+      h('div', { class: 'rel-resumo' }, anel(r.resumo.progresso), h('div', { class: 'grow' }, h('div', { class: 'ac-chips' }, chip(r.resumo.cor, COR[r.resumo.cor]), contaChips(r.resumo)), h('ul', { class: 'rel-lista', style: 'margin-top:8px' }, r.destaques.map(x => li(x))))),
+      sec('Concluído na semana', r.concluidasNaSemana.map(x => li(h('b', {}, x.nome), x.aprovadaPor ? ` · aprovada por ${x.aprovadaPor}` : '', h('span', { class: 'muted small' }, ` · ${fmtTs(x.em)}`))), 'Nenhuma atividade concluída nesta semana.'),
+      sec('Andamento das atividades', r.andamento.map(x => li(h('b', {}, x.nome), `: ${x.de} → ${x.para}`))), sec('Datas alteradas', r.mudancasDeData.map(x => li(h('b', {}, x.nome), ` · ${x.campo}: `, h('s', { class: 'muted' }, fv(x.de)), ' → ', h('b', {}, fv(x.para)), h('span', { class: 'muted small' }, ` · por ${x.por}`)))),
+      sec('Próximas entregas (14 dias)', r.proximas.map(x => li(h('i', { class: 'dot ' + x.cor, style: 'display:inline-block;margin-right:6px' }), h('b', {}, x.nome), ` · ${fmt(x.inicio)} a ${fmt(x.fim)} · ${x.progresso}%`)), 'Nada previsto para os próximos 14 dias.'), sec('Atrasadas', r.atrasadas.map(x => li(h('b', {}, x.nome), ` · término ${fmt(x.fim)} (${x.dias} dia(s) de atraso)`))),
+      sec(eq && !view.relCliente ? 'Aguardando o cliente' : 'Precisamos de você', [...r.aguardandoCliente.pedidos.map(x => li(h('b', {}, x.nome), x.pedido && ` · ${x.pedido}`)), ...r.aguardandoCliente.aprovacoes.map(x => li(h('b', {}, x.nome), ' · aguarda a aprovação da entrega'))]),
+      sec('Documentos da semana', r.documentos.map(x => li(h('b', {}, x.nome), ` · ${x.atividade} · ${x.autor}`))),
+      h('section', { class: 'rel-sec' }, h('h3', {}, 'Suporte'), h('p', {}, `${r.chamados.abertosNaSemana} chamado(s) aberto(s) na semana · ${r.chamados.concluidosNaSemana} concluído(s) · ${r.chamados.abertosAgora} em aberto agora.`), r.chamados.itens && r.chamados.itens.length > 0 && h('ul', { class: 'rel-lista' }, r.chamados.itens.map(x => li(h('b', {}, x.protocolo), ` · ${x.assunto} · ${x.cliente}`)))),
+      h('p', { class: 'muted small rel-rodape' }, `${guardado ? 'Guardado em ' + fmtTs(geradoEm) : 'Gerado em ' + fmtTs(new Date().toISOString())} · Manda4 Projetos e Suporte${r.periodo.referencia < r.periodo.ate ? ' · semana em andamento (dados até ' + fmt(r.periodo.referencia) + ')' : ''}`)));
+}
+
 // ---------- projeto + gantt ----------
 
 const PRIO = { baixa: 'Baixa', media: 'Média', alta: 'Alta' };
@@ -233,9 +262,10 @@ async function telaProjeto(m) {
     pend.length > 0 && h('div', { class: 'card precisa' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, eq ? 'Aguardando o cliente' : 'Precisamos de você neste projeto'), chip('amarelo', `${pend.length} pendência(s)`)),
       pend.map(t => h('div', { class: 'pend' }, h('div', { class: 'grow' }, h('b', {}, t.nome), h('div', { class: 'muted small' }, `até ${fmt(t.fim)}`), h('p', { style: 'margin:6px 0 0' }, aprPend(t) ? 'Esta entrega aguarda a aprovação do cliente.' : t.pedido || 'A equipe aguarda o retorno do cliente.')), t.respondidoEm && !aprPend(t) ? chip('verde', eq ? 'Cliente respondeu' : 'Você respondeu') : null,
         h('button', { class: 'btn pri sm', onclick: () => drawer(p, t) }, eq ? 'Abrir' : aprPend(t) ? 'Revisar e aprovar' : t.respondidoEm ? 'Ver conversa' : 'Responder')))));
-  const tabs = h('div', { class: 'tabs' }, [['gantt', 'Cronograma'], ['lista', 'Atividades'], ['docs', 'Documentos'], ['dados', 'Dados do projeto'], ['historico', 'Histórico']].map(([k, tt]) => h('a', { class: aba === k ? 'on' : '', onclick: () => { view.aba = k; render(); } }, tt)));
+  const tabs = h('div', { class: 'tabs' }, [['gantt', 'Cronograma'], ['lista', 'Atividades'], ['docs', 'Documentos'], ['dados', 'Dados do projeto'], ['relatorios', 'Relatórios'], ['historico', 'Histórico']].map(([k, tt]) => h('a', { class: aba === k ? 'on' : '', onclick: () => { view.aba = k; render(); } }, tt)));
   if (view.abrir) { const t0 = p.tarefas.find(x => x.id === view.abrir); view.abrir = null; if (t0) setTimeout(() => drawer(p, t0), 50); }
   juntar(m, tabs);
+  if (aba === 'relatorios') { if (view.relSemana) m.classList.add('relatorio-aberto'); return juntar(m, await relatoriosProjeto(p)); }
   if (aba === 'historico') return juntar(m, await historicoProjeto(p)); if (aba === 'docs') return juntar(m, await documentosProjeto(p)); if (aba === 'dados') return juntar(m, ficha(p));
   if (!p.tarefas.length) return juntar(m, h('div', { class: 'card vazio' }, 'Nenhuma atividade cadastrada ainda.'));
   if (aba === 'gantt') juntar(m, h('div', { class: 'legenda small' }, h('span', { class: 'chip verde' }, 'No prazo'), h('span', { class: 'chip amarelo' }, 'Alerta'), h('span', { class: 'chip vermelho' }, 'Atrasado'), h('span', { class: 'muted' }, eq ? 'Arraste o bloco para mover as datas · arraste as pontas para mudar início/término · arraste do círculo de uma atividade até outra para criar a dependência · clique na seta para remover' : 'Passe o mouse para detalhes · clique para abrir · para pedir mudança de prazo, abra a atividade')), gantt(p));

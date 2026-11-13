@@ -1,6 +1,6 @@
 'use strict';
 const http = require('http'); const fs = require('fs'); const path = require('path');
-const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const Audit = require('./lib/auditoria'); const Modelos = require('./lib/modelos'); const SLA = require('./lib/sla'); const Ajuda = require('./lib/ajuda'); const A = require('./lib/auth'); const S = require('./lib/schedule');
+const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const Audit = require('./lib/auditoria'); const Modelos = require('./lib/modelos'); const SLA = require('./lib/sla'); const Ajuda = require('./lib/ajuda'); const Relat = require('./lib/relatorio'); const A = require('./lib/auth'); const S = require('./lib/schedule');
 
 const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -502,6 +502,35 @@ rota('POST', '/api/artigos', async (req, res, _m, b, u) => { exigir(u, 'equipe')
 rota('PATCH', '/api/artigos/([0-9a-f]+)', async (req, res, m, b, u) => { exigir(u, 'equipe'); const a = db.artigos.find(x => x.id === m[1]); if (!a) throw bad(404, 'Artigo não encontrado.'); if ('titulo' in b) a.titulo = str(b.titulo, 140, true, 'Título'); if ('texto' in b) a.texto = str(b.texto, 8000, true, 'Texto'); if ('palavras' in b) a.palavras = str(b.palavras, 300); if ('categoria' in b) a.categoria = str(b.categoria, 60); if ('publicado' in b) a.publicado = !!b.publicado; a.atualizadoEm = store.agora(); store.save(); send(res, 200, { artigo: a }); });
 rota('DELETE', '/api/artigos/([0-9a-f]+)', async (req, res, m, _b, u) => { exigir(u, 'equipe'); if (!db.artigos.some(x => x.id === m[1])) throw bad(404, 'Artigo não encontrado.'); db.artigos = db.artigos.filter(x => x.id !== m[1]); store.save(); send(res, 200, { ok: true }); });
 rota('POST', '/api/artigos/([0-9a-f]+)/util', async (req, res, m, b, u) => { exigir(u, 'cliente'); const a = db.artigos.find(x => x.id === m[1] && x.publicado !== false); if (!a) throw bad(404, 'Artigo não encontrado.'); if (b.resolveu) a.uteis = (a.uteis || 0) + 1; else a.naoUteis = (a.naoUteis || 0) + 1; store.save(); send(res, 200, { ok: true }); });
+// ---- relatório semanal ----
+const gerarRelatorio = (p, semana, visao) => Relat.gerar({ projeto: p, tarefas: tarefasDe(p.id), logs: db.logs, solicitacoes: db.solicitacoes, itens: db.itens, arquivos: db.arquivos, S, Audit, cal: calDe(p), hoje: hoje(), semana, visao });
+function guardarRelatorio(p, semana) {
+  const rel = { id: store.id(), projetoId: p.id, semana, geradoEm: store.agora(), equipe: gerarRelatorio(p, semana, 'equipe'), cliente: gerarRelatorio(p, semana, 'cliente') };
+  db.relatorios = (db.relatorios || []).filter(r => !(r.projetoId === p.id && r.semana === semana)); db.relatorios.push(rel);
+  const meus = db.relatorios.filter(r => r.projetoId === p.id).sort((a, b) => b.semana.localeCompare(a.semana)); if (meus.length > 60) db.relatorios = db.relatorios.filter(r => r.projetoId !== p.id || meus.slice(0, 60).includes(r)); store.save(); return rel;
+}
+// Toda segunda-feira (a partir das 6h de Brasília) guarda o relatório da semana anterior de cada projeto ativo; se o servidor estava dormindo, recupera depois.
+function rodarRelatoriosSemanais(agora = new Date()) {
+  const dia = S.hojeSP(agora), dow = new Date(dia + 'T12:00:00Z').getUTCDay(), hora = +new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Sao_Paulo' }).format(agora); if (dow === 1 && hora < 6) return 0;
+  const semana = Relat.semanaAnterior(dia, S); let n = 0;
+  for (const p of db.projetos.filter(x => x.situacao !== 'concluido' && tarefasDe(x.id).length)) { if ((db.relatorios || []).some(r => r.projetoId === p.id && r.semana === semana)) continue; guardarRelatorio(p, semana); store.log('Sistema', 'equipe', 'gerou_relatorio', `semana de ${semana}`, p.id); n++; }
+  return n;
+}
+const semanaValida = (q, h) => { const v = q ? String(q) : Relat.semanaAnterior(h, S); if (!S.isDate(v)) throw bad(400, 'Semana inválida (use AAAA-MM-DD).'); const seg = Relat.segundaDe(v, S); if (seg > Relat.segundaDe(h, S)) throw bad(400, 'Essa semana ainda não começou.'); return seg; };
+rota('GET', '/api/projetos/([0-9a-f]+)/relatorios', async (req, res, m, _b, u) => {
+  exigir(u); const p = projetoDe(m[1]); if (!p || !podeVer(u, p)) throw bad(404, 'Projeto não encontrado.'); const atual = Relat.segundaDe(hoje(), S); const semanas = [];
+  for (let i = 0; i < 12; i++) { const seg = S.addDays(atual, -7 * i), r = (db.relatorios || []).find(x => x.projetoId === p.id && x.semana === seg); semanas.push({ semana: seg, de: seg, ate: S.addDays(seg, 6), atual: i === 0, guardado: !!r, geradoEm: r ? r.geradoEm : null }); }
+  send(res, 200, { semanas });
+});
+rota('GET', '/api/projetos/([0-9a-f]+)/relatorio', async (req, res, m, _b, u) => {
+  exigir(u); const p = projetoDe(m[1]); if (!p || !podeVer(u, p)) throw bad(404, 'Projeto não encontrado.'); const q = new URL(req.url, 'http://x').searchParams; const semana = semanaValida(q.get('semana'), hoje());
+  const visao = u.tipo === 'equipe' && q.get('visao') !== 'cliente' ? 'equipe' : 'cliente'; const guardado = (db.relatorios || []).find(r => r.projetoId === p.id && r.semana === semana);
+  send(res, 200, { relatorio: guardado ? guardado[visao] : gerarRelatorio(p, semana, visao), guardado: !!guardado, geradoEm: guardado ? guardado.geradoEm : null });
+});
+rota('POST', '/api/projetos/([0-9a-f]+)/relatorios/gerar', async (req, res, m, b, u) => {
+  exigir(u, 'equipe'); const p = projetoDe(m[1]); if (!p) throw bad(404, 'Projeto não encontrado.'); const semana = semanaValida(b.semana, hoje()); const r = guardarRelatorio(p, semana); reg(u, 'gerou_relatorio', `semana de ${semana}`, p.id); send(res, 201, { relatorio: r.equipe, geradoEm: r.geradoEm });
+});
+
 // Minha fila: o que precisa de ação da equipe, em todos os projetos (chamados, entregas, atrasos, retornos de clientes).
 rota('GET', '/api/fila', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe'); const soMeus = new URL(req.url, 'http://x').searchParams.get('so_meus') === '1'; const h = hoje(); const nomeMeu = Ajuda.palavras(u.nome)[0] || '';
@@ -593,5 +622,5 @@ const server = http.createServer(async (req, res) => {
     await hit[2](req, res, hit[1], b, quem(req));
   } catch (e) { if (!e.status) console.error(e); send(res, e.status || 500, { erro: e.status ? e.message : 'Erro interno.', ...(e.extra || {}) }); }
 });
-if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); setInterval(() => suporte.ciclo(), 2 * 60e3).unref(); setTimeout(() => suporte.ciclo(), 5e3).unref(); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }
-module.exports = { server, store, suporte, bitrix, secrets };
+if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); setInterval(() => suporte.ciclo(), 2 * 60e3).unref(); setInterval(() => { try { rodarRelatoriosSemanais(); } catch (e) { console.error('relatório semanal:', e.message); } }, 60 * 60e3).unref(); setTimeout(() => { try { rodarRelatoriosSemanais(); } catch { /* tenta de novo na próxima hora */ } }, 15e3).unref(); setTimeout(() => suporte.ciclo(), 5e3).unref(); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }
+module.exports = { server, store, suporte, bitrix, secrets, rodarRelatoriosSemanais };
