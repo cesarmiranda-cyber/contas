@@ -54,3 +54,80 @@ test('campos do projeto: validação, código automático e campos internos ocul
   assert.strictEqual((await call('PATCH', '/api/projetos/' + p.id, { fimPrevisto: '2025-01-01' }, EQ)).s, 400); // antes do início
   assert.strictEqual((await call('PATCH', '/api/projetos/' + p.id, { prioridade: 'baixa' }, EQ)).j.projeto.prioridade, 'baixa');
 });
+
+// ---------- Bitrix24 simulado ----------
+const { suporte, bitrix } = require('../server');
+function fakeBitrix() {
+  const f = { deals: [], contatos: [], chamadas: [], falhar: null };
+  bitrix.call = async (m, p) => {
+    f.chamadas.push([m, p]); if (f.falhar) throw Object.assign(new Error(f.falhar), { rede: true });
+    if (m === 'crm.category.list') return { result: { categories: [{ id: 5, name: 'Suporte' }] } };
+    if (m === 'crm.status.list') return { result: [{ STATUS_ID: 'C5:NEW', NAME: 'Novo chamado' }, { STATUS_ID: 'C5:PROGRESS', NAME: 'Em atendimento' }] };
+    if (m === 'crm.contact.list') return { result: f.contatos.filter(c => c.EMAIL[0].VALUE === p.filter.EMAIL).map(c => ({ ID: c.ID })) };
+    if (m === 'crm.contact.add') { const c = { ID: 100 + f.contatos.length, ...p.fields }; f.contatos.push(c); return { result: c.ID }; }
+    if (m === 'crm.deal.list') { const t = p.filter['%TITLE']; return { result: f.deals.filter(d => d.TITLE.includes(t)).map(d => ({ ID: d.ID })) }; }
+    if (m === 'crm.deal.add') { const d = { ID: 500 + f.deals.length, ...p.fields }; f.deals.push(d); return { result: d.ID }; }
+    throw new Error('método inesperado ' + m);
+  };
+  return f;
+}
+const MEMBRO = { ...EQ, 'x-vibe-user-role': 'MEMBER' };
+const aguarda = async (fn, ms = 2000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = fn(); if (v) return v; await new Promise(r => setTimeout(r, 20)); } return fn(); };
+
+test('chamado de suporte vira card no funil: configuração, conteúdo, idempotência, erro e reenvio', async () => {
+  const f = fakeBitrix();
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Joana Lima', email: 'joana@acme.com', senha: 'senha1234', empresa: 'Acme' }); const k = { cookie: c.c.split(';')[0] };
+  // permissões da configuração
+  assert.strictEqual((await call('GET', '/api/config/suporte', null, k)).s, 403);
+  assert.strictEqual((await call('GET', '/api/config/suporte', null, MEMBRO)).s, 403);
+  assert.strictEqual((await call('POST', '/api/config/suporte/testar', { webhook: 'https://evil.example.com/rest/1/x/' }, EQ)).s, 400); // só portais Bitrix24
+  // 1) chamado antes de configurar: fica na fila
+  const r = await call('POST', '/api/solicitacoes', { assunto: 'Erro ao <b>entrar</b>', texto: 'Aparece <script>alert(1)</script>\nlinha 2', categoria: 'problema', prioridade: 'alta', telefone: '(11) 99999-1111' }, k);
+  assert.strictEqual(r.s, 201); assert.match(r.j.protocolo, /^SUP-\d{4}$/);
+  const lista = () => db().solicitacoes.find(s => s.protocolo === r.j.protocolo); const db = () => require('../server').store.db;
+  await aguarda(() => lista().bitrix.status === 'nao_configurado'); assert.strictEqual(lista().bitrix.status, 'nao_configurado'); assert.strictEqual(f.deals.length, 0);
+  // 2) admin escolhe webhook, funil e etapa
+  const t = await call('POST', '/api/config/suporte/testar', { webhook: 'https://portal.bitrix24.com.br/rest/1/abc123/' }, EQ);
+  assert.strictEqual(t.s, 200); assert.strictEqual(t.j.funis.find(x => x.id === 5).etapas[0].id, 'C5:NEW');
+  const salvo = await call('POST', '/api/config/suporte', { webhook: 'https://portal.bitrix24.com.br/rest/1/abc123/', categoriaId: 5, estagioId: 'C5:NEW', funilNome: 'Suporte', etapaNome: 'Novo chamado' }, EQ);
+  assert.strictEqual(salvo.s, 200); assert.strictEqual(salvo.j.reenviados, 1); assert.strictEqual(salvo.j.dica, '••••c123'); // só o final do código
+  assert.ok(!JSON.stringify(salvo.j).includes('abc123/rest')); assert.ok(!JSON.stringify((await call('GET', '/api/config/suporte', null, EQ)).j).includes('https://portal'));
+  // 3) conteúdo do card
+  assert.strictEqual(f.deals.length, 1); const d = f.deals[0];
+  assert.strictEqual(d.CATEGORY_ID, 5); assert.strictEqual(d.STAGE_ID, 'C5:NEW'); assert.match(d.TITLE, new RegExp(`^\\[${r.j.protocolo}\\]\\[Alta\\] Erro ao`)); assert.match(d.TITLE, /Joana Lima \(Acme\)/);
+  for (const trecho of ['Joana Lima', 'joana@acme.com', '(11) 99999-1111', 'Acme', 'Problema / erro', 'Alta', 'Geral (sem projeto)', 'linha 2']) assert.ok(d.COMMENTS.includes(trecho), trecho + ' faltando no card');
+  assert.ok(!d.COMMENTS.includes('<script>') && d.COMMENTS.includes('&lt;script&gt;')); assert.ok(d.COMMENTS.includes('<br>')); // escapado, com quebra de linha
+  assert.strictEqual(f.contatos.length, 1); assert.strictEqual(d.CONTACT_ID, f.contatos[0].ID); assert.strictEqual(f.contatos[0].PHONE[0].VALUE, '(11) 99999-1111');
+  assert.strictEqual(lista().bitrix.status, 'enviado'); assert.strictEqual(lista().bitrix.dealId, d.ID);
+  // 4) idempotente: reenviar não duplica o card
+  await suporte.enviar(lista()); assert.strictEqual(f.deals.length, 1);
+  // 5) o cliente não vê detalhes do Bitrix24; a equipe vê o link do card
+  const vc = (await call('GET', '/api/solicitacoes', null, k)).j.solicitacoes[0]; assert.ok(!('bitrix' in vc)); assert.strictEqual(vc.protocolo, r.j.protocolo);
+  const ve = (await call('GET', '/api/solicitacoes', null, EQ)).j.solicitacoes.find(x => x.protocolo === r.j.protocolo); assert.strictEqual(ve.bitrix.url, `https://portal.bitrix24.com.br/crm/deal/details/${d.ID}/`);
+  // 6) Bitrix24 fora do ar: o chamado não se perde e é reenviado depois
+  f.falhar = 'Bitrix24 indisponível (ECONNRESET).';
+  const r2 = await call('POST', '/api/solicitacoes', { assunto: 'Segundo', texto: 'texto', categoria: 'duvida' }, k);
+  const s2 = () => db().solicitacoes.find(s => s.protocolo === r2.j.protocolo); await aguarda(() => s2().bitrix.status === 'erro');
+  assert.strictEqual(s2().bitrix.status, 'erro'); assert.strictEqual(s2().bitrix.tentativas, 1); assert.strictEqual(f.deals.length, 1);
+  f.falhar = null; assert.strictEqual(await suporte.processarPendentes(), 1); assert.strictEqual(s2().bitrix.status, 'enviado'); assert.strictEqual(f.deals.length, 2);
+  // validações do formulário
+  assert.strictEqual((await call('POST', '/api/solicitacoes', { assunto: 'x', texto: 'y', categoria: 'inexistente' }, k)).s, 400);
+  assert.strictEqual((await call('POST', '/api/solicitacoes', { assunto: '', texto: 'y' }, k)).s, 400);
+});
+
+test('ativação do cliente: aguardando → vinculado → removido → bloqueado', async () => {
+  const c = await call('POST', '/api/auth/cadastro', { nome: 'Pedro Alves', email: 'pedro@x.com', senha: 'senha1234' }); const k = { cookie: c.c.split(';')[0] };
+  const lista = async () => (await call('GET', '/api/clientes', null, EQ)).j.clientes; const cli = (await lista()).find(x => x.email === 'pedro@x.com');
+  assert.strictEqual(cli.projetoIds.length, 0); assert.strictEqual((await call('GET', '/api/projetos', null, k)).j.projetos.length, 0); // aguardando ativação
+  const p1 = (await call('POST', '/api/projetos', { nome: 'Projeto A' }, EQ)).j.projeto, p2 = (await call('POST', '/api/projetos', { nome: 'Projeto B' }, EQ)).j.projeto;
+  assert.strictEqual((await call('POST', `/api/clientes/${cli.id}/projetos`, { projetos: [p1.id] }, k)).s, 403); // cliente não se ativa
+  assert.strictEqual((await call('POST', `/api/clientes/${cli.id}/projetos`, { projetos: ['ffffffffffffffff'] }, EQ)).s, 400);
+  assert.strictEqual((await call('POST', `/api/clientes/${cli.id}/projetos`, { projetos: [p1.id, p2.id] }, EQ)).s, 200);
+  assert.deepStrictEqual((await call('GET', '/api/projetos', null, k)).j.projetos.map(p => p.nome).sort(), ['Projeto A', 'Projeto B']);
+  await call('POST', `/api/clientes/${cli.id}/projetos`, { projetos: [p2.id] }, EQ); // tira o A
+  assert.deepStrictEqual((await call('GET', '/api/projetos', null, k)).j.projetos.map(p => p.nome), ['Projeto B']); assert.strictEqual((await call('GET', '/api/projetos/' + p1.id, null, k)).s, 404);
+  const novo = (await call('POST', '/api/projetos', { nome: 'Já com cliente', clientes: [cli.id] }, EQ)).j.projeto; assert.strictEqual(novo.clientes.length, 1); // criar projeto já vinculado
+  assert.ok((await call('GET', '/api/logs', null, EQ)).j.logs.some(l => l.acao === 'alterou_acesso_cliente'));
+  await call('PATCH', '/api/clientes/' + cli.id, { ativo: false }, EQ); assert.strictEqual((await call('GET', '/api/projetos', null, k)).s, 401); // bloqueado perde o acesso
+  assert.strictEqual((await call('POST', '/api/auth/login', { email: 'pedro@x.com', senha: 'senha1234' })).s, 401);
+});

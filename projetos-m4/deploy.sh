@@ -9,7 +9,7 @@ T="$T" python3 - <<'PY' > "$T/deploy.json"
 import base64, json, os
 print(json.dumps({"source": {"content": base64.b64encode(open(os.environ["T"]+"/app.tgz","rb").read()).decode()},
   "runtime": "node20", "start": "cd /opt/app && node server.js", "port": 3000,
-  "env": {"DATA_DIR": "/opt/data/state"}, "dataDirs": ["/opt/data/state"], "healthPath": "/health",
+  "env": {"DATA_DIR": "/opt/data/state", "PUBLIC_URL": os.environ.get("PUBLIC_URL", "")}, "dataDirs": ["/opt/data/state"], "healthPath": "/health",
   "displayName": "Projetos M4", "description": "Portal do cliente: projetos, cronograma Gantt, status e documentos.",
   "changelog": os.environ.get("CHANGELOG", "Atualização do app")}))
 PY

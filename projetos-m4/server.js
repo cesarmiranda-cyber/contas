@@ -1,11 +1,13 @@
 'use strict';
 const http = require('http'); const fs = require('fs'); const path = require('path');
-const { createStore } = require('./lib/store'); const A = require('./lib/auth'); const S = require('./lib/schedule');
+const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const A = require('./lib/auth'); const S = require('./lib/schedule');
 
 const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const store = createStore(DATA_DIR); const db = store.db;
 const PUB = path.join(__dirname, 'public');
+const secrets = createSecrets(DATA_DIR); const bitrix = createBitrix('');
+const suporte = createSuporte({ store, secrets, bitrix, publicUrl: process.env.PUBLIC_URL || '' });
 const MAX_FILE = 10 * 1024 * 1024;
 
 const SEC = {
@@ -162,6 +164,7 @@ rota('POST', '/api/projetos', async (req, res, _m, b, u) => {
   const d = lerProjeto(b, false);
   const p = { situacao: 'andamento', prioridade: 'media', ...d, id: store.id(), gerente: d.gerente || u.nome, descricao: d.descricao || '', clientes: [], criadoEm: store.agora(), criadoPor: u.nome };
   p.codigo = p.codigo || proximoCodigo(); validarProjeto(p);
+  if (Array.isArray(b.clientes)) p.clientes = [...new Set(b.clientes.map(String))].filter(id => db.clientes.some(c => c.id === id));
   db.projetos.push(p); store.log(u.nome, 'equipe', 'criou_projeto', p.nome, p.id); store.save(); send(res, 201, { projeto: projetoView(p, u, true) });
 });
 rota('PATCH', '/api/projetos/([0-9a-f]+)', async (req, res, m, b, u) => {
@@ -225,24 +228,71 @@ rota('GET', '/api/arquivos/([0-9a-f]+)', async (req, res, m, _b, u) => {
   res.writeHead(200, { ...SEC, 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(a.nome)}`, 'Content-Length': buf.length, 'Cache-Control': 'private, no-store' }); res.end(buf);
 });
 
+const protocolo = () => 'SUP-' + String(db.solicitacoes.reduce((m, x) => Math.max(m, +(/^SUP-(\d+)$/.exec(x.protocolo || '') || [])[1] || 0), 0) + 1).padStart(4, '0');
+const cardUrl = s => s.bitrix && s.bitrix.dealId && bitrix.base ? `https://${hostDe(bitrix.base)}/crm/deal/details/${s.bitrix.dealId}/` : '';
+function solView(s, u) {
+  const base = { id: s.id, protocolo: s.protocolo, projetoId: s.projetoId, projeto: (projetoDe(s.projetoId) || {}).nome, categoria: s.categoria, prioridade: s.prioridade, assunto: s.assunto, texto: s.texto, status: s.status, resposta: s.resposta, criadoEm: s.criadoEm };
+  return u.tipo === 'equipe' ? { ...base, cliente: s.cliente, empresa: s.empresa, email: s.email, telefone: s.telefone, bitrix: s.bitrix ? { status: s.bitrix.status, erro: s.bitrix.erro, dealId: s.bitrix.dealId, tentativas: s.bitrix.tentativas, url: cardUrl(s) } : null } : base;
+}
 rota('GET', '/api/solicitacoes', async (req, res, _m, _b, u) => {
-  exigir(u); const l = db.solicitacoes.filter(s => u.tipo === 'equipe' || s.clienteId === u.id).map(s => ({ ...s, projeto: (projetoDe(s.projetoId) || {}).nome }));
-  send(res, 200, { solicitacoes: l.sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)) });
+  exigir(u); const l = db.solicitacoes.filter(s => u.tipo === 'equipe' || s.clienteId === u.id).map(s => solView(s, u));
+  send(res, 200, { solicitacoes: l.sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)), categorias: CAT, prioridades: PRIO });
 });
 rota('POST', '/api/solicitacoes', async (req, res, _m, b, u) => {
   exigir(u, 'cliente'); const pid = b.projetoId ? String(b.projetoId) : null; if (pid) { const p = projetoDe(pid); if (!p || !podeVer(u, p)) throw bad(400, 'Projeto inválido.'); }
-  const s = { id: store.id(), clienteId: u.id, cliente: u.nome, empresa: u.empresa || '', projetoId: pid, assunto: str(b.assunto, 160, true, 'Assunto'), texto: str(b.texto, 4000, true, 'Descrição'), status: 'nova', resposta: '', criadoEm: store.agora() };
-  db.solicitacoes.push(s); store.log(u.nome, 'cliente', 'solicitou', s.assunto, pid); store.save(); send(res, 201, { ok: true });
+  if (b.categoria && !CAT[b.categoria]) throw bad(400, 'Categoria inválida.'); if (b.prioridade && !PRIO[b.prioridade]) throw bad(400, 'Prioridade inválida.');
+  const conta = db.clientes.find(c => c.id === u.id) || {};
+  const s = { id: store.id(), protocolo: protocolo(), clienteId: u.id, cliente: u.nome, empresa: u.empresa || '', email: conta.email || '', telefone: str(b.telefone, 40) || conta.telefone || '', projetoId: pid, categoria: b.categoria || 'duvida', prioridade: b.prioridade || 'media',
+    assunto: str(b.assunto, 160, true, 'Assunto'), texto: str(b.texto, 4000, true, 'Descrição'), status: 'nova', resposta: '', criadoEm: store.agora(), bitrix: { status: 'pendente', tentativas: 0 } };
+  db.solicitacoes.push(s); store.log(u.nome, 'cliente', 'solicitou', `${s.protocolo} · ${s.assunto}`, pid); store.save();
+  suporte.enviar(s).catch(() => {}); // cria o card em segundo plano; se falhar, a fila reenvia
+  send(res, 201, { ok: true, protocolo: s.protocolo });
 });
 rota('PATCH', '/api/solicitacoes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const s = db.solicitacoes.find(x => x.id === m[1]); if (!s) throw bad(404, 'Solicitação não encontrada.');
   if (['nova', 'em_analise', 'aprovada', 'recusada', 'concluida'].includes(b.status)) s.status = b.status; if ('resposta' in b) s.resposta = str(b.resposta, 4000);
-  store.log(u.nome, 'equipe', 'atualizou_solicitacao', s.assunto, s.projetoId); store.save(); send(res, 200, { ok: true });
+  store.log(u.nome, 'equipe', 'atualizou_solicitacao', `${s.protocolo} · ${s.assunto}`, s.projetoId); store.save(); send(res, 200, { ok: true });
 });
+rota('POST', '/api/solicitacoes/([0-9a-f]+)/reenviar', async (req, res, m, _b, u) => {
+  exigir(u, 'equipe'); const s = db.solicitacoes.find(x => x.id === m[1]); if (!s) throw bad(404, 'Solicitação não encontrada.');
+  suporte.aplicar(); const r = await suporte.enviar(s); store.log(u.nome, 'equipe', 'reenviou_chamado', s.protocolo, s.projetoId); send(res, 200, { bitrix: { status: r.status, erro: r.erro, dealId: r.dealId, url: cardUrl(s) } });
+});
+
+// ---- integração com o funil de suporte (somente administradores do Bitrix24) ----
+const exigirAdmin = u => { exigir(u, 'equipe'); if (!u.admin) throw bad(403, 'Somente administradores configuram a integração.'); };
+const estadoSuporte = () => { const c = suporte.cfg(); return { configurado: bitrix.enabled, host: hostDe(bitrix.base), dica: hint(suporte.webhook()), origem: secrets.get('bitrixWebhook') ? 'painel' : process.env.BITRIX_WEBHOOK ? 'ambiente' : 'nenhuma', categoriaId: c.categoriaId ?? null, estagioId: c.estagioId || '', funilNome: c.funilNome || '', etapaNome: c.etapaNome || '', pronto: suporte.pronto(),
+  pendentes: db.solicitacoes.filter(s => s.bitrix && s.bitrix.status !== 'enviado').length }; };
+rota('GET', '/api/config/suporte', async (req, res, _m, _b, u) => { exigirAdmin(u); send(res, 200, estadoSuporte()); });
+rota('POST', '/api/config/suporte/testar', async (req, res, _m, b, u) => {
+  exigirAdmin(u); const w = String(b.webhook || '').trim() || suporte.webhook(); const erro = checkWebhook(w); if (erro) throw bad(400, erro);
+  try { const funis = await suporte.funis(w); send(res, 200, { ok: true, funis }); } catch (e) { throw bad(502, 'Não consegui consultar o Bitrix24: ' + e.message); }
+});
+rota('POST', '/api/config/suporte', async (req, res, _m, b, u) => {
+  exigirAdmin(u); const w = String(b.webhook || '').trim();
+  if (w) { const erro = checkWebhook(w); if (erro) throw bad(400, erro); secrets.set({ bitrixWebhook: w }); }
+  if (!suporte.webhook()) throw bad(400, 'Informe o webhook do Bitrix24.'); suporte.aplicar();
+  if (b.categoriaId == null || !b.estagioId) throw bad(400, 'Escolha o funil e a etapa inicial.');
+  db.config.suporte = { categoriaId: +b.categoriaId, estagioId: str(b.estagioId, 60, true, 'Etapa'), funilNome: str(b.funilNome, 120), etapaNome: str(b.etapaNome, 120) };
+  store.log(u.nome, 'equipe', 'configurou_suporte', `${db.config.suporte.funilNome} / ${db.config.suporte.etapaNome}`); store.save();
+  const n = await suporte.processarPendentes(); send(res, 200, { ...estadoSuporte(), reenviados: n });
+});
+rota('POST', '/api/config/suporte/reenviar', async (req, res, _m, _b, u) => { exigirAdmin(u); suporte.aplicar(); const n = await suporte.processarPendentes(); send(res, 200, { ...estadoSuporte(), reenviados: n }); });
 
 rota('GET', '/api/clientes', async (req, res, _m, _b, u) => {
   exigir(u, 'equipe');
-  send(res, 200, { clientes: db.clientes.map(c => ({ id: c.id, nome: c.nome, email: c.email, empresa: c.empresa, telefone: c.telefone, criadoEm: c.criadoEm, ativo: c.ativo !== false, projetos: db.projetos.filter(p => p.clientes.includes(c.id)).map(p => p.nome), ultimoAcesso: [...db.logs].reverse().find(l => l.tipo === 'cliente' && (l.acao === 'login' || l.acao === 'cadastro') && l.detalhe === c.email)?.ts || null })) });
+  send(res, 200, { clientes: db.clientes.map(c => ({ id: c.id, nome: c.nome, email: c.email, empresa: c.empresa, telefone: c.telefone, criadoEm: c.criadoEm, ativo: c.ativo !== false,
+    projetoIds: db.projetos.filter(p => p.clientes.includes(c.id)).map(p => p.id), projetos: db.projetos.filter(p => p.clientes.includes(c.id)).map(p => p.nome),
+    chamados: db.solicitacoes.filter(x => x.clienteId === c.id).length,
+    ultimoAcesso: [...db.logs].reverse().find(l => l.tipo === 'cliente' && (l.acao === 'login' || l.acao === 'cadastro') && l.detalhe === c.email)?.ts || null })) });
+});
+// Ativa/ajusta o acesso do cliente: define exatamente em quais projetos ele entra.
+rota('POST', '/api/clientes/([0-9a-f]+)/projetos', async (req, res, m, b, u) => {
+  exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.');
+  if (!Array.isArray(b.projetos)) throw bad(400, 'Informe a lista de projetos.');
+  const alvo = new Set(b.projetos.map(String)); if ([...alvo].some(id => !projetoDe(id))) throw bad(400, 'Projeto inválido.');
+  const antes = db.projetos.filter(p => p.clientes.includes(c.id)).length;
+  for (const p of db.projetos) { const tem = p.clientes.includes(c.id); if (alvo.has(p.id) && !tem) p.clientes.push(c.id); else if (!alvo.has(p.id) && tem) p.clientes = p.clientes.filter(x => x !== c.id); }
+  store.log(u.nome, 'equipe', antes === 0 && alvo.size ? 'ativou_cliente' : 'alterou_acesso_cliente', `${c.nome} → ${alvo.size} projeto(s)`); store.save(); send(res, 200, { ok: true, projetos: alvo.size });
 });
 rota('PATCH', '/api/clientes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const c = db.clientes.find(x => x.id === m[1]); if (!c) throw bad(404, 'Cliente não encontrado.');
@@ -279,5 +329,5 @@ const server = http.createServer(async (req, res) => {
     await hit[2](req, res, hit[1], b, quem(req));
   } catch (e) { if (!e.status) console.error(e); send(res, e.status || 500, { erro: e.status ? e.message : 'Erro interno.' }); }
 });
-if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }
-module.exports = { server, store };
+if (require.main === module) { server.listen(PORT, () => console.log(`Projetos M4 na porta ${PORT}`)); setInterval(() => suporte.processarPendentes().catch(() => {}), 2 * 60e3).unref(); setTimeout(() => suporte.processarPendentes().catch(() => {}), 5e3).unref(); process.on('SIGTERM', () => { store.flush(); process.exit(0); }); }
+module.exports = { server, store, suporte, bitrix, secrets };

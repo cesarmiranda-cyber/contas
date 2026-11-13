@@ -34,13 +34,13 @@ function render() {
   $app.replaceChildren(); $tip.hidden = true;
   if (!U) return $app.append(telaLogin());
   const eq = U.tipo === 'equipe';
-  const nav = [['projetos', 'Projetos'], ['solicitacoes', 'Suporte'], ...(eq ? [['clientes', 'Clientes'], ['acessos', 'Acessos e log']] : [])];
+  const nav = [['projetos', 'Projetos'], ['solicitacoes', 'Suporte'], ...(eq ? [['clientes', 'Clientes'], ['acessos', 'Acessos e log'], ...(U.admin ? [['integracao', 'Integração']] : [])] : [])];
   const top = h('header', { class: 'top' }, h('div', { class: 'logo', 'aria-label': 'Manda4 · Projetos e Suporte' }, LOGO(), NOME, h('span', { class: 'logo-sub' }, 'Projetos e Suporte')),
     h('nav', {}, nav.map(([k, t]) => h('a', { class: view.nome === k || (k === 'projetos' && view.nome === 'projeto') ? 'on' : '', onclick: () => go({ nome: k }) }, t))),
     h('span', { class: 'muted small' }, `${U.nome}${eq ? ' · equipe' : ''}`),
     !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); U = null; render(); } }, 'Sair'));
   const main = h('main', { class: 'wrap' }); $app.append(top, main);
-  ({ projetos: telaProjetos, projeto: telaProjeto, solicitacoes: telaSolic, clientes: telaClientes, acessos: telaLog }[view.nome])(main).catch(e => main.append(h('div', { class: 'erro' }, e.message)));
+  ({ projetos: telaProjetos, projeto: telaProjeto, solicitacoes: telaSolic, clientes: telaClientes, acessos: telaLog, integracao: telaIntegracao }[view.nome])(main).catch(e => main.append(h('div', { class: 'erro' }, e.message)));
 }
 
 // ---------- login / cadastro ----------
@@ -52,7 +52,7 @@ function telaLogin(modo = 'login') {
     ev.preventDefault(); err.replaceChildren(); const bt = ev.submitter; bt.disabled = true;
     try { await api('POST', cad ? '/api/auth/cadastro' : '/api/auth/login', Object.fromEntries(Object.entries(campos).map(([k, v]) => [k, v.value]))); await boot(); } catch (e) { err.append(h('div', { class: 'erro' }, e.message)); bt.disabled = false; }
   } }, h('h2', {}, cad ? 'Criar sua conta de cliente' : 'Entrar na área do cliente'), h('p', { class: 'muted small' }, cad ? 'Use o e-mail que a equipe Manda4 tem no seu cadastro. Leva menos de um minuto.' : 'Projetos, documentos e suporte em um só lugar.'),
-    cad && f('nome', 'Nome completo', 'text', 'name'), cad && h('div', {}, h('label', {}, 'Empresa'), (campos.empresa = h('input', { autocomplete: 'organization' }))),
+    cad && f('nome', 'Nome completo', 'text', 'name'), cad && h('div', {}, h('label', {}, 'Empresa'), (campos.empresa = h('input', { autocomplete: 'organization' }))), cad && h('div', {}, h('label', {}, 'Telefone / WhatsApp (opcional)'), (campos.telefone = h('input', { type: 'tel', autocomplete: 'tel' }))),
     f('email', 'E-mail profissional', 'email', 'email'), f('senha', cad ? 'Senha (mín. 8 caracteres)' : 'Senha', 'password', cad ? 'new-password' : 'current-password'),
     err, h('button', { class: 'btn pri', type: 'submit' }, cad ? 'Criar conta' : 'Entrar'),
     h('p', { class: 'troca muted small' }, cad ? 'Já tem conta? ' : 'Ainda não tem conta? ', h('a', { tabindex: 0, onclick: () => $app.replaceChildren(telaLogin(cad ? 'login' : 'cadastro')) }, cad ? 'Entrar' : 'Criar conta')),
@@ -188,8 +188,8 @@ async function drawer(p, t) {
 }
 
 // ---------- equipe: projeto e tarefa ----------
-async function modalProjeto(p) {
-  const v = overlay(true), err = h('div'); const { clientes } = await api('GET', '/api/clientes'); const sel = new Set((p && p.clientes || []).map(c => c.id)); const x = p || {};
+async function modalProjeto(p, pre) {
+  const v = overlay(true), err = h('div'); const { clientes } = await api('GET', '/api/clientes'); const sel = new Set(((p || pre || {}).clientes || []).map(c => c.id)); const x = p || pre || {};
   const inp = (val, extra) => h('input', { value: val ?? '', ...extra });
   const f = {
     nome: inp(x.nome, { maxlength: 160 }), codigo: inp(x.codigo, { placeholder: 'Automático (PRJ-0001)' }),
@@ -234,34 +234,107 @@ function modalTarefa(p, t) {
     } }, 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'), t && h('button', { class: 'btn perigo', onclick: async () => { if (confirm('Excluir esta atividade?')) { await api('DELETE', '/api/tarefas/' + t.id); v.remove(); render(); } } }, 'Excluir'))));
 }
 
-// ---------- solicitações ----------
+// ---------- suporte (chamados) ----------
 const SOL = { nova: 'Nova', em_analise: 'Em análise', aprovada: 'Aprovada', recusada: 'Recusada', concluida: 'Concluída' };
+const CATS = { duvida: 'Dúvida', problema: 'Problema / erro', mudanca: 'Solicitação de mudança', acesso: 'Acesso e usuários', financeiro: 'Financeiro', outro: 'Outro' };
+const PRIOS = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
+function toast(msg) { const e = h('div', { class: 'toast', role: 'status' }, msg); document.body.append(e); setTimeout(() => e.remove(), 4200); }
 async function telaSolic(m) {
   const { solicitacoes } = await api('GET', '/api/solicitacoes'); const eq = U.tipo === 'equipe';
   m.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Suporte e solicitações'), !eq && h('button', { class: 'btn pri', onclick: novaSolic }, '+ Abrir chamado')));
-  if (!solicitacoes.length) return m.append(h('div', { class: 'card vazio' }, 'Nenhum chamado por aqui. Precisa de algo? Abra um chamado de suporte.'));
+  const sem = eq && solicitacoes.some(s => s.bitrix && s.bitrix.status === 'nao_configurado');
+  if (sem) m.append(h('div', { class: 'aviso' }, h('b', {}, 'Os chamados ainda não estão chegando ao funil de suporte do Bitrix24. '), U.admin ? h('a', { onclick: () => go({ nome: 'integracao' }) }, 'Configurar a integração →') : 'Peça a um administrador para configurar a integração.'));
+  if (!solicitacoes.length) return m.append(h('div', { class: 'card vazio' }, eq ? 'Nenhum chamado ainda.' : 'Nenhum chamado por aqui. Precisa de algo? Abra um chamado de suporte.'));
   m.append(h('div', { class: 'cards' }, solicitacoes.map(s => {
     const st = h('select', { onchange: e => api('PATCH', '/api/solicitacoes/' + s.id, { status: e.target.value }).then(render) }, Object.entries(SOL).map(([k, t]) => h('option', { value: k, selected: k === s.status }, t)));
-    const rs = h('textarea', { rows: 2, placeholder: 'Resposta ao cliente' }, s.resposta);
+    const rs = h('textarea', { rows: 2, placeholder: 'Resposta ao cliente' }, s.resposta); const bx = s.bitrix;
     return h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, s.assunto), eq ? st : chip(s.status === 'recusada' ? 'vermelho' : s.status === 'nova' || s.status === 'em_analise' ? 'amarelo' : 'verde', SOL[s.status])),
-      h('p', { class: 'muted small' }, `${eq ? s.cliente + (s.empresa ? ' · ' + s.empresa : '') + ' · ' : ''}${s.projeto || 'Geral'} · ${fmtTs(s.criadoEm)}`), h('p', { style: 'white-space:pre-wrap' }, s.texto),
+      h('p', { class: 'muted small', style: 'margin:4px 0' }, h('b', {}, s.protocolo), ` · ${CATS[s.categoria] || ''} · Prioridade ${PRIOS[s.prioridade] || ''} · ${s.projeto || 'Geral'} · ${fmtTs(s.criadoEm)}`),
+      eq && h('p', { class: 'muted small', style: 'margin:0 0 6px' }, [s.cliente, s.empresa, s.email, s.telefone].filter(Boolean).join(' · ')), h('p', { style: 'white-space:pre-wrap' }, s.texto),
+      eq && bx && h('div', { class: 'bx' }, bx.status === 'enviado' ? [chip('verde', 'Card criado no Bitrix24'), bx.url && h('a', { href: bx.url, target: '_blank', rel: 'noopener noreferrer' }, `Abrir card #${bx.dealId}`)]
+        : [chip(bx.status === 'erro' ? 'vermelho' : 'amarelo', bx.status === 'erro' ? 'Falha ao criar o card' : 'Card ainda não criado'), h('span', { class: 'muted small' }, bx.erro || ''), h('button', { class: 'btn sm', onclick: async ev => { ev.target.disabled = true; try { const r = await api('POST', `/api/solicitacoes/${s.id}/reenviar`, {}); toast(r.bitrix.status === 'enviado' ? 'Card criado no Bitrix24.' : (r.bitrix.erro || 'Não foi possível criar o card.')); } catch (e) { toast(e.message); } render(); } }, 'Reenviar ao Bitrix24')]),
       eq ? [rs, h('button', { class: 'btn sm', style: 'margin-top:8px', onclick: () => api('PATCH', '/api/solicitacoes/' + s.id, { resposta: rs.value }).then(render) }, 'Salvar resposta')] : s.resposta && h('div', { class: 'msg eq' }, h('div', { class: 'quem' }, 'Resposta da equipe'), h('p', {}, s.resposta)));
   })));
 }
 async function novaSolic() {
   const v = overlay(true), err = h('div'); const { projetos } = await api('GET', '/api/projetos');
-  const pj = h('select', {}, h('option', { value: '' }, 'Geral (sem projeto)'), projetos.map(p => h('option', { value: p.id }, p.nome))), as = h('input', { maxlength: 160 }), tx = h('textarea', { rows: 5 });
-  v.append(h('div', { class: 'modal' }, h('h2', {}, 'Abrir chamado de suporte'), h('label', {}, 'Projeto'), pj, h('label', {}, 'Assunto'), as, h('label', {}, 'Descreva o que você precisa (dúvida, problema ou nova solicitação)'), tx, err,
-    h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async () => { try { await api('POST', '/api/solicitacoes', { projetoId: pj.value, assunto: as.value, texto: tx.value }); v.remove(); render(); } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); } } }, 'Enviar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'))));
+  const sel = (o, def) => h('select', {}, Object.entries(o).map(([k, t]) => h('option', { value: k, selected: k === def }, t)));
+  const pj = h('select', {}, h('option', { value: '' }, 'Geral (sem projeto)'), projetos.map(p => h('option', { value: p.id }, `${p.nome}${p.codigo ? ' · ' + p.codigo : ''}`)));
+  const cat = sel(CATS, 'duvida'), pri = sel(PRIOS, 'media'), tel = h('input', { type: 'tel', placeholder: '(11) 90000-0000' }), as = h('input', { maxlength: 160, placeholder: 'Resumo em uma linha' }), tx = h('textarea', { rows: 6, placeholder: 'Conte o que aconteceu ou o que você precisa: o que estava fazendo, o que esperava e o que aconteceu.' });
+  const c = (r, el) => h('div', {}, h('label', {}, r), el);
+  v.append(h('div', { class: 'modal' }, h('h2', {}, 'Abrir chamado de suporte'), h('p', { class: 'muted small' }, 'Seu chamado vai direto para a equipe Manda4, com protocolo para acompanhamento.'),
+    h('div', { class: 'g2' }, c('Projeto', pj), c('Categoria', cat), c('Prioridade', pri), c('Telefone para contato (opcional)', tel)), h('label', {}, 'Assunto *'), as, h('label', {}, 'Descrição *'), tx, err,
+    h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async ev => { ev.target.disabled = true; err.replaceChildren(); try {
+      const r = await api('POST', '/api/solicitacoes', { projetoId: pj.value, categoria: cat.value, prioridade: pri.value, telefone: tel.value, assunto: as.value, texto: tx.value }); v.remove(); render(); toast(`Chamado ${r.protocolo} registrado. A equipe Manda4 foi avisada.`);
+    } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); ev.target.disabled = false; } } }, 'Enviar chamado'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'))));
 }
 
-// ---------- equipe: clientes e log ----------
+// ---------- equipe: clientes e ativação ----------
+const iniciais = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(x => x[0]).join('').toUpperCase();
+function situacaoCliente(c) { return !c.ativo ? 'bloqueado' : c.projetoIds.length ? 'ativo' : 'aguardando'; }
 async function telaClientes(m) {
-  const { clientes } = await api('GET', '/api/clientes'); m.append(h('h1', {}, 'Clientes do portal'), h('p', { class: 'muted' }, 'Quem criou conta no portal. Para dar acesso, abra o projeto → Editar projeto → marque o cliente.'));
-  m.append(h('div', { class: 'card', style: 'margin-top:16px;overflow:auto' }, clientes.length ? h('table', {}, h('thead', {}, h('tr', {}, ['Cliente', 'Empresa', 'Situação', 'Projetos', 'Último acesso', ''].map(t => h('th', {}, t)))), h('tbody', {}, clientes.map(c => h('tr', {},
-    h('td', {}, c.nome, h('div', { class: 'muted small' }, c.email)), h('td', {}, c.empresa || '—'), h('td', {}, !c.ativo ? chip('vermelho', 'Bloqueado') : c.projetos.length ? chip('verde', 'Ativo') : chip('amarelo', 'Aguardando ativação')), h('td', {}, c.projetos.join(', ') || h('span', { class: 'muted' }, 'sem projeto')), h('td', {}, c.ultimoAcesso ? fmtTs(c.ultimoAcesso) : 'nunca'),
-    h('td', {}, h('button', { class: 'btn sm', onclick: () => api('PATCH', '/api/clientes/' + c.id, { ativo: !c.ativo }).then(render) }, c.ativo ? 'Bloquear' : 'Reativar')))))) : h('div', { class: 'vazio' }, 'Nenhum cliente cadastrado ainda.')));
+  const [{ clientes }, { projetos }] = await Promise.all([api('GET', '/api/clientes'), api('GET', '/api/projetos')]);
+  const n = { aguardando: 0, ativo: 0, bloqueado: 0 }; clientes.forEach(c => n[situacaoCliente(c)]++);
+  if (!view.filtro) view.filtro = n.aguardando ? 'aguardando' : 'todos'; if (view.busca == null) view.busca = '';
+  const lista = h('div'); const pinta = () => {
+    const q = view.busca.trim().toLowerCase();
+    const l = clientes.filter(c => (view.filtro === 'todos' || situacaoCliente(c) === view.filtro) && (!q || [c.nome, c.email, c.empresa, c.telefone, ...c.projetos].join(' ').toLowerCase().includes(q)))
+      .sort((a, b) => ({ aguardando: 0, ativo: 1, bloqueado: 2 }[situacaoCliente(a)] - { aguardando: 0, ativo: 1, bloqueado: 2 }[situacaoCliente(b)]) || b.criadoEm.localeCompare(a.criadoEm));
+    lista.replaceChildren(l.length ? h('div', { class: 'card tabela' }, h('table', {}, h('thead', {}, h('tr', {}, ['Cliente', 'Empresa', 'Situação', 'Projetos', 'Cadastro · último acesso', ''].map(x => h('th', {}, x)))), h('tbody', {}, l.map(c => {
+      const sit = situacaoCliente(c);
+      return h('tr', {}, h('td', {}, h('div', { class: 'quem-cli' }, h('span', { class: 'avatar' }, iniciais(c.nome)), h('div', {}, h('b', {}, c.nome), h('div', { class: 'muted small' }, c.email), c.telefone && h('div', { class: 'muted small' }, c.telefone)))),
+        h('td', {}, c.empresa || h('span', { class: 'muted' }, '—')), h('td', {}, sit === 'bloqueado' ? chip('vermelho', 'Bloqueado') : sit === 'ativo' ? chip('verde', 'Ativo') : chip('amarelo', 'Aguardando ativação')),
+        h('td', {}, c.projetos.length ? c.projetos.map(p => h('div', { class: 'small' }, p)) : h('span', { class: 'muted' }, 'sem projeto'), c.chamados > 0 && h('div', { class: 'muted small' }, `${c.chamados} chamado(s)`)),
+        h('td', { class: 'small' }, h('div', {}, 'Cadastro: ' + fmtTs(c.criadoEm)), h('div', { class: 'muted' }, 'Acesso: ' + (c.ultimoAcesso ? fmtTs(c.ultimoAcesso) : 'nunca'))),
+        h('td', { class: 'acoes-cli' }, sit === 'bloqueado' ? h('button', { class: 'btn sm', onclick: () => api('PATCH', '/api/clientes/' + c.id, { ativo: true }).then(() => { toast('Cliente reativado.'); render(); }) }, 'Reativar')
+          : [h('button', { class: 'btn sm' + (sit === 'aguardando' ? ' pri' : ''), onclick: () => modalAcesso(c, projetos) }, sit === 'aguardando' ? 'Ativar acesso' : 'Gerenciar projetos'),
+            h('button', { class: 'btn sm perigo', onclick: () => confirm(`Bloquear ${c.nome}? Ele perde o acesso ao portal.`) && api('PATCH', '/api/clientes/' + c.id, { ativo: false }).then(() => { toast('Cliente bloqueado.'); render(); }) }, 'Bloquear')]));
+    })))) : h('div', { class: 'card vazio' }, clientes.length ? 'Nenhum cliente neste filtro.' : 'Nenhum cliente cadastrado ainda. Quando alguém criar conta no portal, aparece aqui.'));
+  };
+  const aba = (k, t, q) => h('button', { class: 'filtro' + (view.filtro === k ? ' on' : ''), onclick: ev => { view.filtro = k; ev.target.parentNode.querySelectorAll('.filtro').forEach(b => b.classList.toggle('on', b === ev.target)); pinta(); } }, `${t} `, h('span', { class: 'n' }, q));
+  m.append(h('h1', {}, 'Clientes do portal'), h('p', { class: 'muted' }, 'Quem criou conta no portal. Para liberar o acesso, ative o cliente em um ou mais projetos.'),
+    n.aguardando > 0 && h('div', { class: 'aviso' }, h('b', {}, `${n.aguardando} cliente(s) aguardando ativação. `), 'Eles já criaram a conta e estão esperando você vincular um projeto.'),
+    h('div', { class: 'toolbar' }, h('div', { class: 'filtros' }, aba('aguardando', 'Aguardando ativação', n.aguardando), aba('ativo', 'Ativos', n.ativo), aba('bloqueado', 'Bloqueados', n.bloqueado), aba('todos', 'Todos', clientes.length)),
+      h('input', { class: 'busca', type: 'search', placeholder: 'Buscar por nome, e-mail, empresa ou projeto', value: view.busca, oninput: e => { view.busca = e.target.value; pinta(); } })), lista); pinta();
 }
+function modalAcesso(c, projetos) {
+  const v = overlay(true), err = h('div'); const sel = new Set(c.projetoIds); const ativar = c.projetoIds.length === 0;
+  const pre = { empresa: c.empresa, contatoNome: c.nome, contatoEmail: c.email, contatoTelefone: c.telefone, clientes: [{ id: c.id }] };
+  const caixa = h('div', { class: 'lista-proj' }, projetos.length ? projetos.map(p => h('label', { class: 'item-proj' }, h('input', { type: 'checkbox', checked: sel.has(p.id), onchange: e => e.target.checked ? sel.add(p.id) : sel.delete(p.id) }),
+    h('span', {}, h('b', {}, p.nome), h('span', { class: 'muted small' }, ` ${[p.codigo, p.empresa].filter(Boolean).join(' · ')}`)))) : h('p', { class: 'muted' }, 'Ainda não há projetos. Crie o primeiro para este cliente.'));
+  v.append(h('div', { class: 'modal' }, h('h2', {}, ativar ? 'Ativar acesso' : 'Projetos do cliente'), h('div', { class: 'quem-cli', style: 'margin:8px 0 4px' }, h('span', { class: 'avatar' }, iniciais(c.nome)), h('div', {}, h('b', {}, c.nome), h('div', { class: 'muted small' }, [c.empresa, c.email].filter(Boolean).join(' · ')))),
+    h('label', {}, ativar ? 'Em quais projetos este cliente pode entrar?' : 'Projetos que este cliente pode acompanhar'), caixa,
+    h('button', { class: 'btn sm', style: 'margin-top:10px', onclick: () => { v.remove(); modalProjeto(null, pre); } }, '+ Criar novo projeto para este cliente'), err,
+    h('div', { class: 'row', style: 'margin-top:18px' }, h('button', { class: 'btn pri', onclick: async ev => { ev.target.disabled = true; try {
+      if (ativar && sel.size === 0) throw new Error('Marque ao menos um projeto para ativar o acesso.');
+      const r = await api('POST', `/api/clientes/${c.id}/projetos`, { projetos: [...sel] }); v.remove(); toast(r.projetos ? `Acesso ativado: ${c.nome} vê ${r.projetos} projeto(s).` : `${c.nome} ficou sem projetos (aguardando ativação).`); render();
+    } catch (e) { err.replaceChildren(h('div', { class: 'erro' }, e.message)); ev.target.disabled = false; } } }, ativar ? 'Ativar acesso' : 'Salvar'), h('button', { class: 'btn', onclick: () => v.remove() }, 'Cancelar'))));
+}
+
+// ---------- equipe: integração com o funil de suporte (administradores) ----------
+async function telaIntegracao(m) {
+  const e = await api('GET', '/api/config/suporte'); let funis = null;
+  const msg = h('div'), selF = h('select', {}), selE = h('select', {}), wh = h('input', { type: 'password', autocomplete: 'off', placeholder: e.configurado ? `Webhook salvo (${e.dica}). Cole outro só para trocar.` : 'https://seu-portal.bitrix24.com.br/rest/1/CODIGO/' });
+  const pintaEtapas = () => { const f = (funis || []).find(x => String(x.id) === selF.value); selE.replaceChildren(...(f ? f.etapas : []).map(x => h('option', { value: x.id, selected: x.id === e.estagioId }, x.nome))); };
+  const carrega = async ev => { ev.target.disabled = true; msg.replaceChildren(); try { funis = (await api('POST', '/api/config/suporte/testar', { webhook: wh.value })).funis;
+      selF.replaceChildren(...funis.map(f => h('option', { value: f.id, selected: f.id === e.categoriaId }, f.nome))); pintaEtapas(); msg.append(h('div', { class: 'ok' }, `Conexão ok. ${funis.length} funil(is) encontrado(s). Escolha o funil e a etapa inicial dos chamados.`)); }
+    catch (x) { msg.append(h('div', { class: 'erro' }, x.message)); } ev.target.disabled = false; };
+  selF.addEventListener('change', pintaEtapas);
+  m.append(h('h1', {}, 'Integração · funil de suporte'), h('p', { class: 'muted' }, 'Cada chamado aberto pelo cliente vira um card no funil que você escolher no Bitrix24.'),
+    h('div', { class: 'card integ' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Conexão com o Bitrix24'), e.pronto ? chip('verde', 'Funcionando') : chip('amarelo', 'Não configurada')),
+      e.pronto && h('p', { class: 'muted small' }, `Portal ${e.host} · funil “${e.funilNome}” · etapa inicial “${e.etapaNome}”`),
+      h('label', {}, 'Webhook de entrada do Bitrix24'), wh, h('p', { class: 'muted small' }, 'No Bitrix24: Recursos para desenvolvedores → Outros → Webhook de entrada, com permissão em CRM. O endereço fica guardado só no servidor e nunca volta inteiro para o navegador.'),
+      h('button', { class: 'btn', style: 'margin-top:8px', onclick: carrega }, e.configurado ? 'Testar conexão e carregar funis' : 'Conectar e carregar funis'), msg,
+      h('div', { class: 'g2' }, h('div', {}, h('label', {}, 'Funil de suporte'), selF), h('div', {}, h('label', {}, 'Etapa inicial dos chamados'), selE)),
+      h('div', { class: 'row', style: 'margin-top:16px' }, h('button', { class: 'btn pri', onclick: async ev => { ev.target.disabled = true; msg.replaceChildren(); try {
+        if (!funis) throw new Error('Clique em “Conectar e carregar funis” primeiro.'); const f = funis.find(x => String(x.id) === selF.value), et = f && f.etapas.find(x => x.id === selE.value); if (!f || !et) throw new Error('Escolha o funil e a etapa.');
+        const r = await api('POST', '/api/config/suporte', { webhook: wh.value, categoriaId: f.id, estagioId: et.id, funilNome: f.nome, etapaNome: et.nome }); toast(r.reenviados ? `Integração salva. ${r.reenviados} chamado(s) pendente(s) enviados.` : 'Integração salva.'); render();
+      } catch (x) { msg.append(h('div', { class: 'erro' }, x.message)); ev.target.disabled = false; } } }, 'Salvar integração'),
+        e.pendentes > 0 && h('button', { class: 'btn', onclick: async () => { const r = await api('POST', '/api/config/suporte/reenviar', {}); toast(`${r.reenviados} chamado(s) reenviado(s).`); render(); } }, `Reenviar ${e.pendentes} pendente(s)`))),
+    h('div', { class: 'card integ', style: 'margin-top:16px' }, h('h3', {}, 'O que vai no card'), h('ul', { class: 'bene2' }, ['Título: [SUP-0001] assunto — cliente (empresa), com a prioridade quando for alta ou urgente', 'Protocolo, data e hora, categoria e prioridade', 'Cliente, empresa, e-mail e telefone (o contato é criado ou reaproveitado pelo e-mail e vinculado ao card)', 'Projeto relacionado (nome e código)', 'Descrição completa escrita pelo cliente', 'Se o Bitrix24 estiver fora do ar, o chamado fica na fila e é reenviado automaticamente']
+      .map(x => h('li', {}, x)))));
+}
+
 async function telaLog(m) {
   const { logs } = await api('GET', '/api/logs'); m.append(h('h1', {}, 'Acessos e atividade'), h('p', { class: 'muted' }, 'Últimos 300 eventos: logins, projetos abertos, comentários, documentos e solicitações.'));
   m.append(h('div', { class: 'card', style: 'margin-top:16px;overflow:auto' }, h('table', {}, h('thead', {}, h('tr', {}, ['Quando', 'Quem', 'Ação', 'Projeto', 'Detalhe'].map(t => h('th', {}, t)))),
