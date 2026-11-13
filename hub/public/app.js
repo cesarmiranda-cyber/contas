@@ -7,6 +7,7 @@ const state = { me: null, portal: '', wizard: null, clientes: { q: '', items: []
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const digits = (s) => String(s ?? '').replace(/\D+/g, '');
 const IC = {
+  pencil: 'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z', trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6', copy: 'M9 9h11v11H9zM5 15H4V4h11v1', refresh: 'M21 12a9 9 0 01-15.5 6.2M3 12A9 9 0 0118.5 5.8M21 4v5h-5M3 20v-5h5',
   back: 'M15 18l-6-6 6-6', arrow: 'M5 12h14M13 6l6 6-6 6', check: 'M20 6L9 17l-5-5', search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.3-4.3',
   user: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0', plus: 'M12 5v14M5 12h14', x: 'M18 6L6 18M6 6l12 12',
   shield: 'M12 3l8 3v6c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V6l8-3zM9 12l2 2 4-4', building: 'M4 21V5l8-2v18M12 9h8v12M8 8h.01M8 12h.01M8 16h.01M16 13h.01M16 17h.01', users: 'M16 11a3 3 0 100-6 3 3 0 000 6zM8 12a3 3 0 100-6 3 3 0 000 6zM2 20a6 6 0 0112 0M14 14a6 6 0 018 6',
@@ -63,6 +64,22 @@ function toast(msg, bad) {
   document.getElementById('toasts').append(t); setTimeout(() => t.remove(), bad ? 6000 : 3500);
 }
 function openInBitrix(path) { if (state.portal) window.top.location.href = `https://${state.portal}${path}`; }
+const telHref = (p) => { const d = digits(p); return `tel:${d.length >= 10 && !d.startsWith('55') ? '+55' : '+'}${d}`; };
+const phoneLink = (p) => `<a class="lnk" href="${esc(telHref(p))}" title="Ligar">${esc(p)}</a>`;
+const mailLink = (m) => `<a class="lnk" href="mailto:${esc(m)}" title="Enviar e-mail">${esc(m)}</a>`;
+async function copyText(t, what = 'Copiado') { try { await navigator.clipboard.writeText(t); toast(`${what}.`); } catch { toast('Não foi possível copiar.', true); } }
+function confirmDialog({ title, message, confirm = 'Confirmar', danger = true }) {
+  return new Promise((resolve) => {
+    const prev = document.activeElement;
+    const w = document.createElement('div'); w.className = 'modal-wrap';
+    w.innerHTML = `<div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="md-t"><h3 id="md-t">${esc(title)}</h3><p class="muted">${message}</p><div class="row" style="justify-content:flex-end;margin-top:20px"><button class="btn ghost" data-r="0">Cancelar</button><button class="btn ${danger ? 'dangerfill' : 'primary'}" data-r="1">${esc(confirm)}</button></div></div>`;
+    const done = (v) => { document.removeEventListener('keydown', key, true); w.remove(); prev?.focus?.(); resolve(v); };
+    const key = (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    w.addEventListener('click', (e) => { if (e.target === w) done(false); });
+    w.querySelectorAll('[data-r]').forEach((b) => (b.onclick = () => done(b.dataset.r === '1')));
+    document.addEventListener('keydown', key, true); document.body.append(w); w.querySelector('[data-r="0"]').focus();
+  });
+}
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
 /* ---------- roteamento ---------- */
@@ -142,7 +159,7 @@ const emptyEmpresa = (cnpj) => ({ title: '', razaoSocial: '', cnpj, situacao: ''
 
 function stepsBar(n) {
   const L = ['Empresa', 'Contatos', 'Revisão'];
-  return `<ol class="steps" style="list-style:none;padding:0">${L.map((t, i) => `<li class="step ${i + 1 === n ? 'on' : i + 1 < n ? 'done' : ''}"><b>${i + 1 < n ? '✓' : i + 1}</b>${t}</li>`).join('')}</ol>`;
+  return `<ol class="steps" style="list-style:none;padding:0">${L.map((t, i) => `<li><button class="step ${i + 1 === n ? 'on' : i + 1 < n ? 'done' : ''}" data-step="${i + 1}" ${i + 1 >= n ? 'disabled' : ''} ${i + 1 === n ? 'aria-current="step"' : ''}><b>${i + 1 < n ? '✓' : i + 1}</b>${t}</button></li>`).join('')}</ol>`;
 }
 function renderWizard(main) {
   if (!state.wizard) state.wizard = newWizard();
@@ -150,6 +167,7 @@ function renderWizard(main) {
   if (w.result) return renderSuccess(main);
   main.innerHTML = `<div class="page-h"><h2>Novo cadastro de cliente</h2><p>Digite o CNPJ: buscamos os dados na Receita Federal e preenchemos o cadastro para você.</p></div>${stepsBar(w.step)}<div id="wz"></div>`;
   const box = main.querySelector('#wz');
+  main.querySelectorAll('[data-step]:not([disabled])').forEach((b) => (b.onclick = () => { w.step = +b.dataset.step; renderWizard(main); }));
   ({ 1: stepEmpresa, 2: stepContatos, 3: stepRevisao })[w.step](box, w);
 }
 
@@ -251,7 +269,7 @@ function stepContatos(box, w) {
     ${socios.length ? `<section class="card card-p"><div class="section-t">Sócios e administradores (Receita Federal)</div><p class="small muted" style="margin-bottom:12px">Toque para adicionar como contato da empresa.</p><div class="chips">${socios.map((s, i) => `<button class="chip" data-socio="${i}">${icon('plus')}<span>${esc(s.nome)}</span> <small>${esc(s.qualificacao)}</small></button>`).join('')}</div></section>` : ''}
     <section class="card card-p stack">
       <div class="section-t" style="margin:0">Contatos desta empresa <span class="badge info">${w.contatos.length}</span></div>
-      ${w.contatos.length ? w.contatos.map((c, i) => personRow(c, `<button class="btn danger sm" data-rm="${i}">Remover</button>`)).join('') : `<p class="muted small">Nenhum contato adicionado ainda. Você pode pular esta etapa e vincular depois.</p>`}
+      ${w.contatos.length ? w.contatos.map((c, i) => personRow(c, `${c.contactId ? '' : `<button class="btn ghost sm" data-ed="${i}">${icon('pencil')} Editar</button>`}<button class="btn danger sm" data-rm="${i}">Remover</button>`)).join('') : `<p class="muted small">Nenhum contato adicionado ainda. Você pode pular esta etapa e vincular depois.</p>`}
       <div class="row"><button class="btn gold" id="add-new">${icon('plus')} Novo contato</button><button class="btn ghost" id="add-link">${icon('link')} Vincular contato existente</button></div>
       <div id="contact-panel"></div>
     </section>
@@ -259,6 +277,7 @@ function stepContatos(box, w) {
   </div>`;
   box.querySelectorAll('[data-socio]').forEach((b) => (b.onclick = () => { const s = socios[+b.dataset.socio]; w.contatos.push({ nome: s.nome, cargo: s.qualificacao }); stepContatos(box, w); }));
   box.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { w.contatos.splice(+b.dataset.rm, 1); stepContatos(box, w); }));
+  box.querySelectorAll('[data-ed]').forEach((b) => (b.onclick = () => { const i = +b.dataset.ed; const p = box.querySelector('#contact-panel'); contactForm(p, (c) => { w.contatos[i] = c; stepContatos(box, w); }, w.contatos[i]); p.scrollIntoView({ behavior: 'smooth', block: 'center' }); }));
   box.querySelector('#b1').onclick = () => { w.step = 1; renderWizard(box.closest('main')); };
   box.querySelector('#to3').onclick = () => { w.step = 3; renderWizard(box.closest('main')); window.scrollTo({ top: 0 }); };
   const panel = box.querySelector('#contact-panel');
@@ -266,21 +285,23 @@ function stepContatos(box, w) {
   box.querySelector('#add-link').onclick = () => contactPicker(panel, w.contatos.filter((c) => c.contactId).map((c) => c.contactId), (c) => { w.contatos.push({ contactId: c.id, nome: c.nome, cargo: c.cargo, telefone: c.telefones[0], email: c.emails[0] }); stepContatos(box, w); });
 }
 function personRow(c, right = '') {
-  const sub = [c.cargo, c.telefone || c.telefones?.[0], c.email || c.emails?.[0]].filter(Boolean).map(esc).join(' · ');
-  return `<div class="person"><span class="avatar" aria-hidden="true">${esc(initials(c.nome))}</span><div class="info"><b>${esc(c.nome)} ${c.contactId ? '<span class="badge info">Já cadastrado</span>' : ''}</b><span>${sub || 'Sem telefone ou e-mail'}</span></div>${right}</div>`;
+  const tel = c.telefone || c.telefones?.[0], mail = c.email || c.emails?.[0];
+  const sub = [c.cargo ? esc(c.cargo) : '', tel ? phoneLink(tel) : '', mail ? mailLink(mail) : ''].filter(Boolean).join(' · ');
+  return `<div class="person"><span class="avatar" aria-hidden="true">${esc(initials(c.nome))}</span><div class="info"><b>${esc(c.nome)} ${c.contactId ? '<span class="badge info">Já cadastrado</span>' : ''}</b><span>${sub || 'Sem telefone ou e-mail'}</span></div><div class="row" style="gap:4px;flex:none">${right}</div></div>`;
 }
-function contactForm(panel, onSave) {
+function contactForm(panel, onSave, init = {}) {
+  const v = (k) => esc(init[k] ?? '');
   panel.innerHTML = `<form class="card card-p stack" style="box-shadow:none;background:#fafbfd" novalidate>
-    <div class="section-t" style="margin:0">Novo contato</div>
+    <div class="section-t" style="margin:0">${init.nome ? 'Editar contato' : 'Novo contato'}</div>
     <div class="grid2">
-      <label class="f"><span>Nome completo</span><input class="in" name="nome" required autocomplete="off"></label>
-      <label class="f"><span>Cargo <em>(opcional)</em></span><input class="in" name="cargo"></label>
-      <label class="f"><span>Telefone / WhatsApp</span><input class="in" name="telefone" inputmode="tel" placeholder="(00) 00000-0000"></label>
-      <label class="f"><span>E-mail</span><input class="in" name="email" type="email"></label>
-      <label class="f"><span>CPF <em>(opcional)</em></span><input class="in" name="cpf" inputmode="numeric" placeholder="000.000.000-00"></label>
+      <label class="f"><span>Nome completo</span><input class="in" name="nome" required autocomplete="off" value="${v('nome')}"></label>
+      <label class="f"><span>Cargo <em>(opcional)</em></span><input class="in" name="cargo" value="${v('cargo')}"></label>
+      <label class="f"><span>Telefone / WhatsApp</span><input class="in" name="telefone" inputmode="tel" placeholder="(00) 00000-0000" value="${v('telefone')}"></label>
+      <label class="f"><span>E-mail</span><input class="in" name="email" type="email" value="${v('email')}"></label>
+      <label class="f"><span>CPF <em>(opcional)</em></span><input class="in" name="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${v('cpf')}"></label>
     </div>
     <p class="hint bad" id="cf-err" role="alert"></p>
-    <div class="row"><button class="btn primary" type="submit">Adicionar contato</button><button class="btn ghost" type="button" id="cf-cancel">Cancelar</button></div></form>`;
+    <div class="row"><button class="btn primary" type="submit">${init.nome ? 'Salvar alterações' : 'Adicionar contato'}</button><button class="btn ghost" type="button" id="cf-cancel">Cancelar</button></div></form>`;
   const f = panel.querySelector('form');
   f.telefone.addEventListener('input', () => (f.telefone.value = fmtPhone(f.telefone.value)));
   f.cpf.addEventListener('input', () => (f.cpf.value = fmtCpf(f.cpf.value)));
@@ -379,8 +400,11 @@ function paintClientes() {
   if (c.loading && !c.items.length) list.innerHTML = Array.from({ length: 5 }, () => '<div style="padding:18px"><div class="skel" style="width:45%;margin-bottom:8px"></div><div class="skel" style="width:25%"></div></div>').join('');
   else if (c.err) list.innerHTML = `<div class="empty"><div class="ico">${icon('alert')}</div><b>Não foi possível carregar</b><p>${esc(c.err)}</p><button class="btn" id="retry" style="margin-top:12px">Tentar de novo</button></div>`;
   else if (!c.items.length) list.innerHTML = `<div class="empty"><div class="ico">${icon('building')}</div><b>${c.q ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado ainda'}</b><p>${c.q ? 'Tente outro nome ou CNPJ.' : 'Comece pelo primeiro cadastro.'}</p><button class="btn gold" id="nov2" style="margin-top:12px">${icon('plus')} Novo cadastro</button></div>`;
-  else list.innerHTML = `<table class="t"><thead><tr><th>Cliente</th><th>CNPJ</th><th>Situação</th><th class="hide-s">Contato</th></tr></thead><tbody>${c.items.map((x) => `<tr class="click" tabindex="0" data-id="${x.id}"><td class="name-cell"><b>${esc(x.title)}</b><span>${esc(x.razaoSocial && x.razaoSocial !== x.title ? x.razaoSocial : x.endereco.split(',').slice(-2).join(',').trim())}</span></td><td class="mono">${esc(x.cnpj) || '—'}</td><td>${situacaoBadge(x.situacao)}</td><td class="hide-s">${esc(x.telefones[0] || x.emails[0] || '—')}</td></tr>`).join('')}</tbody></table>`;
+  else list.innerHTML = `<table class="t"><thead><tr><th>Cliente</th><th>CNPJ</th><th>Situação</th><th class="hide-s">Contato</th><th><span class="sr">Ações</span></th></tr></thead><tbody>${c.items.map((x) => `<tr class="click" tabindex="0" data-id="${x.id}"><td class="name-cell"><b>${esc(x.title)}</b><span>${esc(x.razaoSocial && x.razaoSocial !== x.title ? x.razaoSocial : x.endereco.split(',').slice(-2).join(',').trim())}</span></td><td class="mono">${esc(x.cnpj) || '—'}</td><td>${situacaoBadge(x.situacao)}</td><td class="hide-s">${x.telefones[0] ? phoneLink(x.telefones[0]) : x.emails[0] ? mailLink(x.emails[0]) : '—'}</td><td class="acts"><button class="ib" data-edit="${x.id}" aria-label="Editar ${esc(x.title)}" title="Editar">${icon('pencil')}</button><button class="ib bad" data-del="${x.id}" aria-label="Excluir ${esc(x.title)}" title="Excluir">${icon('trash')}</button></td></tr>`).join('')}</tbody></table>`;
   list.querySelectorAll('tr.click').forEach((r) => { const open = () => openCompany(+r.dataset.id); r.onclick = open; r.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }; });
+  list.querySelectorAll('a.lnk').forEach((a) => a.addEventListener('click', (e) => e.stopPropagation()));
+  list.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); openCompany(+b.dataset.edit, { edit: true }); }));
+  list.querySelectorAll('[data-del]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); const x = c.items.find((i) => i.id === +b.dataset.del); askDeleteCompany(x); }));
   list.querySelector('#retry')?.addEventListener('click', () => loadClientes(true));
   list.querySelector('#nov2')?.addEventListener('click', () => go('#/novo'));
   const more = document.getElementById('more');
@@ -390,46 +414,126 @@ function paintClientes() {
 /* ---------- Gaveta do cliente ---------- */
 function closeDrawer() { document.querySelectorAll('.scrim, .drawer').forEach((n) => n.remove()); state.drawer = null; document.removeEventListener('keydown', escClose); }
 function escClose(e) { if (e.key === 'Escape') closeDrawer(); }
-async function openCompany(id) {
+async function askDeleteCompany(c, dr) {
+  const ok = await confirmDialog({ title: `Excluir ${c.title}?`, message: `A empresa será removida do Bitrix24. Os contatos vinculados <b>não</b> são excluídos. Esta ação não pode ser desfeita.`, confirm: 'Excluir empresa' });
+  if (!ok) return;
+  try {
+    await api(`/api/companies/${c.id}`, { method: 'DELETE' });
+    state.clientes.items = state.clientes.items.filter((i) => i.id !== c.id);
+    if (dr || state.drawer === c.id) closeDrawer();
+    paintClientes(); toast('Empresa excluída.');
+  } catch (e) { toast(e.message, true); }
+}
+async function openCompany(id, { edit = false } = {}) {
   closeDrawer();
   const scrim = document.createElement('div'); scrim.className = 'scrim'; scrim.onclick = closeDrawer;
   const dr = document.createElement('aside'); dr.className = 'drawer'; dr.setAttribute('role', 'dialog'); dr.setAttribute('aria-label', 'Detalhes do cliente');
   dr.innerHTML = `<div class="drawer-h"><b>Cliente</b><button class="x" aria-label="Fechar">${icon('x')}</button></div><div class="drawer-b"><div class="skel" style="height:26px;width:60%"></div><div class="skel"></div><div class="skel" style="width:80%"></div></div>`;
   document.body.append(scrim, dr); state.drawer = id; document.addEventListener('keydown', escClose);
   dr.querySelector('.x').onclick = closeDrawer; dr.querySelector('.x').focus();
-  try { paintDrawer(dr, await api(`/api/companies/${id}`)); }
+  try { const c = await api(`/api/companies/${id}`); edit ? paintDrawerEdit(dr, c) : paintDrawer(dr, c); }
   catch (e) { dr.querySelector('.drawer-b').innerHTML = `<div class="banner bad">${icon('alert')}<div><b>Não foi possível abrir o cliente</b>${esc(e.message)}</div></div>`; }
 }
+function syncList(c) { const i = state.clientes.items.findIndex((x) => x.id === c.id); if (i >= 0) { state.clientes.items[i] = c; paintClientes(); } }
 function paintDrawer(dr, c) {
   const body = dr.querySelector('.drawer-b');
+  const list = (arr, fn) => arr.map(fn).join('<br>') || '—';
   body.innerHTML = `
     <section class="card card-p stack">
-      <div class="company-head"><div><h3>${esc(c.title)}</h3><p class="muted small mono">${esc(c.cnpj) || 'CNPJ não informado'}</p></div>${situacaoBadge(c.situacao)}</div>
+      <div class="company-head"><div><h3>${esc(c.title)}</h3><p class="muted small mono">${c.cnpj ? `${esc(c.cnpj)} <button class="ib sm" id="d-copy" aria-label="Copiar CNPJ" title="Copiar CNPJ">${icon('copy')}</button>` : 'CNPJ não informado'}</p></div>${situacaoBadge(c.situacao)}</div>
       <dl class="kv">
-        <div><dt>Razão social</dt><dd>${esc(c.razaoSocial) || '—'}</dd></div><div><dt>Telefone</dt><dd>${c.telefones.map(esc).join('<br>') || '—'}</dd></div>
-        <div><dt>E-mail</dt><dd>${c.emails.map(esc).join('<br>') || '—'}</dd></div><div><dt>Endereço</dt><dd>${esc(c.endereco) || '—'}</dd></div>
+        <div><dt>Razão social</dt><dd>${esc(c.razaoSocial) || '—'}</dd></div><div><dt>Telefone</dt><dd>${list(c.telefones, phoneLink)}</dd></div>
+        <div><dt>E-mail</dt><dd>${list(c.emails, mailLink)}</dd></div><div><dt>Endereço</dt><dd>${c.endereco ? `<a class="lnk" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.endereco)}" title="Ver no mapa">${esc(c.endereco)}</a>` : '—'}</dd></div>
         <div><dt>Atividade principal</dt><dd>${esc(c.cnae) || '—'}</dd></div><div><dt>Porte</dt><dd>${esc(c.porte) || '—'}</dd></div>
         <div><dt>Abertura</dt><dd>${esc(c.abertura) || '—'}</dd></div><div><dt>Validado na Receita</dt><dd>${esc(c.validadoEm) || 'Não validado'}</dd></div>
       </dl>
-      ${!c.cnpj ? `<div class="banner warn">${icon('alert')}<div><b>Cadastro sem CNPJ</b>Informe o CNPJ para validar este cliente.</div></div>` : ''}
-      <div class="row">${state.portal ? `<button class="btn ghost sm" id="d-bx">${icon('ext')} Abrir no Bitrix24</button>` : ''}</div>
+      ${!c.cnpj ? `<div class="banner warn">${icon('alert')}<div><b>Cadastro sem CNPJ</b>Edite o cadastro e informe o CNPJ para validar este cliente.</div></div>` : ''}
+      <div class="row"><button class="btn primary sm" id="d-edit">${icon('pencil')} Editar</button>${state.portal ? `<button class="btn ghost sm" id="d-bx">${icon('ext')} Abrir no Bitrix24</button>` : ''}<button class="btn danger sm" id="d-del" style="margin-left:auto">${icon('trash')} Excluir</button></div>
     </section>
     <section class="card card-p stack">
       <div class="section-t" style="margin:0">Contatos <span class="badge info">${c.contatos.length}</span></div>
-      ${c.contatos.length ? c.contatos.map((p) => personRow(p, `<button class="btn danger sm" data-un="${p.id}" aria-label="Desvincular ${esc(p.nome)}">Desvincular</button>`)).join('') : '<p class="muted small">Nenhum contato vinculado.</p>'}
+      ${c.contatos.length ? c.contatos.map((p) => personRow(p, `<button class="ib" data-ced="${p.id}" aria-label="Editar ${esc(p.nome)}" title="Editar contato">${icon('pencil')}</button><button class="ib" data-un="${p.id}" aria-label="Desvincular ${esc(p.nome)}" title="Desvincular da empresa">${icon('link')}</button><button class="ib bad" data-cdel="${p.id}" aria-label="Excluir ${esc(p.nome)}" title="Excluir contato">${icon('trash')}</button>`)).join('') : '<p class="muted small">Nenhum contato vinculado.</p>'}
       <div class="row"><button class="btn gold sm" id="d-new">${icon('plus')} Novo contato</button><button class="btn ghost sm" id="d-link">${icon('link')} Vincular existente</button></div>
       <div id="d-panel"></div>
     </section>`;
+  body.querySelector('#d-copy')?.addEventListener('click', () => copyText(c.cnpj, 'CNPJ copiado'));
+  body.querySelector('#d-edit').onclick = () => { paintDrawerEdit(dr, c); dr.scrollTop = 0; };
+  body.querySelector('#d-del').onclick = () => askDeleteCompany(c, dr);
   body.querySelector('#d-bx')?.addEventListener('click', () => openInBitrix(`/crm/company/details/${c.id}/`));
   const panel = body.querySelector('#d-panel');
-  const after = (r) => { paintDrawer(dr, r.empresa); state.clientes.loaded = false; toast('Contato vinculado.'); };
+  const after = (r, msg) => { paintDrawer(dr, r.empresa || r); state.clientes.loaded = false; toast(msg); };
   const fail = (e) => toast(e.message, true);
-  body.querySelector('#d-new').onclick = () => contactForm(panel, (ct) => api(`/api/companies/${c.id}/contacts`, { method: 'POST', body: ct }).then(after, fail));
-  body.querySelector('#d-link').onclick = () => contactPicker(panel, c.contatos.map((p) => p.id), (ct) => api(`/api/companies/${c.id}/contacts`, { method: 'POST', body: { contactId: ct.id } }).then(after, fail));
-  body.querySelectorAll('[data-un]').forEach((b) => (b.onclick = () => {
-    if (!confirm('Desvincular este contato da empresa? O contato continua existindo no Bitrix24.')) return;
-    api(`/api/companies/${c.id}/contacts/${b.dataset.un}`, { method: 'DELETE' }).then((r) => { paintDrawer(dr, r); toast('Contato desvinculado.'); }, fail);
+  body.querySelector('#d-new').onclick = () => contactForm(panel, (ct) => api(`/api/companies/${c.id}/contacts`, { method: 'POST', body: ct }).then((r) => after(r, 'Contato adicionado.'), fail));
+  body.querySelector('#d-link').onclick = () => contactPicker(panel, c.contatos.map((p) => p.id), (ct) => api(`/api/companies/${c.id}/contacts`, { method: 'POST', body: { contactId: ct.id } }).then((r) => after(r, 'Contato vinculado.'), fail));
+  body.querySelectorAll('[data-ced]').forEach((b) => (b.onclick = () => {
+    const p = c.contatos.find((x) => x.id === +b.dataset.ced);
+    contactForm(panel, (ct) => api(`/api/contacts/${p.id}`, { method: 'PATCH', body: { ...ct, telefones: ct.telefone ? [ct.telefone] : [], emails: ct.email ? [ct.email] : [] } })
+      .then(() => api(`/api/companies/${c.id}`)).then((r) => after(r, 'Contato atualizado.'), fail), { ...p, telefone: p.telefones[0] || '', email: p.emails[0] || '' });
+    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }));
+  body.querySelectorAll('[data-un]').forEach((b) => (b.onclick = async () => {
+    const p = c.contatos.find((x) => x.id === +b.dataset.un);
+    if (!(await confirmDialog({ title: `Desvincular ${p.nome}?`, message: 'O contato deixa de aparecer nesta empresa, mas continua existindo no Bitrix24.', confirm: 'Desvincular', danger: false }))) return;
+    api(`/api/companies/${c.id}/contacts/${p.id}`, { method: 'DELETE' }).then((r) => after(r, 'Contato desvinculado.'), fail);
+  }));
+  body.querySelectorAll('[data-cdel]').forEach((b) => (b.onclick = async () => {
+    const p = c.contatos.find((x) => x.id === +b.dataset.cdel);
+    if (!(await confirmDialog({ title: `Excluir o contato ${p.nome}?`, message: 'O contato será removido do Bitrix24 (de todas as empresas). Esta ação não pode ser desfeita.', confirm: 'Excluir contato' }))) return;
+    api(`/api/contacts/${p.id}`, { method: 'DELETE' }).then(() => api(`/api/companies/${c.id}`)).then((r) => after(r, 'Contato excluído.'), fail);
+  }));
+}
+function paintDrawerEdit(dr, c) {
+  const body = dr.querySelector('.drawer-b');
+  const x = { title: c.title, razaoSocial: c.razaoSocial, cnpj: c.cnpj, endereco: c.endereco, telefones: c.telefones.join('\n'), emails: c.emails.join('\n') };
+  let extra = {};
+  body.innerHTML = `<form class="card card-p stack" novalidate id="ef">
+    <div class="company-head"><div><div class="section-t" style="margin:0">Editando</div><h3 id="eh">${esc(c.title)}</h3></div>${situacaoBadge(c.situacao)}</div>
+    <div class="grid2">
+      <label class="f"><span>Nome do cliente</span><input class="in" name="title" value="${esc(x.title)}" required></label>
+      <label class="f"><span>Razão social</span><input class="in" name="razaoSocial" value="${esc(x.razaoSocial)}"></label>
+      <label class="f"><span>CNPJ</span><input class="in mono" name="cnpj" inputmode="numeric" value="${esc(x.cnpj)}" placeholder="00.000.000/0000-00"></label>
+      <div class="f"><span>&nbsp;</span><button class="btn ghost" type="button" id="e-rf">${icon('refresh')} Atualizar pela Receita</button></div>
+      <label class="f"><span>Telefones <em>(um por linha)</em></span><textarea class="in" name="telefones" rows="2">${esc(x.telefones)}</textarea></label>
+      <label class="f"><span>E-mails <em>(um por linha)</em></span><textarea class="in" name="emails" rows="2">${esc(x.emails)}</textarea></label>
+    </div>
+    <label class="f"><span>Endereço</span><input class="in" name="endereco" value="${esc(x.endereco)}"></label>
+    <p class="hint bad" id="e-err" role="alert"></p>
+    <div class="row"><button class="btn primary" type="submit" id="e-save">Salvar alterações</button><button class="btn ghost" type="button" id="e-cancel">Cancelar</button></div></form>`;
+  const f = body.querySelector('#ef'), err = (m) => (body.querySelector('#e-err').textContent = m);
+  f.title.focus();
+  f.title.addEventListener('input', () => (body.querySelector('#eh').textContent = f.title.value || 'Sem nome'));
+  f.cnpj.addEventListener('input', () => (f.cnpj.value = fmtCnpj(f.cnpj.value)));
+  body.querySelector('#e-cancel').onclick = () => { paintDrawer(dr, c); dr.scrollTop = 0; };
+  body.querySelector('#e-rf').onclick = async (e) => {
+    const btn = e.currentTarget; const d = digits(f.cnpj.value);
+    if (!validCnpj(d)) return err('Informe um CNPJ válido para consultar a Receita.');
+    err(''); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Consultando…';
+    try {
+      const r = (await api(`/api/cnpj?v=${d}`)).receita;
+      if (!r) throw new Error('A Receita não retornou dados agora. Tente de novo.');
+      const em = empresaFromReceita(r);
+      f.title.value = f.title.value || em.title; f.razaoSocial.value = em.razaoSocial; f.endereco.value = em.endereco;
+      if (em.telefone && !f.telefones.value.includes(em.telefone)) f.telefones.value = [f.telefones.value.trim(), em.telefone].filter(Boolean).join('\n');
+      if (em.email && !f.emails.value.toLowerCase().includes(em.email)) f.emails.value = [f.emails.value.trim(), em.email].filter(Boolean).join('\n');
+      extra = { situacao: em.situacao, cnae: em.cnae, porte: em.porte, natureza: em.natureza, abertura: em.abertura, validadoEm: new Date().toLocaleDateString('pt-BR') };
+      toast(`Dados atualizados (situação: ${em.situacao || '—'}). Revise e salve.`);
+    } catch (e2) { err(e2.message); }
+    btn.disabled = false; btn.innerHTML = `${icon('refresh')} Atualizar pela Receita`;
+  };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const lines = (v) => v.split(/\n|;/).map((t) => t.trim()).filter(Boolean);
+    const emails = lines(f.emails.value);
+    if (!f.title.value.trim()) return err('Informe o nome do cliente.');
+    if (f.cnpj.value.trim() && !validCnpj(f.cnpj.value)) return err('CNPJ inválido: confira os dígitos.');
+    if (emails.some((m) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m))) return err('Há um e-mail inválido na lista.');
+    const btn = body.querySelector('#e-save'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Salvando…';
+    try {
+      const empresa = { title: f.title.value.trim(), razaoSocial: f.razaoSocial.value.trim(), cnpj: f.cnpj.value.trim(), endereco: f.endereco.value.trim(), telefones: lines(f.telefones.value), emails, ...extra };
+      const upd = await api(`/api/companies/${c.id}`, { method: 'PATCH', body: { empresa } });
+      syncList(upd); paintDrawer(dr, upd); dr.scrollTop = 0; toast('Cadastro atualizado.');
+    } catch (e2) { err(e2.message); btn.disabled = false; btn.textContent = 'Salvar alterações'; }
+  };
 }
 
 /* ---------- início ---------- */

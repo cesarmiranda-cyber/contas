@@ -107,3 +107,23 @@ test('Servidor: exige identidade do gateway e cabeçalho anti-CSRF; fluxo CNPJ �
     assert.equal((await fetch(`${base}/clientes/12`)).status, 200);            // rota do SPA
   });
 });
+
+test('CRM: editar empresa/contato (trocar, apagar e adicionar telefone/e-mail) e excluir', async () => {
+  const { vibe, db } = createMockVibe(false);
+  const crm = createCrm(vibe);
+  const r = await crm.createCompany({ empresa: { title: 'Acme', cnpj: '11222333000181', telefones: ['(11) 3000-1000', '(11) 3000-2000'], emails: ['a@acme.com'] }, contatos: [{ nome: 'Maria Souza', cargo: 'Sócia', telefone: '(11) 99999-0000', cpf: '529.982.247-25' }] });
+  const c = await crm.updateCompany(r.id, { title: 'Acme Brasil', telefones: ['(11) 4000-0000'], emails: ['novo@acme.com', 'fin@acme.com'] });
+  assert.equal(c.title, 'Acme Brasil');
+  assert.deepEqual(c.telefones, ['(11) 4000-0000']);
+  assert.deepEqual(c.emails, ['novo@acme.com', 'fin@acme.com']);
+  assert.equal(c.cnpj, '11.222.333/0001-81');                         // campos não enviados ficam como estavam
+  const ct = c.contatos[0];
+  const e = await crm.updateContact(ct.id, { nome: 'Maria S. Lima', cargo: '', telefones: ['(11) 98888-0000'] });
+  assert.equal(e.nome, 'Maria S. Lima'); assert.equal(e.cargo, ''); assert.deepEqual(e.telefones, ['(11) 98888-0000']);
+  await assert.rejects(crm.updateContact(ct.id, { nome: 'X', cpf: '111.111.111-11' }), /CPF inválido/);
+  await crm.deleteContact(ct.id);
+  assert.equal((await crm.getCompany(r.id)).contatos.length, 0);
+  await crm.deleteCompany(r.id);
+  assert.equal(db.companies.length, 0);
+  await assert.rejects(crm.getCompany(r.id), { status: 404 });
+});

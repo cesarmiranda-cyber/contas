@@ -30,6 +30,21 @@ function multi(v) {
   const a = Array.isArray(v) ? v : [v];
   return a.map((x) => (typeof x === 'object' && x ? str(x.value ?? x.VALUE) : str(x))).filter(Boolean);
 }
+// linhas cruas do multicampo (com id) para montar o `fm` de edição
+const rawRows = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((x) => x && typeof x === 'object');
+const rowType = (r) => String(r.typeId ?? r.valueType ?? r.VALUE_TYPE ?? 'WORK');
+// Troca o conjunto de valores de um canal: altera linhas existentes, apaga as que sobram, adiciona as novas.
+function fmDiff(channel, current, desired, fm, startN = 0) {
+  const want = [...new Set((desired || []).map((x) => str(x)).filter(Boolean))];
+  const rows = rawRows(current).filter((r) => r.id !== undefined);
+  let n = startN;
+  rows.forEach((r, i) => {
+    if (i < want.length) { if (str(r.value ?? r.VALUE) !== want[i]) fm[r.id] = { typeId: channel, valueType: rowType(r), value: want[i] }; }
+    else fm[r.id] = { typeId: channel, value: '' };
+  });
+  want.slice(rows.length).forEach((v) => { fm[`n${n++}`] = { typeId: channel, valueType: 'WORK', value: v }; });
+  return n;
+}
 const multiIn = (list, type = 'WORK') => [...new Set((list || []).map((s) => str(s)).filter(Boolean))].map((value) => ({ value, typeId: type }));
 
 function normCompany(r) {
@@ -187,11 +202,41 @@ function createCrm(vibe) {
       const dup = await findByCnpj(empresa.cnpj);
       if (dup && dup.id !== Number(id)) throw new HubError(409, 'CNPJ_DUPLICATE', `Este CNPJ já pertence a ${dup.title}.`);
     }
-    const p = companyPayload(empresa, { requireTitle: false });
+    const p = companyPayload({ ...empresa, telefones: undefined, emails: undefined, sites: undefined }, { requireTitle: false });
     if (!p.title) delete p.title;
+    const fm = {};
+    if (empresa.telefones || empresa.emails) {
+      const cur = one(await vibe.get(`/companies/${Number(id)}`, { select: 'id,phone,email' }));
+      let n = 0;
+      if (empresa.telefones) n = fmDiff('PHONE', cur.phone, empresa.telefones, fm, n);
+      if (empresa.emails) fmDiff('EMAIL', cur.email, empresa.emails, fm, n);
+    }
+    if (Object.keys(fm).length) p.fm = fm;
+    if (!Object.keys(p).length) return getCompany(id);
     await vibe.patch(`/companies/${Number(id)}`, p);
     return getCompany(id);
   }
+
+  async function deleteCompany(id) { await vibe.del(`/companies/${Number(id)}`); }
+
+  async function updateContact(id, spec) {
+    await ensureSchema();
+    const p = contactPayload({ ...spec, telefones: undefined, emails: undefined, telefone: undefined, email: undefined });
+    delete p.companyId;
+    const fm = {};
+    if (spec.telefones || spec.emails) {
+      const cur = one(await vibe.get(`/contacts/${Number(id)}`, { select: 'id,phone,email' }));
+      let n = 0;
+      if (spec.telefones) n = fmDiff('PHONE', cur.phone, spec.telefones, fm, n);
+      if (spec.emails) fmDiff('EMAIL', cur.email, spec.emails, fm, n);
+    }
+    if (Object.keys(fm).length) p.fm = fm;
+    if (!str(spec.cargo)) p.post = '';
+    if (!str(spec.cpf)) p[F.cpf] = '';
+    await vibe.patch(`/contacts/${Number(id)}`, p);
+    return normContact(one(await vibe.get(`/contacts/${Number(id)}`)));
+  }
+  async function deleteContact(id) { await vibe.del(`/contacts/${Number(id)}`); }
 
   async function searchContacts(q, limit = 12) {
     q = str(q, 80);
@@ -209,7 +254,7 @@ function createCrm(vibe) {
     await vibe.del(`/companies/${Number(companyId)}/contacts/${Number(contactId)}`);
   }
 
-  return { ensureSchema, listCompanies, findByCnpj, getCompany, createCompany, updateCompany, addContact, unlinkContact, searchContacts };
+  return { updateContact, deleteCompany, deleteContact, ensureSchema, listCompanies, findByCnpj, getCompany, createCompany, updateCompany, addContact, unlinkContact, searchContacts };
 }
 
 module.exports = { createCrm, HubError, F, normCompany, normContact, COMPANY_FIELDS, CONTACT_FIELDS };

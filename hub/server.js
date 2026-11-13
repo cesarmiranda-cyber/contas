@@ -58,6 +58,11 @@ function createApp({ vibeFactory, lookup, portal = process.env.BITRIX_PORTAL || 
     if ((r = /^\/api\/companies\/(\d+)$/.exec(p))) {
       if (m === 'GET') return send(res, 200, await crm.getCompany(r[1]));
       if (m === 'PATCH') return send(res, 200, await crm.updateCompany(r[1], (await readJson(req)).empresa || {}));
+      if (m === 'DELETE') { await crm.deleteCompany(r[1]); return send(res, 200, { ok: true }); }
+    }
+    if ((r = /^\/api\/contacts\/(\d+)$/.exec(p))) {
+      if (m === 'PATCH') return send(res, 200, await crm.updateContact(r[1], await readJson(req)));
+      if (m === 'DELETE') { await crm.deleteContact(r[1]); return send(res, 200, { ok: true }); }
     }
     if ((r = /^\/api\/companies\/(\d+)\/contacts$/.exec(p)) && m === 'POST') {
       const out = await crm.addContact(r[1], await readJson(req));

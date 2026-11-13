@@ -2,7 +2,7 @@
 // CRM em memória que imita o trecho usado da API Vibe. Serve aos testes e ao modo demonstração (MOCK=1).
 function createMockVibe(seed = true) {
   const db = { companies: [], contacts: [], links: [], userfields: { companies: [], contacts: [] }, seq: 100 };
-  const mf = (v) => (v || []).map((x, i) => ({ id: i + 1, value: x.value, typeId: x.typeId }));
+  let rid = 0; const mf = (v) => (v || []).map((x) => ({ id: ++rid, value: x.value, typeId: x.typeId }));
   const match = (rec, filter = {}) => Object.entries(filter).every(([k, cond]) => {
     const v = rec[k];
     if (cond && typeof cond === 'object' && !Array.isArray(cond)) {
@@ -16,6 +16,18 @@ function createMockVibe(seed = true) {
     const rec = { id: ++db.seq, createdTime: new Date().toISOString(), ...body };
     for (const k of ['phone', 'email', 'web']) if (rec[k]) rec[k] = mf(rec[k]);
     db[kind].push(rec); return rec;
+  }
+  const CH = { PHONE: 'phone', EMAIL: 'email', WEB: 'web' };
+  function applyPatch(rec, body) {
+    const { fm, ...rest } = body; Object.assign(rec, rest);
+    for (const k of ['phone', 'email', 'web']) if (rest[k]) rec[k] = mf(rest[k]);
+    for (const [key, row] of Object.entries(fm || {})) {
+      const f = CH[row.typeId]; rec[f] = rec[f] || [];
+      if (key.startsWith('n')) { rec[f].push({ id: ++db.seq, value: row.value, typeId: row.valueType }); continue; }
+      const i = rec[f].findIndex((x) => String(x.id) === key);
+      if (i < 0) { const e = new Error('row'); e.status = 409; e.code = 'MULTIFIELD_ROW_NOT_FOUND'; throw e; }
+      if (row.value === '') rec[f].splice(i, 1); else rec[f][i] = { ...rec[f][i], value: row.value };
+    }
   }
   function link(companyId, contactId) {
     if (!db.links.some((l) => l.companyId === companyId && l.contactId === contactId)) db.links.push({ companyId, contactId });
@@ -41,9 +53,20 @@ function createMockVibe(seed = true) {
       db.links = db.links.filter((l) => !(l.companyId === +m[1] && l.contactId === +m[2])); return ok(true);
     }
     if ((m = /^\/companies\/(\d+)\/contacts$/.exec(path)) && method === 'POST') { link(+m[1], Number(body.contactId)); return ok(true); }
+    if ((m = /^\/companies\/(\d+)$/.exec(path)) && method === 'DELETE') {
+      const i = db.companies.findIndex((x) => x.id === +m[1]); if (i < 0) nf(); db.companies.splice(i, 1);
+      db.links = db.links.filter((l) => l.companyId !== +m[1]); return ok(true);
+    }
+    if ((m = /^\/contacts\/(\d+)$/.exec(path)) && method === 'DELETE') {
+      const i = db.contacts.findIndex((x) => x.id === +m[1]); if (i < 0) nf(); db.contacts.splice(i, 1);
+      db.links = db.links.filter((l) => l.contactId !== +m[1]); return ok(true);
+    }
+    if ((m = /^\/contacts\/(\d+)$/.exec(path)) && method === 'PATCH') {
+      const c = db.contacts.find((x) => x.id === +m[1]); if (!c) nf(); applyPatch(c, body); return ok(c);
+    }
     if ((m = /^\/companies\/(\d+)$/.exec(path))) {
       const c = db.companies.find((x) => x.id === +m[1]); if (!c) nf();
-      if (method === 'PATCH') { Object.assign(c, body); for (const k of ['phone', 'email', 'web']) if (body[k]) c[k] = mf(body[k]); return ok(c); }
+      if (method === 'PATCH') { applyPatch(c, body); return ok(c); }
       return ok(query.include === 'contact' ? { ...c, _included: { contacts: contactsOf(c.id) } } : c);
     }
     if ((m = /^\/contacts\/(\d+)$/.exec(path))) { const c = db.contacts.find((x) => x.id === +m[1]); if (!c) nf(); return ok(c); }

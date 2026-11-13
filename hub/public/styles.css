@@ -145,7 +145,7 @@ table.t tr.click { cursor: pointer; } table.t tr.click:hover td { background: #f
 .check { width: 72px; height: 72px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); display: grid; place-items: center; } .check svg { width: 34px; height: 34px; stroke-width: 2.4; }
 .success h2 { font-size: 26px; letter-spacing: -.02em; }
 
-#toasts { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 99; display: grid; gap: 8px; }
+#toasts { position: fixed; bottom: 20px; left: 20px; right: auto; max-width: min(380px, calc(100vw - 40px)); z-index: 99; display: grid; gap: 8px; }
 .toast { background: var(--navy); color: #fff; padding: 12px 18px; border-radius: 12px; box-shadow: var(--shadow); animation: fi .2s; max-width: 90vw; }
 .toast.bad { background: var(--bad); }
 
@@ -155,3 +155,16 @@ table.t tr.click { cursor: pointer; } table.t tr.click:hover td { background: #f
   table.t .hide-s { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---- ações, links, modal ---- */
+a.lnk { color: var(--navy-2); text-decoration: none; border-bottom: 1px dotted #9fb0c8; } a.lnk:hover { color: var(--gold); border-bottom-color: var(--gold); }
+.ib { border: 0; background: none; width: 34px; height: 34px; border-radius: 9px; cursor: pointer; display: inline-grid; place-items: center; color: var(--ink-2); } .ib:hover { background: #eef1f6; color: var(--ink); }
+.ib.bad:hover { background: var(--bad-bg); color: var(--bad); } .ib.sm { width: 26px; height: 26px; vertical-align: middle; }
+td.acts { white-space: nowrap; text-align: right; width: 84px; } td.acts .ib { opacity: .55; } tr:hover td.acts .ib, td.acts .ib:focus-visible { opacity: 1; }
+.sr { position: absolute; left: -9999px; }
+button.step { border: 0; font: inherit; cursor: default; } button.step.done { cursor: pointer; } button.step.done:hover { filter: brightness(.96); }
+.btn.dangerfill { background: var(--bad); color: #fff; } .btn.dangerfill:hover { filter: brightness(1.08); }
+.modal-wrap { position: fixed; inset: 0; z-index: 90; background: rgba(10,28,51,.5); display: grid; place-items: center; padding: 20px; animation: fi .12s; }
+.modal { background: #fff; border-radius: 16px; padding: 24px; width: min(440px, 100%); box-shadow: 0 30px 80px rgba(0,0,0,.3); } .modal h3 { font-size: 19px; margin-bottom: 8px; }
+.f > .btn { align-self: end; justify-content: center; }
+@media (max-width: 720px) { #toasts { left: 50%; transform: translateX(-50%); width: calc(100vw - 32px); } }
