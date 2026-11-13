@@ -48,7 +48,7 @@ test('campos do projeto: validação, código automático e campos internos ocul
   await call('PATCH', '/api/projetos/' + p.id, { clientes: [id] }, EQ);
   await call('POST', `/api/projetos/${p.id}/tarefas`, { nome: 'T', inicio: '2026-01-05', fim: '2026-01-25' }, EQ);
   const eq = (await call('GET', '/api/projetos/' + p.id, null, EQ)).j.projeto, cli = (await call('GET', '/api/projetos/' + p.id, null, k)).j.projeto;
-  assert.strictEqual(eq.valor, 12500.5); assert.strictEqual(eq.obsInternas, 'margem apertada'); assert.strictEqual(eq.desvioDias, 5); assert.strictEqual(eq.resumo.cor, 'amarelo');
+  assert.strictEqual(eq.valor, 12500.5); assert.strictEqual(eq.obsInternas, 'margem apertada'); assert.strictEqual(eq.desvioDias, 5); assert.notStrictEqual(eq.resumo.cor, 'verde'); // previsão além do prazo contratado (com datas antigas a atividade também está atrasada)
   for (const campo of ['valor', 'obsInternas', 'negocioBitrix']) assert.ok(!(campo in cli), campo + ' vazou para o cliente');
   assert.strictEqual(cli.empresa, 'Acme'); assert.strictEqual(cli.link, 'https://drive.example.com/p');
   assert.strictEqual((await call('PATCH', '/api/projetos/' + p.id, { fimPrevisto: '2025-01-01' }, EQ)).s, 400); // antes do início
