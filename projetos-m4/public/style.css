@@ -23,7 +23,8 @@ label{display:block;font-size:12px;font-weight:600;color:var(--tinta-2);margin:1
 /* logo */
 .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:.04em}
 .logo svg{width:34px;height:34px;flex:none}
-.login .brand .logo{font-size:22px}
+.logo-sub{font-weight:500;font-size:13px;letter-spacing:0;color:var(--tinta-2);border-left:1px solid var(--linha);padding-left:10px;margin-left:2px}
+.login .brand .logo{flex-direction:column;gap:4px;font-size:24px;font-weight:800;letter-spacing:.06em}.login .brand .logo svg{width:52px;height:52px}
 .login .brand .tit{font-size:30px;letter-spacing:-.02em;margin:14px 0 4px;text-align:center}.login .brand .sub{margin:0;opacity:.9;text-align:center;max-width:560px;font-size:15px}
 .login .nota a.site{color:var(--marca-2);font-weight:600;text-decoration:none}.login .nota a.site:hover{text-decoration:underline}
 /* login (modelo: topo azul com onda, ilustração à esquerda, cartão flutuante à direita) */

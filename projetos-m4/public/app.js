@@ -21,7 +21,9 @@ const iso = t => new Date(t).toISOString().slice(0, 10);
 const chip = (cor, txt) => h('span', { class: 'chip ' + cor }, txt);
 const COR = { verde: 'No prazo', amarelo: 'Alerta', vermelho: 'Atrasado' };
 const LOGO = () => { const d = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); d.setAttribute('viewBox', '0 0 40 40'); d.setAttribute('aria-hidden', 'true');
-  d.innerHTML = '<g fill="#f5a400"><circle cx="9" cy="8" r="4.5"/><circle cx="20" cy="8" r="4.5"/><circle cx="14.5" cy="19" r="4.5"/><circle cx="26" cy="19" r="4.5"/><circle cx="20" cy="30" r="4.5"/></g>'; return d; };
+  const q = [[5, 3], [17.5, 3], [5, 15.5], [17.5, 15.5], [30, 15.5], [17.5, 28]]; // marca da Manda4: 2 + 3 + 1 quadrados arredondados
+  d.innerHTML = '<g fill="#f5a400">' + q.map(([x, y]) => `<rect x="${x}" y="${y}" width="9" height="9" rx="3"/>`).join('') + '</g>'; return d; };
+const NOME = 'MAND\u039b4'; // "A" sem a barra, como no logotipo
 let U = null, view = { nome: 'projetos' };
 const go = v => { view = v; render(); };
 
@@ -32,7 +34,7 @@ function render() {
   if (!U) return $app.append(telaLogin());
   const eq = U.tipo === 'equipe';
   const nav = [['projetos', 'Projetos'], ['solicitacoes', 'Suporte'], ...(eq ? [['clientes', 'Clientes'], ['acessos', 'Acessos e log']] : [])];
-  const top = h('header', { class: 'top' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4 · Projetos e Suporte'),
+  const top = h('header', { class: 'top' }, h('div', { class: 'logo', 'aria-label': 'Manda4 · Projetos e Suporte' }, LOGO(), NOME, h('span', { class: 'logo-sub' }, 'Projetos e Suporte')),
     h('nav', {}, nav.map(([k, t]) => h('a', { class: view.nome === k || (k === 'projetos' && view.nome === 'projeto') ? 'on' : '', onclick: () => go({ nome: k }) }, t))),
     h('span', { class: 'muted small' }, `${U.nome}${eq ? ' · equipe' : ''}`),
     !eq && h('button', { class: 'btn sm', onclick: async () => { await api('POST', '/api/auth/logout', {}); U = null; render(); } }, 'Sair'));
@@ -50,7 +52,7 @@ function ilustracao() {
     + '<rect x="110" y="60" width="90" height="16" rx="8" fill="#1f9d55"/><rect x="150" y="92" width="110" height="16" rx="8" fill="#e0a800"/><rect x="200" y="124" width="80" height="16" rx="8" fill="#d93636"/><rect x="262" y="156" width="70" height="16" rx="8" fill="#1f9d55"/>'
     + '<g fill="none" stroke="#7d8aa8" stroke-width="1.5"><path d="M200 68 H208 V84 H150" opacity="0"/><path d="M200 68 H212 V100 H215" opacity="0"/><path d="M260 100 H270 V132 H200" opacity="0"/><path d="M280 132 H292 V164 H262" opacity="0"/></g>'
     + '<line x1="236" y1="48" x2="236" y2="200" stroke="#ff6a2b" stroke-width="2"/><circle cx="236" cy="48" r="4" fill="#ff6a2b"/>'
-    + '<g fill="#f5a400"><circle cx="318" cy="196" r="9"/><circle cx="338" cy="196" r="9"/><circle cx="328" cy="216" r="9"/></g>';
+    + '<g fill="#f5a400"><rect x="308" y="186" width="16" height="16" rx="5"/><rect x="328" y="186" width="16" height="16" rx="5"/><rect x="318" y="206" width="16" height="16" rx="5"/></g>';
   return d;
 }
 function telaLogin(modo = 'login') {
@@ -68,7 +70,7 @@ function telaLogin(modo = 'login') {
     h('p', { class: 'nota muted small' }, 'Equipe Manda4? Abra o app "Projetos M4" dentro do Bitrix24.'), h('p', { class: 'nota small' }, h('a', { class: 'site', href: 'https://manda4.com.br/', target: '_blank', rel: 'noopener noreferrer' }, '← Voltar ao site manda4.com.br')));
   const onda = document.createElementNS(NS_SVG, 'svg'); onda.setAttribute('class', 'onda'); onda.setAttribute('viewBox', '0 0 1440 520'); onda.setAttribute('preserveAspectRatio', 'none'); onda.setAttribute('aria-hidden', 'true');
   onda.innerHTML = '<defs><linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f6fd6"/><stop offset="1" stop-color="#0a3f94"/></linearGradient></defs><path d="M0 0H1440V250C1180 170 940 330 700 380C460 430 230 340 0 400Z" fill="url(#gb)"/>';
-  return h('div', { class: 'login' }, onda, h('div', { class: 'cena' }, h('div', { class: 'brand' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4'), h('h1', { class: 'tit' }, 'Área de Projetos e Suporte'), h('p', { class: 'sub' }, 'Acompanhe o andamento do seu projeto Bitrix24 e fale com o suporte da Manda4.')),
+  return h('div', { class: 'login' }, onda, h('div', { class: 'cena' }, h('div', { class: 'brand' }, h('div', { class: 'logo', role: 'img', 'aria-label': 'Manda4' }, LOGO(), NOME), h('h1', { class: 'tit' }, 'Área de Projetos e Suporte'), h('p', { class: 'sub' }, 'Acompanhe o andamento do seu projeto Bitrix24 e fale com o suporte da Manda4.')),
     h('div', { class: 'esq' }, ilustracao(), h('p', { class: 'conf' }, 'Parceiro Gold Bitrix24 · Centro de Treinamento Autorizado'),
       h('ul', { class: 'bene' }, ['Projetos: veja o cronograma e o status de cada atividade (no prazo, alerta ou atrasado)', 'Envie documentos e informações direto na atividade, sem e-mail e sem planilha', 'Suporte: abra chamados e acompanhe as respostas da equipe Manda4', 'Tudo com a equipe que implanta e acompanha o seu Bitrix24'].map(t => h('li', {}, t)))), box));
 }
