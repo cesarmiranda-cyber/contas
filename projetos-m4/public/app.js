@@ -41,21 +41,36 @@ function render() {
 }
 
 // ---------- login / cadastro ----------
+const NS_SVG = 'http://www.w3.org/2000/svg';
+function ilustracao() {
+  const d = document.createElementNS(NS_SVG, 'svg'); d.setAttribute('viewBox', '0 0 360 230'); d.setAttribute('class', 'ilus'); d.setAttribute('role', 'img'); d.setAttribute('aria-label', 'Cronograma de projeto com status por cor');
+  d.innerHTML = '<rect x="10" y="10" width="340" height="200" rx="16" fill="#fff" stroke="#dbe5f5"/><rect x="10" y="10" width="340" height="34" rx="16" fill="#eef3fb"/><rect x="10" y="30" width="340" height="14" fill="#eef3fb"/>'
+    + '<g fill="#cbd6ea"><rect x="26" y="22" width="60" height="8" rx="4"/><rect x="170" y="22" width="40" height="8" rx="4"/><rect x="250" y="22" width="40" height="8" rx="4"/></g>'
+    + '<g font-size="10" fill="#5b6479" font-family="Inter,sans-serif"><text x="26" y="72">Levantamento</text><text x="26" y="104">Configuração</text><text x="26" y="136">Integrações</text><text x="26" y="168">Treinamento</text></g>'
+    + '<rect x="110" y="60" width="90" height="16" rx="8" fill="#1f9d55"/><rect x="150" y="92" width="110" height="16" rx="8" fill="#e0a800"/><rect x="200" y="124" width="80" height="16" rx="8" fill="#d93636"/><rect x="262" y="156" width="70" height="16" rx="8" fill="#1f9d55"/>'
+    + '<g fill="none" stroke="#7d8aa8" stroke-width="1.5"><path d="M200 68 H208 V84 H150" opacity="0"/><path d="M200 68 H212 V100 H215" opacity="0"/><path d="M260 100 H270 V132 H200" opacity="0"/><path d="M280 132 H292 V164 H262" opacity="0"/></g>'
+    + '<line x1="236" y1="48" x2="236" y2="200" stroke="#ff6a2b" stroke-width="2"/><circle cx="236" cy="48" r="4" fill="#ff6a2b"/>'
+    + '<g fill="#f5a400"><circle cx="318" cy="196" r="9"/><circle cx="338" cy="196" r="9"/><circle cx="328" cy="216" r="9"/></g>';
+  return d;
+}
 function telaLogin(modo = 'login') {
   const err = h('div'), campos = {};
   const f = (k, rot, tipo = 'text', ac) => { campos[k] = h('input', { type: tipo, autocomplete: ac, required: true }); return [h('label', {}, rot), campos[k]]; };
   const cad = modo === 'cadastro';
-  const box = h('form', { class: 'box', onsubmit: async ev => {
-    ev.preventDefault(); err.replaceChildren();
-    try { await api('POST', cad ? '/api/auth/cadastro' : '/api/auth/login', Object.fromEntries(Object.entries(campos).map(([k, v]) => [k, v.value]))); await boot(); } catch (e) { err.append(h('div', { class: 'erro' }, e.message)); }
-  } }, h('h2', {}, cad ? 'Criar sua conta' : 'Acessar o portal'), h('p', { class: 'muted' }, cad ? 'Cadastre-se para acompanhar seus projetos.' : 'Entre para acompanhar o andamento do seu projeto.'),
+  const box = h('form', { class: 'cartao', onsubmit: async ev => {
+    ev.preventDefault(); err.replaceChildren(); const bt = ev.submitter; bt.disabled = true;
+    try { await api('POST', cad ? '/api/auth/cadastro' : '/api/auth/login', Object.fromEntries(Object.entries(campos).map(([k, v]) => [k, v.value]))); await boot(); } catch (e) { err.append(h('div', { class: 'erro' }, e.message)); bt.disabled = false; }
+  } }, h('h2', {}, cad ? 'Criar sua conta' : 'Acessar o portal'), h('p', { class: 'muted small' }, cad ? 'Grátis para clientes Manda4. Leva menos de um minuto.' : 'Acompanhe o andamento do seu projeto.'),
     cad && f('nome', 'Nome completo', 'text', 'name'), cad && h('div', {}, h('label', {}, 'Empresa'), (campos.empresa = h('input', { autocomplete: 'organization' }))),
-    f('email', 'E-mail', 'email', 'email'), f('senha', cad ? 'Senha (mín. 8 caracteres)' : 'Senha', 'password', cad ? 'new-password' : 'current-password'),
+    f('email', 'E-mail profissional', 'email', 'email'), f('senha', cad ? 'Senha (mín. 8 caracteres)' : 'Senha', 'password', cad ? 'new-password' : 'current-password'),
     err, h('button', { class: 'btn pri', type: 'submit' }, cad ? 'Criar conta' : 'Entrar'),
-    h('p', { class: 'troca muted' }, cad ? 'Já tem conta? ' : 'Ainda não tem conta? ', h('a', { onclick: () => $app.replaceChildren(telaLogin(cad ? 'login' : 'cadastro')) }, cad ? 'Entrar' : 'Criar conta')),
-    h('p', { class: 'muted small', style: 'text-align:center' }, 'Equipe Manda4? Abra o app "Projetos M4" dentro do Bitrix24.'));
-  return h('div', { class: 'login' }, h('div', { class: 'lado' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4'),
-    h('div', {}, h('span', { class: 'pill' }, 'Portal do Cliente Manda4'), h('h1', {}, h('em', {}, 'Seu projeto'), ', sempre à vista.'), h('p', {}, 'Acompanhe cronograma, status de cada atividade e envie documentos e informações direto para a equipe.')), h('span', { class: 'small muted' }, 'Parceiro Gold Bitrix24')), h('div', { class: 'form' }, box));
+    h('p', { class: 'troca muted small' }, cad ? 'Já tem conta? ' : 'Ainda não tem conta? ', h('a', { tabindex: 0, onclick: () => $app.replaceChildren(telaLogin(cad ? 'login' : 'cadastro')) }, cad ? 'Entrar' : 'Criar conta')),
+    h('p', { class: 'nota muted small' }, 'Equipe Manda4? Abra o app "Projetos M4" dentro do Bitrix24.'));
+  const onda = document.createElementNS(NS_SVG, 'svg'); onda.setAttribute('class', 'onda'); onda.setAttribute('viewBox', '0 0 1440 520'); onda.setAttribute('preserveAspectRatio', 'none'); onda.setAttribute('aria-hidden', 'true');
+  onda.innerHTML = '<defs><linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f6fd6"/><stop offset="1" stop-color="#0a3f94"/></linearGradient></defs><path d="M0 0H1440V250C1180 170 940 330 700 380C460 430 230 340 0 400Z" fill="url(#gb)"/>';
+  return h('div', { class: 'login' }, onda, h('div', { class: 'cena' }, h('div', { class: 'brand' }, h('div', { class: 'logo' }, LOGO(), 'MANDA4'), h('span', { class: 'small' }, 'Portal do Cliente')),
+    h('div', { class: 'esq' }, ilustracao(), h('p', { class: 'conf' }, 'Parceiro Gold Bitrix24 · Centro de Treinamento Autorizado'),
+      h('ul', { class: 'bene' }, ['Veja o cronograma do seu projeto em um Gantt', 'Status por cor: no prazo, alerta ou atrasado', 'Envie documentos e informações direto na atividade', 'Abra novas solicitações para a equipe Manda4'].map(t => h('li', {}, t)))), box));
 }
 
 // ---------- projetos ----------
