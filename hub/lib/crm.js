@@ -39,18 +39,18 @@ function multi(v) {
 // linhas cruas do multicampo (com id) para montar o `fm` de edição
 const rawRows = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter((x) => x && typeof x === 'object');
 const rowType = (r) => String(r.typeId ?? r.valueType ?? r.VALUE_TYPE ?? 'WORK');
-// Troca o conjunto de valores de um canal: altera linhas existentes, apaga as que sobram, adiciona as novas.
-function fmDiff(channel, current, desired, fm, startN = 0) {
+// Plano para trocar o conjunto de valores de um canal: `fm` só altera/apaga linhas que já existem;
+// valores novos vão em `adds` (formato simples da API, que apenas acrescenta — o `n0` do fm nem sempre é confirmado).
+function multiPlan(channel, current, desired, plan) {
   const want = [...new Set((desired || []).map((x) => str(x)).filter(Boolean))];
   const rows = rawRows(current).filter((r) => r.id !== undefined);
-  let n = startN;
   rows.forEach((r, i) => {
-    if (i < want.length) { if (str(r.value ?? r.VALUE) !== want[i]) fm[r.id] = { typeId: channel, valueType: rowType(r), value: want[i] }; }
-    else fm[r.id] = { typeId: channel, value: '' };
+    if (i < want.length) { if (str(r.value ?? r.VALUE) !== want[i]) plan.fm[r.id] = { typeId: channel, valueType: rowType(r), value: want[i] }; }
+    else plan.fm[r.id] = { typeId: channel, value: '' };
   });
-  want.slice(rows.length).forEach((v) => { fm[`n${n++}`] = { typeId: channel, valueType: 'WORK', value: v }; });
-  return n;
+  plan.adds[channel] = want.slice(rows.length);
 }
+const sameSet = (a, b) => { const x = [...new Set(a)].sort(), y = [...new Set(b)].sort(); return x.length === y.length && x.every((v, i) => v === y[i]); };
 const multiIn = (list, type = 'WORK') => [...new Set((list || []).map((s) => str(s)).filter(Boolean))].map((value) => ({ value, typeId: type }));
 
 function normCompany(r, M = F) {
@@ -368,17 +368,29 @@ function createCrm(vibe, shared = {}, userKey = '') {
     }
     const p = { ...companyPayload({ ...empresa, telefones: undefined, emails: undefined, sites: undefined }, { requireTitle: false }), ...(await pickCampos('companies', empresa.campos)) };
     if (!p.title) delete p.title;
-    const fm = {};
+    const plan = { fm: {}, adds: {} };
     if (empresa.telefones || empresa.emails) {
       const cur = one(await vibe.get(`/companies/${Number(id)}`, { select: 'id,phone,email' }));
-      let n = 0;
-      if (empresa.telefones) n = fmDiff('PHONE', cur.phone, empresa.telefones, fm, n);
-      if (empresa.emails) fmDiff('EMAIL', cur.email, empresa.emails, fm, n);
+      if (empresa.telefones) multiPlan('PHONE', cur.phone, empresa.telefones, plan);
+      if (empresa.emails) multiPlan('EMAIL', cur.email, empresa.emails, plan);
     }
-    if (Object.keys(fm).length) p.fm = fm;
-    if (!Object.keys(p).length) return getCompany(id);
-    await vibe.patch(`/companies/${Number(id)}`, p);
+    if (plan.adds.PHONE?.length) p.phone = multiIn(plan.adds.PHONE);
+    if (plan.adds.EMAIL?.length) p.email = multiIn(plan.adds.EMAIL);
+    const check = (raw) => (!empresa.telefones || sameSet(multi(raw.phone), empresa.telefones.map((x) => str(x)).filter(Boolean))) && (!empresa.emails || sameSet(multi(raw.email), empresa.emails.map((x) => str(x)).filter(Boolean)));
+    if (Object.keys(p).length) await patchSafe(`/companies/${Number(id)}`, p, check);
+    if (Object.keys(plan.fm).length) await patchSafe(`/companies/${Number(id)}`, { fm: plan.fm }, check);
     return getCompany(id);
+  }
+
+  // Se o Bitrix aceitou a gravação mas a API não conseguiu confirmar a troca de telefone/e-mail (422), confere o registro:
+  // se já está como pedido, a operação valeu.
+  async function patchSafe(path, body, check) {
+    try { await vibe.patch(path, body); }
+    catch (e) {
+      if (!['MULTIFIELD_NOT_APPLIED', 'MULTIFIELD_UNVERIFIED'].includes(e.code)) throw e;
+      const raw = one(await vibe.get(path, { select: 'id,phone,email' }));
+      if (!check(raw)) throw new HubError(409, 'MULTIFIELD_NOT_APPLIED', 'O Bitrix24 não confirmou a alteração de telefone/e-mail. Atualize a tela e confira o cadastro antes de tentar de novo.');
+    }
   }
 
   async function deleteCompany(id) { await vibe.del(`/companies/${Number(id)}`); }
@@ -388,17 +400,19 @@ function createCrm(vibe, shared = {}, userKey = '') {
     const p = contactPayload({ ...spec, telefones: undefined, emails: undefined, telefone: undefined, email: undefined });
     delete p.companyId;
     Object.assign(p, await pickCampos('contacts', spec.campos));
-    const fm = {};
+    const plan = { fm: {}, adds: {} };
     if (spec.telefones || spec.emails) {
       const cur = one(await vibe.get(`/contacts/${Number(id)}`, { select: 'id,phone,email' }));
-      let n = 0;
-      if (spec.telefones) n = fmDiff('PHONE', cur.phone, spec.telefones, fm, n);
-      if (spec.emails) fmDiff('EMAIL', cur.email, spec.emails, fm, n);
+      if (spec.telefones) multiPlan('PHONE', cur.phone, spec.telefones, plan);
+      if (spec.emails) multiPlan('EMAIL', cur.email, spec.emails, plan);
     }
-    if (Object.keys(fm).length) p.fm = fm;
+    if (plan.adds.PHONE?.length) p.phone = multiIn(plan.adds.PHONE, 'MOBILE');
+    if (plan.adds.EMAIL?.length) p.email = multiIn(plan.adds.EMAIL);
     if (!str(spec.cargo)) p.post = '';
     if (!str(spec.cpf) && M.cpf) p[M.cpf] = '';
-    await vibe.patch(`/contacts/${Number(id)}`, p);
+    const check = (raw) => (!spec.telefones || sameSet(multi(raw.phone), spec.telefones.map((x) => str(x)).filter(Boolean))) && (!spec.emails || sameSet(multi(raw.email), spec.emails.map((x) => str(x)).filter(Boolean)));
+    await patchSafe(`/contacts/${Number(id)}`, p, check);
+    if (Object.keys(plan.fm).length) await patchSafe(`/contacts/${Number(id)}`, { fm: plan.fm }, check);
     return getContact(id);
   }
   async function getContact(id) {

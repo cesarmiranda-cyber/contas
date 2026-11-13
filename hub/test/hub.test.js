@@ -181,3 +181,21 @@ test('Layout do cartão: só campos visíveis, na ordem e por seção (pessoal �
   const fresh = await createCrm(vibe, {}).formFields('companies', true);
   assert.equal(fresh.layout, null); assert.ok(fresh.list.some((f) => f.key === 'industry'));
 });
+
+test('Edição de telefone/e-mail: acrescenta sem duplicar e tolera o 422 MULTIFIELD_NOT_APPLIED quando o registro já está certo', async () => {
+  const { vibe, db } = createMockVibe(false);
+  const crm = createCrm(vibe);
+  const r = await crm.createCompany({ empresa: { title: 'Acme', cnpj: '11222333000181', telefones: ['(11) 3000-1000'] } });
+  // empresa sem e-mail: adicionar um (caso do erro "fm n0 não confirmado")
+  let c = await crm.updateCompany(r.id, { telefones: ['(11) 3000-1000'], emails: ['a@acme.com'] });
+  assert.deepEqual(c.telefones, ['(11) 3000-1000']); assert.deepEqual(c.emails, ['a@acme.com']);
+  c = await crm.updateCompany(r.id, { telefones: ['(11) 3000-1000', '(11) 4000-0000'], emails: ['a@acme.com'] });   // só o novo é acrescentado
+  assert.deepEqual(c.telefones, ['(11) 3000-1000', '(11) 4000-0000']);
+  c = await crm.updateCompany(r.id, { telefones: ['(11) 4000-0000'], emails: ['b@acme.com'] });                     // troca + remove
+  assert.deepEqual(c.telefones, ['(11) 4000-0000']); assert.deepEqual(c.emails, ['b@acme.com']);
+  // Bitrix aplicou, mas a API respondeu 422: confere e segue
+  db.failFm = true;
+  c = await crm.updateCompany(r.id, { telefones: ['(11) 5000-0000'], emails: ['b@acme.com'] });
+  assert.deepEqual(c.telefones, ['(11) 5000-0000']);
+  db.failFm = false;
+});

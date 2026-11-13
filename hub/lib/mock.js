@@ -19,8 +19,8 @@ function createMockVibe(seed = true) {
   }
   const CH = { PHONE: 'phone', EMAIL: 'email', WEB: 'web' };
   function applyPatch(rec, body) {
-    const { fm, ...rest } = body; Object.assign(rec, rest);
-    for (const k of ['phone', 'email', 'web']) if (rest[k]) rec[k] = mf(rest[k]);
+    const { fm, phone, email, web, ...scalars } = body; Object.assign(rec, scalars); const rest = { phone, email, web };
+    for (const k of ['phone', 'email', 'web']) if (rest[k]) rec[k] = [...(rec[k] || []), ...mf(rest[k])];   // como a API real: o array só acrescenta
     for (const [key, row] of Object.entries(fm || {})) {
       const f = CH[row.typeId]; rec[f] = rec[f] || [];
       if (key.startsWith('n')) { rec[f].push({ id: ++db.seq, value: row.value, typeId: row.valueType }); continue; }
@@ -28,6 +28,7 @@ function createMockVibe(seed = true) {
       if (i < 0) { const e = new Error('row'); e.status = 409; e.code = 'MULTIFIELD_ROW_NOT_FOUND'; throw e; }
       if (row.value === '') rec[f].splice(i, 1); else rec[f][i] = { ...rec[f][i], value: row.value };
     }
+    if (db.failFm && fm) { const e = new Error('Bitrix24 accepted the update, but the reread record does not show the requested fm change'); e.status = 422; e.code = 'MULTIFIELD_NOT_APPLIED'; throw e; }
   }
   function link(companyId, contactId) {
     if (!db.links.some((l) => l.companyId === companyId && l.contactId === contactId)) db.links.push({ companyId, contactId });
