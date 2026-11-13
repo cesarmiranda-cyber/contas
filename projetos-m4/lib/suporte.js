@@ -59,7 +59,7 @@ function createSuporte({ store, secrets, bitrix, publicUrl = '', linkArquivo = (
     for (const m of s.mensagens || []) {
       if (m.bx) continue;
       const arq = m.arquivoId ? store.db.arquivos.find(a => a.id === m.arquivoId) : null; const l = arq ? linkArquivo(arq.id) : '';
-      const txt = `${m.tipoAutor === 'cliente' ? 'Cliente' : 'Equipe'} (${m.autor}) no portal, ${s.protocolo}:\n${m.texto || ''}${arq ? `\nAnexo: ${arq.nome}${l ? ' — baixar (link válido por 30 dias): ' + l : ' (disponível no portal)'}` : ''}`.trim();
+      const txt = `${m.interna ? 'Nota interna da equipe' : m.tipoAutor === 'cliente' ? 'Cliente' : 'Equipe'} (${m.autor}) no portal, ${s.protocolo}:\n${m.texto || ''}${arq ? `\nAnexo: ${arq.nome}${l ? ' — baixar (link válido por 30 dias): ' + l : ' (disponível no portal)'}` : ''}`.trim();
       try { await comentario(s.bitrix.dealId, txt); m.bx = true; n++; } catch (e) { break; } // tenta de novo no próximo ciclo
     }
     if (n) store.save(); return n;

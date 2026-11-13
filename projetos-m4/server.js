@@ -1,6 +1,6 @@
 'use strict';
 const http = require('http'); const fs = require('fs'); const path = require('path');
-const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const Audit = require('./lib/auditoria'); const Modelos = require('./lib/modelos'); const A = require('./lib/auth'); const S = require('./lib/schedule');
+const { createStore } = require('./lib/store'); const { createSecrets, hint, checkWebhook, hostDe } = require('./lib/secrets'); const { createBitrix } = require('./lib/bitrix'); const { createSuporte, CAT, PRIO } = require('./lib/suporte'); const Audit = require('./lib/auditoria'); const Modelos = require('./lib/modelos'); const SLA = require('./lib/sla'); const Ajuda = require('./lib/ajuda'); const A = require('./lib/auth'); const S = require('./lib/schedule');
 
 const PORT = +process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -37,7 +37,9 @@ function quem(req) {
   const h = req.headers, uid = String(h['x-vibe-user-id'] || '');
   if (/^\d+$/.test(uid)) {
     let nome = ''; try { nome = decodeURIComponent(String(h['x-vibe-user-name-encoded'] || '')); } catch { /* sem nome */ }
-    return { tipo: 'equipe', id: uid, nome: nome.slice(0, 120) || `Usuário ${uid}`, admin: String(h['x-vibe-user-role'] || '').toUpperCase() === 'ADMIN' };
+    const nomeFinal = nome.slice(0, 120) || `Usuário ${uid}`; const e = (db.equipe = db.equipe || {})[uid]; // lembra quem da equipe já usou o app (para atribuir chamados)
+    if (!e || e.nome !== nomeFinal || Date.now() - Date.parse(e.visto) > 10 * 60e3) { db.equipe[uid] = { id: uid, nome: nomeFinal, visto: new Date().toISOString() }; store.save(); }
+    return { tipo: 'equipe', id: uid, nome: nomeFinal, admin: String(h['x-vibe-user-role'] || '').toUpperCase() === 'ADMIN' };
   }
   const cid = A.ler(store.secret, A.cookies(h.cookie).pm4);
   const c = cid && db.clientes.find(x => x.id === cid && x.ativo !== false);
@@ -323,14 +325,16 @@ rota('GET', '/api/baixar/([0-9a-f]+)', async (req, res, m) => {
 
 const protocolo = () => 'SUP-' + String(db.solicitacoes.reduce((m, x) => Math.max(m, +(/^SUP-(\d+)$/.exec(x.protocolo || '') || [])[1] || 0), 0) + 1).padStart(4, '0');
 const cardUrl = s => s.bitrix && s.bitrix.dealId && bitrix.base ? `https://${hostDe(bitrix.base)}/crm/deal/details/${s.bitrix.dealId}/` : '';
-const msgView = m => { const a = m.arquivoId && db.arquivos.find(x => x.id === m.arquivoId); return { id: m.id, autor: m.autor, tipoAutor: m.tipoAutor, ts: m.ts, texto: m.texto, arquivo: a ? { id: a.id, nome: a.nome, tamanho: a.tamanho } : undefined }; };
+const msgView = m => { const a = m.arquivoId && db.arquivos.find(x => x.id === m.arquivoId); return { id: m.id, autor: m.autor, tipoAutor: m.tipoAutor, ts: m.ts, texto: m.texto, interna: !!m.interna, arquivo: a ? { id: a.id, nome: a.nome, tamanho: a.tamanho } : undefined }; };
 function solView(s, u) {
+  const publicas = (s.mensagens || []).filter(x => !x.interna), visiveis = u.tipo === 'equipe' ? (s.mensagens || []) : publicas; // nota interna: só a equipe vê; nunca muda de quem é a vez
   const base = { id: s.id, protocolo: s.protocolo, projetoId: s.projetoId, projeto: (projetoDe(s.projetoId) || {}).nome, categoria: s.categoria, prioridade: s.prioridade, assunto: s.assunto, texto: s.texto, status: s.status, resposta: s.resposta, criadoEm: s.criadoEm,
-    etapa: s.etapa ? s.etapa.nome : '', historico: s.historico || [], mensagens: (s.mensagens || []).map(msgView), avaliacao: s.avaliacao ? { nota: s.avaliacao.nota, comentario: s.avaliacao.comentario, ts: s.avaliacao.ts } : null,
+    etapa: s.etapa ? s.etapa.nome : '', historico: s.historico || [], mensagens: visiveis.map(msgView), avaliacao: s.avaliacao ? { nota: s.avaliacao.nota, comentario: s.avaliacao.comentario, ts: s.avaliacao.ts } : null,
     podeAvaliar: !s.avaliacao && (s.status === 'concluida' || (s.etapa && s.etapa.semantica === 'S')),
-    aberto: !['concluida', 'recusada'].includes(s.status), atualizadoEm: [s.criadoEm, s.etapa && s.etapa.desde, ...(s.mensagens || []).map(x => x.ts)].filter(Boolean).sort().pop(),
-    vezDe: ['concluida', 'recusada'].includes(s.status) ? null : (((s.mensagens || []).slice(-1)[0] || {}).tipoAutor === 'equipe' ? 'cliente' : 'equipe') }; // quem precisa agir agora
-  return u.tipo === 'equipe' ? { ...base, cliente: s.cliente, empresa: s.empresa, email: s.email, telefone: s.telefone, bitrix: s.bitrix ? { status: s.bitrix.status, erro: s.bitrix.erro, dealId: s.bitrix.dealId, tentativas: s.bitrix.tentativas, url: cardUrl(s) } : null } : base;
+    aberto: !['concluida', 'recusada'].includes(s.status), atualizadoEm: [s.criadoEm, s.etapa && s.etapa.desde, ...visiveis.map(x => x.ts)].filter(Boolean).sort().pop(), atendente: s.responsavel ? s.responsavel.nome : '',
+    vezDe: ['concluida', 'recusada'].includes(s.status) ? null : ((publicas.slice(-1)[0] || {}).tipoAutor === 'equipe' ? 'cliente' : 'equipe') }; // quem precisa agir agora
+  const sla = SLA.calcular(s, SLA.config(db)); if (u.tipo !== 'equipe') return { ...base, respostaPrevistaAte: ['ok', 'vencendo', 'estourado'].includes(sla.estado) ? sla.prazo : null };
+  return u.tipo === 'equipe' ? { ...base, responsavel: s.responsavel || null, sla, cliente: s.cliente, empresa: s.empresa, email: s.email, telefone: s.telefone, bitrix: s.bitrix ? { status: s.bitrix.status, erro: s.bitrix.erro, dealId: s.bitrix.dealId, tentativas: s.bitrix.tentativas, url: cardUrl(s) } : null } : base;
 }
 rota('GET', '/api/solicitacoes', async (req, res, _m, _b, u) => {
   exigir(u); if (u.tipo === 'cliente') regUnico(u, 'suporte', 30 * 60e3, 'abriu_suporte'); await suporte.sincronizarSeVelho(); // etapa do card sempre fresca (no máx. 1 consulta/min)
@@ -350,6 +354,8 @@ rota('POST', '/api/solicitacoes', async (req, res, _m, b, u) => {
 rota('PATCH', '/api/solicitacoes/([0-9a-f]+)', async (req, res, m, b, u) => {
   exigir(u, 'equipe'); const s = db.solicitacoes.find(x => x.id === m[1]); if (!s) throw bad(404, 'Solicitação não encontrada.');
   if (['nova', 'em_analise', 'aprovada', 'recusada', 'concluida'].includes(b.status)) s.status = b.status; if ('resposta' in b) s.resposta = str(b.resposta, 4000);
+  if ('responsavel' in b) { const uid = b.responsavel ? String(b.responsavel) : ''; if (uid && !(db.equipe || {})[uid]) throw bad(400, 'Pessoa da equipe não encontrada.'); const ant = s.responsavel ? s.responsavel.nome : 'ninguém'; s.responsavel = uid ? { uid, nome: db.equipe[uid].nome } : null; reg(u, 'atribuiu_chamado', `${s.protocolo} · ${ant} → ${s.responsavel ? s.responsavel.nome : 'ninguém'}`, s.projetoId); }
+  if ('prioridade' in b) { if (!PRIO[b.prioridade]) throw bad(400, 'Prioridade inválida.'); s.prioridade = b.prioridade; }
   reg(u, 'atualizou_solicitacao', `${s.protocolo} · ${s.assunto}`, s.projetoId); store.save(); send(res, 200, { ok: true });
 });
 rota('POST', '/api/solicitacoes/([0-9a-f]+)/reenviar', async (req, res, m, _b, u) => {
@@ -359,15 +365,16 @@ rota('POST', '/api/solicitacoes/([0-9a-f]+)/reenviar', async (req, res, m, _b, u
 
 const solAcessivel = (u, id) => { exigir(u); const s = db.solicitacoes.find(x => x.id === id); if (!s || (u.tipo === 'cliente' && s.clienteId !== u.id)) throw bad(404, 'Chamado não encontrado.'); return s; };
 rota('POST', '/api/solicitacoes/([0-9a-f]+)/mensagens', async (req, res, m, b, u) => {
-  const s = solAcessivel(u, m[1]); const msg = { id: store.id(), autor: u.nome, tipoAutor: u.tipo, ts: store.agora(), texto: str(b.texto, 4000), bx: false };
+  const s = solAcessivel(u, m[1]); const interna = u.tipo === 'equipe' && !!b.interna; const msg = { id: store.id(), autor: u.nome, tipoAutor: u.tipo, ts: store.agora(), texto: str(b.texto, 4000), bx: false, ...(interna ? { interna: true } : {}) };
   if (b.arquivo) {
     const nome = str(b.arquivo.nome, 160, true, 'Nome do arquivo').replace(/[\\/\0\r\n"]/g, '_'); const buf = Buffer.from(String(b.arquivo.base64 || ''), 'base64');
     if (!buf.length) throw bad(400, 'Arquivo vazio.'); if (buf.length > MAX_FILE) throw bad(413, 'Arquivo acima de 10 MB.');
     const a = { id: store.id(), solicitacaoId: s.id, nome, tamanho: buf.length, ts: msg.ts }; fs.writeFileSync(store.file(a.id), buf, { mode: 0o600 }); db.arquivos.push(a); msg.arquivoId = a.id;
   }
   if (!msg.texto && !msg.arquivoId) throw bad(400, 'Escreva uma mensagem ou anexe um documento.');
-  (s.mensagens = s.mensagens || []).push(msg); if (u.tipo === 'equipe' && s.status === 'nova') s.status = 'em_analise';
-  reg(u, u.tipo === 'cliente' ? 'complementou_chamado' : 'respondeu_chamado', `${s.protocolo} · ${s.assunto}`, s.projetoId, { cliente: s.clienteId }); store.save();
+  (s.mensagens = s.mensagens || []).push(msg); if (u.tipo === 'equipe' && !interna && s.status === 'nova') s.status = 'em_analise';
+  if (u.tipo === 'equipe' && !interna && !s.responsavel) { s.responsavel = { uid: u.id, nome: u.nome }; reg(u, 'atribuiu_chamado', `${s.protocolo} · ninguém → ${u.nome} (ao responder)`, s.projetoId); } // quem responde primeiro assume
+  reg(u, interna ? 'nota_interna' : u.tipo === 'cliente' ? 'complementou_chamado' : 'respondeu_chamado', `${s.protocolo} · ${s.assunto}`, s.projetoId, interna ? {} : { cliente: s.clienteId }); store.save();
   suporte.flushMensagens(s).catch(() => {}); send(res, 201, { ok: true });
 });
 rota('POST', '/api/solicitacoes/([0-9a-f]+)/avaliar', async (req, res, m, b, u) => {
@@ -475,6 +482,26 @@ rota('POST', '/api/logs/([0-9a-f]+)/desfazer', async (req, res, m, b, u) => {
   reg(u, 'desfez_alteracao', entidade.nome, pid, { ...(alvo === 'tarefa' ? { tarefaId: entidade.id, interna: !!entidade.interna } : {}), diff: dif, desfazDe: l.id, desfazer: desfazerDe(alvo, id, antesE, entidade, alvo === 'tarefa' ? Audit.UNDO_TAREFA : Audit.UNDO_PROJETO) });
   l.desfeito = true; l.desfeitoPor = u.nome; l.desfeitoEm = store.agora(); store.save(); send(res, 200, { ok: true, ajustes });
 });
+// ---- equipe, prazos de resposta (SLA), respostas prontas e central de ajuda ----
+rota('GET', '/api/equipe', async (req, res, _m, _b, u) => { exigir(u, 'equipe'); send(res, 200, { equipe: Object.values(db.equipe || {}).sort((a, b) => a.nome.localeCompare(b.nome)).map(x => ({ id: x.id, nome: x.nome })) }); });
+rota('GET', '/api/config/sla', async (req, res, _m, _b, u) => { exigir(u, 'equipe'); send(res, 200, { sla: SLA.config(db), padrao: SLA.PADRAO }); });
+rota('POST', '/api/config/sla', async (req, res, _m, b, u) => {
+  exigir(u, 'equipe'); if (!u.admin) throw bad(403, 'Somente administradores alteram os prazos.'); const novo = {}; for (const k of Object.keys(SLA.PADRAO)) { const v = +b[k]; if (!(v > 0 && v <= 720)) throw bad(400, `Prazo inválido para “${k}” (use de 1 a 720 horas).`); novo[k] = v; }
+  const ant = SLA.config(db); db.config.sla = novo; reg(u, 'configurou_sla', Object.keys(novo).map(k => `${k}: ${ant[k]}h → ${novo[k]}h`).join(' · ')); store.save(); send(res, 200, { sla: SLA.config(db) });
+});
+const RESPOSTAS_PADRAO = [['Recebemos seu chamado', 'Olá, {cliente}! Recebemos o seu chamado {protocolo} e já estamos analisando. Voltamos com uma resposta em breve.'], ['Precisamos de mais informações', 'Olá, {cliente}! Para avançarmos no chamado {protocolo}, pode nos enviar mais detalhes (prints, o passo a passo e o horário em que aconteceu)?'], ['Chamado resolvido', 'Olá, {cliente}! Finalizamos o atendimento do chamado {protocolo}. Se algo ainda não estiver certo, é só responder por aqui. Obrigado!']];
+if (!(db.respostas || []).length) { db.respostas = RESPOSTAS_PADRAO.map(([titulo, texto]) => ({ id: store.id(), titulo, texto })); store.save(); }
+rota('GET', '/api/respostas', async (req, res, _m, _b, u) => { exigir(u, 'equipe'); send(res, 200, { respostas: db.respostas }); });
+rota('POST', '/api/respostas', async (req, res, _m, b, u) => { exigir(u, 'equipe'); const r = { id: store.id(), titulo: str(b.titulo, 80, true, 'Título'), texto: str(b.texto, 2000, true, 'Texto') }; db.respostas.push(r); store.save(); send(res, 201, { resposta: r }); });
+rota('PATCH', '/api/respostas/([0-9a-f]+)', async (req, res, m, b, u) => { exigir(u, 'equipe'); const r = db.respostas.find(x => x.id === m[1]); if (!r) throw bad(404, 'Resposta não encontrada.'); if ('titulo' in b) r.titulo = str(b.titulo, 80, true, 'Título'); if ('texto' in b) r.texto = str(b.texto, 2000, true, 'Texto'); store.save(); send(res, 200, { resposta: r }); });
+rota('DELETE', '/api/respostas/([0-9a-f]+)', async (req, res, m, _b, u) => { exigir(u, 'equipe'); if (!db.respostas.some(x => x.id === m[1])) throw bad(404, 'Resposta não encontrada.'); db.respostas = db.respostas.filter(x => x.id !== m[1]); store.save(); send(res, 200, { ok: true }); });
+const artigoPublico = a => ({ id: a.id, titulo: a.titulo, texto: a.texto, categoria: a.categoria || '' });
+rota('GET', '/api/artigos', async (req, res, _m, _b, u) => { exigir(u); send(res, 200, { artigos: u.tipo === 'equipe' ? db.artigos : db.artigos.filter(a => a.publicado !== false).map(artigoPublico) }); });
+rota('GET', '/api/artigos/sugestoes', async (req, res, _m, _b, u) => { exigir(u); const q = new URL(req.url, 'http://x').searchParams.get('q') || ''; const r = Ajuda.sugerir(db.artigos, q, 3); for (const a of r) a.vistas = (a.vistas || 0) + 1; if (r.length) store.save(); send(res, 200, { artigos: r.map(artigoPublico) }); });
+rota('POST', '/api/artigos', async (req, res, _m, b, u) => { exigir(u, 'equipe'); const a = { id: store.id(), titulo: str(b.titulo, 140, true, 'Título'), texto: str(b.texto, 8000, true, 'Texto'), palavras: str(b.palavras, 300), categoria: str(b.categoria, 60), publicado: b.publicado !== false, criadoEm: store.agora(), vistas: 0, uteis: 0, naoUteis: 0 }; db.artigos.push(a); store.save(); send(res, 201, { artigo: a }); });
+rota('PATCH', '/api/artigos/([0-9a-f]+)', async (req, res, m, b, u) => { exigir(u, 'equipe'); const a = db.artigos.find(x => x.id === m[1]); if (!a) throw bad(404, 'Artigo não encontrado.'); if ('titulo' in b) a.titulo = str(b.titulo, 140, true, 'Título'); if ('texto' in b) a.texto = str(b.texto, 8000, true, 'Texto'); if ('palavras' in b) a.palavras = str(b.palavras, 300); if ('categoria' in b) a.categoria = str(b.categoria, 60); if ('publicado' in b) a.publicado = !!b.publicado; a.atualizadoEm = store.agora(); store.save(); send(res, 200, { artigo: a }); });
+rota('DELETE', '/api/artigos/([0-9a-f]+)', async (req, res, m, _b, u) => { exigir(u, 'equipe'); if (!db.artigos.some(x => x.id === m[1])) throw bad(404, 'Artigo não encontrado.'); db.artigos = db.artigos.filter(x => x.id !== m[1]); store.save(); send(res, 200, { ok: true }); });
+rota('POST', '/api/artigos/([0-9a-f]+)/util', async (req, res, m, b, u) => { exigir(u, 'cliente'); const a = db.artigos.find(x => x.id === m[1] && x.publicado !== false); if (!a) throw bad(404, 'Artigo não encontrado.'); if (b.resolveu) a.uteis = (a.uteis || 0) + 1; else a.naoUteis = (a.naoUteis || 0) + 1; store.save(); send(res, 200, { ok: true }); });
 function filtraLogs(q) {
   const pid = q.get('projeto'), tipo = q.get('tipo'), cat = q.get('cat'), busca = (q.get('q') || '').trim().toLowerCase(), dias = +q.get('dias') || 0, lim = Math.min(+q.get('limite') || 300, 5000);
   const desde = dias ? Date.now() - dias * 86400e3 : 0; const out = [];
