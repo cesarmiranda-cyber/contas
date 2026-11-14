@@ -36,7 +36,7 @@ main{flex:1;min-width:0;padding:16px 20px 40px}
 .row{display:grid;grid-template-columns:78px 1fr 60px;gap:8px;align-items:center;margin:6px 0;font-size:13px}.row span:last-child{text-align:right;color:var(--mut)}
 .leg{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--mut);margin-top:8px}.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .s-reuniao{--c:var(--reuniao);--b:var(--reuniao-bg)}.s-contato{--c:var(--contato);--b:var(--contato-bg)}.s-sem_contato{--c:var(--sem_contato);--b:var(--sem_contato-bg)}.s-pendente{--c:var(--pendente);--b:var(--pendente-bg)}.s-atrasado{--c:var(--atrasado);--b:var(--atrasado-bg)}.s-na{--c:var(--line);--b:var(--bg)}
-.badge{display:inline-flex;gap:4px;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--b);color:var(--c)}
+.badge{white-space:nowrap;flex-shrink:0;display:inline-flex;gap:4px;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--b);color:var(--c)}
 .alert{display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line);cursor:pointer}.alert:first-of-type{border-top:0}.alert .t{flex:1;min-width:0}.alert .t small{color:var(--mut);display:block}
 .chip{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--pendente-bg);color:var(--mut);white-space:nowrap}
 .tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.tools input,.tools select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px}.tools input{min-width:220px}
@@ -60,6 +60,17 @@ label{display:block;font-size:12px;color:var(--mut);margin:10px 0 3px}label.ck{d
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:30;display:none;max-width:90vw}
 .err{background:var(--sem_contato-bg);color:var(--sem_contato);padding:12px;border-radius:10px}
 .empty{color:var(--mut);padding:18px;text-align:center}
+.home{max-width:900px}.home h2{font-size:24px;margin:6px 0 4px}.home p{color:var(--mut);margin:0 0 18px}
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.modc{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.modc.off{opacity:.55}.modc .ic{font-size:30px}.modc h3{margin:0;font-size:17px}.modc p{margin:0;color:var(--mut);flex:1}
+.btn.big{padding:11px 16px;font-size:15px}
+.reg{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:12px;align-items:start}
+.rl{display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 190px);overflow:auto;padding-right:2px}
+.ri{display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 10px;cursor:pointer}
+.ri.sel,.ri:hover{border-color:var(--brand)}.ri small{display:block;color:var(--mut)}
+.pn{position:sticky;top:8px;max-height:calc(100vh - 190px);overflow:auto;position:relative}.pn .x{display:none}
+@media(max-width:760px){.reg{grid-template-columns:1fr}.rl{max-height:260px}.pn{max-height:none}}
 @media(max-width:760px){.shell{display:block}.side{width:auto;display:flex;gap:6px;align-items:center;padding:8px;overflow-x:auto}.side h1{margin:0 8px 0 4px;white-space:nowrap}.side small{display:none}.side .mod{width:auto;white-space:nowrap}main{padding:12px}.two{grid-template-columns:1fr}}
 </style>
 </head>
@@ -67,15 +78,16 @@ label{display:block;font-size:12px;color:var(--mut);margin:10px 0 3px}label.ck{d
 <div class="shell">
   <nav class="side">
     <h1>Hub de Clientes</h1>
-    <button class="mod on">📋 Registro de Cliente</button>
+    <button class="mod" id="nHome">🏠 Início</button>
+    <button class="mod" id="nReg">📋 Registro de Visita</button>
     <button class="mod" disabled>Novos módulos em breve</button>
     <small>Funil de contratos ativos · ciclo de 12 meses</small>
   </nav>
   <main>
-    <div class="top">
-      <h2>Registro de Cliente</h2>
+    <div class="top" id="top">
+      <h2>Registro de Visita</h2>
       <div class="mes"><button id="mAnt" title="Mês anterior">‹</button><b id="mLbl"></b><button id="mPro" title="Próximo mês">›</button></div>
-      <div class="tabs" id="tabs"><button data-t="dash" class="on">Dashboard</button><button data-t="board">Kanban</button><button data-t="lista">Lista</button></div>
+      <div class="tabs" id="tabs"><button data-t="reg">Registrar visita</button><button data-t="hist">Visitas</button><button data-t="dash">Acompanhamento</button><button data-t="board">Kanban</button><button data-t="lista">Lista</button></div>
       <button class="btn" id="rec" title="Recarregar do Bitrix24">↻</button>
     </div>
     <div id="view"><div class="empty">Carregando…</div></div>
@@ -90,7 +102,7 @@ const ST = { reuniao:['Reunião feita','✔'], contato:['Só contato','◐'], se
 const SAUDE = { verde:'Verde', amarelo:'Amarelo', vermelho:'Vermelho' };
 const REN = { provavel:'Provável', indefinido:'Indefinida', improvavel:'Improvável' };
 const CANAL = { reuniao:'Reunião presencial', video:'Videochamada', whatsapp:'WhatsApp', telefone:'Telefone', email:'E-mail', outro:'Outro' };
-let S = null, mes = null, tab = localStorage.getItem('hub.tab') || 'dash', filtro = { q:'', status:'', resp:'' };
+let S = null, mes = null, view = 'home', tab = 'reg', filtro = { q:'', status:'', resp:'' };
 const pct = v => Math.round(v * 100) + '%';
 const mesNome = m => { const [y, mo] = m.split('-'); const t = new Date(+y, mo - 1, 1).toLocaleDateString('pt-BR', { month:'long', year:'numeric' }); return t[0].toUpperCase() + t.slice(1); };
 const mesCurto = m => { const [y, mo] = m.split('-'); return new Date(+y, mo - 1, 1).toLocaleDateString('pt-BR', { month:'short' }).replace('.', '') + '/' + y.slice(2); };
@@ -108,10 +120,15 @@ async function load() {
   catch (e) { $('#view').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 function render() {
+  const home = view === 'home';
+  $('#nHome').classList.toggle('on', home); $('#nReg').classList.toggle('on', !home);
+  $('#top').style.display = home ? 'none' : '';
+  if (home) { $('#dr').classList.remove('on'); $('#view').innerHTML = homeV(); $('#go').onclick = () => { view = 'app'; render(); }; return; }
+  if (tab === 'reg') $('#dr').classList.remove('on');
   $('#mLbl').textContent = mesNome(mes);
   $('#mPro').disabled = mes >= S.hoje.slice(0, 7);
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
-  $('#view').innerHTML = tab === 'dash' ? dash() : tools() + (tab === 'board' ? board() : lista());
+  $('#view').innerHTML = tab === 'dash' ? dash() : tab === 'reg' ? regV() : tab === 'hist' ? histV() : tools() + (tab === 'board' ? board() : lista());
   bind();
   if (openId) drawer(openId, true);
 }
@@ -123,6 +140,28 @@ function stack(v, order = ['reuniao','contato','sem_contato','atrasado','pendent
 }
 const legend = () => '<div class="leg">' + ['reuniao','contato','sem_contato','atrasado','pendente'].map(k => `<span class="s-${k}"><span class="dot" style="background:var(--c)"></span>${ST[k][0]}</span>`).join('') + '</div>';
 
+function homeV() {
+  const g = S.dashboard.geral, f = g.reuniao + g.contato;
+  return `<div class="home"><h2>Hub de Clientes</h2><p>Escolha uma função para começar.</p><div class="mods">
+    <div class="modc"><div class="ic">📋</div><h3>Registro de Visita</h3><p>Registre a visita/contato mensal de cada cliente e acompanhe quem ainda falta.<br><b>${g.pendente + g.atrasado}</b> cliente(s) sem registro em ${esc(mesNome(S.mes))} · ${f}/${g.total} atendidos</p><button class="btn pri big" id="go">Entrar no Registro de Visita →</button></div>
+    <div class="modc off"><div class="ic">🧩</div><h3>Novas funções</h3><p>Em breve.</p></div></div></div>`;
+}
+const ORD = { atrasado:0, pendente:1, sem_contato:2, contato:3, reuniao:4 };
+function rlItems() {
+  const l = filtrados().sort((a, b) => ORD[a.status] - ORD[b.status] || a.nome.localeCompare(b.nome));
+  return l.map(c => `<div class="ri s-${c.status}" data-open="${c.id}"><div><b>${esc(c.nome)}</b><small>${esc(c.etapa)} · ${esc(c.responsavel || 'Sem responsável')}</small></div>${badge(c.status)}</div>`).join('') || '<div class="empty">Nenhum cliente encontrado.</div>';
+}
+function regV() {
+  return tools() + `<div class="reg"><div class="rl" id="rl">${rlItems()}</div><div class="pn box" id="pn"><div class="empty">Selecione um cliente para registrar a visita.<br>Pendentes e atrasados aparecem primeiro.</div></div></div>`;
+}
+function histV() {
+  const nome = Object.fromEntries(S.clientes.map(c => [c.id, c]));
+  const l = S.registros.filter(r => nome[r.dealId]).sort((a, b) => (b.data || b.mes).localeCompare(a.data || a.mes));
+  if (!l.length) return '<div class="empty">Nenhuma visita registrada ainda.</div>';
+  return `<table><thead><tr><th>Data</th><th>Cliente</th><th>Mês</th><th>Resultado</th><th>Canal</th><th>Resumo</th><th>Registrado por</th></tr></thead><tbody>` + l.map(r => {
+    const st = r.reuniaoRealizada ? 'reuniao' : r.contatoFeito ? 'contato' : 'sem_contato';
+    return `<tr class="c" data-open="${r.dealId}" data-mes="${r.mes}"><td>${fdata(r.data) || '—'}</td><td><b>${esc(nome[r.dealId].nome)}</b></td><td>${esc(mesCurto(r.mes))}</td><td>${badge(st)}</td><td>${esc(CANAL[r.canal] || '—')}</td><td>${esc((r.resumo || r.motivo || '').slice(0, 80))}</td><td>${esc(r.criadoPor || '')}</td></tr>`; }).join('') + '</tbody></table>';
+}
 function dash() {
   const D = S.dashboard, g = D.geral, A = D.resumoAlertas;
   const kp = (n, l, extra = '') => `<div class="kpi"><div class="n">${n}</div><div class="l">${l}${extra}</div></div>`;
@@ -177,27 +216,31 @@ function lista() {
 }
 let openId = null;
 function bind() {
-  document.querySelectorAll('[data-open]').forEach(e => e.onclick = () => drawer(+e.dataset.open));
-  const q = $('#q'); if (q) { q.oninput = () => { filtro.q = q.value; const p = q.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(p, p); }; $('#fs').onchange = e => { filtro.status = e.target.value; render(); }; $('#fr').onchange = e => { filtro.resp = e.target.value; render(); }; }
+  document.querySelectorAll('[data-open]').forEach(e => e.onclick = async () => { if (e.dataset.mes && e.dataset.mes !== mes) { mes = e.dataset.mes; openId = +e.dataset.open; await load(); } else drawer(+e.dataset.open); });
+  const refil = () => { if (tab === 'reg') { $('#rl').innerHTML = rlItems(); document.querySelectorAll('#rl [data-open]').forEach(e => e.onclick = () => drawer(+e.dataset.open)); } else render(); };
+  const q = $('#q'); if (q) { q.oninput = () => { filtro.q = q.value; if (tab === 'reg') refil(); else { const p = q.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(p, p); } }; $('#fs').onchange = e => { filtro.status = e.target.value; refil(); }; $('#fr').onchange = e => { filtro.resp = e.target.value; refil(); }; }
 }
-document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; try { localStorage.setItem('hub.tab', tab); } catch {} render(); });
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; openId = null; render(); });
+$('#nHome').onclick = () => { view = 'home'; render(); };
+$('#nReg').onclick = () => { view = 'app'; render(); };
 $('#mAnt').onclick = () => { mes = addMes(mes, -1); load(); };
 $('#mPro').onclick = () => { mes = addMes(mes, 1); load(); };
 $('#rec').onclick = () => load();
 
 function drawer(id, keep) {
-  const c = S.clientes.find(x => x.id === id); const dr = $('#dr');
+  const c = S.clientes.find(x => x.id === id); const inline = tab === 'reg' && $('#pn'); const dr = inline ? $('#pn') : $('#dr');
   if (!c) { dr.classList.remove('on'); openId = null; return; }
+  if (inline) document.querySelectorAll('#rl .ri').forEach(e => e.classList.toggle('sel', +e.dataset.open === id));
   openId = id;
   const r = c.registro || {}, regs = S.registros.filter(x => x.dealId === id).sort((a, b) => b.mes.localeCompare(a.mes));
   const ck = (n, v) => v ? 'checked' : '';
   const keepForm = keep && $('#fm') ? new FormData($('#fm')) : null;
   dr.innerHTML = `<button class="x" id="dx" aria-label="Fechar">×</button>
-    <h2>${esc(c.nome)}</h2><div style="color:var(--mut)">${esc(c.dominio)} · ${esc(c.etapa)} · ${esc(c.responsavel || 'Sem responsável')}</div>
+    <h2>${esc(c.nome)}</h2><div style="color:var(--mut)">${[c.dominio, c.etapa, c.responsavel || 'Sem responsável'].filter(Boolean).map(esc).join(' · ')}</div>
     <div class="meta" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">${badge(c.status)} ${sd(c.saude)} <span class="chip">${c.sequencia} mês(es) seguidos com contato</span>${c.diasNaEtapa !== null ? `<span class="chip">${c.diasNaEtapa}d na etapa</span>` : ''}</div>
     ${hist(c)}
     <p><a href="https://${esc(S.portal)}/crm/deal/details/${c.id}/" target="_blank" rel="noopener">Abrir card no Bitrix24 ↗</a></p>
-    <div class="sec">Registro de ${esc(mesNome(mes))}</div>
+    <div class="sec">Visita · mês de referência: ${esc(mesNome(mes))}</div>
     <form class="f" id="fm">
       <label class="ck"><input type="checkbox" name="reuniaoRealizada" ${ck('', r.reuniaoRealizada)}> Reunião realizada</label>
       <label class="ck"><input type="checkbox" name="contatoFeito" ${ck('', r.contatoFeito && !r.reuniaoRealizada)}> Contato feito (sem reunião)</label>
@@ -233,7 +276,7 @@ function drawer(id, keep) {
   f.contatoFeito.onchange = () => { if (f.contatoFeito.checked) f.reuniaoRealizada.checked = false; sync(); };
   if (!f.data.value) f.data.value = mes === S.hoje.slice(0, 7) ? S.hoje : '';
   sync();
-  $('#dx').onclick = () => { dr.classList.remove('on'); openId = null; };
+  $('#dx').onclick = inline ? null : () => { dr.classList.remove('on'); openId = null; };
   f.onsubmit = async e => {
     e.preventDefault(); const b = $('#sv'); b.disabled = true;
     const fd = Object.fromEntries(new FormData(f));

@@ -2,7 +2,10 @@
 
 Hub com várias funções para gerir clientes. Primeira função: **Registro de Cliente**.
 
-## Registro de Cliente
+## Navegação
+A primeira tela é a **home do hub** (botão *Entrar no Registro de Visita*). Dentro: **Registrar visita** (lista de clientes com pendentes/atrasados primeiro + formulário ao lado), **Visitas** (histórico), **Acompanhamento** (dashboard), **Kanban** e **Lista**.
+
+## Registro de Visita
 Funil **Negócios · categoria 0** (clientes em contrato ativo). Cada card é um cliente e a etapa é o mês de uso: **Mês 0 … Mês 12**, mais *Assinado* e *CANCELADOS*.
 
 - **Registro mensal obrigatório**: para cada cliente e mês registra-se *reunião realizada*, *só contato* ou *sem contato* (com motivo), data, canal, participantes, resumo, próximos passos, saúde (verde/amarelo/vermelho), intenção de renovar e próximo contato. Salvar de novo no mesmo mês atualiza.
