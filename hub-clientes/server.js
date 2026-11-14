@@ -9,7 +9,8 @@ const M = require('./lib/metrics');
 const CATEGORIA = +process.env.CATEGORY_ID || 0;           // funil de contratos ativos (Bitrix24: /crm/deal/kanban/category/0/)
 const PORTAL = process.env.PORTAL_HOST || 'manda4.bitrix24.com.br';
 const CAMPO_RENOV = process.env.RENEWAL_FIELD || 'ufCrm_1771112861536';   // "Próxima Renovação Bitrix24" (referência do ciclo)
-const SELECT = CAMPO_RENOV + ',id,title,stageId,companyId,contactId,amount,currency,assignedById,begindate,movedTime,stageSemanticId';
+const CAMPOS = { plano: process.env.PLAN_FIELD || 'ufCrm_1762467264536', planoB24: 'ufCrm_1794675601057', contratacao: 'ufCrm_1771422009478' };   // Plano (tipo de licença), Plano Bitrix24, Mensal/Anual
+const SELECT = CAMPO_RENOV + ',' + Object.values(CAMPOS).join(',') + ',id,title,stageId,companyId,contactId,amount,currency,assignedById,begindate,movedTime,stageSemanticId';
 const CANAIS = ['reuniao', 'video', 'whatsapp', 'telefone', 'email', 'outro'];
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
@@ -36,6 +37,12 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
     return { mapa: Object.fromEntries(r.map(u => [u.id, nome(u)])), ativos: r.filter(u => u.active !== false).map(nome).sort((a, b) => a.localeCompare(b)) };
   });
   const usuarios = async () => (await usuariosAll()).mapa;
+  // Rótulos das listas (enumerações) dos campos de plano/contratação.
+  const enums = () => memo('enums', 3600000, async () => {
+    const f = (await vibe.get('/deals/fields').catch(() => ({}))).fields || {}, out = {};
+    for (const [nome, campo] of Object.entries(CAMPOS)) out[nome] = Object.fromEntries((f[campo]?.items || []).map(i => [String(i.ID), i.VALUE]));
+    return out;
+  });
   const deals = () => memo('deals', 20000, () => vibe.get('/deals', { 'filter[categoryId]': CATEGORIA, select: SELECT, limit: 5000 }));
   // Nome do cliente: empresa vinculada ao card; sem empresa, o contato (vendas repetidas vêm com título genérico).
   const nomes = async (ds, campo, rota, select, nome) => {
@@ -51,10 +58,10 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
   };
 
   async function estado(mes) {
-    const [et, ds, us] = await Promise.all([etapas(), deals(), usuarios()]);
+    const [et, ds, us, en] = await Promise.all([etapas(), deals(), usuarios(), enums()]);
     const [emp, con] = await Promise.all([nomes(ds, 'companyId', '/companies', 'id,title', c => c.title), nomes(ds, 'contactId', '/contacts', 'id,name,lastName', c => [c.name, c.lastName].filter(Boolean).join(' ') || null)]), h = hoje();
     const registros = store.all();
-    const lista = M.clientes({ deals: ds, etapa: et, registros, empresas: emp, contatos: con, usuarios: us, mes, hoje: h, campo: CAMPO_RENOV });
+    const lista = M.clientes({ deals: ds, etapa: et, registros, empresas: emp, contatos: con, usuarios: us, mes, hoje: h, campo: CAMPO_RENOV, campos: CAMPOS, enums: en });
     const ativos = lista.filter(c => c.tipoEtapa === 'mes');
     const ids = new Set(ativos.map(c => c.id));
     return {

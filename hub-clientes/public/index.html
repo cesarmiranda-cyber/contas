@@ -113,6 +113,10 @@ main{flex:1;min-width:0;padding:22px 28px 56px;max-width:1500px}
 .col .gl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin:0 4px 6px}.col.pri .gl{color:var(--sem_contato)}.col.acp .gl{color:var(--contato)}
 .card.prio{border-left:4px solid var(--sem_contato)}
 
+.pill.sm{box-shadow:none;background:var(--panel2);padding:2px}.pill.sm button{padding:4px 10px;font-size:12px}.pill.sm button b{opacity:.8}
+.box h3{flex-wrap:wrap;gap:8px}.box .tw{box-shadow:none;max-height:420px;overflow:auto}.box table{min-width:520px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}.kpi .l{line-height:1.35}
+.vc{gap:6px}.vc .col1{min-width:0}.vc small{font-size:10.5px;white-space:nowrap}.alerts{max-height:340px;overflow:auto;margin:0 -6px;padding:0 6px}
 /* toolbar */
 .tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
 .sb{position:relative;flex:1;min-width:230px;max-width:380px}.sb svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut)}
@@ -304,35 +308,66 @@ function histV() {
     const st = r.reuniaoRealizada ? 'reuniao' : r.contatoFeito ? 'contato' : 'sem_contato', c = nome[r.dealId];
     return `<tr class="c" data-open="${r.dealId}" data-mes="${r.mes}"><td>${fdata(r.data) || '—'}</td><td><div class="who">${av(c.nome, 'sm')}<b>${esc(c.nome)}</b></div></td><td>${esc(mesCurto(r.mes))}</td><td>${badge(st)}</td><td>${esc(CANAL[r.canal] || '—')}</td><td>${esc((r.resumo || r.motivo || '').slice(0, 80))}</td><td>${esc(r.criadoPor || '')}</td></tr>`; }).join('') + '</tbody></table></div>';
 }
+const R$ = v => (v || 0).toLocaleString('pt-BR', { style:'currency', currency:'BRL', maximumFractionDigits:0 });
+let vJan = 90, vSem = 'nunca';
+const miniBars = (arr, key, label, fmt = v => v) => { const mx = Math.max(1, ...arr.map(x => x[key])); return `<div class="vc">${arr.map(x => `<div class="col1" title="${esc(label(x))}"><span class="pc">${x[key] ? fmt(x[key]) : ''}</span><div class="stk" style="height:${Math.max(x[key] ? 4 : 0, x[key] / mx * 112)}px"><i style="height:100%;background:linear-gradient(180deg,var(--brand),var(--brand2))"></i></div><small>${esc(label(x))}</small></div>`).join('')}</div>`; };
 function dash() {
-  const D = S.dashboard, g = D.geral, A = D.resumoAlertas;
-  const kp = (i, n, l, cls = '') => `<div class="kpi ${cls ? 's-' + cls : ''}"><div class="ki">${ic(i)}</div><div><div class="n">${n}</div><div class="l">${l}</div></div></div>`;
-  const mx = Math.max(1, ...D.serie.map(m => m.total));
-  const serie = `<div class="vc">${D.serie.map(m => `<div class="col1" title="${ORDER.map(k => ST[k][0] + ': ' + m[k]).join(' · ')}"><span class="pc">${m.total ? pct((m.reuniao + m.contato) / m.total) : '–'}</span><div class="stk" style="height:${m.total / mx * 112}px">${ORDER.map(k => m[k] ? `<i class="s-${k}" style="height:${m[k] / m.total * 100}%"></i>` : '').join('')}</div><small>${esc(mesCurto(m.mes))}</small></div>`).join('')}</div>`;
+  const D = S.dashboard, g = D.geral, A = D.resumoAlertas, C = D.carteira, nm = Object.fromEntries(S.clientes.map(c => [c.id, c]));
+  const tile = (i, n, l, sub = '', cls = '') => `<div class="kpi ${cls ? 's-' + cls : ''}"><div class="ki">${ic(i)}</div><div><div class="n">${n}</div><div class="l">${l}${sub ? `<br><b style="color:var(--ink)">${sub}</b>` : ''}</div></div></div>`;
+  const gc = (cls, t, sub, v) => `<div class="gc ${cls}"><div>${ring(v.total ? (v.reuniao + v.contato) / v.total : 0, 78, 9, cls === 'p' ? 'var(--sem_contato)' : 'var(--contato)')}</div><div><h3>${t}</h3><small>${sub}</small><div class="nums"><span class="big">${v.total}</span><span class="chip">${v.reuniao + v.contato} com visita no mês</span><span class="chip warn">${v.pendente + v.atrasado} sem registro</span></div></div></div>`;
+  const row = c => `<tr class="c" data-open="${c.id}"><td><div class="who">${av(c.nome, 'sm')}<div><b>${esc(c.nome)}</b> ${c.prioridade ? '<span class="tag p">Prioridade</span>' : ''}<small>${esc(c.etapa)}${c.responsavel ? ' · ' + esc(c.responsavel) : ''}</small></div></div></td>`;
+  // próximas renovações
+  const prox = C.proximos.filter(c => c.dias <= vJan);
+  const proxRows = prox.map(c => `${row(c)}<td>${c.dias < 0 ? `<span class="chip warn">vencida há ${-c.dias}d</span>` : `<b>${fdata(c.data)}</b><br><small style="color:var(--mut)">em ${c.dias} dia(s)</small>`}</td><td>${esc(c.plano || '—')}</td><td>${c.valor ? R$(c.valor) : '—'}</td><td>${badge(c.status)}</td></tr>`).join('');
+  const jan = k => `<button class="${vJan === k ? 'on' : ''}" data-jan="${k}">${k} dias <b>${C.vencer['d' + k].qtd}</b></button>`;
+  // sem visita
+  const sv = C.semVisita, lista = sv[vSem === 'nunca' ? 'nunca' : vSem === 'longo' ? 'semContato45' : 'pendentes'];
+  const svRows = lista.slice(0, 30).map(c => `${row(c)}<td>${c.mesCiclo !== null ? 'Mês ' + c.mesCiclo : '—'}</td><td>${vSem === 'longo' ? c.semContato + ' dias' : c.dias !== null ? fdata(c.data) : '—'}</td></tr>`).join('');
+  const tb = (k, t, n) => `<button class="${vSem === k ? 'on' : ''}" data-sem="${k}">${t} <b>${n}</b></button>`;
+  const tot = Math.max(1, C.ativos);
+  const planos = C.porPlano.map(p => `<div class="row" style="grid-template-columns:120px 1fr 96px"><span title="${esc(p.nome)}">${esc(p.nome)}</span><div class="bar"><i style="width:${p.qtd / tot * 100}%;background:var(--brand)"></i></div><span>${p.qtd} · ${pct(p.qtd / tot)}</span></div>`).join('');
+  const contr = C.porContratacao.map(p => `<span class="chip brand">${esc(p.nome)}: <b>${p.qtd}</b></span>`).join(' ');
+  const mxT = Math.max(1, ...C.tempo.faixas.map(f => f.qtd));
+  const serie = (() => { const mx = Math.max(1, ...D.serie.map(m => m.total)); return `<div class="vc">${D.serie.map(m => `<div class="col1" title="${ORDER.map(k => ST[k][0] + ': ' + m[k]).join(' · ')}"><span class="pc">${m.total ? pct((m.reuniao + m.contato) / m.total) : '–'}</span><div class="stk" style="height:${m.total / mx * 112}px">${ORDER.map(k => m[k] ? `<i class="s-${k}" style="height:${m[k] / m.total * 100}%"></i>` : '').join('')}</div><small>${esc(mesCurto(m.mes))}</small></div>`).join('')}</div>`; })();
   const etapas = D.porEtapa.map(e => `<div class="row"><span>${esc(e.etapa)}</span>${stack(e)}<span>${e.total}</span></div>`).join('');
   const resp = D.porResponsavel.map(e => `<div class="row"><span title="${esc(e.nome)}">${esc(e.nome)}</span>${stack(e)}<span>${e.reuniao + e.contato}/${e.total}</span></div>`).join('');
   const tipos = { atrasado:['Atraso','warn'], sem_contato:['Sem contato','warn'], saude:['Saúde','warn'], renovacao:['Renovação','warn'], mover:['Mover','brand'] };
-  const nm = Object.fromEntries(S.clientes.map(c => [c.id, c]));
-  const al = D.alertas.slice(0, 40).map(a => `<div class="alert" data-open="${a.dealId}">${av(a.nome, 'sm')}<span class="t">${esc(a.nome)} ${nm[a.dealId]?.prioridade ? '<span class="tag p">Prioridade</span>' : ''}<small>${esc(a.etapa)} · ${esc(a.detalhe)}</small></span><span class="chip ${tipos[a.tipo][1]}">${tipos[a.tipo][0]}</span></div>`).join('');
-  const gc = (cls, t, sub, v) => `<div class="gc ${cls}"><div>${ring(v.total ? (v.reuniao + v.contato) / v.total : 0, 78, 9, cls === 'p' ? 'var(--sem_contato)' : 'var(--contato)')}</div><div><h3>${t}</h3><small>${sub}</small><div class="nums"><span class="big">${v.total}</span><span class="chip">${v.reuniao + v.contato} com contato</span><span class="chip warn">${v.pendente + v.atrasado} sem registro</span>${v.atrasado ? `<span class="chip" style="background:var(--sem_contato-bg);color:var(--sem_contato)">${v.atrasado} em atraso</span>` : ''}</div></div></div>`;
-  return `<div class="gcards">${gc('p', 'Prioridade', 'Últimos 3 meses de contrato (Mês 10 a 12): renovação próxima', D.grupos.prioridade)}${gc('a', 'Acompanhamento', 'Demais clientes (Mês 0 a 9)', D.grupos.acompanhamento)}</div>
-  <div class="kpis">
-    <div class="kpi big"><div class="ringw">${ring(D.cobertura, 84, 10, 'var(--reuniao)')}</div><div><div class="n">${pct(D.cobertura)}</div><div class="l">com contato no mês<br>${g.reuniao + g.contato} de ${g.total} clientes · ${pct(D.reuniaoPct)} com reunião</div></div></div>
-    ${kp('users', g.total, 'clientes ativos no funil')}
-    ${kp('clock', g.pendente + g.atrasado, `sem registro no mês<br>${g.atrasado} em atraso`, 'atrasado')}
-    ${kp('ban', g.sem_contato, 'registrados sem contato', 'sem_contato')}
-    ${kp('sync', A.mover, 'para mover de etapa')}
+  const al = D.alertas.slice(0, 30).map(a => `<div class="alert" data-open="${a.dealId}">${av(a.nome, 'sm')}<span class="t">${esc(a.nome)} ${nm[a.dealId]?.prioridade ? '<span class="tag p">Prioridade</span>' : ''}<small>${esc(a.etapa)} · ${esc(a.detalhe)}</small></span><span class="chip ${tipos[a.tipo][1]}">${tipos[a.tipo][0]}</span></div>`).join('');
+  const Q = C.qualidade, I = C.intencao, ret = C.ativos + D.encerrados.cancelados;
+  const qrow = (t, n, cls = 'warn') => `<div class="row" style="grid-template-columns:1fr 54px"><span>${t}</span><span class="chip ${n ? cls : ''}" style="justify-self:end">${n}</span></div>`;
+  return `<div class="kpis">
+    ${tile('users', C.ativos, 'clientes ativos', `${D.grupos.prioridade.total} prioridade · ${D.grupos.acompanhamento.total} acompanhamento`)}
+    ${tile('chart', R$(C.valor), 'valor da carteira', C.ticket ? 'ticket médio ' + R$(C.ticket) : '')}
+    ${tile('clock', C.vencer.d30.qtd, 'vencem em 30 dias', R$(C.vencer.d30.valor), 'atrasado')}
+    ${tile('clock', C.vencer.d90.qtd, 'vencem em 90 dias', R$(C.vencer.d90.valor))}
+    ${tile('ban', sv.nNunca, 'sem nenhuma visita registrada', `${g.pendente + g.atrasado} sem registro no mês`, 'sem_contato')}
+    ${tile('alert', Q.vencidas.length + Q.semData.length, 'renovação vencida ou sem data', `${Q.vencidas.length} vencidas · ${Q.semData.length} sem data`, 'atrasado')}
+    ${tile('hist', C.tempo.media.toFixed(1).replace('.', ',') + ' m', 'tempo médio de contrato', ret ? `${D.encerrados.cancelados} cancelados · ${pct(C.ativos / ret)} de retenção` : '')}
+  </div>
+  <div class="gcards">${gc('p', 'Prioridade', 'Últimos 3 meses de contrato (Mês 10 a 12)', D.grupos.prioridade)}${gc('a', 'Acompanhamento', 'Demais clientes (Mês 0 a 9)', D.grupos.acompanhamento)}</div>
+  <div class="grid g2">
+    <div class="box"><h3>Próximas renovações <span class="pill sm" id="jan">${jan(30)}${jan(60)}${jan(90)}</span></h3>
+      ${prox.length ? `<div class="tw"><table><thead><tr><th>Cliente</th><th>Renovação</th><th>Licença</th><th>Valor</th><th>Visita no mês</th></tr></thead><tbody>${proxRows}</tbody></table></div>` : `<div class="empty">Nenhuma renovação nos próximos ${vJan} dias.</div>`}</div>
+    <div class="box"><h3>Renovações nos próximos 12 meses <small>quantidade</small></h3>${miniBars(C.porMesRenov, 'qtd', m => mesCurto(m.mes))}<div class="leg">Passe o mouse para ver o valor de cada mês. Total: ${C.porMesRenov.reduce((s, m) => s + m.qtd, 0)} renovações · ${R$(C.porMesRenov.reduce((s, m) => s + m.valor, 0))}</div></div>
   </div>
   <div class="grid g2">
-    <div class="box"><h3>Contato por mês <small>% com contato · últimos 6 meses</small></h3>${serie}${legend()}</div>
-    <div class="box"><h3>Saúde dos clientes</h3>
-      ${['verde','amarelo','vermelho','sem'].map(k => `<div class="row"><span>${k === 'sem' ? 'Sem avaliação' : SAUDE[k]}</span><div class="bar"><i style="width:${g.total ? D.saude[k] / g.total * 100 : 0}%;background:${k === 'sem' ? 'var(--pendente)' : 'var(--' + k + ')'}"></i></div><span>${D.saude[k]}</span></div>`).join('')}
-      <div class="leg">Encerrados: ${D.encerrados.assinados} assinados · ${D.encerrados.cancelados} cancelados</div></div>
+    <div class="box"><h3>Clientes sem visita <span class="pill sm" id="sem">${tb('nunca', 'Nunca visitados', sv.nNunca)}${tb('longo', 'Sem contato +45d', sv.semContato45.length)}${tb('pend', 'Pendentes do mês', sv.pendentes.length)}</span></h3>
+      ${lista.length ? `<div class="tw"><table><thead><tr><th>Cliente</th><th>Etapa</th><th>${vSem === 'longo' ? 'Sem contato' : 'Renovação'}</th></tr></thead><tbody>${svRows}</tbody></table></div>${lista.length > 30 ? `<div class="hint">Mostrando 30 de ${lista.length}. A prioridade vem primeiro.</div>` : ''}` : `<div class="empty">${ic('check')}<br>Nenhum cliente nesta situação.</div>`}</div>
+    <div class="box"><h3>Tipo de licença <small>${C.ativos} clientes</small></h3>${planos}<div class="leg" style="margin-top:12px">Contratação: ${contr}</div></div>
+  </div>
+  <div class="grid g3">
+    <div class="box"><h3>Tempo de contrato <small>meses desde o início</small></h3>${miniBars(C.tempo.faixas, 'qtd', f => f.faixa)}</div>
+    <div class="box"><h3>Visitas por mês <small>% com contato</small></h3>${serie}${legend()}</div>
+    <div class="box"><h3>Intenção de renovar <small>último registro</small></h3>
+      ${[['provavel', 'Provável', 'var(--reuniao)'], ['indefinido', 'Indefinida', 'var(--atrasado)'], ['improvavel', 'Improvável', 'var(--sem_contato)'], ['sem', 'Sem avaliação', 'var(--pendente)']].map(([k, t, c]) => `<div class="row"><span>${t}</span><div class="bar"><i style="width:${I[k] / tot * 100}%;background:${c}"></i></div><span>${I[k]}</span></div>`).join('')}
+      <div class="sec" style="margin:16px 0 4px">Saúde</div>
+      ${['verde', 'amarelo', 'vermelho'].map(k => `<div class="row"><span>${SAUDE[k]}</span><div class="bar"><i style="width:${D.saude[k] / tot * 100}%;background:var(--${k})"></i></div><span>${D.saude[k]}</span></div>`).join('')}</div>
   </div>
   <div class="grid g3">
     <div class="box"><h3>Por etapa do ciclo <small>${esc(mesNome(mes))}</small></h3>${etapas}${legend()}</div>
-    <div class="box"><h3>Por responsável</h3>${resp || '<div class="empty">Sem dados</div>'}</div>
-    <div class="box"><h3>Atenção <small>${D.alertas.length} alerta(s)</small></h3>${al || `<div class="empty">${ic('check')}<br>Nenhum alerta</div>`}</div>
+    <div class="box"><h3>Por responsável <small>visitas no mês</small></h3>${resp || '<div class="empty">Sem dados</div>'}</div>
+    <div class="box"><h3>Atenção <small>${D.alertas.length} alerta(s)</small></h3><div class="alerts">${al || `<div class="empty">${ic('check')}<br>Nenhum alerta</div>`}</div>
+      <div class="sec" style="margin:16px 0 0">Qualidade dos dados</div>${qrow('Sem data de renovação', Q.semData.length)}${qrow('Renovação vencida', Q.vencidas.length)}${qrow('Sem plano (licença)', Q.semPlano)}${qrow('Sem responsável', Q.semResponsavel)}</div>
   </div>`;
 }
 function tools() {
@@ -363,6 +398,8 @@ function lista() {
 }
 function bind() {
   document.querySelectorAll('[data-open]').forEach(e => e.onclick = async () => { if (e.dataset.mes && e.dataset.mes !== mes) { mes = e.dataset.mes; openId = +e.dataset.open; await load(); } else drawer(+e.dataset.open); });
+  document.querySelectorAll('[data-jan]').forEach(b => b.onclick = () => { vJan = +b.dataset.jan; render(); });
+  document.querySelectorAll('[data-sem]').forEach(b => b.onclick = () => { vSem = b.dataset.sem; render(); });
   const refil = () => { if (tab === 'reg') { $('#rl').innerHTML = rlItems(); document.querySelectorAll('#rl [data-open]').forEach(e => e.onclick = () => drawer(+e.dataset.open)); } else render(); };
   const q = $('#q'); if (q) { q.oninput = () => { filtro.q = q.value; if (tab === 'reg') refil(); else { const p = q.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(p, p); } }; $('#fg').onchange = e => { filtro.grupo = e.target.value; refil(); }; $('#fs').onchange = e => { filtro.status = e.target.value; refil(); }; $('#fr').onchange = e => { filtro.resp = e.target.value; refil(); }; }
 }

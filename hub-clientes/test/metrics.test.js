@@ -69,3 +69,17 @@ test('mesEsperado e plano: etapa pela próxima renovação (meses de calendário
   const l = M.clientes({ deals: [deal(1, 'S5', { r: '2027-03-17' })], etapa: et, registros: [], mes: '2026-11', hoje, campo });
   assert.deepEqual(l[0].mover, { tipo: 'sincronizar', vencida: true, destinoMes: 8 });
 });
+
+test('carteira: renovações, licença, tempo de contrato e sem visita', () => {
+  const campos = { plano: 'pl' }, enums = { plano: { 1: 'Basic', 2: 'Professional' } }, campo = 'r';
+  const ds = [deal(1, 'S10', { r: '2026-12-10', pl: 2, amount: 1000, begindate: '2025-12-10T00:00:00Z' }), deal(2, 'S3', { r: '2027-05-01', pl: 1, amount: 500, begindate: '2026-05-01T00:00:00Z' }), deal(3, 'S11', { r: '2026-09-01', amount: 0 })];
+  const regs = [reg(2, '2026-10', { contatoFeito: true, data: '2026-10-01' })];
+  const l = M.clientes({ deals: ds, etapa: et, registros: regs, mes: '2026-11', hoje, campo, campos, enums });
+  assert.equal(l[0].plano, 'Professional'); assert.equal(l[0].mesesContrato, 11); assert.equal(l[0].diasParaRenovar, 26); assert.equal(l[2].plano, null);
+  const C = M.dashboard({ lista: l, etapa: et, registros: regs, mes: '2026-11', hoje }).carteira;
+  assert.equal(C.ativos, 3); assert.equal(C.valor, 1500); assert.equal(C.vencer.d30.qtd, 1); assert.equal(C.vencer.d90.qtd, 1);
+  assert.deepEqual(C.proximos.map(c => c.id), [3, 1]);   // vencida primeiro
+  assert.deepEqual(C.porPlano.map(p => [p.nome, p.qtd]).sort(), [['Basic', 1], ['Professional', 1], ['Sem plano', 1]]);
+  assert.deepEqual(C.semVisita.nunca.map(c => c.id).sort(), [1, 3]); assert.equal(C.semVisita.nNunca, 2);
+  assert.equal(C.qualidade.vencidas.length, 1); assert.equal(C.porMesRenov.length, 12); assert.equal(C.porMesRenov[1].qtd, 1);
+});

@@ -9,6 +9,7 @@ const STATUS = ['reuniao', 'contato', 'sem_contato', 'pendente', 'atrasado'];
 
 const addMes = (m, n) => { const [y, mo] = m.split('-').map(Number), t = y * 12 + mo - 1 + n; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; };
 const diasEntre = (a, b) => Math.floor((Date.parse(b.slice(0, 10) + 'T00:00:00Z') - Date.parse(a.slice(0, 10) + 'T00:00:00Z')) / 864e5);
+const mesesEntre = (a, b) => Math.max(0, (+b.slice(0, 4) * 12 + +b.slice(5, 7)) - (+a.slice(0, 4) * 12 + +a.slice(5, 7)) - (+b.slice(8, 10) < +a.slice(8, 10) ? 1 : 0));
 const todayBR = (d = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d);
 
 // Etapas do funil a partir de /statuses (DEAL_STAGE): "Mês N" = ciclo, semântica S = assinado, F = cancelados.
@@ -60,7 +61,7 @@ function plano({ deals, etapa, hoje, campo }) {
 }
 
 // Monta a visão de cada cliente do funil. deals: [{id,title,stageId,companyId,assignedById,begindate,movedTime,...}]
-function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuarios = {}, mes, hoje, campo }) {
+function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuarios = {}, mes, hoje, campo, campos = {}, enums = {} }) {
   const porDeal = new Map();
   for (const r of registros) { if (!porDeal.has(r.dealId)) porDeal.set(r.dealId, new Map()); porDeal.get(r.dealId).set(r.mes, r); }
   const out = [];
@@ -78,6 +79,9 @@ function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuar
     let seq = 0;
     for (let i = (reg ? 0 : 1); i < 24; i++) { const r = regs.get(addMes(mes, -i)); if (r && (r.reuniaoRealizada || r.contatoFeito)) seq++; else break; }
     const diasNaEtapa = d.movedTime ? Math.max(0, diasEntre(d.movedTime, hoje)) : null;
+    const rot = (k, v) => (v === null || v === undefined || v === '') ? null : (enums[k]?.[v] || String(v));
+    const plano = rot('plano', campos.plano && d[campos.plano]) || rot('planoB24', campos.planoB24 && d[campos.planoB24]);
+    const contratacao = rot('contratacao', campos.contratacao && d[campos.contratacao]);
     const renov = campo && d[campo] ? String(d[campo]).slice(0, 10) : null, esp = mesEsperado(renov, hoje);
     let mover = null;
     if (e.tipo === 'mes') {
@@ -93,7 +97,7 @@ function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuar
       id: d.id, nome: empresas[d.companyId] || contatos[d.contactId] || d.title, dominio: String(d.title).includes('.') ? d.title : '', empresaId: d.companyId || null,
       responsavelId: d.assignedById, responsavel: usuarios[d.assignedById] || null,
       prioridade: e.tipo === 'mes' && e.mes >= MES_PRIORIDADE, etapaId: e.id, etapa: e.nome, mesCiclo: e.mes, tipoEtapa: e.tipo, inicio, valor: d.amount || 0, moeda: d.currency || 'BRL',
-      diasNaEtapa, mover, proxRenovacao: renov, mesEsperado: esp ? esp.mes : null, status: situacao(reg, mes, hoje, inicio), registro: reg,
+      diasNaEtapa, mover, plano, contratacao, mesesContrato: inicio ? mesesEntre(inicio, hoje) : null, diasParaRenovar: renov ? diasEntre(hoje, renov) : null, nuncaVisitado: !comContato, proxRenovacao: renov, mesEsperado: esp ? esp.mes : null, status: situacao(reg, mes, hoje, inicio), registro: reg,
       saude: ultimo?.saude || null, renovacao: ultimo?.renovacao || null,
       ultimoContato: refDias, diasSemContato: refDias ? Math.max(0, diasEntre(refDias, hoje)) : null, temContato: !!comContato,
       sequencia: seq, historico,
@@ -136,8 +140,31 @@ function dashboard({ lista, etapa, registros, mes, hoje }) {
   }
   alertas.sort((a, b) => (nivel[b.dealId] || 0) - (nivel[a.dealId] || 0));
   const cont = t => alertas.filter(a => a.tipo === t).length;
+  const soma = a => a.reduce((s, c) => s + (c.valor || 0), 0), res = a => ({ qtd: a.length, valor: soma(a) });
+  const janela = n => ativos.filter(c => c.diasParaRenovar !== null && c.diasParaRenovar >= 0 && c.diasParaRenovar <= n);
+  const ficha = c => ({ id: c.id, nome: c.nome, etapa: c.etapa, mesCiclo: c.mesCiclo, prioridade: c.prioridade, responsavel: c.responsavel, status: c.status, plano: c.plano, valor: c.valor, dias: c.diasParaRenovar, data: c.proxRenovacao, semContato: c.diasSemContato });
+  const porChave = (fn) => { const m = new Map(); for (const c of ativos) { const k = fn(c); const o = m.get(k) || { nome: k, qtd: 0, valor: 0 }; o.qtd++; o.valor += c.valor || 0; m.set(k, o); } return [...m.values()].sort((a, b) => b.qtd - a.qtd); };
+  const meses = []; for (let i = 0; i < 12; i++) { const m = addMes(hoje.slice(0, 7), i); const l = ativos.filter(c => c.proxRenovacao && c.proxRenovacao.slice(0, 7) === m); meses.push({ mes: m, ...res(l) }); }
+  const faixas = [['0 a 3', 0, 3], ['4 a 6', 4, 6], ['7 a 9', 7, 9], ['10 a 12', 10, 12], ['13 a 24', 13, 24], ['25+', 25, 1e9]].map(([f, a, b]) => ({ faixa: f, qtd: ativos.filter(c => c.mesesContrato !== null && c.mesesContrato >= a && c.mesesContrato <= b).length }));
+  const medidos = ativos.filter(c => c.mesesContrato !== null);
+  const urg = (a, b) => (b.prioridade - a.prioridade) || (b.mesCiclo - a.mesCiclo);
+  const carteira = {
+    ativos: ativos.length, valor: soma(ativos), ticket: ativos.length ? soma(ativos) / ativos.filter(c => c.valor).length || 0 : 0,
+    vencer: { d30: res(janela(30)), d60: res(janela(60)), d90: res(janela(90)) },
+    proximos: ativos.filter(c => c.diasParaRenovar !== null && c.diasParaRenovar <= 90).sort((a, b) => a.diasParaRenovar - b.diasParaRenovar).slice(0, 80).map(ficha),
+    porMesRenov: meses, porPlano: porChave(c => c.plano || 'Sem plano'), porContratacao: porChave(c => c.contratacao || 'Não informado'),
+    tempo: { faixas, media: medidos.length ? medidos.reduce((s, c) => s + c.mesesContrato, 0) / medidos.length : 0 },
+    semVisita: {
+      nunca: ativos.filter(c => c.nuncaVisitado).sort(urg).slice(0, 80).map(ficha),
+      semContato45: ativos.filter(c => !c.nuncaVisitado && c.diasSemContato > DIAS_SEM_CONTATO).sort(urg).slice(0, 80).map(ficha),
+      pendentes: ativos.filter(c => c.status === 'pendente' || c.status === 'atrasado').sort(urg).slice(0, 80).map(ficha),
+      nNunca: ativos.filter(c => c.nuncaVisitado).length,
+    },
+    qualidade: { semData: ativos.filter(c => !c.proxRenovacao).map(ficha), vencidas: ativos.filter(c => c.mover?.motivo === 'renovacao_vencida').map(ficha), semPlano: ativos.filter(c => !c.plano).length, semResponsavel: ativos.filter(c => !c.responsavel).length },
+    intencao: { provavel: ativos.filter(c => c.renovacao === 'provavel').length, indefinido: ativos.filter(c => c.renovacao === 'indefinido').length, improvavel: ativos.filter(c => c.renovacao === 'improvavel').length, sem: ativos.filter(c => !c.renovacao).length },
+  };
   return {
-    mes, geral, grupos, cobertura: geral.total ? feito / geral.total : 0, reuniaoPct: geral.total ? geral.reuniao / geral.total : 0,
+    mes, geral, grupos, carteira, cobertura: geral.total ? feito / geral.total : 0, reuniaoPct: geral.total ? geral.reuniao / geral.total : 0,
     porEtapa, porResponsavel, serie, saude, alertas, resumoAlertas: { saude: cont('saude'), renovacao: cont('renovacao'), sem_contato: cont('sem_contato'), atrasado: cont('atrasado'), mover: cont('mover') },
     encerrados: { assinados: lista.filter(c => c.tipoEtapa === 'ganho').length, cancelados: lista.filter(c => c.tipoEtapa === 'perdido').length },
   };
