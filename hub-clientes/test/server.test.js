@@ -13,9 +13,9 @@ function fakeVibe() {
   const statuses = [...Array.from({ length: 13 }, (_, i) => ({ statusId: 'S' + i, name: 'Mês ' + i, sort: i })), { statusId: 'WON', name: 'Assinado', semantics: 'S' }, { statusId: 'LOSE', name: 'CANCELADOS', semantics: 'F' }];
   const deals = [{ id: 10, title: 'a.bitrix24.com.br', stageId: 'S3', companyId: 5, assignedById: 1, begindate: '2026-01-01T00:00:00Z', movedTime: '2026-11-01T00:00:00Z' }, { id: 11, title: 'b', stageId: 'S12', companyId: 0, assignedById: 1, begindate: '2025-11-01T00:00:00Z', movedTime: '2026-10-01T00:00:00Z' }];
   return { calls, deals, enabled: true,
-    async get(p) { calls.push(['GET', p]); return p === '/statuses' ? statuses : p === '/deals' ? deals : p === '/users' ? [{ id: 1, name: 'Ana', lastName: 'Lima' }] : [{ id: 5, title: 'Empresa A' }]; },
+    async get(p) { calls.push(['GET', p]); if (p === '/deals/fields') return { fields: { ufCrm_1762467264536: { items: [{ ID: '1176', VALUE: 'Basic' }] }, ufCrm_1771422009478: { items: [{ ID: '1428', VALUE: 'Mensal' }] } } }; return p === '/statuses' ? statuses : p === '/deals' ? deals : p === '/users' ? [{ id: 1, name: 'Ana', lastName: 'Lima' }] : [{ id: 5, title: 'Empresa A' }]; },
     async post(p, b) { calls.push(['POST', p, b]); return { id: 1 }; },
-    async patch(p, b) { calls.push(['PATCH', p, b]); return {}; } };
+    async patch(p, b) { calls.push(['PATCH', p, b]); const d = deals.find(x => '/deals/' + x.id === p); if (d) Object.assign(d, b); return {}; } };
 }
 async function boot() {
   const vibe = fakeVibe(), store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'hub-')));
@@ -78,5 +78,21 @@ test('sincronizar: move o card pela Próxima Renovação e comenta; renovação 
   assert.deepEqual(pl.mover.map(m => [m.id, m.para]), [[12, 'Mês 8']]); assert.ok(pl.ignorados.some(i => i.id === 13 && i.motivo === 'vencida'));
   const r = (await req('POST', '/api/sincronizar', {})).json; assert.equal(r.movidos.length, 1);
   assert.deepEqual(vibe.calls.find(x => x[0] === 'PATCH').slice(1), ['/deals/12', { stageId: 'S8' }]);
+  srv.close();
+});
+
+test('dados: atualiza renovação/plano/valor no card, comenta e reposiciona a etapa', async () => {
+  const { srv, req, vibe } = await boot();
+  const r = await req('POST', '/api/clientes/10/dados', { renovacao: '2027-03-17', plano: '1176', valor: 1234.5 });
+  assert.equal(r.status, 200); assert.equal(r.json.movido.para, 'Mês 8');
+  const patches = vibe.calls.filter(x => x[0] === 'PATCH');
+  assert.deepEqual(patches[0][2], { ufCrm_1771112861536: '2027-03-17', ufCrm_1762467264536: '1176', amount: 1234.5, isManualOpportunity: true });
+  assert.deepEqual(patches[1].slice(1), ['/deals/10', { stageId: 'S8' }]);
+  assert.match(vibe.calls.find(x => x[0] === 'POST')[2].comment, /Dados do contrato atualizados/);
+  assert.equal((await req('POST', '/api/clientes/10/dados', { renovacao: 'xx' })).status, 400);
+  assert.equal((await req('POST', '/api/clientes/10/dados', { plano: '9999' })).status, 400);
+  assert.equal((await req('POST', '/api/clientes/10/dados', { responsavelId: 777 })).status, 400);
+  assert.equal((await req('POST', '/api/clientes/999/dados', { valor: 1 })).status, 404);
+  assert.equal((await req('POST', '/api/clientes/10/dados', {})).status, 400);
   srv.close();
 });

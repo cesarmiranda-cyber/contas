@@ -117,6 +117,22 @@ main{flex:1;min-width:0;padding:22px 28px 56px;max-width:1500px}
 .box h3{flex-wrap:wrap;gap:8px}.box .tw{box-shadow:none;max-height:420px;overflow:auto}.box table{min-width:520px}
 .kpis{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}.kpi .l{line-height:1.35}
 .vc{gap:6px}.vc .col1{min-width:0}.vc small{font-size:10.5px;white-space:nowrap}.alerts{max-height:340px;overflow:auto;margin:0 -6px;padding:0 6px}
+/* drill */
+.clk{cursor:pointer;transition:.12s}.kpi.clk:hover,.gc.clk:hover{transform:translateY(-2px);box-shadow:var(--sh2);border-color:var(--brand)}
+.row.clk:hover{background:var(--panel2);border-radius:8px}.row span.clk:hover{color:var(--brand);text-decoration:underline}.bar i.clk:hover{filter:brightness(1.15)}
+.vc .col1.clk:hover .stk{filter:brightness(1.12)}.vc .col1.clk:hover small{color:var(--brand)}.stk i.clk:hover{filter:brightness(1.15)}
+.more{margin-top:12px;text-align:right}
+.modal{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(10,12,30,.5);backdrop-filter:blur(3px)}.modal.on{display:flex;animation:fade .2s}
+.mc{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:var(--sh3);width:min(1180px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+.mh{display:flex;gap:16px;justify-content:space-between;padding:20px 24px 14px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,var(--brand-soft),var(--panel))}.mh h2{margin:0;font-size:20px;letter-spacing:-.01em}.mh p{margin:2px 0 6px;color:var(--mut)}
+.src{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px}.src svg{width:14px;height:14px}.src a{color:var(--brand);font-weight:600}
+.x2{border:0;background:var(--panel);width:36px;height:36px;border-radius:11px;display:grid;place-items:center;box-shadow:var(--sh1);flex-shrink:0}
+.mb{overflow:auto;flex:1}.mf{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 24px;border-top:1px solid var(--line);background:var(--panel2)}
+table.dl{min-width:980px}.dl td{padding:8px 12px}.dl .lk{cursor:pointer;display:block}.dl .lk:hover b{color:var(--brand)}.dl small{color:var(--mut)}.warnt{color:var(--atrasado);font-weight:600}
+.ed{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;max-width:150px}.ed.num{width:96px}.ed:focus{border-color:var(--brand);outline:0;box-shadow:0 0 0 3px var(--brand-soft)}.ed.bad{border-color:var(--atrasado);background:var(--atrasado-bg)}.ed:disabled{opacity:.5}
+.acts{white-space:nowrap}.acts a{text-decoration:none}
+details.dc{margin:14px 0;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:4px 14px}details.dc summary{cursor:pointer;font-weight:700;padding:10px 0;list-style:none;display:flex;gap:8px;align-items:center}details.dc summary::-webkit-details-marker{display:none}details.dc[open] summary{border-bottom:1px solid var(--line);margin-bottom:6px}
+@media(max-width:820px){.modal{padding:0}.mc{border-radius:0;height:100%}.mh,.mf{padding-left:14px;padding-right:14px}}
 /* toolbar */
 .tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
 .sb{position:relative;flex:1;min-width:230px;max-width:380px}.sb svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--mut)}
@@ -213,6 +229,7 @@ label{display:block;font-size:12.5px;color:var(--mut);margin:12px 0 5px;font-wei
 </div>
 <div class="scrim" id="sc"></div>
 <aside class="drawer" id="dr" aria-label="Cliente"></aside>
+<div class="modal" id="md" aria-label="Origem dos dados"></div>
 <div class="toast" id="toast" role="status"></div>
 <script>
 const $ = s => document.querySelector(s);
@@ -278,6 +295,7 @@ function render() {
   $('#view').innerHTML = `<div class="fade">${tab === 'dash' ? dash() : tab === 'reg' ? regV() : tab === 'hist' ? histV() : tools() + (tab === 'board' ? board() : lista())}</div>`;
   bind();
   if (openId) drawer(openId, true);
+  if (drill) renderDrill();
 }
 
 function homeV() {
@@ -309,67 +327,138 @@ function histV() {
     return `<tr class="c" data-open="${r.dealId}" data-mes="${r.mes}"><td>${fdata(r.data) || '—'}</td><td><div class="who">${av(c.nome, 'sm')}<b>${esc(c.nome)}</b></div></td><td>${esc(mesCurto(r.mes))}</td><td>${badge(st)}</td><td>${esc(CANAL[r.canal] || '—')}</td><td>${esc((r.resumo || r.motivo || '').slice(0, 80))}</td><td>${esc(r.criadoPor || '')}</td></tr>`; }).join('') + '</tbody></table></div>';
 }
 const R$ = v => (v || 0).toLocaleString('pt-BR', { style:'currency', currency:'BRL', maximumFractionDigits:0 });
-let vJan = 90, vSem = 'nunca';
-const miniBars = (arr, key, label, fmt = v => v) => { const mx = Math.max(1, ...arr.map(x => x[key])); return `<div class="vc">${arr.map(x => `<div class="col1" title="${esc(label(x))}"><span class="pc">${x[key] ? fmt(x[key]) : ''}</span><div class="stk" style="height:${Math.max(x[key] ? 4 : 0, x[key] / mx * 112)}px"><i style="height:100%;background:linear-gradient(180deg,var(--brand),var(--brand2))"></i></div><small>${esc(label(x))}</small></div>`).join('')}</div>`; };
+let vJan = 90, vSem = 'nunca', drill = null;
+const dk = (...p) => `data-drill="${p.map(x => encodeURIComponent(x)).join(':')}"`;
+const miniBars = (arr, key, label, kf, fmt = v => v) => { const mx = Math.max(1, ...arr.map(x => x[key])); return `<div class="vc">${arr.map(x => `<div class="col1 clk" ${kf(x)} title="${esc(label(x))}: ${x[key]} cliente(s)${x.valor ? ' · ' + R$(x.valor) : ''}"><span class="pc">${x[key] ? fmt(x[key]) : ''}</span><div class="stk" style="height:${Math.max(x[key] ? 4 : 0, x[key] / mx * 112)}px"><i style="height:100%;background:linear-gradient(180deg,var(--brand),var(--brand2))"></i></div><small>${esc(label(x))}</small></div>`).join('')}</div>`; };
+const stackK = (v, pre) => !v.total ? '<div class="bar"></div>' : `<div class="bar" title="${ORDER.map(k => ST[k][0] + ': ' + v[k]).join(' · ')}">` + ORDER.map(k => v[k] ? `<i class="s-${k} clk" ${dk(...pre, k)} style="width:${v[k] / v.total * 100}%"></i>` : '').join('') + '</div>';
+
 function dash() {
-  const D = S.dashboard, g = D.geral, A = D.resumoAlertas, C = D.carteira, nm = Object.fromEntries(S.clientes.map(c => [c.id, c]));
-  const tile = (i, n, l, sub = '', cls = '') => `<div class="kpi ${cls ? 's-' + cls : ''}"><div class="ki">${ic(i)}</div><div><div class="n">${n}</div><div class="l">${l}${sub ? `<br><b style="color:var(--ink)">${sub}</b>` : ''}</div></div></div>`;
-  const gc = (cls, t, sub, v) => `<div class="gc ${cls}"><div>${ring(v.total ? (v.reuniao + v.contato) / v.total : 0, 78, 9, cls === 'p' ? 'var(--sem_contato)' : 'var(--contato)')}</div><div><h3>${t}</h3><small>${sub}</small><div class="nums"><span class="big">${v.total}</span><span class="chip">${v.reuniao + v.contato} com visita no mês</span><span class="chip warn">${v.pendente + v.atrasado} sem registro</span></div></div></div>`;
+  const D = S.dashboard, g = D.geral, C = D.carteira, nm = Object.fromEntries(S.clientes.map(c => [c.id, c]));
+  const tile = (key, i, n, l, sub = '', cls = '') => `<div class="kpi clk ${cls ? 's-' + cls : ''}" ${dk(key)} role="button" tabindex="0"><div class="ki">${ic(i)}</div><div><div class="n">${n}</div><div class="l">${l}${sub ? `<br><b style="color:var(--ink)">${sub}</b>` : ''}</div></div></div>`;
+  const gc = (key, cls, t, sub, v) => `<div class="gc clk ${cls}" ${dk(key)} role="button" tabindex="0"><div>${ring(v.total ? (v.reuniao + v.contato) / v.total : 0, 78, 9, cls === 'p' ? 'var(--sem_contato)' : 'var(--contato)')}</div><div><h3>${t}</h3><small>${sub}</small><div class="nums"><span class="big">${v.total}</span><span class="chip">${v.reuniao + v.contato} com visita no mês</span><span class="chip warn">${v.pendente + v.atrasado} sem registro</span></div></div></div>`;
   const row = c => `<tr class="c" data-open="${c.id}"><td><div class="who">${av(c.nome, 'sm')}<div><b>${esc(c.nome)}</b> ${c.prioridade ? '<span class="tag p">Prioridade</span>' : ''}<small>${esc(c.etapa)}${c.responsavel ? ' · ' + esc(c.responsavel) : ''}</small></div></div></td>`;
-  // próximas renovações
   const prox = C.proximos.filter(c => c.dias <= vJan);
   const proxRows = prox.map(c => `${row(c)}<td>${c.dias < 0 ? `<span class="chip warn">vencida há ${-c.dias}d</span>` : `<b>${fdata(c.data)}</b><br><small style="color:var(--mut)">em ${c.dias} dia(s)</small>`}</td><td>${esc(c.plano || '—')}</td><td>${c.valor ? R$(c.valor) : '—'}</td><td>${badge(c.status)}</td></tr>`).join('');
   const jan = k => `<button class="${vJan === k ? 'on' : ''}" data-jan="${k}">${k} dias <b>${C.vencer['d' + k].qtd}</b></button>`;
-  // sem visita
-  const sv = C.semVisita, lista = sv[vSem === 'nunca' ? 'nunca' : vSem === 'longo' ? 'semContato45' : 'pendentes'];
-  const svRows = lista.slice(0, 30).map(c => `${row(c)}<td>${c.mesCiclo !== null ? 'Mês ' + c.mesCiclo : '—'}</td><td>${vSem === 'longo' ? c.semContato + ' dias' : c.dias !== null ? fdata(c.data) : '—'}</td></tr>`).join('');
+  const sv = C.semVisita, kSem = vSem === 'nunca' ? 'nunca' : vSem === 'longo' ? 'sem45' : 'pend', lista = sv[vSem === 'nunca' ? 'nunca' : vSem === 'longo' ? 'semContato45' : 'pendentes'];
+  const svRows = lista.slice(0, 30).map(c => `${row(c)}<td>${c.mesCiclo !== null ? 'Mês ' + c.mesCiclo : '—'}</td><td>${vSem === 'longo' ? c.semContato + ' dias' : c.data ? fdata(c.data) : '—'}</td></tr>`).join('');
   const tb = (k, t, n) => `<button class="${vSem === k ? 'on' : ''}" data-sem="${k}">${t} <b>${n}</b></button>`;
   const tot = Math.max(1, C.ativos);
-  const planos = C.porPlano.map(p => `<div class="row" style="grid-template-columns:120px 1fr 96px"><span title="${esc(p.nome)}">${esc(p.nome)}</span><div class="bar"><i style="width:${p.qtd / tot * 100}%;background:var(--brand)"></i></div><span>${p.qtd} · ${pct(p.qtd / tot)}</span></div>`).join('');
-  const contr = C.porContratacao.map(p => `<span class="chip brand">${esc(p.nome)}: <b>${p.qtd}</b></span>`).join(' ');
-  const mxT = Math.max(1, ...C.tempo.faixas.map(f => f.qtd));
-  const serie = (() => { const mx = Math.max(1, ...D.serie.map(m => m.total)); return `<div class="vc">${D.serie.map(m => `<div class="col1" title="${ORDER.map(k => ST[k][0] + ': ' + m[k]).join(' · ')}"><span class="pc">${m.total ? pct((m.reuniao + m.contato) / m.total) : '–'}</span><div class="stk" style="height:${m.total / mx * 112}px">${ORDER.map(k => m[k] ? `<i class="s-${k}" style="height:${m[k] / m.total * 100}%"></i>` : '').join('')}</div><small>${esc(mesCurto(m.mes))}</small></div>`).join('')}</div>`; })();
-  const etapas = D.porEtapa.map(e => `<div class="row"><span>${esc(e.etapa)}</span>${stack(e)}<span>${e.total}</span></div>`).join('');
-  const resp = D.porResponsavel.map(e => `<div class="row"><span title="${esc(e.nome)}">${esc(e.nome)}</span>${stack(e)}<span>${e.reuniao + e.contato}/${e.total}</span></div>`).join('');
+  const planos = C.porPlano.map(p => `<div class="row clk" ${dk('plano', p.nome)} style="grid-template-columns:120px 1fr 96px"><span title="${esc(p.nome)}">${esc(p.nome)}</span><div class="bar"><i style="width:${p.qtd / tot * 100}%;background:var(--brand)"></i></div><span>${p.qtd} · ${pct(p.qtd / tot)}</span></div>`).join('');
+  const contr = C.porContratacao.map(p => `<button class="chip brand clk" ${dk('contr', p.nome)}>${esc(p.nome)}: <b>${p.qtd}</b></button>`).join(' ');
+  const serie = (() => { const mx = Math.max(1, ...D.serie.map(m => m.total)); return `<div class="vc">${D.serie.map(m => `<div class="col1" title="${ORDER.map(k => ST[k][0] + ': ' + m[k]).join(' · ')}"><span class="pc">${m.total ? pct((m.reuniao + m.contato) / m.total) : '–'}</span><div class="stk" style="height:${m.total / mx * 112}px">${ORDER.map(k => m[k] ? `<i class="s-${k} clk" ${dk('serie', m.mes, k)} style="height:${m[k] / m.total * 100}%"></i>` : '').join('')}</div><small>${esc(mesCurto(m.mes))}</small></div>`).join('')}</div>`; })();
+  const etapas = D.porEtapa.map(e => `<div class="row"><span class="clk" ${dk('etapa', e.mes)}>${esc(e.etapa)}</span>${stackK(e, ['etapa', e.mes])}<span>${e.total}</span></div>`).join('');
+  const resp = D.porResponsavel.map(e => `<div class="row"><span class="clk" ${dk('resp', e.nome)} title="${esc(e.nome)}">${esc(e.nome)}</span>${stackK(e, ['resp', e.nome])}<span>${e.reuniao + e.contato}/${e.total}</span></div>`).join('');
   const tipos = { atrasado:['Atraso','warn'], sem_contato:['Sem contato','warn'], saude:['Saúde','warn'], renovacao:['Renovação','warn'], mover:['Mover','brand'] };
   const al = D.alertas.slice(0, 30).map(a => `<div class="alert" data-open="${a.dealId}">${av(a.nome, 'sm')}<span class="t">${esc(a.nome)} ${nm[a.dealId]?.prioridade ? '<span class="tag p">Prioridade</span>' : ''}<small>${esc(a.etapa)} · ${esc(a.detalhe)}</small></span><span class="chip ${tipos[a.tipo][1]}">${tipos[a.tipo][0]}</span></div>`).join('');
   const Q = C.qualidade, I = C.intencao, ret = C.ativos + D.encerrados.cancelados;
-  const qrow = (t, n, cls = 'warn') => `<div class="row" style="grid-template-columns:1fr 54px"><span>${t}</span><span class="chip ${n ? cls : ''}" style="justify-self:end">${n}</span></div>`;
-  return `<div class="kpis">
-    ${tile('users', C.ativos, 'clientes ativos', `${D.grupos.prioridade.total} prioridade · ${D.grupos.acompanhamento.total} acompanhamento`)}
-    ${tile('chart', R$(C.valor), 'valor da carteira', C.ticket ? 'ticket médio ' + R$(C.ticket) : '')}
-    ${tile('clock', C.vencer.d30.qtd, 'vencem em 30 dias', R$(C.vencer.d30.valor), 'atrasado')}
-    ${tile('clock', C.vencer.d90.qtd, 'vencem em 90 dias', R$(C.vencer.d90.valor))}
-    ${tile('ban', sv.nNunca, 'sem nenhuma visita registrada', `${g.pendente + g.atrasado} sem registro no mês`, 'sem_contato')}
-    ${tile('alert', Q.vencidas.length + Q.semData.length, 'renovação vencida ou sem data', `${Q.vencidas.length} vencidas · ${Q.semData.length} sem data`, 'atrasado')}
-    ${tile('hist', C.tempo.media.toFixed(1).replace('.', ',') + ' m', 'tempo médio de contrato', ret ? `${D.encerrados.cancelados} cancelados · ${pct(C.ativos / ret)} de retenção` : '')}
+  const qrow = (t, n, key) => `<div class="row clk" ${dk(key)} style="grid-template-columns:1fr 54px"><span>${t}</span><span class="chip ${n ? 'warn' : ''}" style="justify-self:end">${n}</span></div>`;
+  const brow = (key, t, n, c) => `<div class="row clk" ${dk(...key)}><span>${t}</span><div class="bar"><i style="width:${n / tot * 100}%;background:${c}"></i></div><span>${n}</span></div>`;
+  return `<div class="hint" style="margin:-6px 2px 12px">Clique em qualquer número, barra ou linha para ver os clientes por trás do dado, abrir o card e atualizar.</div>
+  <div class="kpis">
+    ${tile('ativos', 'users', C.ativos, 'clientes ativos', `${D.grupos.prioridade.total} prioridade · ${D.grupos.acompanhamento.total} acompanhamento`)}
+    ${tile('valor', 'chart', R$(C.valor), 'valor da carteira', C.ticket ? 'ticket médio ' + R$(C.ticket) : '')}
+    ${tile('v30', 'clock', C.vencer.d30.qtd, 'vencem em 30 dias', R$(C.vencer.d30.valor), 'atrasado')}
+    ${tile('v90', 'clock', C.vencer.d90.qtd, 'vencem em 90 dias', R$(C.vencer.d90.valor))}
+    ${tile('nunca', 'ban', sv.nNunca, 'sem nenhuma visita registrada', `${g.pendente + g.atrasado} sem registro no mês`, 'sem_contato')}
+    ${tile('dados', 'alert', Q.vencidas.length + Q.semData.length, 'renovação vencida ou sem data', `${Q.vencidas.length} vencidas · ${Q.semData.length} sem data`, 'atrasado')}
+    ${tile('tempo', 'hist', C.tempo.media.toFixed(1).replace('.', ',') + ' m', 'tempo médio de contrato', ret ? `${D.encerrados.cancelados} cancelados · ${pct(C.ativos / ret)} de retenção` : '')}
   </div>
-  <div class="gcards">${gc('p', 'Prioridade', 'Últimos 3 meses de contrato (Mês 10 a 12)', D.grupos.prioridade)}${gc('a', 'Acompanhamento', 'Demais clientes (Mês 0 a 9)', D.grupos.acompanhamento)}</div>
+  <div class="gcards">${gc('prio', 'p', 'Prioridade', 'Últimos 3 meses de contrato (Mês 10 a 12)', D.grupos.prioridade)}${gc('acomp', 'a', 'Acompanhamento', 'Demais clientes (Mês 0 a 9)', D.grupos.acompanhamento)}</div>
   <div class="grid g2">
     <div class="box"><h3>Próximas renovações <span class="pill sm" id="jan">${jan(30)}${jan(60)}${jan(90)}</span></h3>
-      ${prox.length ? `<div class="tw"><table><thead><tr><th>Cliente</th><th>Renovação</th><th>Licença</th><th>Valor</th><th>Visita no mês</th></tr></thead><tbody>${proxRows}</tbody></table></div>` : `<div class="empty">Nenhuma renovação nos próximos ${vJan} dias.</div>`}</div>
-    <div class="box"><h3>Renovações nos próximos 12 meses <small>quantidade</small></h3>${miniBars(C.porMesRenov, 'qtd', m => mesCurto(m.mes))}<div class="leg">Passe o mouse para ver o valor de cada mês. Total: ${C.porMesRenov.reduce((s, m) => s + m.qtd, 0)} renovações · ${R$(C.porMesRenov.reduce((s, m) => s + m.valor, 0))}</div></div>
+      ${prox.length ? `<div class="tw"><table><thead><tr><th>Cliente</th><th>Renovação</th><th>Licença</th><th>Valor</th><th>Visita no mês</th></tr></thead><tbody>${proxRows}</tbody></table></div><div class="more"><button class="btn" ${dk('v' + vJan)}>Ver origem e editar (${C.vencer['d' + vJan].qtd})</button></div>` : `<div class="empty">Nenhuma renovação nos próximos ${vJan} dias.</div>`}</div>
+    <div class="box"><h3>Renovações nos próximos 12 meses <small>quantidade</small></h3>${miniBars(C.porMesRenov, 'qtd', m => mesCurto(m.mes), m => dk('mesren', m.mes))}<div class="leg">Clique numa barra para ver os clientes. Total: ${C.porMesRenov.reduce((s, m) => s + m.qtd, 0)} renovações · ${R$(C.porMesRenov.reduce((s, m) => s + m.valor, 0))}</div></div>
   </div>
   <div class="grid g2">
     <div class="box"><h3>Clientes sem visita <span class="pill sm" id="sem">${tb('nunca', 'Nunca visitados', sv.nNunca)}${tb('longo', 'Sem contato +45d', sv.semContato45.length)}${tb('pend', 'Pendentes do mês', sv.pendentes.length)}</span></h3>
-      ${lista.length ? `<div class="tw"><table><thead><tr><th>Cliente</th><th>Etapa</th><th>${vSem === 'longo' ? 'Sem contato' : 'Renovação'}</th></tr></thead><tbody>${svRows}</tbody></table></div>${lista.length > 30 ? `<div class="hint">Mostrando 30 de ${lista.length}. A prioridade vem primeiro.</div>` : ''}` : `<div class="empty">${ic('check')}<br>Nenhum cliente nesta situação.</div>`}</div>
+      ${lista.length ? `<div class="tw"><table><thead><tr><th>Cliente</th><th>Etapa</th><th>${vSem === 'longo' ? 'Sem contato' : 'Renovação'}</th></tr></thead><tbody>${svRows}</tbody></table></div><div class="more"><button class="btn" ${dk(kSem)}>Ver origem e editar (${vSem === 'nunca' ? sv.nNunca : lista.length})</button></div>` : `<div class="empty">${ic('check')}<br>Nenhum cliente nesta situação.</div>`}</div>
     <div class="box"><h3>Tipo de licença <small>${C.ativos} clientes</small></h3>${planos}<div class="leg" style="margin-top:12px">Contratação: ${contr}</div></div>
   </div>
   <div class="grid g3">
-    <div class="box"><h3>Tempo de contrato <small>meses desde o início</small></h3>${miniBars(C.tempo.faixas, 'qtd', f => f.faixa)}</div>
+    <div class="box"><h3>Tempo de contrato <small>meses desde o início</small></h3>${miniBars(C.tempo.faixas, 'qtd', f => f.faixa, f => dk('tempo', f.faixa))}</div>
     <div class="box"><h3>Visitas por mês <small>% com contato</small></h3>${serie}${legend()}</div>
     <div class="box"><h3>Intenção de renovar <small>último registro</small></h3>
-      ${[['provavel', 'Provável', 'var(--reuniao)'], ['indefinido', 'Indefinida', 'var(--atrasado)'], ['improvavel', 'Improvável', 'var(--sem_contato)'], ['sem', 'Sem avaliação', 'var(--pendente)']].map(([k, t, c]) => `<div class="row"><span>${t}</span><div class="bar"><i style="width:${I[k] / tot * 100}%;background:${c}"></i></div><span>${I[k]}</span></div>`).join('')}
+      ${[['provavel', 'Provável', 'var(--reuniao)'], ['indefinido', 'Indefinida', 'var(--atrasado)'], ['improvavel', 'Improvável', 'var(--sem_contato)'], ['sem', 'Sem avaliação', 'var(--pendente)']].map(([k, t, c]) => brow(['int', k], t, I[k], c)).join('')}
       <div class="sec" style="margin:16px 0 4px">Saúde</div>
-      ${['verde', 'amarelo', 'vermelho'].map(k => `<div class="row"><span>${SAUDE[k]}</span><div class="bar"><i style="width:${D.saude[k] / tot * 100}%;background:var(--${k})"></i></div><span>${D.saude[k]}</span></div>`).join('')}</div>
+      ${['verde', 'amarelo', 'vermelho'].map(k => brow(['saude', k], SAUDE[k], D.saude[k], 'var(--' + k + ')')).join('')}</div>
   </div>
   <div class="grid g3">
     <div class="box"><h3>Por etapa do ciclo <small>${esc(mesNome(mes))}</small></h3>${etapas}${legend()}</div>
     <div class="box"><h3>Por responsável <small>visitas no mês</small></h3>${resp || '<div class="empty">Sem dados</div>'}</div>
     <div class="box"><h3>Atenção <small>${D.alertas.length} alerta(s)</small></h3><div class="alerts">${al || `<div class="empty">${ic('check')}<br>Nenhum alerta</div>`}</div>
-      <div class="sec" style="margin:16px 0 0">Qualidade dos dados</div>${qrow('Sem data de renovação', Q.semData.length)}${qrow('Renovação vencida', Q.vencidas.length)}${qrow('Sem plano (licença)', Q.semPlano)}${qrow('Sem responsável', Q.semResponsavel)}</div>
-  </div>`;
+      <div class="sec" style="margin:16px 0 0">Qualidade dos dados</div>${qrow('Sem data de renovação', Q.semData.length, 'semdata')}${qrow('Renovação vencida', Q.vencidas.length, 'vencidas')}${qrow('Sem plano (licença)', Q.semPlano, 'semplano')}${qrow('Sem responsável', Q.semResponsavel, 'semresp')}</div>
+  </div>
+  <div class="hint">Fonte: funil Negócios (categoria ${esc(String(S.funilUrl.match(/category\/(\d+)/)?.[1] ?? 0))}) do Bitrix24 — etapas Mês 0 a 12 — campos Próxima Renovação, Plano e Valor do negócio, mais os registros de visita do hub. <a href="${esc(S.funilUrl)}" target="_blank" rel="noopener">Abrir funil no Bitrix24 ↗</a></div>`;
 }
+
+/* origem dos dados (drill-down) */
+const FAIXAS = { '0 a 3':[0, 3], '4 a 6':[4, 6], '7 a 9':[7, 9], '10 a 12':[10, 12], '13 a 24':[13, 24], '25+':[25, 1e9] };
+function drillDef(key) {
+  const [k, a, b] = key.map(String), n = k.startsWith('v') && /^v\d+$/.test(k) ? +k.slice(1) : 0;
+  const ST_ = s => ST[s]?.[0] || s;
+  const D = {
+    ativos: ['Clientes ativos', 'Negócios do funil nas etapas Mês 0 a Mês 12.', () => true],
+    prio: ['Prioridade', 'Clientes nos últimos 3 meses de contrato (Mês 10, 11 e 12).', c => c.prioridade],
+    acomp: ['Acompanhamento', 'Clientes nas etapas Mês 0 a Mês 9.', c => !c.prioridade],
+    valor: ['Valor da carteira', 'Soma do campo Valor do negócio de cada cliente ativo (maiores primeiro).', c => true, (x, y) => y.valor - x.valor],
+    nunca: ['Sem nenhuma visita registrada', 'Clientes ativos sem registro de visita ou contato no hub.', c => c.nuncaVisitado],
+    sem45: ['Sem contato há mais de 45 dias', 'Último contato registrado há mais de 45 dias.', c => !c.nuncaVisitado && c.diasSemContato > 45],
+    pend: ['Pendentes do mês', `Clientes sem registro de visita em ${mesNome(mes)}.`, c => c.status === 'pendente' || c.status === 'atrasado'],
+    vencidas: ['Renovação vencida', 'A Próxima Renovação já passou: atualize a data (se renovou) ou cancele.', c => c.mover?.motivo === 'renovacao_vencida'],
+    semdata: ['Sem data de renovação', 'Campo Próxima Renovação Bitrix24 vazio: preencha para a etapa ser calculada.', c => !c.proxRenovacao],
+    semplano: ['Sem plano (licença)', 'Campo Plano vazio no negócio.', c => !c.plano],
+    semresp: ['Sem responsável', 'Negócio sem responsável.', c => !c.responsavel],
+    dados: ['Renovação vencida ou sem data', 'Clientes cuja data de renovação precisa ser corrigida ou preenchida.', c => c.mover?.motivo === 'renovacao_vencida' || !c.proxRenovacao],
+    tempo: [b === undefined && a === undefined ? 'Tempo de contrato' : `Contrato de ${a} meses`, 'Meses entre a data de início do negócio e hoje.', c => !a || (c.mesesContrato !== null && c.mesesContrato >= FAIXAS[a][0] && c.mesesContrato <= FAIXAS[a][1]), (x, y) => y.mesesContrato - x.mesesContrato],
+    plano: [`Licença: ${a}`, 'Clientes com este plano no campo Plano.', c => (c.plano || 'Sem plano') === a],
+    contr: [`Contratação: ${a}`, 'Campo Tipo de Contratação.', c => (c.contratacao || 'Não informado') === a],
+    mesren: [`Renovam em ${a && mesNome(a)}`, 'Próxima Renovação dentro do mês.', c => c.proxRenovacao && c.proxRenovacao.slice(0, 7) === a],
+    int: [`Intenção de renovar: ${{ provavel:'provável', indefinido:'indefinida', improvavel:'improvável', sem:'sem avaliação' }[a] || a}`, 'Do último registro de visita.', c => (c.renovacao || 'sem') === a],
+    saude: [`Saúde ${SAUDE[a]?.toLowerCase() || a}`, 'Da última avaliação registrada.', c => c.saude === a],
+    etapa: [`Mês ${a}${b ? ' · ' + ST_(b) : ''}`, `Clientes na etapa Mês ${a}${b ? ` com situação "${ST_(b)}" em ${mesNome(mes)}` : ''}.`, c => c.mesCiclo === +a && (!b || c.status === b)],
+    resp: [`Responsável: ${a}${b ? ' · ' + ST_(b) : ''}`, `Clientes sob responsabilidade de ${a}${b ? ` com situação "${ST_(b)}"` : ''}.`, c => (c.responsavel || 'Sem responsável') === a && (!b || c.status === b)],
+    serie: [`${mesNome(a || mes)} · ${ST_(b)}`, `Situação de visita de cada cliente em ${a && mesNome(a)}.`, c => c.historico.find(h => h.mes === a)?.status === b],
+  };
+  if (n) return [`Vencem em ${n} dias`, `Próxima Renovação nos próximos ${n} dias (ordem por data).`, c => c.diasParaRenovar !== null && c.diasParaRenovar >= 0 && c.diasParaRenovar <= n, (x, y) => x.diasParaRenovar - y.diasParaRenovar];
+  return D[k];
+}
+function drillRows() {
+  const def = drillDef(drill.key); if (!def) return { def: null, rows: [] };
+  const rows = S.clientes.filter(c => c.tipoEtapa === 'mes' && c.status !== 'na' && def[2](c)).sort(def[3] || ((x, y) => (y.prioridade - x.prioridade) || (y.mesCiclo - x.mesCiclo) || x.nome.localeCompare(y.nome)));
+  return { def, rows };
+}
+function renderDrill() {
+  const m = $('#md'); if (!drill) { m.classList.remove('on'); return; }
+  const { def, rows } = drillRows(); if (!def) { drill = null; m.classList.remove('on'); return; }
+  const old = m.querySelector('.mb')?.scrollTop || 0, planos = S.opcoes?.plano || [];
+  const soma = rows.reduce((s, c) => s + (c.valor || 0), 0);
+  m.innerHTML = `<div class="mc"><div class="mh"><div><h2>${esc(def[0])}</h2><p>${esc(def[1])}</p><div class="src">Origem: ${ic('link')} funil Negócios do Bitrix24 · <a href="${esc(S.funilUrl)}" target="_blank" rel="noopener">abrir funil ↗</a></div></div><button class="x2" id="mx" aria-label="Fechar">${ic('x')}</button></div>
+    <div class="mb">${rows.length ? `<table class="dl"><thead><tr><th>Cliente</th><th>Etapa</th><th>Renovação</th><th>Plano</th><th>Valor</th><th>Visita no mês</th><th>Responsável</th><th></th></tr></thead><tbody>${rows.map(c => `<tr>
+      <td><a class="lk" data-open="${c.id}"><div class="who">${av(c.nome, 'sm')}<div><b>${esc(c.nome)}</b> ${c.prioridade ? '<span class="tag p">Prioridade</span>' : ''}<small>${esc(c.dominio || '')}</small></div></div></a></td>
+      <td>${esc(c.etapa)}${c.mesEsperado !== null && c.mesEsperado !== c.mesCiclo ? `<br><small class="warnt">pela data: Mês ${c.mesEsperado}</small>` : ''}</td>
+      <td><input type="date" class="ed ${c.mover?.motivo === 'renovacao_vencida' || !c.proxRenovacao ? 'bad' : ''}" data-id="${c.id}" data-f="renovacao" value="${esc(c.proxRenovacao || '')}" aria-label="Próxima renovação"></td>
+      <td><select class="ed ${c.plano ? '' : 'bad'}" data-id="${c.id}" data-f="plano" aria-label="Plano"><option value="">—</option>${planos.map(p => `<option value="${p.id}" ${p.id === c.planoId ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>${c.plano && !c.planoId ? `<br><small>${esc(c.plano)}</small>` : ''}</td>
+      <td><input type="number" min="0" step="0.01" class="ed num" data-id="${c.id}" data-f="valor" value="${c.valor || ''}" placeholder="0" aria-label="Valor"></td>
+      <td>${badge(c.status)}</td><td>${esc(c.responsavel || '—')}</td>
+      <td class="acts"><a class="chip brand" href="https://${esc(S.portal)}/crm/deal/details/${c.id}/" target="_blank" rel="noopener" title="Abrir o card no Bitrix24">${ic('link')}Card</a></td></tr>`).join('')}</tbody></table>` : `<div class="empty">${ic('check')}<br>Nenhum cliente nesta situação.</div>`}</div>
+    <div class="mf"><span><b>${rows.length}</b> cliente(s) · <b>${R$(soma)}</b></span><span class="hint" style="margin:0">Altere a data, o plano ou o valor direto na linha: salva no card do Bitrix24 e reposiciona a etapa. Clique no nome para abrir o cliente.</span><button class="btn" id="csv">Exportar CSV</button></div></div>`;
+  m.classList.add('on'); m.querySelector('.mb').scrollTop = old;
+  $('#mx').onclick = closeDrill;
+  m.querySelectorAll('[data-open]').forEach(e => e.onclick = () => drawer(+e.dataset.open));
+  m.querySelectorAll('.ed').forEach(e => e.onchange = async () => {
+    const body = { [e.dataset.f]: e.value }; e.disabled = true;
+    try { const r = await api(`/api/clientes/${e.dataset.id}/dados`, { method:'POST', body: JSON.stringify(body) }); toast(r.movido ? `Salvo · ${r.movido.de} → ${r.movido.para}` : 'Salvo no card do Bitrix24 ✔'); await load(); }
+    catch (er) { toast(er.message); e.disabled = false; }
+  });
+  $('#csv').onclick = () => {
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const csv = ['ID;Cliente;Domínio;Etapa;Renovação;Plano;Contratação;Valor;Meses de contrato;Visita no mês;Responsável'].concat(rows.map(c => [c.id, c.nome, c.dominio, c.etapa, c.proxRenovacao, c.plano, c.contratacao, c.valor, c.mesesContrato, ST[c.status][0], c.responsavel].map(q).join(';'))).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' })); a.download = `${def[0].replace(/[^\p{L}\p{N}]+/gu, '-')}.csv`; a.click();
+  };
+}
+function openDrill(key) { drill = { key }; renderDrill(); }
+const closeDrill = () => { drill = null; renderDrill(); };
 function tools() {
   const rs = [...new Set([...(S.responsaveis || []), ...S.clientes.filter(c => c.tipoEtapa === 'mes').map(c => c.responsavel).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
   return `<div class="tools"><div class="sb">${ic('search')}<input id="q" placeholder="Buscar cliente ou domínio…" value="${esc(filtro.q)}"></div>
@@ -398,6 +487,7 @@ function lista() {
 }
 function bind() {
   document.querySelectorAll('[data-open]').forEach(e => e.onclick = async () => { if (e.dataset.mes && e.dataset.mes !== mes) { mes = e.dataset.mes; openId = +e.dataset.open; await load(); } else drawer(+e.dataset.open); });
+  document.querySelectorAll('[data-drill]').forEach(e => { const open = ev => { ev.stopPropagation(); openDrill(e.dataset.drill.split(':').map(decodeURIComponent)); }; e.onclick = open; e.onkeydown = ev => { if (ev.key === 'Enter') open(ev); }; });
   document.querySelectorAll('[data-jan]').forEach(b => b.onclick = () => { vJan = +b.dataset.jan; render(); });
   document.querySelectorAll('[data-sem]').forEach(b => b.onclick = () => { vSem = b.dataset.sem; render(); });
   const refil = () => { if (tab === 'reg') { $('#rl').innerHTML = rlItems(); document.querySelectorAll('#rl [data-open]').forEach(e => e.onclick = () => drawer(+e.dataset.open)); } else render(); };
@@ -411,7 +501,8 @@ $('#mAnt').onclick = () => { mes = addMes(mes, -1); load(); };
 $('#mPro').onclick = () => { mes = addMes(mes, 1); load(); };
 $('#rec').onclick = () => load();
 $('#sc').onclick = () => { closeDr(); openId = null; };
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#dr').classList.contains('on')) { closeDr(); openId = null; } });
+document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if ($('#dr').classList.contains('on')) { closeDr(); openId = null; } else if (drill) closeDrill(); });
+$('#md').addEventListener('click', e => { if (e.target.id === 'md') closeDrill(); });
 $('#syn').onclick = async () => {
   try {
     const pl = await api('/api/sincronizar');
@@ -437,6 +528,13 @@ function drawer(id, keep) {
     <div class="info"><div><small>Próxima renovação</small><b>${c.proxRenovacao ? fdata(c.proxRenovacao) : 'não informada'}</b></div><div><small>Etapa pela renovação</small><b>${c.mesEsperado !== null ? 'Mês ' + c.mesEsperado : '—'}</b></div></div>
     ${c.mover?.motivo === 'renovacao_vencida' ? '<div class="warnb">Renovação vencida: o cliente renovou ou cancelou?</div>' : ''}
     <a class="chip brand" href="https://${esc(S.portal)}/crm/deal/details/${c.id}/" target="_blank" rel="noopener">${ic('link')}Abrir card no Bitrix24</a>
+    <details class="dc" ${c.mover?.motivo === 'renovacao_vencida' || !c.proxRenovacao || !c.plano ? 'open' : ''}><summary>${ic('chart')}Dados do contrato <small style="color:var(--mut);font-weight:500">editar no card</small></summary>
+      <form class="f" id="fd"><div class="two"><div><label>Próxima renovação</label><input type="date" name="renovacao" value="${esc(c.proxRenovacao || '')}"></div>
+        <div><label>Valor do negócio (R$)</label><input type="text" inputmode="decimal" name="valor" value="${c.valor || ''}" placeholder="0"></div></div>
+      <div class="two"><div><label>Plano (licença)</label><select name="plano"><option value="">—</option>${(S.opcoes?.plano || []).map(p => `<option value="${p.id}" ${p.id === c.planoId ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select></div>
+        <div><label>Contratação</label><select name="contratacao"><option value="">—</option>${(S.opcoes?.contratacao || []).map(p => `<option value="${p.id}" ${p.id === c.contratacaoId ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select></div></div>
+      <label>Responsável</label><select name="responsavelId">${(S.usuarios || []).map(u => `<option value="${u.id}" ${u.id === c.responsavelId ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}</select>
+      <div style="margin:12px 0 8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn" id="svd">${ic('check')}Salvar dados no card</button><span class="hint" style="margin:0">A etapa é reposicionada pela renovação.</span></div></form></details>
     <div class="sec">Visita · ${esc(mesNome(mes))}</div>
     <form class="f" id="fm">
       <div class="opts">${opt('reuniao', 'reuniao', 'Reunião realizada')}${opt('contato', 'contato', 'Só contato')}${opt('nenhum', 'sem_contato', 'Sem contato')}</div>
@@ -471,6 +569,12 @@ function drawer(id, keep) {
   f.querySelectorAll('[name=res]').forEach(x => x.onchange = sync);
   if (!f.data.value) f.data.value = mes === S.hoje.slice(0, 7) ? S.hoje : '';
   sync();
+  $('#fd').onsubmit = async e => {
+    e.preventDefault(); const b = $('#svd'); b.disabled = true; const fd = Object.fromEntries(new FormData($('#fd')));
+    fd.valor = fd.valor.includes(',') ? fd.valor.replace(/\./g, '').replace(',', '.') : fd.valor; if (fd.valor === '') fd.valor = 0; fd.responsavelId = +fd.responsavelId;
+    try { const r = await api(`/api/clientes/${id}/dados`, { method:'POST', body: JSON.stringify(fd) }); toast(r.movido ? `Dados salvos · ${r.movido.de} → ${r.movido.para}` : 'Dados salvos no card do Bitrix24 ✔'); await load(); }
+    catch (er) { toast(er.message); b.disabled = false; }
+  };
   $('#dx').onclick = inline ? null : () => { closeDr(); openId = null; };
   f.onsubmit = async e => {
     e.preventDefault(); const b = $('#sv'); b.disabled = true;

@@ -34,7 +34,7 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
   const usuariosAll = () => memo('users', 600000, async () => {
     const r = await vibe.get('/users', { limit: 500 }).catch(() => []);
     const nome = u => [u.name, u.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || `Usuário ${u.id}`;
-    return { mapa: Object.fromEntries(r.map(u => [u.id, nome(u)])), ativos: r.filter(u => u.active !== false).map(nome).sort((a, b) => a.localeCompare(b)) };
+    return { mapa: Object.fromEntries(r.map(u => [u.id, nome(u)])), ativos: r.filter(u => u.active !== false).map(nome).sort((a, b) => a.localeCompare(b)), lista: r.filter(u => u.active !== false).map(u => ({ id: u.id, nome: nome(u) })).sort((a, b) => a.nome.localeCompare(b.nome)) };
   });
   const usuarios = async () => (await usuariosAll()).mapa;
   // Rótulos das listas (enumerações) dos campos de plano/contratação.
@@ -67,7 +67,7 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
     return {
       hoje: h, mes, portal: PORTAL, canais: CANAIS,
       etapas: et.meses.map(e => ({ id: e.id, nome: e.nome, mes: e.mes })), ganho: et.ganho?.nome, perdido: et.perdido?.nome,
-      responsaveis: (await usuariosAll()).ativos, clientes: lista, sync, campoRenov: CAMPO_RENOV,
+      responsaveis: (await usuariosAll()).ativos, usuarios: (await usuariosAll()).lista, opcoes: Object.fromEntries(Object.entries(en).map(([k, m]) => [k, Object.entries(m).map(([id, nome]) => ({ id, nome }))])), funilUrl: `https://${PORTAL}/crm/deal/kanban/category/${CATEGORIA}/`, clientes: lista, sync, campoRenov: CAMPO_RENOV,
       registros: registros.filter(r => ids.has(r.dealId)),
       dashboard: M.dashboard({ lista, etapa: et, registros: registros.filter(r => ids.has(r.dealId)), mes, hoje: h }),
     };
@@ -141,6 +141,36 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
     },
   };
 
+  // POST /api/clientes/:id/dados  { renovacao, plano, contratacao, valor, responsavelId } — atualiza o card no Bitrix24 e reposiciona a etapa pela renovação.
+  async function dados(id, b, who) {
+    const [d, en, us] = await Promise.all([deals().then(ds => ds.find(x => x.id === id)), enums(), usuariosAll()]);
+    if (!d) throw bad(404, 'Cliente não encontrado no funil.');
+    const up = {}, mud = [];
+    const lista = (k, v) => { if (v === '' || v === null) return ''; if (!en[k]?.[String(v)]) throw bad(400, 'Opção inválida.'); return String(v); };
+    if ('renovacao' in b) {
+      const v = b.renovacao ? String(b.renovacao) : '';
+      if (v && (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(Date.parse(v)) || v < '2000-01-01' || v > '2100-01-01')) throw bad(400, 'Data de renovação inválida.');
+      up[CAMPO_RENOV] = v || null; mud.push(`Próxima renovação: ${fmtData(String(d[CAMPO_RENOV] || '').slice(0, 10)) || '—'} → ${fmtData(v) || '—'}`);
+    }
+    for (const [campo, chave, rot] of [['plano', 'plano', 'Plano'], ['contratacao', 'contratacao', 'Contratação']]) if (campo in b) {
+      const v = lista(chave, b[campo]); up[CAMPOS[chave]] = v || null; mud.push(`${rot}: ${en[chave]?.[String(d[CAMPOS[chave]])] || '—'} → ${en[chave]?.[v] || '—'}`);
+    }
+    if ('valor' in b) {
+      const v = b.valor === '' || b.valor === null ? 0 : +b.valor; if (!isFinite(v) || v < 0 || v > 1e9) throw bad(400, 'Valor inválido.');
+      up.amount = v; up.isManualOpportunity = true; mud.push(`Valor: ${d.amount || 0} → ${v}`);
+    }
+    if ('responsavelId' in b) {
+      const v = +b.responsavelId; if (!us.lista.some(u => u.id === v)) throw bad(400, 'Responsável inválido.');
+      up.assignedById = v; mud.push(`Responsável: ${us.mapa[d.assignedById] || '—'} → ${us.mapa[v]}`);
+    }
+    if (!mud.length) throw bad(400, 'Nada para atualizar.');
+    await vibe.patch(`/deals/${id}`, up); invalidar();
+    const timeline = await comentar(id, `[B]Dados do contrato atualizados[/B] por ${who.nome} (Hub de Clientes)\n${mud.join('\n')}`);
+    let movido = null;
+    if ('renovacao' in b) { try { const r = await sincronizar(true, who.nome, id); movido = r.movidos?.[0] || null; } catch { /* a conferência periódica corrige */ } }
+    return { ok: true, timeline, movido: movido && { de: movido.de, para: movido.para } };
+  }
+
   // POST /api/clientes/:id/mover  { acao: avancar | renovar | cancelar }
   async function mover(id, body, who) {
     const [d, et] = await Promise.all([deals().then(ds => ds.find(x => x.id === id)), etapas()]);
@@ -155,9 +185,9 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
 
   // Ajusta a etapa de cada card pela Próxima Renovação (Mês = 12 − meses até renovar). Renovação vencida ou sem data não é movida.
   let sync = { quando: null, movidos: [], erro: null }, rodando = false;
-  async function sincronizar(aplicar, quem = 'Hub de Clientes') {
+  async function sincronizar(aplicar, quem = 'Hub de Clientes', soId = null) {
     const [et, ds] = await Promise.all([etapas(), vibe.get('/deals', { 'filter[categoryId]': CATEGORIA, select: SELECT, limit: 5000 })]);
-    const pl = M.plano({ deals: ds, etapa: et, hoje: hoje(), campo: CAMPO_RENOV });
+    const pl = M.plano({ deals: soId ? ds.filter(d => d.id === soId) : ds, etapa: et, hoje: hoje(), campo: CAMPO_RENOV });
     if (!aplicar) return pl;
     if (rodando) throw bad(409, 'Sincronização já em andamento.');
     rodando = true; const feitos = [];
@@ -167,7 +197,7 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
         await comentar(m.id, `[B]Ciclo do cliente:[/B] ${m.de} → ${m.para}. Etapa ajustada pela Próxima Renovação Bitrix24 (${fmtData(m.renovacao)}) por ${quem}.`);
         feitos.push(m);
       }
-    } finally { rodando = false; invalidar(); sync = { quando: new Date().toISOString(), movidos: feitos, erro: null }; }
+    } finally { rodando = false; invalidar(); if (!soId) sync = { quando: new Date().toISOString(), movidos: feitos, erro: null }; }
     return { ...pl, movidos: feitos };
   }
   routes['GET /api/sincronizar'] = async () => ({ ...(await sincronizar(false)), ultima: sync });
@@ -188,6 +218,8 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
         }
         const mm = /^\/api\/clientes\/(\d+)\/mover$/.exec(u.pathname);
         if (mm && req.method === 'POST') return send(200, await mover(+mm[1], await readBody(req), who));
+        const md = /^\/api\/clientes\/(\d+)\/dados$/.exec(u.pathname);
+        if (md && req.method === 'POST') return send(200, await dados(+md[1], await readBody(req), who));
         const fn = routes[`${req.method} ${u.pathname}`]; if (!fn) throw bad(404, 'Rota não encontrada.');
         const body = req.method === 'POST' ? await readBody(req) : {};
         const r = await fn(u, body, who);

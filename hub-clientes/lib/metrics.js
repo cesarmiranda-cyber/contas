@@ -97,7 +97,7 @@ function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuar
       id: d.id, nome: empresas[d.companyId] || contatos[d.contactId] || d.title, dominio: String(d.title).includes('.') ? d.title : '', empresaId: d.companyId || null,
       responsavelId: d.assignedById, responsavel: usuarios[d.assignedById] || null,
       prioridade: e.tipo === 'mes' && e.mes >= MES_PRIORIDADE, etapaId: e.id, etapa: e.nome, mesCiclo: e.mes, tipoEtapa: e.tipo, inicio, valor: d.amount || 0, moeda: d.currency || 'BRL',
-      diasNaEtapa, mover, plano, contratacao, mesesContrato: inicio ? mesesEntre(inicio, hoje) : null, diasParaRenovar: renov ? diasEntre(hoje, renov) : null, nuncaVisitado: !comContato, proxRenovacao: renov, mesEsperado: esp ? esp.mes : null, status: situacao(reg, mes, hoje, inicio), registro: reg,
+      diasNaEtapa, mover, plano, planoId: campos.plano && d[campos.plano] ? String(d[campos.plano]) : '', contratacao, contratacaoId: campos.contratacao && d[campos.contratacao] ? String(d[campos.contratacao]) : '', mesesContrato: inicio ? mesesEntre(inicio, hoje) : null, diasParaRenovar: renov ? diasEntre(hoje, renov) : null, nuncaVisitado: !comContato, proxRenovacao: renov, mesEsperado: esp ? esp.mes : null, status: situacao(reg, mes, hoje, inicio), registro: reg,
       saude: ultimo?.saude || null, renovacao: ultimo?.renovacao || null,
       ultimoContato: refDias, diasSemContato: refDias ? Math.max(0, diasEntre(refDias, hoje)) : null, temContato: !!comContato,
       sequencia: seq, historico,
