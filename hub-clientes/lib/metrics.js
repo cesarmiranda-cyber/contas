@@ -4,6 +4,7 @@
 const DIA_ATRASO = 20;          // a partir do dia 20 o mês corrente sem registro vira "atrasado"
 const DIAS_ETAPA = 30;          // tempo na etapa para sugerir avançar de mês
 const DIAS_SEM_CONTATO = 45;    // alerta de cliente sem contato
+const MES_PRIORIDADE = 10;     // últimos 3 meses de contrato (Mês 10, 11 e 12) = prioridade; antes disso, acompanhamento
 const STATUS = ['reuniao', 'contato', 'sem_contato', 'pendente', 'atrasado'];
 
 const addMes = (m, n) => { const [y, mo] = m.split('-').map(Number), t = y * 12 + mo - 1 + n; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; };
@@ -91,7 +92,7 @@ function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuar
     out.push({
       id: d.id, nome: empresas[d.companyId] || contatos[d.contactId] || d.title, dominio: String(d.title).includes('.') ? d.title : '', empresaId: d.companyId || null,
       responsavelId: d.assignedById, responsavel: usuarios[d.assignedById] || null,
-      etapaId: e.id, etapa: e.nome, mesCiclo: e.mes, tipoEtapa: e.tipo, inicio, valor: d.amount || 0, moeda: d.currency || 'BRL',
+      prioridade: e.tipo === 'mes' && e.mes >= MES_PRIORIDADE, etapaId: e.id, etapa: e.nome, mesCiclo: e.mes, tipoEtapa: e.tipo, inicio, valor: d.amount || 0, moeda: d.currency || 'BRL',
       diasNaEtapa, mover, proxRenovacao: renov, mesEsperado: esp ? esp.mes : null, status: situacao(reg, mes, hoje, inicio), registro: reg,
       saude: ultimo?.saude || null, renovacao: ultimo?.renovacao || null,
       ultimoContato: refDias, diasSemContato: refDias ? Math.max(0, diasEntre(refDias, hoje)) : null, temContato: !!comContato,
@@ -109,6 +110,8 @@ function dashboard({ lista, etapa, registros, mes, hoje }) {
   const ativos = lista.filter(c => c.tipoEtapa === 'mes');
   const geral = ativos.reduce((a, c) => conta(a, c.status), vazio());
   const feito = geral.reuniao + geral.contato;
+  const grupo = p => ativos.filter(c => c.prioridade === p).reduce((a, c) => conta(a, c.status), vazio());
+  const grupos = { prioridade: grupo(true), acompanhamento: grupo(false) };
   const porEtapa = etapa.meses.map(e => ({ etapa: e.nome, mes: e.mes, ...ativos.filter(c => c.mesCiclo === e.mes).reduce((a, c) => conta(a, c.status), vazio()) }));
   const resp = new Map();
   for (const c of ativos) { const k = c.responsavel || 'Sem responsável'; resp.set(k, conta(resp.get(k) || vazio(), c.status)); }
@@ -122,7 +125,7 @@ function dashboard({ lista, etapa, registros, mes, hoje }) {
   }
   const saude = { verde: 0, amarelo: 0, vermelho: 0, sem: 0 };
   for (const c of ativos) saude[c.saude || 'sem']++;
-  const alertas = [];
+  const alertas = [], nivel = Object.fromEntries(ativos.map(c => [c.id, c.prioridade ? 1 : 0]));
   const add = (tipo, c, detalhe) => alertas.push({ tipo, dealId: c.id, nome: c.nome, etapa: c.etapa, detalhe });
   for (const c of ativos) {
     if (c.saude === 'vermelho') add('saude', c, 'Saúde do cliente em vermelho');
@@ -131,9 +134,10 @@ function dashboard({ lista, etapa, registros, mes, hoje }) {
     if (c.status === 'atrasado') add('atrasado', c, 'Registro do mês em atraso');
     if (c.mover?.vencida) add('mover', c, c.mover.motivo === 'renovacao_vencida' ? `Renovação vencida (${c.proxRenovacao.split('-').reverse().join('/')}): renovar ou cancelar` : c.mover.tipo === 'sincronizar' ? `Pela renovação (${c.proxRenovacao.split('-').reverse().join('/')}) deveria estar no Mês ${c.mover.destinoMes}` : c.mover.tipo === 'decidir' ? 'Fim do ciclo: renovar ou cancelar' : `Há ${c.diasNaEtapa} dias em ${c.etapa}: avançar de mês`);
   }
+  alertas.sort((a, b) => (nivel[b.dealId] || 0) - (nivel[a.dealId] || 0));
   const cont = t => alertas.filter(a => a.tipo === t).length;
   return {
-    mes, geral, cobertura: geral.total ? feito / geral.total : 0, reuniaoPct: geral.total ? geral.reuniao / geral.total : 0,
+    mes, geral, grupos, cobertura: geral.total ? feito / geral.total : 0, reuniaoPct: geral.total ? geral.reuniao / geral.total : 0,
     porEtapa, porResponsavel, serie, saude, alertas, resumoAlertas: { saude: cont('saude'), renovacao: cont('renovacao'), sem_contato: cont('sem_contato'), atrasado: cont('atrasado'), mover: cont('mover') },
     encerrados: { assinados: lista.filter(c => c.tipoEtapa === 'ganho').length, cancelados: lista.filter(c => c.tipoEtapa === 'perdido').length },
   };
@@ -154,4 +158,4 @@ function destino(acao, atual, etapa) {
   return { erro: 'Ação inválida.' };
 }
 
-module.exports = { mesEsperado, plano, STATUS, DIA_ATRASO, DIAS_ETAPA, DIAS_SEM_CONTATO, addMes, diasEntre, todayBR, etapas, situacao, statusDoRegistro, clientes, dashboard, destino };
+module.exports = { MES_PRIORIDADE, mesEsperado, plano, STATUS, DIA_ATRASO, DIAS_ETAPA, DIAS_SEM_CONTATO, addMes, diasEntre, todayBR, etapas, situacao, statusDoRegistro, clientes, dashboard, destino };

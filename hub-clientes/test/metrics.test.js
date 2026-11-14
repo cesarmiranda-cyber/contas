@@ -43,6 +43,9 @@ test('dashboard: cobertura, alertas e série', () => {
   assert.equal(D.resumoAlertas.saude, 1); assert.equal(D.resumoAlertas.renovacao, 1);
   assert.equal(D.serie.length, 6); assert.equal(D.serie[5].mes, '2026-11');
   assert.equal(D.porEtapa.find(e => e.mes === 2).total, 2);
+  assert.equal(D.grupos.prioridade.total, 0); assert.equal(D.grupos.acompanhamento.total, 3);
+  const l2 = M.clientes({ deals: [deal(1, 'S9'), deal(2, 'S10'), deal(3, 'S12'), deal(4, 'S0')], etapa: et, registros: [], mes: '2026-11', hoje });
+  assert.deepEqual(l2.map(c => c.prioridade), [false, true, true, false]);
 });
 test('destino: avançar, renovar e cancelar respeitam o ciclo', () => {
   assert.equal(M.destino('avancar', et.porId.S3, et).etapa.id, 'S4');
