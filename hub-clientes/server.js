@@ -30,10 +30,12 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
   const hoje = () => M.todayBR(now());
 
   const etapas = () => memo('etapas', 600000, async () => M.etapas(await vibe.get('/statuses', { 'filter[entityId]': CATEGORIA ? `DEAL_STAGE_${CATEGORIA}` : 'DEAL_STAGE', limit: 100 })));
-  const usuarios = () => memo('users', 600000, async () => {
+  const usuariosAll = () => memo('users', 600000, async () => {
     const r = await vibe.get('/users', { limit: 500 }).catch(() => []);
-    return Object.fromEntries(r.map(u => [u.id, [u.name, u.lastName].filter(Boolean).join(' ') || `Usuário ${u.id}`]));
+    const nome = u => [u.name, u.lastName].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || `Usuário ${u.id}`;
+    return { mapa: Object.fromEntries(r.map(u => [u.id, nome(u)])), ativos: r.filter(u => u.active !== false).map(nome).sort((a, b) => a.localeCompare(b)) };
   });
+  const usuarios = async () => (await usuariosAll()).mapa;
   const deals = () => memo('deals', 20000, () => vibe.get('/deals', { 'filter[categoryId]': CATEGORIA, select: SELECT, limit: 5000 }));
   // Nome do cliente: empresa vinculada ao card; sem empresa, o contato (vendas repetidas vêm com título genérico).
   const nomes = async (ds, campo, rota, select, nome) => {
@@ -58,7 +60,7 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
     return {
       hoje: h, mes, portal: PORTAL, canais: CANAIS,
       etapas: et.meses.map(e => ({ id: e.id, nome: e.nome, mes: e.mes })), ganho: et.ganho?.nome, perdido: et.perdido?.nome,
-      clientes: lista, sync, campoRenov: CAMPO_RENOV,
+      responsaveis: (await usuariosAll()).ativos, clientes: lista, sync, campoRenov: CAMPO_RENOV,
       registros: registros.filter(r => ids.has(r.dealId)),
       dashboard: M.dashboard({ lista, etapa: et, registros: registros.filter(r => ids.has(r.dealId)), mes, hoje: h }),
     };

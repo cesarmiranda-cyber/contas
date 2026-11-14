@@ -336,7 +336,7 @@ function dash() {
   </div>`;
 }
 function tools() {
-  const rs = [...new Set(S.clientes.filter(c => c.tipoEtapa === 'mes').map(c => c.responsavel).filter(Boolean))].sort();
+  const rs = [...new Set([...(S.responsaveis || []), ...S.clientes.filter(c => c.tipoEtapa === 'mes').map(c => c.responsavel).filter(Boolean)])].sort((a, b) => a.localeCompare(b));
   return `<div class="tools"><div class="sb">${ic('search')}<input id="q" placeholder="Buscar cliente ou domínio…" value="${esc(filtro.q)}"></div>
     <select id="fg"><option value="">Prioridade + acompanhamento</option><option value="p" ${filtro.grupo === 'p' ? 'selected' : ''}>Só prioridade (Mês 10–12)</option><option value="a" ${filtro.grupo === 'a' ? 'selected' : ''}>Só acompanhamento (Mês 0–9)</option></select>
     <select id="fs"><option value="">Todas as situações</option>${['reuniao','contato','sem_contato','pendente','atrasado'].map(k => `<option value="${k}" ${filtro.status === k ? 'selected' : ''}>${ST[k][0]}</option>`).join('')}</select>
