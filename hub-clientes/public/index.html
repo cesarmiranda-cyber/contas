@@ -128,7 +128,7 @@ main{flex:1;min-width:0;padding:22px 28px 56px;max-width:1500px}
 .src{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px}.src svg{width:14px;height:14px}.src a{color:var(--brand);font-weight:600}
 .x2{border:0;background:var(--panel);width:36px;height:36px;border-radius:11px;display:grid;place-items:center;box-shadow:var(--sh1);flex-shrink:0}
 .mb{overflow:auto;flex:1}.mf{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 24px;border-top:1px solid var(--line);background:var(--panel2)}
-table.dl{min-width:980px}.dl td{padding:8px 12px}.dl .lk{cursor:pointer;display:block}.dl .lk:hover b{color:var(--brand)}.dl small{color:var(--mut)}.warnt{color:var(--atrasado);font-weight:600}
+table.dl{min-width:1180px}.dl td{padding:8px 12px}.dl .lk{cursor:pointer;display:block}.dl .lk:hover b{color:var(--brand)}.dl small{color:var(--mut)}.warnt{color:var(--atrasado);font-weight:600}
 .ed{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;max-width:150px}.ed.num{width:96px}.ed:focus{border-color:var(--brand);outline:0;box-shadow:0 0 0 3px var(--brand-soft)}.ed.bad{border-color:var(--atrasado);background:var(--atrasado-bg)}.ed:disabled{opacity:.5}
 .acts{white-space:nowrap}.acts a{text-decoration:none}
 details.dc{margin:14px 0;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:4px 14px}details.dc summary{cursor:pointer;font-weight:700;padding:10px 0;list-style:none;display:flex;gap:8px;align-items:center}details.dc summary::-webkit-details-marker{display:none}details.dc[open] summary{border-bottom:1px solid var(--line);margin-bottom:6px}
@@ -434,20 +434,22 @@ function renderDrill() {
   const old = m.querySelector('.mb')?.scrollTop || 0, planos = S.opcoes?.plano || [];
   const soma = rows.reduce((s, c) => s + (c.valor || 0), 0);
   m.innerHTML = `<div class="mc"><div class="mh"><div><h2>${esc(def[0])}</h2><p>${esc(def[1])}</p><div class="src">Origem: ${ic('link')} funil Negócios do Bitrix24 · <a href="${esc(S.funilUrl)}" target="_blank" rel="noopener">abrir funil ↗</a></div></div><button class="x2" id="mx" aria-label="Fechar">${ic('x')}</button></div>
-    <div class="mb">${rows.length ? `<table class="dl"><thead><tr><th>Cliente</th><th>Etapa</th><th>Renovação</th><th>Plano</th><th>Valor</th><th>Visita no mês</th><th>Responsável</th><th></th></tr></thead><tbody>${rows.map(c => `<tr>
+    <div class="mb">${rows.length ? `<table class="dl"><thead><tr><th>Cliente</th><th>Etapa</th><th>Renovação</th><th>Plano</th><th>Contratação</th><th>Valor</th><th>Visita no mês</th><th>Responsável</th><th></th></tr></thead><tbody>${rows.map(c => `<tr>
       <td><a class="lk" data-open="${c.id}"><div class="who">${av(c.nome, 'sm')}<div><b>${esc(c.nome)}</b> ${c.prioridade ? '<span class="tag p">Prioridade</span>' : ''}<small>${esc(c.dominio || '')}</small></div></div></a></td>
       <td>${esc(c.etapa)}${c.mesEsperado !== null && c.mesEsperado !== c.mesCiclo ? `<br><small class="warnt">pela data: Mês ${c.mesEsperado}</small>` : ''}</td>
       <td><input type="date" class="ed ${c.mover?.motivo === 'renovacao_vencida' || !c.proxRenovacao ? 'bad' : ''}" data-id="${c.id}" data-f="renovacao" value="${esc(c.proxRenovacao || '')}" aria-label="Próxima renovação"></td>
       <td><select class="ed ${c.plano ? '' : 'bad'}" data-id="${c.id}" data-f="plano" aria-label="Plano"><option value="">—</option>${planos.map(p => `<option value="${p.id}" ${p.id === c.planoId ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select>${c.plano && !c.planoId ? `<br><small>${esc(c.plano)}</small>` : ''}</td>
+      <td><select class="ed" data-id="${c.id}" data-f="contratacao" aria-label="Contratação"><option value="">—</option>${(S.opcoes?.contratacao || []).map(p => `<option value="${p.id}" ${p.id === c.contratacaoId ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select></td>
       <td><input type="number" min="0" step="0.01" class="ed num" data-id="${c.id}" data-f="valor" value="${c.valor || ''}" placeholder="0" aria-label="Valor"></td>
-      <td>${badge(c.status)}</td><td>${esc(c.responsavel || '—')}</td>
+      <td>${badge(c.status)}</td>
+      <td><select class="ed ${c.responsavel ? '' : 'bad'}" data-id="${c.id}" data-f="responsavelId" aria-label="Responsável">${c.responsavelId && !(S.usuarios || []).some(u => u.id === c.responsavelId) ? `<option value="${c.responsavelId}" selected>${esc(c.responsavel || 'Inativo')}</option>` : ''}${c.responsavelId ? '' : '<option value="" selected>—</option>'}${(S.usuarios || []).map(u => `<option value="${u.id}" ${u.id === c.responsavelId ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}</select></td>
       <td class="acts"><a class="chip brand" href="https://${esc(S.portal)}/crm/deal/details/${c.id}/" target="_blank" rel="noopener" title="Abrir o card no Bitrix24">${ic('link')}Card</a></td></tr>`).join('')}</tbody></table>` : `<div class="empty">${ic('check')}<br>Nenhum cliente nesta situação.</div>`}</div>
     <div class="mf"><span><b>${rows.length}</b> cliente(s) · <b>${R$(soma)}</b></span><span class="hint" style="margin:0">Altere a data, o plano ou o valor direto na linha: salva no card do Bitrix24 e reposiciona a etapa. Clique no nome para abrir o cliente.</span><button class="btn" id="csv">Exportar CSV</button></div></div>`;
   m.classList.add('on'); m.querySelector('.mb').scrollTop = old;
   $('#mx').onclick = closeDrill;
   m.querySelectorAll('[data-open]').forEach(e => e.onclick = () => drawer(+e.dataset.open));
   m.querySelectorAll('.ed').forEach(e => e.onchange = async () => {
-    const body = { [e.dataset.f]: e.value }; e.disabled = true;
+    if (e.dataset.f === 'responsavelId' && !e.value) return; const body = { [e.dataset.f]: e.dataset.f === 'responsavelId' ? +e.value : e.value }; e.disabled = true;
     try { const r = await api(`/api/clientes/${e.dataset.id}/dados`, { method:'POST', body: JSON.stringify(body) }); toast(r.movido ? `Salvo · ${r.movido.de} → ${r.movido.para}` : 'Salvo no card do Bitrix24 ✔'); await load(); }
     catch (er) { toast(er.message); e.disabled = false; }
   });
