@@ -8,7 +8,7 @@ function espera(m) {
     h('h2', {}, 'Sua conta foi criada. Estamos ativando o seu acesso.'),
     h('p', {}, `Olá, ${primeiroNome(U.nome)}! A equipe Manda4 vai vincular você ao seu projeto. Assim que for ativado, o cronograma e o status aparecem aqui. Você não precisa fazer nada.`),
     h('ol', { class: 'passos' }, passo('feito', 1, 'Conta criada', 'Concluído'), passo('agora', 2, 'Manda4 vincula seu projeto', 'Em andamento'), passo('', 3, 'Acompanhe e envie documentos', 'Em breve')),
-    h('div', { class: 'acoes' }, h('button', { class: 'btn pri', onclick: novaSolic }, 'Abrir chamado de suporte'), h('button', { class: 'btn', onclick: render }, 'Atualizar'), h('a', { class: 'btn', href: 'https://manda4.com.br/', target: '_blank', rel: 'noopener noreferrer' }, 'Conhecer a Manda4')),
+    h('div', { class: 'acoes' }, SUPORTE && h('button', { class: 'btn pri', onclick: novaSolic }, 'Abrir chamado de suporte'), h('button', { class: 'btn', onclick: render }, 'Atualizar'), h('a', { class: 'btn', href: 'https://manda4.com.br/', target: '_blank', rel: 'noopener noreferrer' }, 'Conhecer a Manda4')),
     h('p', { class: 'muted small', style: 'margin-top:18px' }, `Conta: ${U.email}`)));
 }
 const saudacao = () => { const hr = +new Intl.DateTimeFormat('pt-BR', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Sao_Paulo' }).format(new Date()); return hr < 12 ? 'Bom dia' : hr < 18 ? 'Boa tarde' : 'Boa noite'; };

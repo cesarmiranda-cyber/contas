@@ -1,13 +1,14 @@
 'use strict';
 // Chamados, integração com o funil de suporte, SLA, equipe, respostas prontas e central de ajuda.
 module.exports = ctx => {
-  const { A, Ajuda, CAT, MAX_FILE, PRIO, S, SLA, artigoPublico, bad, bitrix, cardUrl, checkWebhook, db, estadoSuporte, exigir, exigirAdmin, fs, http, podeVer, projetoDe, protocolo, quem, reg, regUnico, rota, secrets, send, solAcessivel, solView, store, str, suporte } = ctx;
+  const { SUPORTE_ATIVO, A, Ajuda, CAT, MAX_FILE, PRIO, S, SLA, artigoPublico, bad, bitrix, cardUrl, checkWebhook, db, estadoSuporte, exigir, exigirAdmin, fs, http, podeVer, projetoDe, protocolo, quem, reg, regUnico, rota, secrets, send, solAcessivel, solView, store, str, suporte } = ctx;
 rota('GET', '/api/solicitacoes', async (req, res, _m, _b, u) => {
   exigir(u); if (u.tipo === 'cliente') regUnico(u, 'suporte', 30 * 60e3, 'abriu_suporte'); await suporte.sincronizarSeVelho(); // etapa do card sempre fresca (no máx. 1 consulta/min)
   const l = db.solicitacoes.filter(s => u.tipo === 'equipe' || s.clienteId === u.id).map(s => solView(s, u));
   send(res, 200, { solicitacoes: l.sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)), categorias: CAT, prioridades: PRIO });
 });
 rota('POST', '/api/solicitacoes', async (req, res, _m, b, u) => {
+  if (!SUPORTE_ATIVO) throw bad(503, 'O suporte pelo portal está temporariamente indisponível.');
   exigir(u, 'cliente'); const pid = b.projetoId ? String(b.projetoId) : null; if (pid) { const p = projetoDe(pid); if (!p || !podeVer(u, p)) throw bad(400, 'Projeto inválido.'); }
   if (b.categoria && !CAT[b.categoria]) throw bad(400, 'Categoria inválida.'); if (b.prioridade && !PRIO[b.prioridade]) throw bad(400, 'Prioridade inválida.');
   const conta = db.clientes.find(c => c.id === u.id) || {};

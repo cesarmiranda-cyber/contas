@@ -18,9 +18,9 @@ function telaLogin(modo = 'login') {
     h('header', { class: 'lt' }, h('div', { class: 'logo', role: 'img', 'aria-label': 'Manda4' }, LOGO(), NOME), h('a', { class: 'btn sm', href: 'https://manda4.com.br/', target: '_blank', rel: 'noopener noreferrer' }, 'Ir para o site manda4.com.br')),
     h('main', { class: 'cena' },
       h('div', { class: 'esq' }, h('div', { class: 'selos' }, selo('or', 'Parceiro Gold Bitrix24'), selo('az', 'Centro de Treinamento Autorizado')),
-        h('h1', { class: 'tit' }, h('em', {}, 'Projetos e Suporte'), ': acompanhe o seu Bitrix24 com quem implantou'),
-        h('p', { class: 'sub' }, 'Veja o andamento do seu projeto, envie documentos e fale com a equipe Manda4. Implantamos no seu processo e seguimos ao lado, com suporte que responde.'),
-        h('ul', { class: 'bene' }, ['Projetos: cronograma e status de cada atividade (no prazo, alerta ou atrasado)', 'Envie documentos e informações direto na atividade', 'Suporte: abra chamados e acompanhe as respostas'].map(t => h('li', {}, t)))),
+        h('h1', { class: 'tit' }, h('em', {}, SUPORTE ? 'Projetos e Suporte' : 'Projetos'), ': acompanhe o seu Bitrix24 com quem implantou'),
+        h('p', { class: 'sub' }, SUPORTE ? 'Veja o andamento do seu projeto, envie documentos e fale com a equipe Manda4. Implantamos no seu processo e seguimos ao lado, com suporte que responde.' : 'Veja o andamento do seu projeto e envie documentos para a equipe Manda4. Implantamos no seu processo e seguimos ao lado.'),
+        h('ul', { class: 'bene' }, ['Projetos: cronograma e status de cada atividade (no prazo, alerta ou atrasado)', 'Envie documentos e informações direto na atividade', ...(SUPORTE ? ['Suporte: abra chamados e acompanhe as respostas'] : [])].map(t => h('li', {}, t)))),
       box));
 }
 

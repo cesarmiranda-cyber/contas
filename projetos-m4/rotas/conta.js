@@ -1,7 +1,7 @@
 'use strict';
 // Conta e acesso: cadastro, login, termos (LGPD) e “meus dados”.
 module.exports = ctx => {
-  const { MAX_FALHAS, limitaIp, A, Audit, SEC, bad, cookie, db, exigir, falhas, legal, protocolo, reg, rota, send, solView, store, str } = ctx;
+  const { SUPORTE_ATIVO, MAX_FALHAS, limitaIp, A, Audit, SEC, bad, cookie, db, exigir, falhas, legal, protocolo, reg, rota, send, solView, store, str } = ctx;
 rota('GET', '/api/legal', async (req, res) => send(res, 200, legal())); // público: o cadastro precisa mostrar antes do login
 rota('POST', '/api/config/legal', async (req, res, _m, b, u) => {
   exigir(u, 'equipe'); if (!u.admin) throw bad(403, 'Somente administradores publicam os textos legais.'); const termos = str(b.termos, 30000, true, 'Termos de uso'), privacidade = str(b.privacidade, 30000, true, 'Política de privacidade');
@@ -49,7 +49,7 @@ rota('POST', '/api/eu/senha', async (req, res, _m, b, u) => {
   c.senha = A.hash(String(b.nova)); c.trocarSenha = false; c.sessoesRevogadasEm = Date.now() - 1; reg(u, 'trocou_senha'); store.save();
   send(res, 200, { ok: true }, { 'Set-Cookie': cookie(req, A.emitir(store.secret, c.id), A.TTL / 1000) });
 });
-rota('GET', '/api/me', async (req, res, _m, _b, u) => { const l = legal(); const c = u && u.tipo === 'cliente' && db.clientes.find(x => x.id === u.id); send(res, 200, { usuario: u, sessaoMin: A.TTL / 60e3, trocarSenha: !!(c && c.trocarSenha), legalVersao: l.versao, precisaAceitar: !!(c && l.versao && !(c.aceite && c.aceite.versao === l.versao)) }); });
+rota('GET', '/api/me', async (req, res, _m, _b, u) => { const l = legal(); const c = u && u.tipo === 'cliente' && db.clientes.find(x => x.id === u.id); send(res, 200, { usuario: u, suporte: SUPORTE_ATIVO, sessaoMin: A.TTL / 60e3, trocarSenha: !!(c && c.trocarSenha), legalVersao: l.versao, precisaAceitar: !!(c && l.versao && !(c.aceite && c.aceite.versao === l.versao)) }); });
 // ---- LGPD: o cliente baixa os próprios dados; um administrador anonimiza quando ele pedir a exclusão ----
 rota('GET', '/api/eu/dados', async (req, res, _m, _b, u) => {
   exigir(u, 'cliente'); const c = db.clientes.find(x => x.id === u.id); const meus = db.projetos.filter(p => p.clientes.includes(c.id)); const tids = new Map(db.tarefas.filter(t => meus.some(p => p.id === t.projetoId) && !t.interna).map(t => [t.id, t]));

@@ -11,8 +11,8 @@ async function telaInicio(m) {
     h('div', { class: 'ac-num' }, h('b', {}, sp.abertos), h('span', { class: 'muted' }, ` chamado(s) em aberto${sp.total ? ` · ${sp.total} no total` : ''}`)),
     sp.ultimo ? h('p', { class: 'ac-prox' }, h('span', { class: 'muted' }, 'Último: '), h('b', {}, `${sp.ultimo.protocolo} · ${sp.ultimo.assunto}`), h('span', { class: 'muted' }, ` · ${sp.ultimo.aberto ? sp.ultimo.etapa || 'em atendimento' : 'concluído'} · ${rel(sp.ultimo.atualizadoEm)}`)) : h('p', { class: 'muted' }, 'Dúvida, problema ou precisa de algo? Abra um chamado e a equipe Manda4 responde por aqui.'),
     h('div', { class: 'ac-cta' }, h('button', { class: 'btn pri', onclick: () => novaSolic() }, 'Abrir chamado'), sp.total > 0 && h('button', { class: 'btn', onclick: () => go({ nome: 'solicitacoes' }) }, 'Ver chamados')));
-  juntar(m, h('section', { class: 'hero-cli' }, h('p', { class: 'eyebrow' }, U.empresa || 'Área do cliente'), h('h1', {}, `${saudacao()}, `, h('em', {}, primeiroNome(U.nome)), '.'), h('p', { class: 'sub' }, 'Acompanhe os seus projetos e fale com o suporte da Manda4.')),
-    h('div', { class: 'acessos' }, cardProj, cardSup));
+  juntar(m, h('section', { class: 'hero-cli' }, h('p', { class: 'eyebrow' }, U.empresa || 'Área do cliente'), h('h1', {}, `${saudacao()}, `, h('em', {}, primeiroNome(U.nome)), '.'), h('p', { class: 'sub' }, SUPORTE ? 'Acompanhe os seus projetos e fale com o suporte da Manda4.' : 'Acompanhe o andamento dos seus projetos com a Manda4.')),
+    h('div', { class: 'acessos' }, cardProj, SUPORTE && cardSup));
   if (pj.total === 0) return espera(m);
   const pend = [...ini.aprovacoes.map(i => ({ ...i, _apr: true, pedido: 'Esta entrega está pronta e aguarda a sua aprovação.' })), ...ini.pendencias];
   juntar(m, pend.length > 0 && h('div', { class: 'card precisa' }, h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Precisamos de você'), chip('amarelo', `${pend.length} pendência(s)`)), h('p', { class: 'muted small' }, 'Estas atividades dependem de uma informação ou documento seu para continuar no prazo.'),
