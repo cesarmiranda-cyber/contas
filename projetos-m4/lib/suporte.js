@@ -37,7 +37,7 @@ function createSuporte({ store, secrets, bitrix, publicUrl = '', linkArquivo = (
   // Envia (ou reenvia) o chamado. Idempotente: procura um card com o mesmo protocolo antes de criar.
   async function enviar(s) {
     const b = s.bitrix = { ...(s.bitrix || {}), tentativas: ((s.bitrix || {}).tentativas || 0) };
-    if (!pronto()) { b.status = 'nao_configurado'; b.erro = 'Integração com o funil de suporte ainda não configurada.'; store.save(); return b; }
+    if (!pronto()) { b.status = 'nao_configurado'; b.erro = 'Integração com o funil de suporte ainda não configurada.'; console.error(`[suporte] ${s.protocolo}: integração não configurada (sem webhook, funil ou etapa)`); store.save(); return b; }
     try {
       const ex = await bitrix.call('crm.deal.list', { filter: { '%TITLE': `[${s.protocolo}]`, CATEGORY_ID: cfg().categoriaId }, select: ['ID'] });
       if (ex.result?.[0]) { Object.assign(b, { status: 'enviado', dealId: +ex.result[0].ID, erro: '', enviadoEm: b.enviadoEm || store.agora() }); store.save(); return b; }
@@ -49,7 +49,7 @@ function createSuporte({ store, secrets, bitrix, publicUrl = '', linkArquivo = (
       const r = await bitrix.call('crm.deal.add', { fields: f, params: { REGISTER_SONET_EVENT: 'Y' } });
       Object.assign(b, { status: 'enviado', dealId: +r.result, erro: '', enviadoEm: store.agora() });
       if (!s.etapa) { s.etapa = { id: cfg().estagioId, nome: cfg().etapaNome || 'Recebido', semantica: '', desde: store.agora() }; s.historico = [{ ts: store.agora(), etapa: s.etapa.nome }]; }
-    } catch (e) { b.tentativas++; b.status = 'erro'; b.erro = String(e.message).slice(0, 300); b.ultimaTentativa = store.agora(); }
+    } catch (e) { b.tentativas++; b.status = 'erro'; b.erro = String(e.message).slice(0, 300); console.error(`[suporte] ${s.protocolo}: falha ao criar o card (tentativa ${b.tentativas}): ${b.erro}`); b.ultimaTentativa = store.agora(); }
     store.save(); return b;
   }
   // Mensagens do portal (cliente e equipe) viram comentários na linha do tempo do card.
