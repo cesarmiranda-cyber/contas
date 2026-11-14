@@ -1,0 +1,9 @@
+{
+  "name": "hub-gestao-clientes-manda4",
+  "version": "1.0.0",
+  "description": "Hub de gestão de clientes (Bitrix24): registro mensal de contato/reunião, dashboard e ciclo de 12 meses",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node --test" },
+  "engines": { "node": ">=20" }
+}

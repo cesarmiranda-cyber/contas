@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hub de Clientes</title>
+<style>
+:root{--bg:#f4f5f9;--panel:#fff;--ink:#1c2033;--mut:#667;--line:#e1e4ee;--brand:#4f46e5;--brand-ink:#fff;
+--reuniao:#1b8a5a;--contato:#2a6fdb;--sem_contato:#c0392b;--pendente:#8a8fa3;--atrasado:#d97706;
+--reuniao-bg:#e3f5ec;--contato-bg:#e4eefc;--sem_contato-bg:#fbe7e4;--pendente-bg:#eceef4;--atrasado-bg:#fdf0dc;
+--verde:#1b8a5a;--amarelo:#d9a406;--vermelho:#c0392b;--shadow:0 1px 3px rgba(20,25,60,.1)}
+@media(prefers-color-scheme:dark){:root{--bg:#12141f;--panel:#1b1e2d;--ink:#e8eaf4;--mut:#9aa0b8;--line:#2c3047;--brand:#7c78ff;--brand-ink:#12141f;
+--reuniao:#4cc38a;--contato:#6aa3ff;--sem_contato:#ff7a6b;--pendente:#9aa0b8;--atrasado:#f5a524;
+--reuniao-bg:#173126;--contato-bg:#182a47;--sem_contato-bg:#3a1f1c;--pendente-bg:#262a3d;--atrasado-bg:#3a2d14;--shadow:none}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.shell{display:flex;min-height:100vh}
+.side{width:210px;background:var(--panel);border-right:1px solid var(--line);padding:16px 12px;flex-shrink:0}
+.side h1{font-size:16px;margin:0 6px 14px}.side .mod{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:8px;margin-bottom:2px;cursor:pointer}
+.side .mod.on{background:var(--brand);color:var(--brand-ink);font-weight:600}.side .mod[disabled]{opacity:.5;cursor:default}.side small{display:block;color:var(--mut);margin:14px 8px 0}
+main{flex:1;min-width:0;padding:16px 20px 40px}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.top h2{margin:0;font-size:20px;flex:1;min-width:200px}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button{border:0;background:none;padding:6px 14px;border-radius:7px;cursor:pointer}.tabs button.on{background:var(--brand);color:var(--brand-ink);font-weight:600}
+.mes{display:flex;align-items:center;gap:4px}.mes button{border:1px solid var(--line);background:var(--panel);border-radius:8px;width:32px;height:32px;cursor:pointer}
+.mes b{min-width:130px;text-align:center}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer}.btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:600}
+.btn.dan{color:var(--sem_contato)}.btn:disabled{opacity:.55;cursor:default}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+.kpi,.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.kpi .n{font-size:26px;font-weight:700}.kpi .l{color:var(--mut);font-size:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px;margin-bottom:12px}
+.box h3{margin:0 0 10px;font-size:14px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--pendente-bg)}.bar i{display:block}
+.row{display:grid;grid-template-columns:78px 1fr 60px;gap:8px;align-items:center;margin:6px 0;font-size:13px}.row span:last-child{text-align:right;color:var(--mut)}
+.leg{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--mut);margin-top:8px}.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.s-reuniao{--c:var(--reuniao);--b:var(--reuniao-bg)}.s-contato{--c:var(--contato);--b:var(--contato-bg)}.s-sem_contato{--c:var(--sem_contato);--b:var(--sem_contato-bg)}.s-pendente{--c:var(--pendente);--b:var(--pendente-bg)}.s-atrasado{--c:var(--atrasado);--b:var(--atrasado-bg)}.s-na{--c:var(--line);--b:var(--bg)}
+.badge{display:inline-flex;gap:4px;align-items:center;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--b);color:var(--c)}
+.alert{display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line);cursor:pointer}.alert:first-of-type{border-top:0}.alert .t{flex:1;min-width:0}.alert .t small{color:var(--mut);display:block}
+.chip{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--pendente-bg);color:var(--mut);white-space:nowrap}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.tools input,.tools select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px}.tools input{min-width:220px}
+.board{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;align-items:flex-start}
+.col{background:var(--bg);width:262px;flex-shrink:0}.col h4{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;border-top:3px solid var(--brand)}
+.card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:9px 10px;margin-bottom:8px;cursor:pointer;box-shadow:var(--shadow)}
+.card:hover{border-color:var(--brand)}.card .nm{font-weight:600;word-break:break-word}.card .sub{color:var(--mut);font-size:12px;word-break:break-all}
+.card .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.hist{display:flex;gap:2px;margin-top:7px}.hist i{flex:1;height:6px;border-radius:2px;background:var(--c)}
+.sd{width:9px;height:9px;border-radius:50%;display:inline-block}.sd.verde{background:var(--verde)}.sd.amarelo{background:var(--amarelo)}.sd.vermelho{background:var(--vermelho)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}th{font-size:12px;color:var(--mut)}tr.c{cursor:pointer}tr.c:hover{background:var(--bg)}
+.drawer{position:fixed;inset:0 0 0 auto;width:min(560px,100%);background:var(--panel);border-left:1px solid var(--line);box-shadow:-8px 0 30px rgba(0,0,0,.2);overflow:auto;padding:18px;z-index:10;display:none}
+.drawer.on{display:block}.drawer h2{margin:0 30px 2px 0;font-size:18px}.x{position:absolute;right:12px;top:10px;border:0;background:none;font-size:22px;cursor:pointer}
+.sec{margin:16px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut)}
+label{display:block;font-size:12px;color:var(--mut);margin:10px 0 3px}label.ck{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
+.f input[type=text],.f input[type=date],.f select,.f textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px}.f textarea{min-height:70px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}.seg label{margin:0;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;color:var(--ink);font-size:13px;display:flex;gap:6px;align-items:center}.seg input{accent-color:var(--brand)}
+.tl{border-left:2px solid var(--line);margin-left:6px;padding-left:12px}.tl .it{margin:0 0 10px;position:relative}.tl .it:before{content:"";position:absolute;left:-18px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--c);border:2px solid var(--panel)}
+.tl .it p{margin:2px 0;color:var(--mut);white-space:pre-wrap}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:30;display:none;max-width:90vw}
+.err{background:var(--sem_contato-bg);color:var(--sem_contato);padding:12px;border-radius:10px}
+.empty{color:var(--mut);padding:18px;text-align:center}
+@media(max-width:760px){.shell{display:block}.side{width:auto;display:flex;gap:6px;align-items:center;padding:8px;overflow-x:auto}.side h1{margin:0 8px 0 4px;white-space:nowrap}.side small{display:none}.side .mod{width:auto;white-space:nowrap}main{padding:12px}.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="side">
+    <h1>Hub de Clientes</h1>
+    <button class="mod on">📋 Registro de Cliente</button>
+    <button class="mod" disabled>Novos módulos em breve</button>
+    <small>Funil de contratos ativos · ciclo de 12 meses</small>
+  </nav>
+  <main>
+    <div class="top">
+      <h2>Registro de Cliente</h2>
+      <div class="mes"><button id="mAnt" title="Mês anterior">‹</button><b id="mLbl"></b><button id="mPro" title="Próximo mês">›</button></div>
+      <div class="tabs" id="tabs"><button data-t="dash" class="on">Dashboard</button><button data-t="board">Kanban</button><button data-t="lista">Lista</button></div>
+      <button class="btn" id="rec" title="Recarregar do Bitrix24">↻</button>
+    </div>
+    <div id="view"><div class="empty">Carregando…</div></div>
+  </main>
+</div>
+<aside class="drawer" id="dr"></aside>
+<div class="toast" id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ST = { reuniao:['Reunião feita','✔'], contato:['Só contato','◐'], sem_contato:['Sem contato','✖'], pendente:['Pendente','○'], atrasado:['Atrasado','!'], na:['—',''] };
+const SAUDE = { verde:'Verde', amarelo:'Amarelo', vermelho:'Vermelho' };
+const REN = { provavel:'Provável', indefinido:'Indefinida', improvavel:'Improvável' };
+const CANAL = { reuniao:'Reunião presencial', video:'Videochamada', whatsapp:'WhatsApp', telefone:'Telefone', email:'E-mail', outro:'Outro' };
+let S = null, mes = null, tab = localStorage.getItem('hub.tab') || 'dash', filtro = { q:'', status:'', resp:'' };
+const pct = v => Math.round(v * 100) + '%';
+const mesNome = m => { const [y, mo] = m.split('-'); const t = new Date(+y, mo - 1, 1).toLocaleDateString('pt-BR', { month:'long', year:'numeric' }); return t[0].toUpperCase() + t.slice(1); };
+const mesCurto = m => { const [y, mo] = m.split('-'); return new Date(+y, mo - 1, 1).toLocaleDateString('pt-BR', { month:'short' }).replace('.', '') + '/' + y.slice(2); };
+const addMes = (m, n) => { const [y, mo] = m.split('-').map(Number), t = y * 12 + mo - 1 + n; return `${Math.floor(t/12)}-${String(t%12+1).padStart(2,'0')}`; };
+const fdata = d => d ? d.split('-').reverse().join('/') : '';
+function toast(t) { const e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.display = 'none', 4500); }
+async function api(path, opt) {
+  const r = await fetch(path, { ...opt, headers: opt?.body ? { 'Content-Type':'application/json' } : {} });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Erro ' + r.status);
+  return j;
+}
+async function load() {
+  try { S = await api('/api/estado' + (mes ? '?mes=' + mes : '')); mes = S.mes; render(); }
+  catch (e) { $('#view').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+function render() {
+  $('#mLbl').textContent = mesNome(mes);
+  $('#mPro').disabled = mes >= S.hoje.slice(0, 7);
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
+  $('#view').innerHTML = tab === 'dash' ? dash() : tools() + (tab === 'board' ? board() : lista());
+  bind();
+  if (openId) drawer(openId, true);
+}
+const badge = s => `<span class="badge s-${s}">${ST[s][1]} ${ST[s][0]}</span>`;
+const sd = s => s ? `<span class="sd ${s}" title="Saúde: ${SAUDE[s]}"></span>` : '';
+function stack(v, order = ['reuniao','contato','sem_contato','atrasado','pendente']) {
+  if (!v.total) return '<div class="bar"></div>';
+  return `<div class="bar" title="${order.map(k => ST[k][0] + ': ' + v[k]).join(' · ')}">` + order.map(k => v[k] ? `<i class="s-${k}" style="width:${v[k]/v.total*100}%;background:var(--c)"></i>` : '').join('') + '</div>';
+}
+const legend = () => '<div class="leg">' + ['reuniao','contato','sem_contato','atrasado','pendente'].map(k => `<span class="s-${k}"><span class="dot" style="background:var(--c)"></span>${ST[k][0]}</span>`).join('') + '</div>';
+
+function dash() {
+  const D = S.dashboard, g = D.geral, A = D.resumoAlertas;
+  const kp = (n, l, extra = '') => `<div class="kpi"><div class="n">${n}</div><div class="l">${l}${extra}</div></div>`;
+  const serie = D.serie.map(m => `<div class="row"><span>${esc(mesCurto(m.mes))}</span>${stack(m)}<span>${m.reuniao + m.contato}/${m.total}</span></div>`).join('');
+  const etapas = D.porEtapa.map(e => `<div class="row"><span>${esc(e.etapa)}</span>${stack(e)}<span>${e.total}</span></div>`).join('');
+  const resp = D.porResponsavel.map(e => `<div class="row"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(e.nome)}">${esc(e.nome)}</span>${stack(e)}<span>${e.reuniao + e.contato}/${e.total}</span></div>`).join('');
+  const tipos = { atrasado:'Atrasos', sem_contato:'Sem contato', saude:'Saúde', renovacao:'Renovação', mover:'Mover' };
+  const al = D.alertas.slice(0, 40).map(a => `<div class="alert" data-open="${a.dealId}"><span class="chip">${tipos[a.tipo]}</span><span class="t">${esc(a.nome)}<small>${esc(a.etapa)} · ${esc(a.detalhe)}</small></span></div>`).join('');
+  return `<div class="kpis">
+    ${kp(g.total, 'clientes ativos no funil')}
+    ${kp(pct(D.cobertura), 'com contato no mês', ` (${g.reuniao + g.contato}/${g.total})`)}
+    ${kp(pct(D.reuniaoPct), 'com reunião realizada', ` (${g.reuniao})`)}
+    ${kp(g.pendente + g.atrasado, 'sem registro no mês', ` (${g.atrasado} em atraso)`)}
+    ${kp(g.sem_contato, 'registrados sem contato')}
+    ${kp(A.mover, 'para mover de etapa')}
+  </div>
+  <div class="grid2">
+    <div class="box"><h3>Contato por mês (últimos 6)</h3>${serie}${legend()}</div>
+    <div class="box"><h3>${esc(mesNome(mes))}: por etapa do ciclo</h3>${etapas}${legend()}</div>
+    <div class="box"><h3>Por responsável</h3>${resp || '<div class="empty">Sem dados</div>'}</div>
+    <div class="box"><h3>Saúde dos clientes</h3>
+      ${['verde','amarelo','vermelho','sem'].map(k => `<div class="row"><span>${k === 'sem' ? 'Sem avaliação' : SAUDE[k]}</span><div class="bar"><i style="width:${g.total ? D.saude[k]/g.total*100 : 0}%;background:${k==='sem'?'var(--pendente)':'var(--'+k+')'}"></i></div><span>${D.saude[k]}</span></div>`).join('')}
+      <div class="leg">Encerrados: ${D.encerrados.assinados} assinados · ${D.encerrados.cancelados} cancelados</div></div>
+  </div>
+  <div class="box"><h3>Atenção (${D.alertas.length})</h3>${al || '<div class="empty">Nenhum alerta 🎉</div>'}</div>`;
+}
+function tools() {
+  const rs = [...new Set(S.clientes.filter(c => c.tipoEtapa === 'mes').map(c => c.responsavel).filter(Boolean))].sort();
+  return `<div class="tools"><input id="q" placeholder="Buscar cliente ou domínio…" value="${esc(filtro.q)}">
+    <select id="fs"><option value="">Todas as situações</option>${['reuniao','contato','sem_contato','pendente','atrasado'].map(k => `<option value="${k}" ${filtro.status===k?'selected':''}>${ST[k][0]}</option>`).join('')}</select>
+    <select id="fr"><option value="">Todos os responsáveis</option>${rs.map(r => `<option ${filtro.resp===r?'selected':''}>${esc(r)}</option>`).join('')}</select></div>`;
+}
+const filtrados = () => S.clientes.filter(c => c.tipoEtapa === 'mes' && c.status !== 'na' &&
+  (!filtro.status || c.status === filtro.status) && (!filtro.resp || c.responsavel === filtro.resp) &&
+  (!filtro.q || (c.nome + ' ' + c.dominio).toLowerCase().includes(filtro.q.toLowerCase())));
+const hist = c => `<div class="hist">${c.historico.map(h => `<i class="s-${h.status}" title="${esc(mesNome(h.mes))}: ${ST[h.status][0]}"></i>`).join('')}</div>`;
+function card(c) {
+  return `<div class="card s-${c.status}" data-open="${c.id}"><div class="nm">${esc(c.nome)}</div>${c.nome !== c.dominio ? `<div class="sub">${esc(c.dominio)}</div>` : ''}
+    <div class="meta">${badge(c.status)} ${sd(c.saude)} ${c.mover?.vencida ? '<span class="chip" title="Hora de mover">⇄ mover</span>' : ''}</div>
+    <div class="sub" style="margin-top:4px">${esc(c.responsavel || 'Sem responsável')}${c.diasSemContato !== null ? ' · ' + c.diasSemContato + 'd sem contato' : ''}</div>${hist(c)}</div>`;
+}
+function board() {
+  const l = filtrados();
+  return '<div class="board">' + S.etapas.map(e => { const cs = l.filter(c => c.etapaId === e.id);
+    return `<div class="col"><h4><span>${esc(e.nome)}</span><span>${cs.length}</span></h4>${cs.map(card).join('') || '<div class="empty">—</div>'}</div>`; }).join('') + '</div>';
+}
+function lista() {
+  const l = filtrados().sort((a, b) => a.mesCiclo - b.mesCiclo || a.nome.localeCompare(b.nome));
+  if (!l.length) return '<div class="empty">Nenhum cliente encontrado.</div>';
+  return `<table><thead><tr><th>Cliente</th><th>Etapa</th><th>Situação do mês</th><th>Último contato</th><th>Saúde</th><th>Responsável</th></tr></thead><tbody>` +
+    l.map(c => `<tr class="c" data-open="${c.id}"><td><b>${esc(c.nome)}</b><br><small style="color:var(--mut)">${esc(c.dominio)}</small></td><td>${esc(c.etapa)}</td><td>${badge(c.status)}</td><td>${c.ultimoContato ? fdata(c.ultimoContato.slice(0, 10)) + ' (' + c.diasSemContato + 'd)' : '—'}</td><td>${sd(c.saude)} ${c.saude ? SAUDE[c.saude] : '—'}</td><td>${esc(c.responsavel || '—')}</td></tr>`).join('') + '</tbody></table>';
+}
+let openId = null;
+function bind() {
+  document.querySelectorAll('[data-open]').forEach(e => e.onclick = () => drawer(+e.dataset.open));
+  const q = $('#q'); if (q) { q.oninput = () => { filtro.q = q.value; const p = q.selectionStart; render(); const n = $('#q'); n.focus(); n.setSelectionRange(p, p); }; $('#fs').onchange = e => { filtro.status = e.target.value; render(); }; $('#fr').onchange = e => { filtro.resp = e.target.value; render(); }; }
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { tab = b.dataset.t; try { localStorage.setItem('hub.tab', tab); } catch {} render(); });
+$('#mAnt').onclick = () => { mes = addMes(mes, -1); load(); };
+$('#mPro').onclick = () => { mes = addMes(mes, 1); load(); };
+$('#rec').onclick = () => load();
+
+function drawer(id, keep) {
+  const c = S.clientes.find(x => x.id === id); const dr = $('#dr');
+  if (!c) { dr.classList.remove('on'); openId = null; return; }
+  openId = id;
+  const r = c.registro || {}, regs = S.registros.filter(x => x.dealId === id).sort((a, b) => b.mes.localeCompare(a.mes));
+  const ck = (n, v) => v ? 'checked' : '';
+  const keepForm = keep && $('#fm') ? new FormData($('#fm')) : null;
+  dr.innerHTML = `<button class="x" id="dx" aria-label="Fechar">×</button>
+    <h2>${esc(c.nome)}</h2><div style="color:var(--mut)">${esc(c.dominio)} · ${esc(c.etapa)} · ${esc(c.responsavel || 'Sem responsável')}</div>
+    <div class="meta" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">${badge(c.status)} ${sd(c.saude)} <span class="chip">${c.sequencia} mês(es) seguidos com contato</span>${c.diasNaEtapa !== null ? `<span class="chip">${c.diasNaEtapa}d na etapa</span>` : ''}</div>
+    ${hist(c)}
+    <p><a href="https://${esc(S.portal)}/crm/deal/details/${c.id}/" target="_blank" rel="noopener">Abrir card no Bitrix24 ↗</a></p>
+    <div class="sec">Registro de ${esc(mesNome(mes))}</div>
+    <form class="f" id="fm">
+      <label class="ck"><input type="checkbox" name="reuniaoRealizada" ${ck('', r.reuniaoRealizada)}> Reunião realizada</label>
+      <label class="ck"><input type="checkbox" name="contatoFeito" ${ck('', r.contatoFeito && !r.reuniaoRealizada)}> Contato feito (sem reunião)</label>
+      <div id="comC"><div class="two"><div><label>Data do contato</label><input type="date" name="data" value="${esc(r.data || '')}" max="${esc(S.hoje)}"></div>
+        <div><label>Canal</label><select name="canal">${Object.entries(CANAL).map(([k, v]) => `<option value="${k}" ${r.canal === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
+        <label>Participantes</label><input type="text" name="participantes" value="${esc(r.participantes || '')}" maxlength="300"></div>
+      <div id="semC"><label>Motivo de não ter havido contato/reunião</label><textarea name="motivo" maxlength="1000">${esc(r.motivo || '')}</textarea></div>
+      <label>Resumo</label><textarea name="resumo" maxlength="4000">${esc(r.resumo || '')}</textarea>
+      <label>Próximos passos</label><textarea name="proximosPassos" maxlength="2000">${esc(r.proximosPassos || '')}</textarea>
+      <div class="two"><div><label>Saúde do cliente</label><div class="seg">${['', 'verde','amarelo','vermelho'].map(k => `<label><input type="radio" name="saude" value="${k}" ${(r.saude || '') === k ? 'checked' : ''}>${k ? SAUDE[k] : '—'}</label>`).join('')}</div></div>
+        <div><label>Intenção de renovar</label><select name="renovacao"><option value="">—</option>${Object.entries(REN).map(([k, v]) => `<option value="${k}" ${r.renovacao === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div></div>
+      <label>Próximo contato</label><input type="date" name="proximoContato" value="${esc(r.proximoContato || '')}">
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" id="sv">${c.registro ? 'Atualizar registro' : 'Salvar registro'}</button>
+        ${c.registro ? '<button type="button" class="btn dan" id="del">Excluir registro do mês</button>' : ''}</div>
+      <div style="color:var(--mut);font-size:12px;margin-top:6px">Ao salvar, o registro também é lançado na linha do tempo do card no Bitrix24. Sem marcar nada = "sem contato" neste mês.</div>
+    </form>
+    <div class="sec">Ciclo do cliente</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${c.mesCiclo < 12 ? `<button class="btn ${c.mover?.tipo === 'avancar' ? 'pri' : ''}" data-mv="avancar">Avançar para Mês ${c.mesCiclo + 1}</button>` : `<button class="btn ${c.mover ? 'pri' : ''}" data-mv="renovar">Renovou → voltar ao Mês 0</button>`}
+      <button class="btn dan" data-mv="cancelar">Cancelar cliente</button></div>
+    <div class="sec">Histórico</div>
+    <div class="tl">${regs.map(x => { const s = x.reuniaoRealizada ? 'reuniao' : x.contatoFeito ? 'contato' : 'sem_contato';
+      return `<div class="it s-${s}"><b>${esc(mesNome(x.mes))}</b> ${badge(s)} ${sd(x.saude)}
+        <p>${x.data ? fdata(x.data) + ' · ' + esc(CANAL[x.canal] || '') : esc(x.motivo || '')}${x.resumo ? '\n' + esc(x.resumo) : ''}${x.proximosPassos ? '\n➜ ' + esc(x.proximosPassos) : ''}</p></div>`; }).join('') || '<div class="empty">Nenhum registro ainda.</div>'}</div>`;
+  dr.classList.add('on');
+  const f = $('#fm');
+  if (keepForm) for (const [k, v] of keepForm) { const el = f.elements[k]; if (!el) continue; if (el.type === 'checkbox') el.checked = true; else if (el.length) [...el].forEach(x => x.checked = x.value === v); else el.value = v; }
+  const sync = () => {
+    const re = f.reuniaoRealizada.checked, co = f.contatoFeito.checked || re;
+    $('#comC').style.display = co ? '' : 'none'; $('#semC').style.display = co ? 'none' : '';
+  };
+  f.reuniaoRealizada.onchange = () => { if (f.reuniaoRealizada.checked) f.contatoFeito.checked = false; sync(); };
+  f.contatoFeito.onchange = () => { if (f.contatoFeito.checked) f.reuniaoRealizada.checked = false; sync(); };
+  if (!f.data.value) f.data.value = mes === S.hoje.slice(0, 7) ? S.hoje : '';
+  sync();
+  $('#dx').onclick = () => { dr.classList.remove('on'); openId = null; };
+  f.onsubmit = async e => {
+    e.preventDefault(); const b = $('#sv'); b.disabled = true;
+    const fd = Object.fromEntries(new FormData(f));
+    const body = { ...fd, dealId: id, mes, reuniaoRealizada: f.reuniaoRealizada.checked, contatoFeito: f.contatoFeito.checked };
+    try { const r = await api('/api/registros', { method:'POST', body: JSON.stringify(body) }); toast(r.timeline ? 'Registro salvo e lançado no card ✔' : 'Registro salvo (não foi possível lançar no card do Bitrix24)'); openId = null; await load(); drawer(id); }
+    catch (er) { toast(er.message); b.disabled = false; }
+  };
+  const del = $('#del'); if (del) del.onclick = async () => {
+    if (!confirm('Excluir o registro deste mês? (o comentário já lançado no Bitrix24 permanece)')) return;
+    try { await api(`/api/registros?dealId=${id}&mes=${mes}`, { method:'DELETE' }); toast('Registro excluído'); await load(); } catch (er) { toast(er.message); }
+  };
+  dr.querySelectorAll('[data-mv]').forEach(b => b.onclick = async () => {
+    const a = b.dataset.mv, msg = { avancar:`Mover ${c.nome} para o Mês ${c.mesCiclo + 1}?`, renovar:`${c.nome} renovou? Voltar para o Mês 0.`, cancelar:`Mover ${c.nome} para CANCELADOS?` }[a];
+    if (!confirm(msg)) return;
+    try { const r = await api(`/api/clientes/${id}/mover`, { method:'POST', body: JSON.stringify({ acao: a }) }); toast(`${r.de} → ${r.para}`); openId = null; $('#dr').classList.remove('on'); await load(); } catch (er) { toast(er.message); }
+  });
+}
+load();
+</script>
+</body>
+</html>
