@@ -36,8 +36,30 @@ function situacao(reg, mes, hoje, inicio) {
   return 'pendente';
 }
 
+// Etapa esperada pela data da próxima renovação (campo "Próxima Renovação Bitrix24"), por meses de calendário:
+// renova daqui a 12 meses → Mês 0 … renova neste mês → Mês 12. Data em mês anterior = renovação vencida (precisa decisão).
+const idxMes = d => { const [y, m] = d.slice(0, 7).split('-').map(Number); return y * 12 + m - 1; };
+function mesEsperado(renov, hoje) {
+  if (!renov) return null;
+  const diff = idxMes(renov) - idxMes(hoje);
+  if (diff < 0) return { mes: 12, vencida: true };
+  return { mes: Math.max(0, Math.min(12, 12 - diff)), vencida: false };
+}
+// Plano de sincronização: quais cards mudam de etapa e quais ficam de fora (sem data / renovação vencida).
+function plano({ deals, etapa, hoje, campo }) {
+  const mover = [], ignorados = [];
+  for (const d of deals) {
+    const e = etapa.porId[d.stageId]; if (!e || e.tipo !== 'mes') continue;
+    const renov = d[campo] ? String(d[campo]).slice(0, 10) : null, esp = mesEsperado(renov, hoje);
+    if (!esp) { ignorados.push({ id: d.id, titulo: d.title, etapa: e.nome, motivo: 'sem_data' }); continue; }
+    if (esp.vencida) { ignorados.push({ id: d.id, titulo: d.title, etapa: e.nome, renovacao: renov, motivo: 'vencida' }); continue; }
+    if (esp.mes !== e.mes) mover.push({ id: d.id, titulo: d.title, de: e.nome, para: etapa.meses.find(x => x.mes === esp.mes)?.nome, paraId: etapa.meses.find(x => x.mes === esp.mes)?.id, renovacao: renov });
+  }
+  return { mover: mover.filter(m => m.paraId), ignorados };
+}
+
 // Monta a visão de cada cliente do funil. deals: [{id,title,stageId,companyId,assignedById,begindate,movedTime,...}]
-function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuarios = {}, mes, hoje }) {
+function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuarios = {}, mes, hoje, campo }) {
   const porDeal = new Map();
   for (const r of registros) { if (!porDeal.has(r.dealId)) porDeal.set(r.dealId, new Map()); porDeal.get(r.dealId).set(r.mes, r); }
   const out = [];
@@ -55,16 +77,22 @@ function clientes({ deals, etapa, registros, empresas = {}, contatos = {}, usuar
     let seq = 0;
     for (let i = (reg ? 0 : 1); i < 24; i++) { const r = regs.get(addMes(mes, -i)); if (r && (r.reuniaoRealizada || r.contatoFeito)) seq++; else break; }
     const diasNaEtapa = d.movedTime ? Math.max(0, diasEntre(d.movedTime, hoje)) : null;
+    const renov = campo && d[campo] ? String(d[campo]).slice(0, 10) : null, esp = mesEsperado(renov, hoje);
     let mover = null;
-    if (e.tipo === 'mes' && diasNaEtapa !== null) {
-      if (e.mes === 12) mover = { tipo: 'decidir', vencida: diasNaEtapa >= DIAS_ETAPA };
-      else if (diasNaEtapa >= DIAS_ETAPA) mover = { tipo: 'avancar', vencida: true };
+    if (e.tipo === 'mes') {
+      if (esp?.vencida) mover = { tipo: 'decidir', vencida: true, motivo: 'renovacao_vencida' };
+      else if (esp && esp.mes !== e.mes) mover = { tipo: 'sincronizar', vencida: true, destinoMes: esp.mes };
+      else if (esp && e.mes === 12) mover = { tipo: 'decidir', vencida: false };
+      else if (!esp && diasNaEtapa !== null) {
+        if (e.mes === 12) mover = { tipo: 'decidir', vencida: diasNaEtapa >= DIAS_ETAPA };
+        else if (diasNaEtapa >= DIAS_ETAPA) mover = { tipo: 'avancar', vencida: true };
+      }
     }
     out.push({
       id: d.id, nome: empresas[d.companyId] || contatos[d.contactId] || d.title, dominio: String(d.title).includes('.') ? d.title : '', empresaId: d.companyId || null,
       responsavelId: d.assignedById, responsavel: usuarios[d.assignedById] || null,
       etapaId: e.id, etapa: e.nome, mesCiclo: e.mes, tipoEtapa: e.tipo, inicio, valor: d.amount || 0, moeda: d.currency || 'BRL',
-      diasNaEtapa, mover, status: situacao(reg, mes, hoje, inicio), registro: reg,
+      diasNaEtapa, mover, proxRenovacao: renov, mesEsperado: esp ? esp.mes : null, status: situacao(reg, mes, hoje, inicio), registro: reg,
       saude: ultimo?.saude || null, renovacao: ultimo?.renovacao || null,
       ultimoContato: refDias, diasSemContato: refDias ? Math.max(0, diasEntre(refDias, hoje)) : null, temContato: !!comContato,
       sequencia: seq, historico,
@@ -101,7 +129,7 @@ function dashboard({ lista, etapa, registros, mes, hoje }) {
     if (c.renovacao === 'improvavel') add('renovacao', c, 'Renovação improvável');
     if (c.diasSemContato !== null && c.diasSemContato > DIAS_SEM_CONTATO) add('sem_contato', c, `${c.diasSemContato} dias sem contato`);
     if (c.status === 'atrasado') add('atrasado', c, 'Registro do mês em atraso');
-    if (c.mover?.vencida) add('mover', c, c.mover.tipo === 'decidir' ? 'Fim do ciclo: renovar ou cancelar' : `Há ${c.diasNaEtapa} dias em ${c.etapa}: avançar de mês`);
+    if (c.mover?.vencida) add('mover', c, c.mover.motivo === 'renovacao_vencida' ? `Renovação vencida (${c.proxRenovacao.split('-').reverse().join('/')}): renovar ou cancelar` : c.mover.tipo === 'sincronizar' ? `Pela renovação (${c.proxRenovacao.split('-').reverse().join('/')}) deveria estar no Mês ${c.mover.destinoMes}` : c.mover.tipo === 'decidir' ? 'Fim do ciclo: renovar ou cancelar' : `Há ${c.diasNaEtapa} dias em ${c.etapa}: avançar de mês`);
   }
   const cont = t => alertas.filter(a => a.tipo === t).length;
   return {
@@ -126,4 +154,4 @@ function destino(acao, atual, etapa) {
   return { erro: 'Ação inválida.' };
 }
 
-module.exports = { STATUS, DIA_ATRASO, DIAS_ETAPA, DIAS_SEM_CONTATO, addMes, diasEntre, todayBR, etapas, situacao, statusDoRegistro, clientes, dashboard, destino };
+module.exports = { mesEsperado, plano, STATUS, DIA_ATRASO, DIAS_ETAPA, DIAS_SEM_CONTATO, addMes, diasEntre, todayBR, etapas, situacao, statusDoRegistro, clientes, dashboard, destino };

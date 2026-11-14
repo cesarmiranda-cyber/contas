@@ -88,7 +88,7 @@ label{display:block;font-size:12px;color:var(--mut);margin:10px 0 3px}label.ck{d
       <h2>Registro de Visita</h2>
       <div class="mes"><button id="mAnt" title="Mês anterior">‹</button><b id="mLbl"></b><button id="mPro" title="Próximo mês">›</button></div>
       <div class="tabs" id="tabs"><button data-t="reg">Registrar visita</button><button data-t="hist">Visitas</button><button data-t="dash">Acompanhamento</button><button data-t="board">Kanban</button><button data-t="lista">Lista</button></div>
-      <button class="btn" id="rec" title="Recarregar do Bitrix24">↻</button>
+      <button class="btn" id="syn" title="Ajusta as etapas pela Próxima Renovação">⇄ Sincronizar etapas</button><button class="btn" id="rec" title="Recarregar do Bitrix24">↻</button>
     </div>
     <div id="view"><div class="empty">Carregando…</div></div>
   </main>
@@ -226,6 +226,14 @@ $('#nReg').onclick = () => { view = 'app'; render(); };
 $('#mAnt').onclick = () => { mes = addMes(mes, -1); load(); };
 $('#mPro').onclick = () => { mes = addMes(mes, 1); load(); };
 $('#rec').onclick = () => load();
+$('#syn').onclick = async () => {
+  try {
+    const pl = await api('/api/sincronizar');
+    if (!pl.mover.length) return toast(`Etapas já estão corretas pela renovação.${pl.ignorados.length ? ' ' + pl.ignorados.length + ' card(s) sem data ou com renovação vencida não são movidos.' : ''}`);
+    if (!confirm(`Mover ${pl.mover.length} card(s) conforme a Próxima Renovação?\n\n` + pl.mover.slice(0, 15).map(m => `${m.titulo}: ${m.de} → ${m.para}`).join('\n'))) return;
+    const r = await api('/api/sincronizar', { method:'POST', body:'{}' }); toast(`${r.movidos.length} card(s) movido(s)`); await load();
+  } catch (e) { toast(e.message); }
+};
 
 function drawer(id, keep) {
   const c = S.clientes.find(x => x.id === id); const inline = tab === 'reg' && $('#pn'); const dr = inline ? $('#pn') : $('#dr');
@@ -239,6 +247,7 @@ function drawer(id, keep) {
     <h2>${esc(c.nome)}</h2><div style="color:var(--mut)">${[c.dominio, c.etapa, c.responsavel || 'Sem responsável'].filter(Boolean).map(esc).join(' · ')}</div>
     <div class="meta" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">${badge(c.status)} ${sd(c.saude)} <span class="chip">${c.sequencia} mês(es) seguidos com contato</span>${c.diasNaEtapa !== null ? `<span class="chip">${c.diasNaEtapa}d na etapa</span>` : ''}</div>
     ${hist(c)}
+    <p style="margin:8px 0 0">Próxima renovação: <b>${c.proxRenovacao ? fdata(c.proxRenovacao) : 'não informada'}</b>${c.mesEsperado !== null ? ` · pela data deveria estar no <b>Mês ${c.mesEsperado}</b>` : ''}${c.mover?.motivo === 'renovacao_vencida' ? ' · <b style="color:var(--sem_contato)">renovação vencida: renovou ou cancelou?</b>' : ''}</p>
     <p><a href="https://${esc(S.portal)}/crm/deal/details/${c.id}/" target="_blank" rel="noopener">Abrir card no Bitrix24 ↗</a></p>
     <div class="sec">Visita · mês de referência: ${esc(mesNome(mes))}</div>
     <form class="f" id="fm">

@@ -12,7 +12,7 @@ function fakeVibe() {
   const calls = [];
   const statuses = [...Array.from({ length: 13 }, (_, i) => ({ statusId: 'S' + i, name: 'Mês ' + i, sort: i })), { statusId: 'WON', name: 'Assinado', semantics: 'S' }, { statusId: 'LOSE', name: 'CANCELADOS', semantics: 'F' }];
   const deals = [{ id: 10, title: 'a.bitrix24.com.br', stageId: 'S3', companyId: 5, assignedById: 1, begindate: '2026-01-01T00:00:00Z', movedTime: '2026-11-01T00:00:00Z' }, { id: 11, title: 'b', stageId: 'S12', companyId: 0, assignedById: 1, begindate: '2025-11-01T00:00:00Z', movedTime: '2026-10-01T00:00:00Z' }];
-  return { calls, enabled: true,
+  return { calls, deals, enabled: true,
     async get(p) { calls.push(['GET', p]); return p === '/statuses' ? statuses : p === '/deals' ? deals : p === '/users' ? [{ id: 1, name: 'Ana', lastName: 'Lima' }] : [{ id: 5, title: 'Empresa A' }]; },
     async post(p, b) { calls.push(['POST', p, b]); return { id: 1 }; },
     async patch(p, b) { calls.push(['PATCH', p, b]); return {}; } };
@@ -67,5 +67,16 @@ test('mover: avança, renova no Mês 12, bloqueia inválidos e protege CSRF', as
   assert.equal((await req('POST', '/api/clientes/11/mover', { acao: 'renovar' })).json.para, 'Mês 0');
   const csrf = await req('POST', '/api/clientes/11/mover', { acao: 'cancelar' }, { 'X-Vibe-User-Id': '1', 'Sec-Fetch-Site': 'cross-site' });
   assert.equal(csrf.status, 403);
+  srv.close();
+});
+
+test('sincronizar: move o card pela Próxima Renovação e comenta; renovação vencida fica de fora', async () => {
+  const { srv, req, vibe } = await boot();
+  vibe.deals.push({ id: 12, title: 'c', stageId: 'S5', companyId: 0, begindate: '2026-03-01T00:00:00Z', ufCrm_1771112861536: '2027-03-17T03:00:00+03:00' },
+                  { id: 13, title: 'd', stageId: 'S12', companyId: 0, begindate: '2025-03-01T00:00:00Z', ufCrm_1771112861536: '2026-09-01T03:00:00+03:00' });
+  const pl = (await req('GET', '/api/sincronizar')).json;
+  assert.deepEqual(pl.mover.map(m => [m.id, m.para]), [[12, 'Mês 8']]); assert.ok(pl.ignorados.some(i => i.id === 13 && i.motivo === 'vencida'));
+  const r = (await req('POST', '/api/sincronizar', {})).json; assert.equal(r.movidos.length, 1);
+  assert.deepEqual(vibe.calls.find(x => x[0] === 'PATCH').slice(1), ['/deals/12', { stageId: 'S8' }]);
   srv.close();
 });

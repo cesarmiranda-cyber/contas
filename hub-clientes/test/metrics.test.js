@@ -52,3 +52,17 @@ test('destino: avançar, renovar e cancelar respeitam o ciclo', () => {
   assert.equal(M.destino('cancelar', et.porId.S5, et).etapa.id, 'LOSE');
   assert.ok(M.destino('avancar', et.porId.WON, et).erro);
 });
+
+test('mesEsperado e plano: etapa pela próxima renovação (meses de calendário)', () => {
+  assert.deepEqual(M.mesEsperado('2027-11-20', hoje), { mes: 0, vencida: false });
+  assert.deepEqual(M.mesEsperado('2027-03-17', hoje), { mes: 8, vencida: false });
+  assert.deepEqual(M.mesEsperado('2026-11-27', hoje), { mes: 12, vencida: false });
+  assert.deepEqual(M.mesEsperado('2026-10-19T03:00:00+03:00', hoje), { mes: 12, vencida: true });
+  assert.equal(M.mesEsperado('2030-01-01', hoje).mes, 0); assert.equal(M.mesEsperado(null, hoje), null);
+  const campo = 'r';
+  const p = M.plano({ deals: [deal(1, 'S5', { r: '2027-03-17' }), deal(2, 'S8', { r: '2027-03-17' }), deal(3, 'S12', { r: '2026-09-01' }), deal(4, 'S3'), deal(5, 'LOSE', { r: '2027-03-17' })], etapa: et, hoje, campo });
+  assert.deepEqual(p.mover.map(m => [m.id, m.para]), [[1, 'Mês 8']]);
+  assert.deepEqual(p.ignorados.map(m => [m.id, m.motivo]), [[3, 'vencida'], [4, 'sem_data']]);
+  const l = M.clientes({ deals: [deal(1, 'S5', { r: '2027-03-17' })], etapa: et, registros: [], mes: '2026-11', hoje, campo });
+  assert.deepEqual(l[0].mover, { tipo: 'sincronizar', vencida: true, destinoMes: 8 });
+});

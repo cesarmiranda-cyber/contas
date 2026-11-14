@@ -8,7 +8,8 @@ const M = require('./lib/metrics');
 
 const CATEGORIA = +process.env.CATEGORY_ID || 0;           // funil de contratos ativos (Bitrix24: /crm/deal/kanban/category/0/)
 const PORTAL = process.env.PORTAL_HOST || 'manda4.bitrix24.com.br';
-const SELECT = 'id,title,stageId,companyId,contactId,amount,currency,assignedById,begindate,movedTime,stageSemanticId';
+const CAMPO_RENOV = process.env.RENEWAL_FIELD || 'ufCrm_1771112861536';   // "Próxima Renovação Bitrix24" (referência do ciclo)
+const SELECT = CAMPO_RENOV + ',id,title,stageId,companyId,contactId,amount,currency,assignedById,begindate,movedTime,stageSemanticId';
 const CANAIS = ['reuniao', 'video', 'whatsapp', 'telefone', 'email', 'outro'];
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
@@ -51,13 +52,13 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
     const [et, ds, us] = await Promise.all([etapas(), deals(), usuarios()]);
     const [emp, con] = await Promise.all([nomes(ds, 'companyId', '/companies', 'id,title', c => c.title), nomes(ds, 'contactId', '/contacts', 'id,name,lastName', c => [c.name, c.lastName].filter(Boolean).join(' ') || null)]), h = hoje();
     const registros = store.all();
-    const lista = M.clientes({ deals: ds, etapa: et, registros, empresas: emp, contatos: con, usuarios: us, mes, hoje: h });
+    const lista = M.clientes({ deals: ds, etapa: et, registros, empresas: emp, contatos: con, usuarios: us, mes, hoje: h, campo: CAMPO_RENOV });
     const ativos = lista.filter(c => c.tipoEtapa === 'mes');
     const ids = new Set(ativos.map(c => c.id));
     return {
       hoje: h, mes, portal: PORTAL, canais: CANAIS,
       etapas: et.meses.map(e => ({ id: e.id, nome: e.nome, mes: e.mes })), ganho: et.ganho?.nome, perdido: et.perdido?.nome,
-      clientes: lista,
+      clientes: lista, sync, campoRenov: CAMPO_RENOV,
       registros: registros.filter(r => ids.has(r.dealId)),
       dashboard: M.dashboard({ lista, etapa: et, registros: registros.filter(r => ids.has(r.dealId)), mes, hoje: h }),
     };
@@ -143,6 +144,26 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
     return { de: atual.nome, para: dest.etapa.nome, timeline };
   }
 
+  // Ajusta a etapa de cada card pela Próxima Renovação (Mês = 12 − meses até renovar). Renovação vencida ou sem data não é movida.
+  let sync = { quando: null, movidos: [], erro: null }, rodando = false;
+  async function sincronizar(aplicar, quem = 'Hub de Clientes') {
+    const [et, ds] = await Promise.all([etapas(), vibe.get('/deals', { 'filter[categoryId]': CATEGORIA, select: SELECT, limit: 5000 })]);
+    const pl = M.plano({ deals: ds, etapa: et, hoje: hoje(), campo: CAMPO_RENOV });
+    if (!aplicar) return pl;
+    if (rodando) throw bad(409, 'Sincronização já em andamento.');
+    rodando = true; const feitos = [];
+    try {
+      for (const m of pl.mover) {
+        await vibe.patch(`/deals/${m.id}`, { stageId: m.paraId });
+        await comentar(m.id, `[B]Ciclo do cliente:[/B] ${m.de} → ${m.para}. Etapa ajustada pela Próxima Renovação Bitrix24 (${fmtData(m.renovacao)}) por ${quem}.`);
+        feitos.push(m);
+      }
+    } finally { rodando = false; invalidar(); sync = { quando: new Date().toISOString(), movidos: feitos, erro: null }; }
+    return { ...pl, movidos: feitos };
+  }
+  routes['GET /api/sincronizar'] = async () => ({ ...(await sincronizar(false)), ultima: sync });
+  routes['POST /api/sincronizar'] = async (_, __, who) => sincronizar(true, who.nome);
+
   async function handle(req, res) {
     const u = new URL(req.url, 'http://x');
     const send = (code, obj) => { res.writeHead(code, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
@@ -174,7 +195,7 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
       if (!e.status) console.error(e);
     }
   }
-  return { handle, estado };
+  return { handle, estado, sincronizar, ultimaSync: () => sync, falhaSync: e => { sync = { ...sync, quando: new Date().toISOString(), erro: String(e.message || e) }; } };
 }
 
 const readBody = req => new Promise((ok, no) => {
@@ -191,5 +212,10 @@ if (require.main === module) {
   const app = createApp({ vibe, store });
   const port = +process.env.PORT || 3000;
   http.createServer(app.handle).listen(port, () => console.log(`Hub de Clientes na porta ${port}`));
+  // Quando o mês vira, os cards avançam sozinhos (desligue com AUTO_MOVE=0). Roda ao iniciar e a cada 6 horas.
+  if (process.env.AUTO_MOVE !== '0' && vibe.enabled) {
+    const ciclo = () => app.sincronizar(true).then(r => r.movidos.length && console.log('Etapas ajustadas:', r.movidos.map(m => `${m.id} ${m.de}→${m.para}`).join(', '))).catch(e => { app.falhaSync(e); console.error('sync:', e.message); });
+    setTimeout(ciclo, 30000); setInterval(ciclo, 6 * 3600 * 1000);
+  }
 }
 module.exports = { createApp };
