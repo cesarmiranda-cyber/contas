@@ -19,3 +19,7 @@ Funil **Negócios · categoria 0** (clientes em contrato ativo). Cada card é um
 Node ≥ 20 sem dependências. Lê/escreve o CRM pela API Vibecode (`/v1/deals`, `/statuses`, `/companies`, `/contacts`, `/users`, `/timelines`) com a chave `VIBE_KEY`. Registros ficam em `DATA_DIR/registros.json`. Acesso: só com a identidade do gateway (`X-Vibe-User-Id`).
 Variáveis: `VIBE_KEY` · `DATA_DIR` · `PORT` · `CATEGORY_ID` (0) · `PORTAL_HOST`.
 `npm test` · deploy: `VIBE_KEY=… SERVER_ID=… ./deploy.sh`.
+
+## Apps M4
+Funil **Licenças Apps** (categoria 54): cada negócio é a licença de um app para um cliente; a etapa é o app (MandaZap, Fale Fácil Chat…) ou o estado da cobrança. Telas: **Visão geral** (receita mensal, composição por app, cobrança e risco, maiores clientes, licenças novas por mês, qualidade dos dados), **Cliente × App** (matriz, com filtro de clientes com 1 app) e **Licenças** (edição de app, plano, valor, contratação e renovação). Todo número é clicável e abre as licenças de origem (com CSV).
+O app das licenças em cobrança vem do histórico de etapas (última etapa de app) ou da correção manual guardada no hub (`DATA_DIR/apps.json`); nada é criado no Bitrix24. O valor do negócio é tratado como valor mensal.

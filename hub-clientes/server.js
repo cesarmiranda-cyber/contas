@@ -5,12 +5,16 @@ const path = require('path');
 const { createVibe } = require('./lib/vibe');
 const { createStore } = require('./lib/store');
 const M = require('./lib/metrics');
+const AP = require('./lib/apps');
 
 const CATEGORIA = +process.env.CATEGORY_ID || 0;           // funil de contratos ativos (Bitrix24: /crm/deal/kanban/category/0/)
 const PORTAL = process.env.PORTAL_HOST || 'manda4.bitrix24.com.br';
 const CAMPO_RENOV = process.env.RENEWAL_FIELD || 'ufCrm_1771112861536';   // "Próxima Renovação Bitrix24" (referência do ciclo)
 const CAMPOS = { plano: process.env.PLAN_FIELD || 'ufCrm_1762467264536', planoB24: 'ufCrm_1794675601057', contratacao: 'ufCrm_1771422009478' };   // Plano (tipo de licença), Plano Bitrix24, Mensal/Anual
 const SELECT = CAMPO_RENOV + ',' + Object.values(CAMPOS).join(',') + ',id,title,stageId,companyId,contactId,amount,currency,assignedById,begindate,movedTime,stageSemanticId';
+const CATEGORIA_APPS = +process.env.APPS_CATEGORY_ID || 54;                  // funil "Licenças Apps" (uma licença de app por negócio)
+const CAMPO_RENOV_APP = process.env.APP_RENEWAL_FIELD || 'ufCrm_1771421893314';   // "Próxima Renovação App"
+const SELECT_APPS = CAMPO_RENOV_APP + ',' + Object.values(CAMPOS).join(',') + ',id,title,stageId,companyId,contactId,amount,assignedById,createdAt';
 const CANAIS = ['reuniao', 'video', 'whatsapp', 'telefone', 'email', 'outro'];
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
@@ -200,8 +204,59 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
     } finally { rodando = false; invalidar(); if (!soId) sync = { quando: new Date().toISOString(), movidos: feitos, erro: null }; }
     return { ...pl, movidos: feitos };
   }
+  routes['GET /api/apps'] = async () => estadoApps();
   routes['GET /api/sincronizar'] = async () => ({ ...(await sincronizar(false)), ultima: sync });
   routes['POST /api/sincronizar'] = async (_, __, who) => sincronizar(true, who.nome);
+
+  // ----- Apps M4 -----
+  const etapasAppsM = () => memo('etapasApps', 600000, async () => AP.etapasApps(await vibe.get('/statuses', { 'filter[entityId]': `DEAL_STAGE_${CATEGORIA_APPS}`, limit: 100 })));
+  const dealsApps = () => memo('dealsApps', 20000, () => vibe.get('/deals', { 'filter[categoryId]': CATEGORIA_APPS, select: SELECT_APPS, limit: 5000 }));
+  // Licenças em cobrança perdem o app da etapa: descobre pelo histórico (última etapa de app antes da cobrança) e guarda.
+  async function inferirApps(ds, et) {
+    const inf = store.apps.inf(), over = store.apps.over();
+    const falta = ds.filter(d => et.porId[d.stageId] && et.porId[d.stageId].tipo !== 'app' && !over[d.id] && !(d.id in inf) && et.porId[d.stageId].tipo !== 'nova');
+    for (let i = 0; i < falta.length; i += 4) await Promise.all(falta.slice(i, i + 4).map(async d => {
+      try {
+        const h = await vibe.get('/stage-history', { entityType: 'deal', ownerId: d.id, limit: 100 });
+        const ult = h.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).find(x => et.porId[x.stageId]?.tipo === 'app');
+        store.apps.setInf(d.id, ult ? et.porId[ult.stageId].nome : '');
+      } catch { /* tenta de novo na próxima carga */ }
+    }));
+    return Object.fromEntries(Object.entries(store.apps.inf()).filter(([, v]) => v));
+  }
+  async function estadoApps() {
+    const [et, ds, en] = await Promise.all([etapasAppsM(), dealsApps(), enums()]);
+    const [emp, con, inf] = await Promise.all([nomes(ds, 'companyId', '/companies', 'id,title', c => c.title), nomes(ds, 'contactId', '/contacts', 'id,name,lastName', c => [c.name, c.lastName].filter(Boolean).join(' ') || null), inferirApps(ds, et)]);
+    const h = hoje(), lic = AP.licencas({ deals: ds, etapa: et, enums: en, campos: CAMPOS, empresas: emp, contatos: con, over: store.apps.over(), inf, campoRenovApp: CAMPO_RENOV_APP, hoje: h });
+    return {
+      hoje: h, portal: PORTAL, funilUrl: `https://${PORTAL}/crm/deal/kanban/category/${CATEGORIA_APPS}/`, apps: et.apps, licencas: lic, resumo: AP.resumo(lic, h),
+      opcoes: Object.fromEntries(Object.entries(en).map(([k, m]) => [k, Object.entries(m).map(([id, nome]) => ({ id, nome }))])),
+    };
+  }
+  // POST /api/apps/:id/dados { app, plano, contratacao, valor, renovacaoApp } — app fica no hub; o resto grava no negócio.
+  async function dadosApp(id, b, who) {
+    const [d, et, en] = await Promise.all([dealsApps().then(ds => ds.find(x => x.id === id)), etapasAppsM(), enums()]);
+    if (!d) throw bad(404, 'Licença não encontrada no funil de apps.');
+    const up = {}, mud = [];
+    if ('app' in b) {
+      const v = String(b.app || ''); if (v && !et.apps.includes(v)) throw bad(400, 'App inválido.');
+      store.apps.setOver(id, v); mud.push(`App: ${v || 'automático'}`);
+    }
+    for (const [campo, rot] of [['plano', 'Plano'], ['contratacao', 'Contratação']]) if (campo in b) {
+      const v = b[campo] === '' || b[campo] === null ? '' : String(b[campo]); if (v && !en[campo]?.[v]) throw bad(400, 'Opção inválida.');
+      up[CAMPOS[campo]] = v || null; mud.push(`${rot}: ${en[campo]?.[String(d[CAMPOS[campo]])] || '—'} → ${en[campo]?.[v] || '—'}`);
+    }
+    if ('valor' in b) { const v = b.valor === '' || b.valor === null ? 0 : +b.valor; if (!isFinite(v) || v < 0 || v > 1e9) throw bad(400, 'Valor inválido.'); up.amount = v; up.isManualOpportunity = true; mud.push(`Valor: ${d.amount || 0} → ${v}`); }
+    if ('renovacaoApp' in b) {
+      const v = b.renovacaoApp ? String(b.renovacaoApp) : ''; if (v && (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(Date.parse(v)))) throw bad(400, 'Data inválida.');
+      up[CAMPO_RENOV_APP] = v || null; mud.push(`Próxima renovação do app: ${fmtData(String(d[CAMPO_RENOV_APP] || '').slice(0, 10)) || '—'} → ${fmtData(v) || '—'}`);
+    }
+    if (!mud.length) throw bad(400, 'Nada para atualizar.');
+    let timeline = true;
+    if (Object.keys(up).length) { await vibe.patch(`/deals/${id}`, up); timeline = await comentar(id, `[B]Licença de app atualizada[/B] por ${who.nome} (Hub de Clientes)\n${mud.join('\n')}`); }
+    cache.delete('dealsApps');
+    return { ok: true, timeline };
+  }
 
   async function handle(req, res) {
     const u = new URL(req.url, 'http://x');
@@ -218,6 +273,8 @@ function createApp({ vibe, store, now = () => new Date(), allowAnon = false }) {
         }
         const mm = /^\/api\/clientes\/(\d+)\/mover$/.exec(u.pathname);
         if (mm && req.method === 'POST') return send(200, await mover(+mm[1], await readBody(req), who));
+        const ma = /^\/api\/apps\/(\d+)\/dados$/.exec(u.pathname);
+        if (ma && req.method === 'POST') return send(200, await dadosApp(+ma[1], await readBody(req), who));
         const md = /^\/api\/clientes\/(\d+)\/dados$/.exec(u.pathname);
         if (md && req.method === 'POST') return send(200, await dados(+md[1], await readBody(req), who));
         const fn = routes[`${req.method} ${u.pathname}`]; if (!fn) throw bad(404, 'Rota não encontrada.');

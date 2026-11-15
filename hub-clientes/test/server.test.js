@@ -13,7 +13,16 @@ function fakeVibe() {
   const statuses = [...Array.from({ length: 13 }, (_, i) => ({ statusId: 'S' + i, name: 'Mês ' + i, sort: i })), { statusId: 'WON', name: 'Assinado', semantics: 'S' }, { statusId: 'LOSE', name: 'CANCELADOS', semantics: 'F' }];
   const deals = [{ id: 10, title: 'a.bitrix24.com.br', stageId: 'S3', companyId: 5, assignedById: 1, begindate: '2026-01-01T00:00:00Z', movedTime: '2026-11-01T00:00:00Z' }, { id: 11, title: 'b', stageId: 'S12', companyId: 0, assignedById: 1, begindate: '2025-11-01T00:00:00Z', movedTime: '2026-10-01T00:00:00Z' }];
   return { calls, deals, enabled: true,
-    async get(p) { calls.push(['GET', p]); if (p === '/deals/fields') return { fields: { ufCrm_1762467264536: { items: [{ ID: '1176', VALUE: 'Basic' }] }, ufCrm_1771422009478: { items: [{ ID: '1428', VALUE: 'Mensal' }] } } }; return p === '/statuses' ? statuses : p === '/deals' ? deals : p === '/users' ? [{ id: 1, name: 'Ana', lastName: 'Lima' }] : [{ id: 5, title: 'Empresa A' }]; },
+    async get(p, q = {}) {
+      calls.push(['GET', p]);
+      if (p === '/statuses' && q['filter[entityId]'] === 'DEAL_STAGE_54') return [{ statusId: 'A1', name: 'MANDAZAP' }, { statusId: 'A2', name: 'FALE FACIL CHAT' }, { statusId: 'AC', name: 'COBRANÇA' }, { statusId: 'AX', name: 'SERVIÇO CANCELADO', semantics: 'F' }];
+      if (p === '/deals' && +q['filter[categoryId]'] === 54) return [
+        { id: 501, title: 'a.bitrix24.com.br', stageId: 'A1', companyId: 5, amount: 100, createdAt: '2026-05-10T10:00:00Z', ufCrm_1771422009478: '1428', ufCrm_1771421893314: '2026-11-30T03:00:00+03:00' },
+        { id: 502, title: 'a.bitrix24.com.br', stageId: 'AC', companyId: 5, amount: 1200, createdAt: '2026-06-10T10:00:00Z', ufCrm_1771422009478: '1428' },
+        { id: 503, title: 'b', stageId: 'A2', companyId: 0, contactId: 9, amount: 50, createdAt: '2026-06-11T10:00:00Z' },
+        { id: 504, title: 'c', stageId: 'AX', companyId: 0, amount: 70, createdAt: '2026-06-12T10:00:00Z' }];
+      if (p === '/stage-history') return [{ createdAt: '2026-01-01T00:00:00Z', stageId: 'A2' }, { createdAt: '2026-02-01T00:00:00Z', stageId: 'AC' }];
+      if (p === '/contacts') return [{ id: 9, name: 'Maria', lastName: 'Souza' }]; if (p === '/deals/fields') return { fields: { ufCrm_1762467264536: { items: [{ ID: '1176', VALUE: 'Basic' }] }, ufCrm_1771422009478: { items: [{ ID: '1428', VALUE: 'Mensal' }] } } }; return p === '/statuses' ? statuses : p === '/deals' ? deals : p === '/users' ? [{ id: 1, name: 'Ana', lastName: 'Lima' }] : [{ id: 5, title: 'Empresa A' }]; },
     async post(p, b) { calls.push(['POST', p, b]); return { id: 1 }; },
     async patch(p, b) { calls.push(['PATCH', p, b]); const d = deals.find(x => '/deals/' + x.id === p); if (d) Object.assign(d, b); return {}; } };
 }
@@ -94,5 +103,23 @@ test('dados: atualiza renovação/plano/valor no card, comenta e reposiciona a e
   assert.equal((await req('POST', '/api/clientes/10/dados', { responsavelId: 777 })).status, 400);
   assert.equal((await req('POST', '/api/clientes/999/dados', { valor: 1 })).status, 404);
   assert.equal((await req('POST', '/api/clientes/10/dados', {})).status, 400);
+  srv.close();
+});
+
+test('apps: licenças por app, app inferido do histórico, MRR e edição', async () => {
+  const { srv, req, vibe } = await boot();
+  const r = (await req('GET', '/api/apps')).json;
+  assert.deepEqual(r.apps, ['MandaZap', 'Fale Fácil Chat']);
+  const l = Object.fromEntries(r.licencas.map(x => [x.id, x]));
+  assert.equal(l[502].app, 'Fale Fácil Chat'); assert.equal(l[502].appOrigem, 'historico'); assert.equal(l[501].appOrigem, 'etapa');
+  assert.equal(r.resumo.totais.licencas, 3); assert.equal(r.resumo.totais.mrr, 1350); assert.equal(r.resumo.estados.cancelada.qtd, 1); assert.equal(r.resumo.estados.cobranca.qtd, 1);
+  assert.equal(r.resumo.renovacoes.d30.qtd, 1); assert.equal(l[501].diasRenovar, 16); assert.equal(r.resumo.qualidade.semRenovacao, 2);
+  assert.equal(r.resumo.porApp[0].app, 'Fale Fácil Chat'); assert.equal(l[503].nome, 'Maria Souza');
+  const ed = await req('POST', '/api/apps/502/dados', { app: 'MandaZap', valor: 99 });
+  assert.equal(ed.status, 200);
+  assert.deepEqual(vibe.calls.filter(x => x[0] === 'PATCH').pop().slice(1), ['/deals/502', { amount: 99, isManualOpportunity: true }]);
+  assert.equal((await req('GET', '/api/apps')).json.licencas.find(x => x.id === 502).app, 'MandaZap');
+  assert.equal((await req('POST', '/api/apps/502/dados', { app: 'Nada' })).status, 400);
+  assert.equal((await req('POST', '/api/apps/999/dados', { valor: 1 })).status, 404);
   srv.close();
 });

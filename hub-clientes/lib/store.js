@@ -14,7 +14,15 @@ function createStore(dir) {
     fs.renameSync(tmp, file);
   };
   const idx = (dealId, mes) => regs.findIndex(r => r.dealId === dealId && r.mes === mes);
+  // Dados do módulo Apps: app informado à mão por licença e app inferido do histórico (cache).
+  const appsFile = path.join(dir, 'apps.json');
+  let apps = { over: {}, inf: {} };
+  try { apps = { over: {}, inf: {}, ...JSON.parse(fs.readFileSync(appsFile, 'utf8')) }; } catch { /* primeira execução */ }
+  const flushApps = () => { const tmp = appsFile + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(apps), { mode: 0o600 }); fs.renameSync(tmp, appsFile); };
   return {
+    apps: { over: () => ({ ...apps.over }), inf: () => ({ ...apps.inf }),
+      setOver(id, app) { if (app) apps.over[id] = app; else delete apps.over[id]; flushApps(); },
+      setInf(id, app) { apps.inf[id] = app; flushApps(); } },
     all: () => regs.slice(),
     get: (dealId, mes) => regs[idx(dealId, mes)] || null,
     upsert(reg) {
