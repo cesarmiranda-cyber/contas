@@ -12,7 +12,7 @@ const F = require('../lib/feriados');
 
 const fake = () => {
   const deals = [], notif = [];
-  const est = { 8: [['C8:NEW', 'Aviso recebido', ''], ['C8:A', 'Plano de ação', ''], ['C8:W', 'Resolvido', 'S']], 12: [['C12:A', 'Em andamento', ''], ['C12:B', 'Aguardando cliente', ''], ['C12:W', 'Concluído', 'S']], 17: [['C17:N', 'Solicitação recebida', ''], ['C17:D', 'Entregue / Concluído', 'S']] };
+  const est = { 0: [['C0:NEW', 'Novo contato', ''], ['C0:WON', 'Ganho', 'S']], 8: [['C8:NEW', 'Aviso recebido', ''], ['C8:A', 'Plano de ação', ''], ['C8:W', 'Resolvido', 'S']], 12: [['C12:A', 'Em andamento', ''], ['C12:B', 'Aguardando cliente', ''], ['C12:W', 'Concluído', 'S']], 17: [['C17:N', 'Solicitação recebida', ''], ['C17:D', 'Entregue / Concluído', 'S']] };
   return { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', deals, notif, async call(m, p) {
     if (m === 'crm.deal.fields') return { result: { UF_PROD: { formLabel: 'Nome do Produto' }, UF_ING: { formLabel: 'Ingredientes e quantidades (g)' }, UF_GLU: { formLabel: 'Contaminação cruzada com Glúten?', items: [{ ID: '1', VALUE: 'Sim' }, { ID: '2', VALUE: 'Não' }] }, UF_SAC: { formLabel: 'SAC' } } };
     if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' } } };
@@ -182,4 +182,39 @@ test('porções de referência (IN 75, Anexo V): busca por produto e utensílios
   const m = P.buscar('molho de tomate')[0]; assert.deepEqual([m.produto.slice(0, 15), m.valor, m.un, m.medida], ['Molho de tomate', 60, 'g', 'Colheres de sopa']);
   assert.equal(P.buscar('iogurte')[0].valor, 200); assert.equal(P.buscar('IOGURTE')[0].un, 'g'); assert.equal(P.buscar('refrigerante')[0].un, 'ml'); assert.equal(P.buscar('pó para gelatina')[0].qsp, true);
   assert.deepEqual(P.buscar('xyzqq'), []); assert.equal(P.UTENSILIOS.length, 6);
+});
+
+
+test('gestão: prioridade, cartão parado, painel por pessoa, sugestão de responsável, prazo da defesa e fechamento comercial', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gs-')), bitrix = fake(), fin = createFinStore(dir); fin.empresas.add({ id: 'e1', nome: 'Nutri Mix', ativa: true });
+  const api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [{ bkn: '23735', empresaBitrixId: '5' }] }, fin, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  await call('PUT', '/gestao/config', { paradoDias: 3, gestorIds: ['10'], equipe: { 11: ['multas', 'rotulagem'], 10: ['suplementos'] } });
+  // multas: BKN liga a empresa; ciência + prazo legal calculam o prazo da defesa
+  const m = await call('POST', '/multas/negocios', { titulo: 'Auto loja Uberlândia', bkn: '23735', prioridade: 'alta', responsavel: '11' }); assert.equal(m.empresaId, '5'); assert.equal(m.prioridade, 'alta'); assert.equal(m.bkn, '23735');
+  await assert.rejects(call('PUT', `/multas/negocios/${m.id}/campos`, { dataCiencia: '31/12/2026' }), /Data inválida/);
+  const hj = R.todayBR(), c = await call('PUT', `/multas/negocios/${m.id}/campos`, { orgao: 'CVS', numeroAuto: '123', dataCiencia: hj, prazoDias: '10' }); assert.equal(c.prazo, F.somaDias(hj, 10));
+  await assert.rejects(call('PUT', `/multas/negocios/${m.id}`, { prioridade: 'urgentíssima' }), /Prioridade inválida/); await call('PUT', `/multas/negocios/${m.id}`, { prioridade: 'baixa' }); assert.equal((await call('GET', `/multas/negocios/${m.id}`)).prioridade, 'baixa'); await call('PUT', `/multas/negocios/${m.id}`, { prioridade: 'alta' });
+  // parado: cartão antigo sem movimento aparece no painel e avisa responsável e gestor uma vez
+  const rot = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo parado', empresaId: '5', responsavel: '11' }); api.dados().locais[rot.id].criado = F.somaDias(hj, -9) + 'T10:00:00.000Z'; api.dados().itens[rot.id].movidoEm = F.somaDias(hj, -9) + 'T10:00:00.000Z';
+  const p = await call('GET', '/gestao'); assert.equal(p.parados.length, 1); assert.equal(p.parados[0].titulo, 'Rótulo parado'); assert.ok(p.parados[0].paradoDias >= 9); assert.equal(p.pessoas.find(x => x.id === '11').abertos, 2); assert.equal(p.pessoas.find(x => x.id === '11').altas, 1);
+  assert.equal(p.processos.find(x => x.chave === 'rotulagem').parados, 1);
+  const av = await call('POST', '/avisar', { simular: false }); const par = bitrix.notif.filter(n => /sem movimento/.test(n.MESSAGE)); assert.deepEqual(par.map(n => n.USER_ID).sort(), ['10', '11']); assert.ok(av.enviados.some(e => /sem movimento/.test(e.msg)));
+  const antes = bitrix.notif.length; await call('POST', '/avisar', { simular: false }); assert.equal(bitrix.notif.filter(n => /sem movimento/.test(n.MESSAGE)).length, 2); assert.ok(bitrix.notif.length >= antes);   // não repete no mesmo marco
+  await call('POST', `/rotulagem/negocios/${rot.id}/nota`, { texto: 'retomado' }); assert.equal((await call('GET', '/gestao')).parados.length, 0);   // qualquer atividade tira da lista de parados
+  // sugestão: quem tem menos carga entre quem atua no processo
+  const sg = await call('GET', '/gestao/sugestao?processo=multas'); assert.deepEqual(sg.map(x => x.id), ['11']); assert.equal((await call('GET', '/gestao/sugestao?processo=suplementos'))[0].id, '10');
+  // novos processos: fichas técnicas e tabela avulsa
+  const fi = await call('POST', '/fichas/negocios', { titulo: 'Ficha — molho', empresaId: '5' }); assert.equal(fi.etapa, 'f1'); assert.equal(fi.documentos.length, 4); const tb = await call('POST', '/tabelas/negocios', { titulo: 'Tabela — pão', empresaId: '5' }); assert.equal(tb.comCalculadora, true); assert.equal(tb.dupla, 'Entrega ao cliente');
+  await assert.rejects(call('POST', `/tabelas/negocios/${tb.id}/mover`, { etapa: 't3' }), /Como os valores nutricionais/);
+  assert.equal((await call('POST', '/tabelas/calculadora', { negocioId: tb.id, base: 'solido', porcao: '30', v100: { carbo: '10' } })).linhas.length, 1);
+  // questionário por processo (link guardado em Gestão)
+  await assert.rejects(call('PUT', '/gestao/config', { questionarios: { fichas: 'javascript:x' } }), /Link inválido/); await call('PUT', '/gestao/config', { questionarios: { fichas: 'https://forms.example/ficha' } }); assert.equal((await call('GET', `/fichas/negocios/${fi.id}`)).questionarioUrl, 'https://forms.example/ficha');
+  // fechamento comercial: negócio ganho vira cartão + cobrança de 50%; simulação não cria nada; sem classificação fica de fora
+  await call('PUT', '/config', { empresaFaturaId: 'e1' });
+  bitrix.deals.push({ ID: '71', CATEGORY_ID: 0, TITLE: 'Rotulagem — Padaria Sol', STAGE_ID: 'C0:WON', COMPANY_ID: '5', ASSIGNED_BY_ID: '11', OPPORTUNITY: '1200' }, { ID: '72', CATEGORY_ID: 0, TITLE: 'Consultoria mensal', STAGE_ID: 'C0:WON', COMPANY_ID: '5' }, { ID: '73', CATEGORY_ID: 0, TITLE: 'Suplemento Whey', STAGE_ID: 'C0:NEW', COMPANY_ID: '5' });
+  const sim = await call('POST', '/fechamento/processar', {}); assert.equal(sim.simulacao, true); assert.deepEqual(sim.criados.map(x => [x.negocioComercial, x.processo, x.valor]), [['71', 'rotulagem', 1200]]); assert.deepEqual(sim.semClassificar.map(x => x.id), ['72']); assert.equal(Object.keys(api.dados().fechados).length, 0);
+  const real = await call('POST', '/fechamento/processar', { simular: false }); assert.equal(real.criados[0].cobrado, true); assert.equal(fin.receber.all().filter(x => x.demandaProcesso === 'rotulagem' && /BK Anhaia/.test(x.descricao)).length, 2);
+  assert.equal((await call('POST', '/fechamento/processar', { simular: false })).criados.length, 0);   // não duplica
+  const novo = await call('GET', `/rotulagem/negocios/${real.criados[0].id}`); assert.equal(novo.origem, 'comercial'); assert.equal(novo.empresaId, '5');
 });

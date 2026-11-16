@@ -69,6 +69,21 @@ a.proc:hover{border-color:var(--brand)}
       <div><h2>Solicitações (e-mail e formulários)</h2><p>Pedidos das unidades chegam por e-mail, são ligados ao BKN e viram cartão no funil.</p></div>
       <span class="sel o">Abrir</span>
     </a>
+    <a class="proc" id="dem_fichas" href="/demandas.html#fichas" aria-label="Fichas técnicas">
+      <span class="ic">FT</span>
+      <div><h2>Fichas técnicas</h2><p>Ficha comercial e de preparo: questionário, laudos, elaboração, revisão e validação do cliente.</p></div>
+      <span class="sel o">Abrir</span>
+    </a>
+    <a class="proc" id="dem_tabelas" href="/demandas.html#tabelas" aria-label="Tabela nutricional avulsa">
+      <span class="ic">TN</span>
+      <div><h2>Tabela nutricional (avulsa)</h2><p>Cálculo da tabela com a calculadora (RDC 429 e IN 75), dupla checagem e memória de cálculo.</p></div>
+      <span class="sel o">Abrir</span>
+    </a>
+    <a class="proc" id="dem_gestao" href="/demandas.html#gestao" aria-label="Gestão dos processos" hidden>
+      <span class="ic">GE</span>
+      <div><h2>Gestão dos processos</h2><p>Painel do gestor: prazos vencidos, cartões parados, carga por pessoa e fechamento comercial.</p></div>
+      <span class="sel o">Abrir</span>
+    </a>
     <a class="proc" id="dem_suplementos" href="/demandas.html#suplementos" aria-label="Suplementos (notificação na Anvisa)">
       <span class="ic">SU</span>
       <div><h2>Suplementos (notificação na Anvisa)</h2><p>Fluxo de notificação, memorial de cálculo e dossiê. Aguarda o passo a passo da equipe técnica para fechar as etapas.</p></div>
@@ -82,7 +97,8 @@ a.proc:hover{border-color:var(--brand)}
 (async () => {
   if (!NM.token) return NM.paraLogin();
   try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
-    const AR = j.usuario.areas || []; for (const [id, a] of [['bk', 'bk'], ['cron', 'cronograma'], ['car', 'clientes'], ['dem_multas', 'multas'], ['dem_rotulagem', 'rotulagem'], ['dem_manuais', 'manuais'], ['dem_solicitacoes', 'solicitacoes'], ['dem_suplementos', 'suplementos']]) { const e = document.getElementById(id); if (e && !AR.includes(a)) e.hidden = true; }
+    const AR = j.usuario.areas || []; for (const [id, a] of [['bk', 'bk'], ['cron', 'cronograma'], ['car', 'clientes'], ['dem_multas', 'multas'], ['dem_rotulagem', 'rotulagem'], ['dem_manuais', 'manuais'], ['dem_solicitacoes', 'solicitacoes'], ['dem_suplementos', 'suplementos'], ['dem_fichas', 'fichas'], ['dem_tabelas', 'fichas']]) { const e = document.getElementById(id); if (e && !AR.includes(a)) e.hidden = true; }
+    if (j.usuario.perfil === 'admin') document.getElementById('dem_gestao').hidden = false;
     document.getElementById('user').innerHTML = '<strong></strong> · ' + j.usuario.perfilNome; document.querySelector('#user strong').textContent = j.usuario.nome; document.getElementById('conteudo').hidden = false;
   } catch { NM.paraLogin(); }
 })();
