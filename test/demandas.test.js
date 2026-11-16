@@ -290,3 +290,15 @@ test('formulário do Bitrix24: o negócio criado pelo formulário no funil Servi
   assert.ok(Array.isArray((await call('GET', `/rotulagem/negocios/${c.id}/respostas`)).respostas));
   assert.equal((await call('PUT', '/gestao/config', { importarFormularios: false })).importarFormularios, false);
 });
+
+
+test('formulário do Bitrix24: se o cliente já tem cartão aberto do serviço, as respostas vão para ele em vez de criar outro', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fa-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  const card = await call('POST', '/rotulagem/negocios', { titulo: 'Rotulagem — Padaria Sol', empresaId: '5' });   // criado no fechamento comercial
+  bitrix.deals.push({ ID: '301', CATEGORY_ID: 12, TITLE: 'Rotulagem — questionário', STAGE_ID: 'C12:A', COMPANY_ID: '5', COMMENTS: '', UF_PROD: 'Granola', UF_ING: 'Aveia 400 g' });
+  const sim = await call('POST', '/formulario/importar', {}); assert.equal(sim.criados[0].anexadoAo, card.id);
+  const r = await call('POST', '/formulario/importar', { simular: false }); assert.equal(r.criados[0].anexadoAo, card.id); assert.equal(Object.keys(api.dados().locais).length, 1);   // nenhum cartão novo
+  const c = await call('GET', `/rotulagem/negocios/${card.id}`); assert.equal(c.dadosIa['nome do produto'], 'Granola'); assert.match(c.notas.map(x => x.t).join(' '), /Questionário recebido pelo formulário/);
+  assert.match(bitrix.deals.find(x => x.ID === '301').COMMENTS, /incorporadas ao cartão/); assert.equal((await call('POST', '/formulario/importar', { simular: false })).criados.length, 0);
+});
