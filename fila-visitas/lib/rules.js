@@ -2,15 +2,24 @@
 // Regras de negócio puras (sem I/O): intervalos, datas, antecipada, limite de mês e etapa.
 const SEGMENTOS = ['Motores', 'Peças', 'Serviços', 'Novos Negócios'];
 const CARGOS = ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'];
-const CLASSES = ['A', 'B', 'C'];
+const CLASSES = ['A', 'B', 'C', 'E'];
+const CLASSE_NOME = { E: 'Clientes Estratégicos' };     // classe "liberal": a cada 6 meses, primeira visita em março, o vendedor altera datas livremente
+// "Clientes Estratégicos" não pode virar "C" pela primeira letra: reconhece pelo nome.
+function classeDe(texto) {
+  const t = String(texto || '').trim();
+  if (!t) return '';
+  if (/estrat/i.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))) return 'E';
+  const x = t.toUpperCase().slice(0, 1);
+  return ['A', 'B', 'C'].includes(x) ? x : '';
+}
 
 // Dias entre visitas por cargo e classe (tabela da Odin). Configurável na tela de configurações.
 const INTERVALOS = {
-  Vendedor: { A: 30, B: 60, C: 90 },
-  Supervisor: { A: 60, B: 90, C: 120 },
-  Coordenador: { A: 90, B: 120, C: 150 },
-  Gerente: { A: 120, B: 150, C: 180 },
-  Diretor: { A: 150, B: 180, C: 210 },
+  Vendedor: { A: 30, B: 60, C: 90, E: 180 },
+  Supervisor: { A: 60, B: 90, C: 120, E: 180 },
+  Coordenador: { A: 90, B: 120, C: 150, E: 180 },
+  Gerente: { A: 120, B: 150, C: 180, E: 180 },
+  Diretor: { A: 150, B: 180, C: 210, E: 180 },
 };
 
 const DEFAULT_CONFIG = {
@@ -65,6 +74,23 @@ function primeiraVisitaClasse(cfg, hojeIso, classe, n = 0) {
 }
 // Espalha `n` itens de forma uniforme pelas datas `dias` (a posição j cai no meio de sua fatia).
 const espalhar = (n, dias, j) => dias[Math.min(dias.length - 1, Math.floor((j + 0.5) * dias.length / n))];
+function addMonths(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number), alvo = new Date(Date.UTC(y, m - 1 + n, 1, 12));
+  const ult = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0, 12)).getUTCDate();
+  return `${alvo.getUTCFullYear()}-${pad(alvo.getUTCMonth() + 1)}-${pad(Math.min(d, ult))}`;
+}
+// Clientes estratégicos nunca visitados começam em MARÇO (o próximo março): dias úteis do mês, espalhados pelo contador `n`.
+// Dias úteis de março em que um estratégico novo pode começar (o próximo março; em março, só os dias que ainda faltam).
+function diasMarco(hojeIso) {
+  const [y, m] = hojeIso.split('-').map(Number);
+  const marco = ano => diasUteis(`${ano}-03-01`, 31).filter(d => d.startsWith(`${ano}-03`) && d > hojeIso);
+  const dias = m <= 3 ? marco(y) : [];
+  return dias.length ? dias : marco(y + 1);
+}
+function primeiraVisitaEstrategica(hojeIso, n = 0) {
+  const dias = diasMarco(hojeIso);
+  return dias[Math.min(dias.length - 1, Math.floor(((Math.abs(n) * 0.6180339887) % 1) * dias.length))];
+}
 const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z')) / 864e5);
 const sameMonth = (a, b) => !!a && !!b && a.slice(0, 7) === b.slice(0, 7);
 const fmtBR = iso => (iso ? iso.split('-').reverse().join('/') : '');
@@ -75,6 +101,7 @@ function intervalo(cfg, cargo, classe) {
 }
 // Última visita + intervalo do cargo/classe. Sem classe válida não há data.
 function dataProgramada(cfg, { cargo, classe, ultima, hoje }) {
+  if (classe === 'E') return addMonths(isoDate(ultima) || hoje, 6);        // clientes estratégicos: de 6 em 6 meses
   const n = intervalo(cfg, cargo, classe);
   if (n === null) return null;
   return addDays(isoDate(ultima) || hoje, n);
@@ -97,8 +124,9 @@ function mesLimite(dataIso, criadoIso) {
 }
 const ultimoDiaDoMes = mes => { const [y, m] = mes.split('-').map(Number); return `${mes}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
 // Alteração da data: motivo obrigatório, só do dia seguinte em diante e dentro do mês da visita (nunca para o mês seguinte).
-function validarReprogramacao({ atual, nova, motivo, hoje, mes }) {
+function validarReprogramacao({ atual, nova, motivo, hoje, mes, livre = false }) {
   if (!isoDate(nova)) return 'Informe a nova data.';
+  if (livre) return nova === atual ? 'A nova data é igual à data atual.' : (hoje && nova < hoje ? 'A nova data não pode ser no passado.' : null);   // classe liberal: qualquer data futura, motivo opcional
   if (String(motivo || '').trim().length < 3) return 'O motivo da alteração é obrigatório.';
   const mesVisita = mes || atual.slice(0, 7);
   if (nova.slice(0, 7) !== mesVisita) {
@@ -135,6 +163,6 @@ const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLow
 const chaveFila = (empresaId, seg, cargo) => `${empresaId}|${norm(seg)}|${norm(cargo)}`;
 
 module.exports = {
-  primeiraVisitaData, primeiraVisitaClasse, diasUteis, espalhar, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, parseBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
+  primeiraVisitaData, primeiraVisitaClasse, primeiraVisitaEstrategica, diasMarco, addMonths, classeDe, CLASSE_NOME, diasUteis, espalhar, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, parseBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
   mesLimite, ultimoDiaDoMes, brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
 };

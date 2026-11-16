@@ -35,7 +35,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const user = k => { for (const c of chaves(k)) { const x = r[c]; const n = Array.isArray(x) ? x[0] : x; if (!vazio(n) && +n) return +n; } return null; };
       const data = (k, pick) => { const ds = chaves(k).map(c => R.isoDate(r[c])).filter(Boolean).sort(); return ds.length ? (pick === 'max' ? ds[ds.length - 1] : ds[0]) : null; };
       let classe = '';
-      for (const c of chaves('classe')) { const x = String(F.decode(meta, c, r[c])).trim().toUpperCase().slice(0, 1); if (R.CLASSES.includes(x)) { classe = x; break; } }
+      for (const c of chaves('classe')) { const x = R.classeDe(F.decode(meta, c, r[c])); if (x) { classe = x; break; } }
       segs[seg] = {
         diretor: user('diretor'), gerente: user('gerente'), coordenador: user('coordenador'),
         supervisor: user('supervisor'), vendedor: user('vendedor'),
@@ -245,7 +245,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return {
       id: +it.id, titulo: it.title, empresaId: +it.companyId || reg.empresaId, empresa: reg.empresa || parts[0],
       segmento: g('segmento') || reg.seg || parts[1], cargo: g('cargo') || reg.cargo || parts[2],
-      classe: g('classe') || reg.classe || '', responsavel: +it.assignedById || null,
+      classe: R.classeDe(g('classe')) || reg.classe || '', responsavel: +it.assignedById || null,
       data: (R.isoDate(map.fila.data ? it[map.fila.data] : null) || R.isoDate(it.closedate)), stageId: it.stageId, criadoEm: it.createdTime || null,
     };
   };
@@ -257,7 +257,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const f = { title: tituloCard(empresa.nome, seg, cargo), companyId: empresa.id, assignedById: responsavel, stageId: stage };
     if (map.fila.segmento) f[map.fila.segmento] = F.encode(meta, map.fila.segmento, seg);
     if (map.fila.cargo) f[map.fila.cargo] = F.encode(meta, map.fila.cargo, cargo);
-    if (map.fila.classe) f[map.fila.classe] = F.encode(meta, map.fila.classe, classe);
+    if (map.fila.classe) f[map.fila.classe] = F.encode(meta, map.fila.classe, R.CLASSE_NOME[classe] || classe);
     f[map.fila.data || 'closedate'] = data;
     const r = (await bitrix.call('crm.item.add', { entityTypeId: F.ETYPE.fila, fields: f })).result?.item;
     store.setChave(chave, +r.id);
@@ -277,7 +277,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const st = map.etapas[R.etapaPara(data, hoje())];
       if (st && !map.etapas.fechadas.includes(card.stageId)) f.stageId = st;
     }
-    if (classe && classe !== card.classe && map.fila.classe) f[map.fila.classe] = F.encode(meta, map.fila.classe, classe);
+    if (classe && classe !== card.classe && map.fila.classe) f[map.fila.classe] = F.encode(meta, map.fila.classe, R.CLASSE_NOME[classe] || classe);
     if (!Object.keys(f).length) return false;
     await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: f });
     store.setSnapCard(card.id, { data: data || card.data, resp: responsavel || card.responsavel });
@@ -347,7 +347,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         // Empresa nunca visitada (sem Última Visita): a primeira visita do Vendedor já entra na fila para HOJE.
         // Com Última Visita: Última + intervalo da classe. Cargos acima do Vendedor sempre seguem o intervalo.
         const primeira = cargo === 'Vendedor' && !s.ultima;
-        const calc = primeira ? R.primeiraVisitaClasse(cfg, hoje(), s.classe, proximoRodizio(`${resp}|${s.classe}`)) : R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
+        const calc = primeira ? (s.classe === 'E' ? R.primeiraVisitaEstrategica(hoje(), proximoRodizio(`${resp}|E`)) : R.primeiraVisitaClasse(cfg, hoje(), s.classe, proximoRodizio(`${resp}|${s.classe}`))) : R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
         // Empresa que já tem Última e Próxima Visita: o card do Vendedor NASCE na data da Próxima Visita (sem partir de uma visita nova).
         const dataNova = (cargo === 'Vendedor' && s.ultima && s.proxima) ? s.proxima : calc;
         const existente = abertos.get(chave);
@@ -361,6 +361,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         }
         store.setChave(chave, existente.id);
         { const reg = store.card(existente.id) || {}, eq = equipeIds(s); if (JSON.stringify(reg.equipe) !== JSON.stringify(eq) || reg.ramo !== (emp.ramo || '')) store.setCard(existente.id, { ...reg, empresaId: id, empresa: emp.nome, seg, cargo, equipe: eq, ramo: emp.ramo || '' }); }
+        // Entrou ou saiu da classe Clientes Estratégicos (primeira visita muda de regra): recalcula, a menos que o vendedor já tenha escolhido a data.
+        if (primeira && (existente.classe === 'E') !== (s.classe === 'E') && !store.historico.some(x => !x.tipo && +x.card === existente.id)) {
+          if (await atualizarCard(existente, { data: calc, classe: s.classe }, 'mudança para/de Clientes Estratégicos')) { res.atualizados.push(existente.id); continue; }
+        }
         const ant = snapAnt[k] || {};
         const mudouData = !primeira && (forcar || ant.classe !== s.classe || ant.ultima !== s.ultima);
         const mudouResp = forcar || ant.resp !== resp || existente.responsavel !== resp;
@@ -650,7 +654,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     if (!card.aberto) throw erro('Visita já finalizada não pode ser alterada.', 409);
     if (!uid) throw erro('Usuário não identificado.', 401);
     if (!card.data) throw erro('O card não tem data programada.');
-    const msg = R.validarReprogramacao({ atual: card.data, nova, motivo, hoje: hoje(), mes: R.mesLimite(card.data, card.criadoEm ? R.todayBR(new Date(card.criadoEm)) : null) });
+    const livre = card.classe === 'E';                 // Clientes Estratégicos: o vendedor altera a data livremente (sem motivo obrigatório nem limite de mês)
+    const msg = R.validarReprogramacao({ atual: card.data, nova, motivo, hoje: hoje(), livre, mes: R.mesLimite(card.data, card.criadoEm ? R.todayBR(new Date(card.criadoEm)) : null) });
     if (msg) throw erro(msg, 422);
     const stage = map.etapas[R.etapaPara(nova, hoje())];
     await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { [map.fila.data || 'closedate']: nova, ...(stage ? { stageId: stage } : {}) } });
@@ -658,12 +663,12 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const tarefas = await moverPrazoTarefas(card.id, nova);
     const nome = await nomeUsuario(uid);
     const agora = clock().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-    store.addHistorico({ card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: motivo.trim(), autor: uid, autorNome: nome, responsavel: card.responsavel });
+    store.addHistorico({ card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, anterior: card.data, nova, motivo: String(motivo || '').trim() || '(sem motivo — cliente estratégico)', autor: uid, autorNome: nome, responsavel: card.responsavel });
     try {
       await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila),
-        COMMENT: `Visita alterada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${motivo.trim()}` } });
+        COMMENT: `Visita alterada em ${agora} por ${nome}.\nData anterior: ${R.fmtBR(card.data)}\nNova data: ${R.fmtBR(nova)}\nMotivo: ${String(motivo || '').trim() || '—'}` } });
     } catch (e) { store.log('aviso', `Comentário na linha do tempo do card ${card.id} falhou: ${e.message}`); }
-    store.log('reprogramacao', `Card ${card.id}: ${R.fmtBR(card.data)} → ${R.fmtBR(nova)} por ${uid}: ${motivo.trim()}`, { card: card.id });
+    store.log('reprogramacao', `Card ${card.id}: ${R.fmtBR(card.data)} → ${R.fmtBR(nova)} por ${uid}: ${String(motivo || '').trim()}`, { card: card.id });
     return { ok: true, data: nova, tarefasAtualizadas: tarefas };
   }
 
@@ -686,6 +691,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     let marcadas = 0;
     for (const it of await cardsAbertos()) {
       const c = await dadosCard(it);
+      if (c.classe === 'E') continue;                    // estratégicos não vencem no fim do mês
       const lim = R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null);
       if (!lim || lim >= mesHoje) continue;
       await comTrava(`empresa:${c.empresaId}`, async () => {
@@ -802,14 +808,14 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       if (sg.ultima) { fora.comUltima++; continue; }
       if (!sg.vendedor || !R.CLASSES.includes(sg.classe)) { fora.semClasseOuVendedor++; continue; }
       if (comRegistro.has(`${c.empresaId}|${R.norm(c.segmento)}`) || (!map.visita.segmento && comRegistroEmpresa.has(c.empresaId))) { fora.comRegistro++; continue; }
-      if (store.historico.some(x => x.tipo === 'ajuste-inicial' && +x.card === c.id)) { fora.jaAjustado++; continue; }
+      if (store.historico.some(x => x.tipo === 'ajuste-inicial' && +x.card === c.id && (x.classe ? x.classe === sg.classe : sg.classe !== 'E'))) { fora.jaAjustado++; continue; }
       if (store.historico.some(x => !x.tipo && +x.card === c.id)) { fora.alteradoPeloVendedor++; continue; }
-      ((grupos[sg.classe] ||= {})[sg.vendedor] ||= []).push({ c, it });
+      ((grupos[sg.classe] ||= {})[sg.vendedor] ||= []).push({ c, it, classe: sg.classe });
     }
     const plano = { inicio, hoje: h, fora, classes: {}, aplicados: 0, erros: [] };
     const tarefas = [];
     for (const classe of Object.keys(grupos).sort()) {
-      const n = R.intervalo(cfg, 'Vendedor', classe), dias = R.diasUteis(inicio, n);
+      const n = classe === 'E' ? null : R.intervalo(cfg, 'Vendedor', classe), dias = classe === 'E' ? R.diasMarco(h) : R.diasUteis(inicio, n);
       const semanas = {}; let total = 0;
       for (const lista of Object.values(grupos[classe])) {
         lista.sort((a, b) => a.c.empresa.localeCompare(b.c.empresa) || a.c.segmento.localeCompare(b.c.segmento));
@@ -824,7 +830,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
           const card = { ...x.c, stageId: x.it.stageId };
           const ok = await atualizarCard(card, { data: x.nova }, 'ajuste das datas iniciais por classe');
           if (ok) {
-            store.addHistorico({ tipo: 'ajuste-inicial', card: x.c.id, empresaId: x.c.empresaId, empresa: x.c.empresa, segmento: x.c.segmento, cargo: x.c.cargo, anterior: x.c.data, nova: x.nova, motivo: 'Ajuste das datas iniciais por classe (A 30, B 60, C 90 dias)', autorNome: 'App' });
+            store.addHistorico({ tipo: 'ajuste-inicial', classe: x.classe, card: x.c.id, empresaId: x.c.empresaId, empresa: x.c.empresa, segmento: x.c.segmento, cargo: x.c.cargo, anterior: x.c.data, nova: x.nova, motivo: 'Ajuste das datas iniciais por classe (A 30, B 60, C 90 dias; estratégicos em março)', autorNome: 'App' });
             if (store.config.tarefaAtiva) await moverPrazoTarefas(x.c.id, x.nova).catch(() => {});
             plano.aplicados++;
           }
@@ -969,6 +975,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const atual = (R.isoDate(map.fila.data ? it[map.fila.data] : null) || R.isoDate(it.closedate));
       if (!snap) { store.setSnapCard(+it.id, { data: atual, resp: +it.assignedById }); continue; }
       if (atual === snap.data) continue;
+      if ((await dadosCard(it)).classe === 'E') { store.setSnapCard(+it.id, { data: atual, resp: +it.assignedById }); continue; }   // estratégicos: edição direta é aceita
       await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: it.id, fields: { [map.fila.data || 'closedate']: snap.data } });
       store.addBloqueio({ tipo: 'card-data', card: +it.id, tentou: atual, original: snap.data, responsavel: +it.assignedById });
       store.log('bloqueio', `Data programada do card ${it.id} revertida (tentativa: ${atual}, original: ${snap.data}). Use "Reprogramar visita".`, { card: +it.id });
@@ -1149,9 +1156,16 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const situacao = fechado ? (it.stageId === map.etapas.naoRealizada ? 'naorealizada' : 'finalizado') : R.etapaPara(c.data, h);
       leves.push({ it, c, reg, fechado, situacao, vendId: (eq || {}).vendedor || null, part: reg.participantes || [] });
     }
-    // 2) contadores e opções (sobre tudo o que o usuário pode ver)
+    // 2) contadores e opções (sobre o que o usuário pode ver, dentro do período escolhido)
+    const faixa = (() => {
+      if (per === 'hoje') return [h, h];
+      if (per === 'semana') { const dow = (new Date(h + 'T12:00:00Z').getUTCDay() + 6) % 7; return [R.addDays(h, -dow), R.addDays(h, 6 - dow)]; }
+      if (per === 'mes') return [`${h.slice(0, 7)}-01`, R.ultimoDiaDoMes(h.slice(0, 7))];
+      if (per === 'custom') return [R.isoDate(de) || '0000-01-01', R.isoDate(ate) || '9999-12-31'];
+      return null;
+    })();
     const counts = { abertas: 0, atrasada: 0, dia: 0, aguardando: 0, finalizado: 0, naorealizada: 0 };
-    for (const l of leves) { counts[l.situacao]++; if (!l.fechado) counts.abertas++; }
+    for (const l of leves) { if (faixa && !(l.c.data && l.c.data >= faixa[0] && l.c.data <= faixa[1])) continue; counts[l.situacao]++; if (!l.fechado) counts.abertas++; }
     const nomeDe = id => memo(`nome:${id}`, 600e3, () => nomeUsuario(id));
     const vendIds = [...new Set(leves.map(l => l.vendId).filter(Boolean))], respIds = [...new Set(leves.map(l => +l.c.responsavel).filter(Boolean))];
     const opcoes = {
@@ -1161,13 +1175,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       responsaveis: (await Promise.all(respIds.map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
     };
     // 3) filtros
-    const faixa = (() => {
-      if (per === 'hoje') return [h, h];
-      if (per === 'semana') { const dow = (new Date(h + 'T12:00:00Z').getUTCDay() + 6) % 7; return [R.addDays(h, -dow), R.addDays(h, 6 - dow)]; }
-      if (per === 'mes') return [`${h.slice(0, 7)}-01`, R.ultimoDiaDoMes(h.slice(0, 7))];
-      if (per === 'custom') return [R.isoDate(de) || '0000-01-01', R.isoDate(ate) || '9999-12-31'];
-      return null;
-    })();
     const busca = R.norm(q);
     let sel = leves.filter(l => (status === 'todas' || (status === 'abertas' ? !l.fechado : l.situacao === status))
       && (!faixa || (l.c.data && l.c.data >= faixa[0] && l.c.data <= faixa[1]))
@@ -1219,7 +1226,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       return ({ ...c, segmentoEmpresa: await nomeRamo(emp?.ramo), tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
         encerradoEm: l.fechado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null, dias: !l.fechado && c.data ? R.dayDiff(h, c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, h) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
-        altMin: R.addDays(h, 1), altMax: R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || h.slice(0, 7)),
+        livre: c.classe === 'E', altMin: c.classe === 'E' ? h : R.addDays(h, 1), altMax: c.classe === 'E' ? R.addDays(h, 730) : R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || h.slice(0, 7)),
         equipe, participantes: await Promise.all((l.part || []).map(async id => ({ id, nome: await nomeDe(id) }))), reprogramacoes: store.historico.filter(x => x.card === c.id && !x.tipo).length,
         urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     });

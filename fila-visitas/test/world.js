@@ -5,7 +5,7 @@ function createWorld() {
   const w = { companies: {}, items: { 1032: {}, 1036: {} }, seq: 100, comments: [], notifs: [], tasks: [], users: {}, depts: [] };
   const companyFields = {};
   for (const s of SEG) for (const [k, l] of [['Diretor', 'Diretor Responsável'], ['Gerente', 'Gerente Responsável'], ['Coordenador', 'Coordenador Responsável'], ['Supervisor', 'Supervisor Responsável'], ['Vendedor', 'Vendedor Responsável'], ['Classe', 'Classe'], ['Proxima', 'Próxima Visita'], ['Ultima', 'Última Visita']]) {
-    companyFields[`UF_CRM_${s.slice(0, 3).toUpperCase()}_${k.toUpperCase()}`] = { formLabel: `[${s}] ${l}`, type: k === 'Classe' ? 'enumeration' : 'string', items: k === 'Classe' ? [{ ID: '1', VALUE: 'A' }, { ID: '2', VALUE: 'B' }, { ID: '3', VALUE: 'C' }] : undefined };
+    companyFields[`UF_CRM_${s.slice(0, 3).toUpperCase()}_${k.toUpperCase()}`] = { formLabel: `[${s}] ${l}`, type: k === 'Classe' ? 'enumeration' : 'string', items: k === 'Classe' ? [{ ID: '1', VALUE: 'A' }, { ID: '2', VALUE: 'B' }, { ID: '3', VALUE: 'C' }, { ID: '4', VALUE: 'Clientes Estratégicos' }] : undefined };
   }
   w.companyFields = companyFields;
   const stages = [{ STATUS_ID: 'DT1036_1:NEW', NAME: 'Aguardando' }, { STATUS_ID: 'DT1036_1:DIA', NAME: 'Dia da Visita' }, { STATUS_ID: 'DT1036_1:LATE', NAME: 'Atrasada' }, { STATUS_ID: 'DT1036_1:DONE', NAME: 'Finalizado' }, { STATUS_ID: 'DT1036_1:FAIL', NAME: 'Removido', SEMANTICS: 'F' }];

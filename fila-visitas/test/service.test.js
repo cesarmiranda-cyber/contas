@@ -714,3 +714,37 @@ test('datas iniciais por classe: espalha pelo período da classe em dias úteis 
   const de = await svc.ajustarDatasIniciais({ aplicar: true });
   assert.equal(de.aplicados, 0, 'idempotente');
 });
+
+test('Clientes Estratégicos: começa em março, a cada 6 meses, o vendedor altera a data livremente e o card não vence no fim do mês', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_CLASSE: '4', UF_CRM_MOT_ULTIMA: '', __cfg: { cargosFila: ['Vendedor'] } });   // hoje = 10/05/2026
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w)[0];
+  assert.ok(vend.ufCrm_data.startsWith('2027-03-'), `primeira visita em março: ${vend.ufCrm_data}`);
+  assert.equal(vend.ufCrm_classe, 'Clientes Estratégicos');
+  // o vendedor muda para qualquer data (outro mês, sem motivo)
+  const r = await svc.reprogramar(vend.id, { uid: 10, nova: '2026-12-15', motivo: '' });
+  assert.equal(r.ok, true); assert.equal(vend.ufCrm_data, '2026-12-15');
+  // não vira "não realizada" no fim do mês, mesmo atrasado de meses anteriores
+  vend.ufCrm_data = '2026-03-02'; vend.closedate = '2026-03-02';
+  const nr = await svc.encerrarNaoRealizadas();
+  assert.equal(nr.marcadas, 0);
+});
+
+test('Clientes Estratégicos: com Última visita o próximo é +6 meses; classes comuns continuam com regras e motivo obrigatório', async () => {
+  const R = require('../lib/rules');
+  assert.equal(R.dataProgramada(R.DEFAULT_CONFIG, { cargo: 'Vendedor', classe: 'E', ultima: '2026-08-31', hoje: '2026-11-16' }), '2027-02-28');
+  assert.equal(R.classeDe('Clientes Estratégicos'), 'E'); assert.equal(R.classeDe('C'), 'C');
+  assert.ok(R.validarReprogramacao({ atual: '2026-11-20', nova: '2026-12-10', motivo: 'x', hoje: '2026-11-16' }), 'classe comum: mês limitado');
+  assert.equal(R.validarReprogramacao({ atual: '2026-11-20', nova: '2027-02-10', motivo: '', hoje: '2026-11-16', livre: true }), null);
+  assert.ok(R.validarReprogramacao({ atual: '2026-11-20', nova: '2026-11-10', motivo: '', hoje: '2026-11-16', livre: true }), 'passado não vale');
+});
+
+test('empresa que vira Clientes Estratégicos sem Última visita: o card vai para março', async () => {
+  const { w, svc } = setup({ UF_CRM_MOT_ULTIMA: '', __cfg: { cargosFila: ['Vendedor'] } });
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w)[0];
+  assert.ok(vend.ufCrm_data < '2026-12-31');
+  w.companies[1].UF_CRM_MOT_CLASSE = '4';
+  await svc.sincronizarEmpresa(1);
+  assert.ok(vend.ufCrm_data.startsWith('2027-03-'), vend.ufCrm_data);
+});

@@ -216,6 +216,11 @@ server.listen(PORT, () => {
   if (bitrix.enabled && process.env.NOVO_CICLO) setTimeout(() => svc.novoCiclo().then(r => console.log('novo-ciclo fim', r.fase)).catch(e => console.error('novo-ciclo:', e.message)), 4000);
   if (bitrix.enabled && process.env.DIAG_CAMPOS36) setTimeout(async () => { try { const f = (await bitrix.call('crm.item.fields', { entityTypeId: 1036 })).result?.fields || {}; console.log('diag36', JSON.stringify(Object.entries(f).filter(([k, d]) => /observ|assigned|created|accomp|users|resp/i.test(k + JSON.stringify(d.title || '')) ).map(([k, d]) => [k, d.type, d.isMultiple, d.title]))); } catch (e) { console.error('diag36:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.AJUSTAR_DATAS) setTimeout(async () => { try { const r = await svc.ajustarDatasIniciais({ aplicar: process.env.AJUSTAR_DATAS === 'aplicar' }); const j = JSON.stringify(r); for (let i = 0; i < j.length; i += 1500) console.log('ajuste-datas', j.slice(i, i + 1500)); } catch (e) { console.error('ajuste-datas:', e.message); } }, 4000);
+  if (bitrix.enabled && process.env.DIAG_CLASSES) setTimeout(async () => { try {
+    const { map, meta } = await svc.campos(true); const out = { fila: [map.fila.classe, (meta[map.fila.classe] || {}).itens], empresa: {} };
+    for (const seg of Object.keys(map.empresa)) { const k = map.empresa[seg].classe; out.empresa[seg] = [k, (meta[k] || {}).itens, ((map.alt || {})[seg] || {}).classe]; }
+    const j = JSON.stringify(out); for (let i = 0; i < j.length; i += 1500) console.log('diag-classes', j.slice(i, i + 1500));
+  } catch (e) { console.error('diag-classes:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;

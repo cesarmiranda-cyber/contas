@@ -325,7 +325,8 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmt = iso => iso ? iso.split('-').reverse().join('/') : '—';
 let uid = null, eu = {}, aba = 'minhas', dados = null, users = [], foco = 'abertas';
-const VD = { per: '', de: '', ate: '' };   // filtro de data: '' | hoje | semana | mes | custom
+const VD = { per: 'mes', de: '', ate: '' };   // filtro de data: '' (qualquer) | hoje | semana | mes (padrão: só o mês corrente) | custom
+const clsNome = c => ({ E: 'Clientes Estratégicos' })[c] || c;
 try { uid = +localStorage.getItem('fv.uid') || null; } catch {}
 const F = { seg: '', ramo: '', tipo: '', classe: '', resp: '', vend: '' };
 
@@ -402,7 +403,7 @@ function lista() {
   }).join('');
   const de = (dados.pagina - 1) * dados.tamanho + 1, ate = Math.min(dados.total, dados.pagina * dados.tamanho);
   const janela = (() => { const a = Math.max(1, dados.pagina - 2), b = Math.min(dados.paginas, a + 4); return Array.from({ length: b - a + 1 }, (_, i) => a + i); })();
-  const filtrado = F.seg || F.ramo || F.tipo || F.classe || F.resp || F.vend || foco !== 'abertas' || VD.per || F.q;
+  const filtrado = F.seg || F.ramo || F.tipo || F.classe || F.resp || F.vend || foco !== 'abertas' || (VD.per && VD.per !== 'mes') || F.q;
   $('#main').innerHTML = `
     <div class="stats s5">
       <button class="stat ${foco === 'abertas' ? 'on' : ''}" data-f="abertas"><i>◷</i><div><b>${c.abertas}</b><span>Em aberto</span></div></button>
@@ -422,7 +423,7 @@ function lista() {
       <select id="fra" title="Segmento do cadastro da empresa"><option value="">Segmento da empresa: todos</option>${opt(op.ramos.map(x => [x.id, x.nome]), F.ramo)}</select>
       <select id="fs" title="Linha de negócio"><option value="">Todas as linhas (Motores, Peças…)</option>${opt(op.segmentos.map(s => [s, s]), F.seg)}</select>
       <select id="ft"><option value="">Industrial e marítimo</option>${opt([['industrial', 'Industrial'], ['marítimo', 'Marítimo']], F.tipo)}</select>
-      <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C']], F.classe)}</select>
+      <select id="fc"><option value="">Todas as classes</option>${opt([['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C'], ['E', 'Clientes Estratégicos']], F.classe)}</select>
     </div>
     <div class="bar2"><button class="btn sm fxb" id="fxb">${FX.aberto ? 'Ocultar filtros' : 'Filtros'}${filtrado ? ' •' : ''}</button><span class="hint">${dados.total ? `${de}–${ate} de ${dados.total}` : '0'} visita(s)${filtrado ? ' · <a href="#" id="flimpa">limpar filtros</a>' : ''}</span>
       <div class="bar2r"><label class="sl2">Ordenar<select id="fo">${opt([['data', 'Situação e data'], ['prazo', 'Data programada'], ['empresa', 'Empresa'], ['segmento', 'Segmento'], ['cargo', 'Cargo'], ['classe', 'Classe'], ...(verEquipe ? [['responsavel', 'Responsável']] : [])], VP.ord)}</select></label>
@@ -458,7 +459,7 @@ function lista() {
   document.querySelectorAll('[data-oc]').forEach(th => th.onclick = () => { const o = th.dataset.oc; VP.dir = VP.ord === o ? -VP.dir : 1; VP.ord = o; salvaVP(); refaz(); });
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { VQ.page = +b.dataset.p; refaz(false); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   $('#psz') && ($('#psz').onchange = e => { VQ.size = +e.target.value; refaz(); });
-  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', ramo: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: '', de: '', ate: '' }); salvaF(); refaz(); };
+  if ($('#flimpa')) $('#flimpa').onclick = e => { e.preventDefault(); Object.assign(F, { seg: '', ramo: '', tipo: '', classe: '', resp: '', vend: '', q: '' }); foco = 'abertas'; Object.assign(VD, { per: 'mes', de: '', ate: '' }); salvaF(); refaz(); };
   $('#vcsv').onclick = async () => {
     const todas = (await api('/api/visitas?' + consultaVisitas({ page: 1, size: 5000 }))).visitas;
     const q2 = x => `"${String(x ?? '').replace(/"/g, '""')}"`;
@@ -558,7 +559,7 @@ function abreGrupoIds(ids, nota) {
   modal(`<div class="sh-h"><h3>${c0.urlEmpresa ? `<a href="${esc(c0.urlEmpresa)}" target="_top">${esc(c0.empresa)}</a>` : esc(c0.empresa)}</h3>
       <div class="chips">${c0.segmentoEmpresa ? `<span class="tag emp">${esc(c0.segmentoEmpresa)}</span>` : ''}${c0.tipoEmpresa ? `<span class="tag">${esc(c0.tipoEmpresa)}</span>` : ''}<span class="tag">${grp.length} visita(s)</span></div></div>
     <div class="sh-b">${nota ? `<div class="info">${esc(nota)}</div>` : ''}${eq ? `<div class="kg-eq">${eq}</div>` : ''}
-      <div class="tw"><table><tr><th>Linha</th><th>Cargo</th><th>Classe</th><th>Responsável</th><th>Última visita</th><th>Programada</th><th>Prazo</th><th></th></tr>${grp.map(x => `<tr><td><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span></td><td>${esc(x.cargo)}</td><td>${esc(x.classe)}</td><td>${esc(x.responsavelNome)}</td><td>${x.ultima ? fmt(x.ultima) : '—'}</td><td>${fmt(x.data)}</td><td><span class="pl2" style="background:${pl[x.situacao][0]};color:${pl[x.situacao][1]}">${prazoTxt(x)}</span></td>
+      <div class="tw"><table><tr><th>Linha</th><th>Cargo</th><th>Classe</th><th>Responsável</th><th>Última visita</th><th>Programada</th><th>Prazo</th><th></th></tr>${grp.map(x => `<tr><td><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span></td><td>${esc(x.cargo)}</td><td>${esc(x.classe === 'E' ? 'Estratégico' : x.classe)}</td><td>${esc(x.responsavelNome)}</td><td>${x.ultima ? fmt(x.ultima) : '—'}</td><td>${fmt(x.data)}</td><td><span class="pl2" style="background:${pl[x.situacao][0]};color:${pl[x.situacao][1]}">${prazoTxt(x)}</span></td>
         <td style="white-space:nowrap">${x.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button>${abertas.length > 1 ? '<button class="btn" id="gall">Alterar a data de todas</button>' : ''}</div>`);
   document.querySelectorAll('[data-greg]').forEach(b => b.onclick = () => registrar(+b.dataset.greg));
@@ -638,7 +639,7 @@ function tabelaVisitas(v, verEquipe) {
   const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
   const linhaTab = (c, filha) => {
     const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${c.id}">Ver registro</button>` : c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`;
+    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe === 'E' ? 'Estratégico' : c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${c.id}">Ver registro</button>` : c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`;
   };
   const grupos = [];                                                  // linhas seguidas da mesma empresa viram um grupo recolhível
   for (const c of v) { const g = grupos[grupos.length - 1]; if (g && c.empresaId && g[0].empresaId === c.empresaId) g.push(c); else grupos.push([c]); }
@@ -668,7 +669,7 @@ function linha(c) {
   return `<div class="item ${c.situacao}">
     <div class="main">
       <div class="emp">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</div>
-      <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag">Classe ${esc(c.classe)}</span>` : ''}${c.segmentoEmpresa ? `<span class="tag emp" title="Segmento da empresa">${esc(c.segmentoEmpresa)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
+      <div class="tags"><span class="tag seg">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag ${c.classe === 'E' ? 'warn' : ''}">${c.classe === 'E' ? esc(clsNome(c.classe)) : 'Classe ' + esc(c.classe)}</span>` : ''}${c.segmentoEmpresa ? `<span class="tag emp" title="Segmento da empresa">${esc(c.segmentoEmpresa)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
       <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null && c.diasDesdeUltima !== undefined ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${dados.visao !== 'minhas' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
       ${eq || extras ? `<div class="pessoas">${eq}${extras}</div>` : ''}
     </div>
@@ -787,13 +788,14 @@ function reagendarVisita(id) {
   const hojeIso = (dados && dados.hoje) || new Date().toISOString().slice(0, 10);
   const soma = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
   const fimMes = iso => { const [y, m] = iso.slice(0, 7).split('-').map(Number); return `${iso.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
+  const livre = !!c.livre;
   const min = c.altMin || soma(hojeIso, 1), max = c.altMax || fimMes(c.data), [y, m] = max.slice(0, 7).split('-');
   const semDia = min > max;
   modal(`<div class="sh-h"><h3>Alterar visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span></div></div>
     <div class="sh-b"><div class="hint" style="margin-top:12px">Data atual: <b>${fmt(c.data)}</b>.</div>
-    <div class="info">A visita só pode ser alterada <b>do dia seguinte em diante</b> e <b>dentro do mês ${m}/${y}</b>. Não dá para passar para o mês seguinte: se a visita não for registrada no mês, ela é marcada como <b>não realizada</b> e a data não pode mais ser alterada.</div>
+    ${livre ? '<div class="info"><b>Cliente estratégico</b>: você pode escolher qualquer data a partir de hoje. O motivo é opcional e a visita não vence no fim do mês.</div>' : `<div class="info">A visita só pode ser alterada <b>do dia seguinte em diante</b> e <b>dentro do mês ${m}/${y}</b>. Não dá para passar para o mês seguinte: se a visita não for registrada no mês, ela é marcada como <b>não realizada</b> e a data não pode mais ser alterada.</div>`}
     ${semDia ? `<div class="err on">Não há mais dias disponíveis em ${m}/${y}. Registre a visita ou ela será marcada como não realizada.</div>` : `<div class="fld"><label>Nova data <i>*</i> <span class="hint">(${fmt(min)} a ${fmt(max)})</span></label><input type="date" id="nd" min="${min}" max="${max}" value="${c.data >= min && c.data <= max ? c.data : min}"></div>
-    <div class="fld"><label>Motivo <i>*</i></label><textarea id="mo" placeholder="Por que a visita muda de data?"></textarea></div>`}<div class="err" id="er"></div></div>
+    <div class="fld"><label>Motivo ${livre ? '<span class="hint">(opcional)</span>' : '<i>*</i>'}</label><textarea id="mo" placeholder="Por que a visita muda de data?"></textarea></div>`}<div class="err" id="er"></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button>${semDia ? '' : '<button class="btn pri" id="ok">Alterar visita</button>'}</div>`);
   if (semDia) return;
   $('#ok').onclick = async () => {
@@ -861,7 +863,7 @@ async function cfg(d) {
     <div class="panel"><h2>Automação</h2>
       <label><input type="checkbox" id="at" style="width:auto" ${c.ativo ? 'checked' : ''}> <b>App ativo</b> — cria/atualiza cards, roda o job diário e reverte edições diretas</label>
       <p class="hint">Desligue para pausar toda a automação. A consulta de visitas e o registro continuam funcionando.</p></div>
-    <h2>Intervalos entre visitas (dias)</h2><div class="tw"><table><tr><th>Cargo</th><th>A</th><th>B</th><th>C</th></tr>${cargos.map(g => `<tr><td>${g}</td>${['A', 'B', 'C'].map(k => `<td><input data-i="${g}.${k}" type="number" min="1" value="${c.intervalos[g][k]}"></td>`).join('')}</tr>`).join('')}</table></div>
+    <h2>Intervalos entre visitas (dias)</h2><div class="tw"><table><tr><th>Cargo</th><th>A</th><th>B</th><th>C</th><th title="Clientes Estratégicos: 6 meses, começam em março">Estratégicos</th></tr>${cargos.map(g => `<tr><td>${g}</td>${['A', 'B', 'C', 'E'].map(k => k === 'E' ? '<td><span class="hint">6 meses · começa em março</span></td>' : `<td><input data-i="${g}.${k}" type="number" min="1" value="${c.intervalos[g][k]}"></td>`).join('')}</tr>`).join('')}</table></div>
     <h2>Geral</h2><div class="panel">
     <div class="fld"><label>Hora do job diário (Brasília)</label><input id="hj" type="number" min="0" max="23" value="${c.horaJob}"></div>
     <label><input type="checkbox" id="ta" style="width:auto" ${c.tarefaAtiva ? 'checked' : ''}> Criar tarefa "Realizar Visita" (prazo em horas úteis)</label>
@@ -1135,7 +1137,7 @@ function paginaFila() {
      ${vz('Tempo de atraso', hbar(AGING.map(([r, a, b], i) => [r, agBase.filter(c => -c.dias >= a && -c.dias <= b).length, COR.atrasada, i]), { keys: ['aging'] }))}</div>
    <div class="g3">${vz('Mapa de atrasos: segmento × cargo', matriz(aoutros(['seg', 'cargo']), segs, ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor']), 's2')}
      ${vz('Atrasadas por responsável', hbar(respAtr, { keys: ['resp'] }))}</div>
-   <div class="g3">${vz('Fila por classe', hbar(['A', 'B', 'C'].map((k, i) => [`Classe ${k}`, cl.filter(c => c.classe === k).length, PBI[i], k]), { keys: ['classe'] }))}
+   <div class="g3">${vz('Fila por classe', hbar(['A', 'B', 'C', 'E'].map((k, i) => [k === 'E' ? 'Estratégicos' : `Classe ${k}`, cl.filter(c => c.classe === k).length, PBI[i], k]), { keys: ['classe'] }))}
      ${vz('Fila por tipo de empresa', rosca(contar(aoutros(['tipo']), c => c.tipo).map(([k, n], i) => ({ nome: k, valor: n, cor: PBI[i % PBI.length] }))))}
      ${vz('Fila por responsável (todas)', hbar(contar(aoutros(['resp']), c => c.respNome).slice(0, 8).map(([n, v]) => [n, v, PBI[1], String((DB.dados.cards.find(c => c.respNome === n) || {}).resp)]), { keys: ['resp'] }))}</div>
    ${detalhe(dets, [
@@ -1195,7 +1197,7 @@ function dashDesenha() {
   const scrollY = window.scrollY;
   $('#main').innerHTML = `<div class="pbi">
     <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${hmBR(d.geradoEm)} · <a href="#" id="s_r2">atualizar</a></span></div>
-      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend)}${sel('s_ra', 'Segmento da empresa', [['', 'Todos'], ...ramos.map(x => [x, x])], f.ramo)}${sel('s_s', 'Linha', [['', 'Todas'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
+      <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend)}${sel('s_ra', 'Segmento da empresa', [['', 'Todos'], ...ramos.map(x => [x, x])], f.ramo)}${sel('s_s', 'Linha', [['', 'Todas'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C'], ['E', 'Estratégicos']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
     <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Visitas alteradas']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
     ${chips ? `<div class="chips-bar"><span>Filtros aplicados:</span>${chips}</div>` : '<div class="chips-bar dica">Dica: clique em qualquer barra, fatia, coluna ou indicador para filtrar a página e ver os registros abaixo.</div>'}
     <div class="pbi-cv">${pagina}</div>

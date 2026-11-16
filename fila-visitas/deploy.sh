@@ -30,6 +30,7 @@ if os.environ.get("DIAG_PROX"): env["DIAG_PROX"] = os.environ["DIAG_PROX"]
 if os.environ.get("NOVO_CICLO"): env["NOVO_CICLO"] = "1"
 if os.environ.get("DIAG_CAMPOS36"): env["DIAG_CAMPOS36"] = "1"
 if os.environ.get("AJUSTAR_DATAS"): env["AJUSTAR_DATAS"] = os.environ["AJUSTAR_DATAS"]
+if os.environ.get("DIAG_CLASSES"): env["DIAG_CLASSES"] = "1"
 if os.environ.get("DIAG_DATAS"): env["DIAG_DATAS"] = "1"
 if os.environ.get("DIAG_CICLO"): env["DIAG_CICLO"] = "1"
 if os.environ.get("DIAG_FILTRO"): env["DIAG_FILTRO"] = os.environ["DIAG_FILTRO"]
