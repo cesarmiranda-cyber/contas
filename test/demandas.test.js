@@ -302,3 +302,11 @@ test('formulário do Bitrix24: se o cliente já tem cartão aberto do serviço, 
   const c = await call('GET', `/rotulagem/negocios/${card.id}`); assert.equal(c.dadosIa['nome do produto'], 'Granola'); assert.match(c.notas.map(x => x.t).join(' '), /Questionário recebido pelo formulário/);
   assert.match(bitrix.deals.find(x => x.ID === '301').COMMENTS, /incorporadas ao cartão/); assert.equal((await call('POST', '/formulario/importar', { simular: false })).criados.length, 0);
 });
+
+test('formulário do Bitrix24: o título do negócio decide o processo (rotulagem, tabela, fichas, suplementos e multas)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ft-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  const t = ['Rotulagem — A', 'Tabela nutricional — B', 'Fichas técnicas — C', 'Suplementos — D', 'Multas — E', 'Manual — F'];
+  t.forEach((x, i) => bitrix.deals.push({ ID: String(400 + i), CATEGORY_ID: 12, TITLE: x, STAGE_ID: 'C12:A', COMMENTS: '' }));
+  const r = await call('POST', '/formulario/importar', {}); assert.deepEqual(r.criados.map(x => x.processo), ['rotulagem', 'tabelas', 'fichas', 'suplementos', 'multas']); assert.deepEqual(r.semClassificar.map(x => x.titulo), ['Manual — F']);
+});
