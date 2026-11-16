@@ -79,7 +79,7 @@ const routes = {
       for (const c of R.CARGOS) for (const k of R.CLASSES) { const n = +b.intervalos?.[c]?.[k]; if (Number.isInteger(n) && n > 0 && n < 1000) (p.intervalos[c] ||= {})[k] = n; }
     }
     if (Number.isInteger(+b.horaJob) && +b.horaJob >= 0 && +b.horaJob < 24) p.horaJob = +b.horaJob;
-    for (const k of ['tarefaAtiva', 'atualizarProxima', 'hierarquiaAuto', 'respeitarBitrix']) if (typeof b[k] === 'boolean') p[k] = b[k];
+    for (const k of ['tarefaAtiva', 'atualizarProxima', 'hierarquiaAuto', 'respeitarBitrix', 'removerSemClasse']) if (typeof b[k] === 'boolean') p[k] = b[k];
     if (typeof b.ativo === 'boolean') p.ativo = b.ativo;
     if (Number.isFinite(+b.tarefaHorasUteis) && +b.tarefaHorasUteis > 0) p.tarefaHorasUteis = +b.tarefaHorasUteis;
     if (['secao', 'extra'].includes(b.motoresDatas)) p.motoresDatas = b.motoresDatas;

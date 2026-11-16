@@ -331,6 +331,13 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     }
     for (const seg of R.SEGMENTOS) {
       const s = emp.segs[seg];
+      // Classe em branco no cadastro: o cliente deixou de ter visitas nesta linha. O card aberto é removido sozinho (e volta a nascer se a classe for preenchida de novo).
+      if (!R.CLASSES.includes(s.classe) && cfg.removerSemClasse !== false) {
+        for (const cargo of R.CARGOS) {
+          const card = abertos.get(R.chaveFila(id, seg, cargo));
+          if (card && await removerCardAuto(card, 'Classe em branco no cadastro da empresa: o cliente não terá mais visitas nesta linha.')) (res.removidosAuto ||= []).push(card.id);
+        }
+      }
       if (!s.vendedor && !s.supervisor && !s.coordenador && !s.gerente && !s.classe) continue; // segmento não usado
       if (!s.diretor) s.diretor = await diretorDe(s.gerente);
       for (const cargo of R.CARGOS.filter(x => x === 'Vendedor' || (cfg.cargosFila || []).includes(x))) {
@@ -950,6 +957,31 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const ex = store.job('excluidos') || {};
     return Promise.all(Object.values(ex).sort((a, b) => String(b.em).localeCompare(String(a.em))).map(async x => ({ ...x, porNome: await nomeUsuario(x.por) })));
   }
+  // Remoção automática (regra do cadastro): move o card para Removido, encerra tarefas, comenta no card e registra no log.
+  async function removerCardAuto(card, motivo) {
+    const { map } = await campos();
+    if (!map.etapas.removido || card.stageId === map.etapas.removido) return false;
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.removido } });
+    const chave = R.chaveFila(card.empresaId, card.segmento, card.cargo);
+    if (store.chave(chave) === card.id) store.setChave(chave, null);
+    try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `Visita removida automaticamente. ${motivo}` } }); } catch { /* opcional */ }
+    await encerrarTarefas(card.id, 'Visita removida automaticamente.');
+    store.log('card-removido-auto', `Card ${card.id} (${card.titulo}) removido: ${motivo}`, { card: card.id, empresa: card.empresaId });
+    envelhece();
+    return true;
+  }
+  // Rede de segurança: confere de hora em hora as empresas que ainda têm card aberto e sincroniza as que ficaram sem classe.
+  async function reconciliarSemClasse() {
+    if (store.config.removerSemClasse === false) return { empresas: 0, removidos: 0 };
+    const abertos = await cardsAbertos();
+    const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))];
+    const sem = []; let i = 0;
+    await Promise.all(Array.from({ length: 6 }, async () => { while (i < ids.length) { const id = ids[i++]; const e = await lerEmpresa(id).catch(() => null); if (e && R.SEGMENTOS.some(sg => !R.CLASSES.includes(e.segs?.[sg]?.classe))) sem.push(id); } }));
+    let removidos = 0;
+    for (const id of sem) { try { const r = await sincronizarEmpresa(id); removidos += (r.removidosAuto || []).length; } catch (e) { store.log('erro', `Classe em branco, empresa ${id}: ${e.message}`); } }
+    if (removidos) store.log('reconciliacao', `Classe em branco: ${removidos} card(s) removido(s)`);
+    return { empresas: sem.length, removidos };
+  }
   // Prévia (só leitura) de "encerrar a fila atual e começar um novo ciclo": para cada card aberto calcula a data que o card teria
   // se fosse recriado hoje pelas regras (mesma conta da sincronização). Não escreve nada no Bitrix.
   async function previaNovoCiclo() {
@@ -1126,6 +1158,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     try {
       await campos();
       const guardas = { visitas: await guardarVisitas(), cards: await guardarCards(await cardsAbertos()) };
+      if (!store.job('semClasse') || Date.now() - Date.parse(store.job('semClasse')) > 3600e3) { guardas.semClasse = await reconciliarSemClasse(); store.setJob('semClasse', new Date().toISOString()); }
       if (!store.job('cadastros') || Date.now() - Date.parse(store.job('cadastros')) > 3600e3) { guardas.cadastros = await reconciliarCadastros(); store.setJob('cadastros', new Date().toISOString()); }
       if (!store.job('migradoEncerrado')) { guardas.migradas = (await migrarFinalizadas()).movidos; store.setJob('migradoEncerrado', new Date().toISOString()); }
       if (!store.job('reconciliado') || Date.now() - Date.parse(store.job('reconciliado')) > 3600e3) { guardas.reconciliados = (await reconciliarVisitas()).finalizados; store.setJob('reconciliado', new Date().toISOString()); }
@@ -1484,6 +1517,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, lerEmpresa, dadosCard, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, podeExcluir, excluirCard, restaurarCard, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, lerEmpresa, dadosCard, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

@@ -799,3 +799,27 @@ test('excluir visitas: só quem tem permissão; o card vai para Removido, não �
   store.setConfig({ admins: [30] });
   assert.equal(svc.podeExcluir(30), true, 'administrador também pode');
 });
+
+test('classe em branco no cadastro: o card aberto é removido sozinho e volta quando a classe é preenchida', async () => {
+  const { w, svc, store } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  await svc.sincronizarEmpresa(1);
+  const card = cards(w)[0];
+  assert.notEqual(card.stageId, w.stages.removido);
+  w.companies[1].UF_CRM_MOT_CLASSE = '';                                   // classe apagada no cadastro
+  const r = await svc.sincronizarEmpresa(1);
+  assert.deepEqual(r.removidosAuto, [card.id]);
+  assert.equal(card.stageId, w.stages.removido);
+  assert.ok(w.comments.some(c => /removida automaticamente/.test(c.COMMENT || '')));
+  assert.equal((await svc.sincronizarEmpresa(1)).removidosAuto, undefined, 'não repete');
+  w.companies[1].UF_CRM_MOT_CLASSE = '1';                                  // classe preenchida de novo
+  await svc.sincronizarEmpresa(1);
+  assert.equal(cards(w).filter(c => c.stageId !== w.stages.removido).length, 1, 'a visita volta a nascer');
+  // rede de segurança por hora
+  w.companies[1].UF_CRM_MOT_CLASSE = '';
+  const rr = await svc.reconciliarSemClasse();
+  assert.equal(rr.removidos, 1);
+  store.setConfig({ removerSemClasse: false });
+  w.companies[1].UF_CRM_MOT_CLASSE = '1'; await svc.sincronizarEmpresa(1);
+  w.companies[1].UF_CRM_MOT_CLASSE = '';
+  assert.equal((await svc.reconciliarSemClasse()).removidos, 0, 'regra desligada em configuração');
+});
