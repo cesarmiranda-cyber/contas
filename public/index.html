@@ -183,9 +183,13 @@ function entraPeloBitrix() {
     document.head.appendChild(s);
   });
 }
+async function entraPeloGateway() {   // Vibe+: o Gateway da plataforma já sabe quem abriu o app no Bitrix24
+  try { const r = await nmFetch('/auth/bitrix/gateway'), j = await r.json().catch(() => ({})); if (!r.ok) { if (r.status === 403 && /liberado|acesso/i.test(j.error || '')) bxErro(j.error); return false; } NM.token = j.token; await entrou(j.usuario); return true; } catch { return false; }
+}
 async function semSessao() {
-  if (!dentroDoBitrix) { mostra('#vLogin'); focaLogin(); return; }
   $('#fBx').hidden = true; $('#fAuto').hidden = false; mostra('#vLogin');
+  if (await entraPeloGateway()) return;
+  if (!dentroDoBitrix) { $('#fAuto').hidden = true; $('#fBx').hidden = false; focaLogin(); return; }
   if (await entraPeloBitrix()) return;
   $('#fAuto').hidden = true; $('#fBx').hidden = false; $('#notaAuto').textContent = 'Não consegui identificar o seu usuário automaticamente. Abra o Nutrimix pelo menu Aplicativos do Bitrix24 (o administrador precisa cadastrá-lo como aplicativo local) ou use o código acima.'; focaLogin();
 }

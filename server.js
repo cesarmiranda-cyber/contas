@@ -161,6 +161,12 @@ const server = http.createServer(async (req, res) => {
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
       return send(res, 200, await demApi.entradaFormulario(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
     }
+    if (req.method === 'GET' && u.pathname === '/auth/bitrix/gateway') {   // Vibe+: usuário identificado pelo Gateway da plataforma
+      const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?', h = req.headers;
+      let nome = ''; try { nome = decodeURIComponent(String(h['x-vibe-user-name-encoded'] || '')); } catch { nome = ''; }
+      res.setHeader('Cache-Control', 'no-store');
+      return send(res, 200, await bxLogin.porGateway({ id: h['x-vibe-user-id'], nome, requestId: h['x-vibe-request-id'] }, ip, process.env.VIBE_GATEWAY_TRUST === '1'));
+    }
     if (req.method === 'POST' && u.pathname === '/auth/bitrix/sdk') {   // entrada automática dentro do Bitrix24 (aplicativo local): o token vem do BX24.getAuth()
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
       const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?', b = await readBody(req, 5000);

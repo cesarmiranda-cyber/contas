@@ -56,3 +56,12 @@ test('entrada automática dentro do Bitrix24 (SDK): só do portal autorizado, to
   for (let i = 0; i < 40; i++) await bx.porSdk({ AUTH_ID: 'curto', DOMAIN: 'p.bitrix24.com.br' }, '9.9.9.9').catch(() => {});
   await assert.rejects(bx.porSdk({ AUTH_ID: 'curto', DOMAIN: 'p.bitrix24.com.br' }, '9.9.9.9'), /Muitas tentativas/);
 });
+
+test('Vibe+ (Gateway): usuário vem do cabeçalho do Gateway; só com confiança habilitada, id numérico e liberado', async () => {
+  const { bx, auth } = await cenario({ ADMIN_BITRIX_IDS: '10' }); const ok = { id: '10', nome: 'Cesar M', requestId: 'req_0123456789abcdef' };
+  await assert.rejects(bx.porGateway(ok, '1.1.1.1', false), /não está habilitada/);
+  await assert.rejects(bx.porGateway({ ...ok, requestId: '' }, '1.1.1.1', true), /não passou pelo Gateway/);
+  for (const id of ['net_5', 'share:abc', 'vibe:9', '10; drop', '']) await assert.rejects(bx.porGateway({ ...ok, id }, '1.1.1.1', true), /não identificou/);
+  await assert.rejects(bx.porGateway({ ...ok, id: '99' }, '1.1.1.1', true), /ainda não tem acesso/);   // identificado, mas não liberado em Usuários e acessos
+  const r = await bx.porGateway(ok, '1.1.1.1', true); assert.ok(auth.valida(r.token)); assert.equal(r.usuario.perfil, 'admin');
+});
