@@ -59,7 +59,7 @@ const store_historico_para = lista => { const ids = lista.split(',').map(Number)
 const routes = {
   'GET /health': async () => ({ ok: true }),
   'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '', podeConfig: svc.acessoRestrito() ? !!(id.verificado && svc.podeConfigurar(id.uid)) : true, podeDashboard: svc.acessoRestrito() ? !!(id.verificado && svc.podeDashboard(id.uid)) : true, podeExcluir: !!(id.verificado && svc.podeExcluir(id.uid)) }),
-  'GET /api/dashboard': async (_, __, id) => { exige(); exigeDashboard(id); return svc.dashboardDados({ uid: id.uid, bearer: id.bearer }); },
+  'GET /api/dashboard': async (_, __, id) => { exige(); exigeDashboard(id); return svc.dashboardDados({ uid: id.uid, bearer: id.bearer, forcar: _.searchParams.get('novo') === '1' }); },
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
   'GET /api/visitas': async (u, _, id) => {
     exige();
@@ -295,6 +295,17 @@ server.listen(PORT, () => {
     for (const it of cards) { const c = await svc.dadosCard(it); const r = porCard.get(String(it.id)); out.push([it.id, c.empresa, c.segmento, c.data, it.updatedTime, r ? { visita: r.id, por: r.assignedById, sup: map.visita.supervisor ? r[map.visita.supervisor] : null } : 'SEM REGISTRO']); }
     const j = JSON.stringify({ encerrados: out.length, semRegistro: out.filter(x => x[5] === 'SEM REGISTRO').length, lista: out.slice(0, 30), podeEditarCfg: { admins: store.config.admins } }); for (let i = 0; i < j.length; i += 1500) console.log('diag-enc', j.slice(i, i + 1500));
   } catch (e) { console.error('diag-enc:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_SUPREG) setTimeout(async () => { try {
+    const { map } = await svc.campos(true);
+    const f = (await bitrix.call('crm.item.fields', { entityTypeId: 1032 })).result?.fields || {};
+    console.log('diag-supreg mapa', JSON.stringify({ supervisor: map.visita.supervisor, filaId: map.visita.filaId, candidatos: Object.entries(f).filter(([k, d]) => /supervisor/i.test(d.title || '')).map(([k, d]) => [k, d.type, d.title]) }));
+    const it = (await bitrix.call('crm.item.list', { entityTypeId: 1032, order: { id: 'desc' }, select: ['*', 'uf*'] })).result?.items || [];
+    console.log('diag-supreg itens', JSON.stringify(it.slice(0, 8).map(x => ({ id: x.id, cr: x.createdTime, sup: map.visita.supervisor ? x[map.visita.supervisor] : '(sem mapa)', todos: Object.entries(x).filter(([k, v]) => /^ufCrm9_/.test(k) && /supervisor|1\d{12}/.test(k) && v && v !== 0).length }))));
+  } catch (e) { console.error('diag-supreg:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_DASH) setTimeout(async () => { try {
+    const d = await svc.dashboardDados({ uid: +process.env.DIAG_DASH, espera: 300000 });
+    console.log('diag-dash', JSON.stringify({ visitas: (d.visitas || []).length, comSup: (d.visitas || []).filter(v => v.supervisor).length, amostra: (d.visitas || []).slice(0, 3).map(v => [v.id, v.dia, v.supervisor, v.supervisorNome, v.resp]), carregando: d.carregando || false, visao: d.visao }));
+  } catch (e) { console.error('diag-dash:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;

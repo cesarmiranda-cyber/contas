@@ -199,7 +199,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   // Só os cards mudam quando se escreve na fila: nomes, empresas e equipe continuam em cache (a tela não refaz tudo a cada alteração).
   // Alterações da varredura só deixam a lista "velha" (a tela segue mostrando e atualiza em segundo plano); ações do usuário descartam.
   const envelhece = () => { for (const [k, v] of memoria) if (k.startsWith('cards-')) memoria.set(k, { ...v, em: 0 }); };
-  const invalida = () => { for (const k of [...memoria.keys()]) if (k.startsWith('cards-')) memoria.delete(k); };
+  // Depois de uma escrita do usuário (registrar, editar, excluir...), o dashboard recalcula em segundo plano (com uma pequena espera para juntar várias).
+  let timerDash = null;
+  const agendaDash = () => { clearTimeout(timerDash); timerDash = setTimeout(() => { if (typeof baseDashboard === 'function') baseDashboard().catch(() => {}); }, 4000); };
+  const invalida = () => { for (const k of [...memoria.keys()]) if (k.startsWith('cards-')) memoria.delete(k); agendaDash(); };
   const empresaCurta = id => memo(`emp:${id}`, 120e3, () => lerEmpresa(id).catch(() => null));
 
   // ---------- cards da fila ----------
@@ -1621,6 +1624,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   async function dashboardDados(p) {
     const chave = `${p.uid}|${p.bearer ? p.bearer.slice(-12) : ''}`;
     const c0 = cacheDash.get(chave);
+    if (p.forcar) { baseEm = 0; baseDashboard().catch(() => {}); }
     if (baseDash && Date.now() - baseEm > 120e3) baseDashboard().catch(() => {});
     if (c0 && c0.base === baseDash) return c0.dados;
     const trabalho = (async () => {

@@ -1115,10 +1115,10 @@ const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const SELNOME = { mnr: 'Motivo', vnd: 'Vendedor', supn: 'Supervisor', sup: 'Supervisor', seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
 let dashTent = 0;
-async function dashboard() {
+async function dashboard(novo = false) {
   const espera = msg => { $('#main').innerHTML = `<div class="vazio">${msg}</div>`; setTimeout(() => { if (aba === 'dash') dashboard().catch(e => { $('#main').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }); }, 3000); };
   let d;
-  try { d = await api('/api/dashboard'); } catch (e) {                  // o gateway cortou a espera: o servidor segue calculando, tenta de novo
+  try { d = await api('/api/dashboard' + (novo ? '?novo=1' : '')); } catch (e) {                  // o gateway cortou a espera: o servidor segue calculando, tenta de novo
     if (/gateway|demorou|timeout|504/i.test(e.message) && ++dashTent < 20) return espera('Preparando o dashboard… isso leva alguns segundos na primeira vez.');
     throw e;
   }
@@ -1393,7 +1393,7 @@ function dashDesenha() {
   lig('s_m', 'meses', true); lig('s_v', 'vend'); lig('s_ra', 'ramo'); lig('s_s', 'seg'); lig('s_r', 'resp'); lig('s_t', 'tipo'); lig('s_c', 'classe'); if ($('#s_su')) lig('s_su', 'sup');
   const se = $('#s_e'); if (se) se.oninput = () => { f.emp = se.value; DB.tab.pg = 0; const p = se.selectionStart; dashDesenha(); const n = $('#s_e'); n.focus(); n.setSelectionRange(p, p); };
   $('#s_x').onclick = () => { Object.assign(f, { meses: 6, seg: '', ramo: '', resp: '', tipo: '', classe: '', emp: '', vend: '', sup: '' }); DB.sel = {}; DB.tab = { col: null, dir: 1, q: '', pg: 0 }; dashDesenha(); };
-  $('#s_r2').onclick = async e => { e.preventDefault(); await dashboard(); };
+  $('#s_r2').onclick = async e => { e.preventDefault(); aviso('Atualizando os dados do dashboard em segundo plano (cerca de 1 minuto). Clique em atualizar de novo depois.'); await dashboard(true); };
   document.querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { DB.pag = b.dataset.pg; DB.sel = {}; DB.tab = { col: null, dir: 1, q: '', pg: 0 }; dashDesenha(); });
   document.querySelectorAll('[data-rm]').forEach(c => c.onclick = () => { delete DB.sel[c.dataset.rm]; DB.tab.pg = 0; dashDesenha(); });
   document.querySelectorAll('.pbi [data-sel]').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); clicou(el); }));
