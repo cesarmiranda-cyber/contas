@@ -1680,6 +1680,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       if (!['Vendedor', ...(store.config.cargosFila || [])].includes(d.cargo)) continue;
       const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
       cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel), _eq: { ...(reg.equipe || {}), ...Object.fromEntries((reg.participantes || []).map((u, i) => ['extra' + i, u])) },
+        criado: d.criadoEm ? R.todayBR(new Date(d.criadoEm)) : null, encerradoEm: finalizado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null,
         motivo: d.motivoNR, detalhe: d.detalheNR, supervisorId: +((reg.equipe || {}).supervisor) || null, supervisorNome: (reg.equipe || {}).supervisor ? await nome(+reg.equipe.supervisor) : '', vendedorId: +((reg.equipe || {}).vendedor) || null,
         data: d.data, situacao: naoRealizada ? 'naorealizada' : finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
@@ -1711,6 +1712,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const nomesContato = new Map(), todosIds = [...new Set(visitas.flatMap(x => x.contatoIds))];
     for (let i = 0; i < todosIds.length; i += 50) { try { for (const c of await contatosPorId(todosIds.slice(i, i + 50))) nomesContato.set(c.id, c.nome); } catch { /* segue sem o nome */ } }
     visitas.forEach(x => { x.contatos = x.contatoIds.map(id => nomesContato.get(id) || `Contato ${id}`); });
+    // o card encerrado herda os dados do registro de visita (data real, supervisor que acompanhou, contatos, edições)
+    for (const x of visitas) { const c = x.card ? porId.get(String(x.card)) : null; if (c) Object.assign(c, { visitaId: x.id, visitaDia: x.dia, desvio: x.desvio, antecipada: x.antecipada, supAcomp: x.supervisorNome || '', contatos: x.contatos, editada: x.editada, registrou: x.respNome }); }
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
     const reprog = store.historico.filter(x => !x.tipo).map(x => ({ _a: x.autor, _r: x.responsavel, ramo: '', vendedor: x.autorNome, card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
     for (const x of reprog) if (x.empresaId) x.ramo = await nomeRamo((await empDe(x.empresaId))?.ramo);

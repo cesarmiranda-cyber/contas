@@ -1113,7 +1113,7 @@ const SIT = { atrasada: 'Atrasada', dia: 'Hoje', aguardando: 'No prazo', finaliz
 const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', ramo: '', resp: '', tipo: '', classe: '', emp: '', vend: '', sup: '' }, sel: {}, tab: { col: null, dir: 1, q: '', pg: 0 } };
 const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
-const SELNOME = { mnr: 'Motivo', vnd: 'Vendedor', supn: 'Supervisor', sup: 'Supervisor', seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
+const SELNOME = { supa: 'Supervisor (acompanhou)', prz: 'Prazo', mesE: 'Mês da visita', mnr: 'Motivo', vnd: 'Vendedor', supn: 'Supervisor', sup: 'Supervisor', seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
 let dashTent = 0;
 async function dashboard(novo = false) {
   const espera = msg => { $('#main').innerHTML = `<div class="vazio">${msg}</div>`; setTimeout(() => { if (aba === 'dash') dashboard().catch(e => { $('#main').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }); }, 3000); };
@@ -1155,6 +1155,7 @@ function dashFiltra(ex = []) {
   const okR = r => !f.ramo || r.ramo === f.ramo;
   const okC = c => eq(c.empresa) && okR(c) && (!f.vend || c.vendedor === f.vend) && (!f.seg || c.segmento === f.seg) && (!f.resp || String(c.resp) === f.resp) && (!f.tipo || (c.tipo || '').toLowerCase() === f.tipo) && (!f.classe || c.classe === f.classe) && (!f.sup || c.supervisorNome === f.sup)
     && (!u('seg') || c.segmento === s.seg) && (!u('cargo') || c.cargo === s.cargo) && (!u('situacao') || c.situacao === s.situacao) && (!u('resp') || String(c.resp) === s.resp) && (!u('classe') || c.classe === s.classe)
+    && (!u('supa') || (c.supAcomp || '(sem supervisor)') === s.supa) && (!u('prz') || (s.prz === 'fora' ? c.desvio > 0 : (c.desvio == null || c.desvio <= 0))) && (!u('mesE') || (c.visitaDia || c.encerradoEm || c.data || '').slice(0, 7) === s.mesE)
     && (!u('mnr') || (c.motivo || '(não informado)') === s.mnr) && (!u('vnd') || c.vendedor === s.vnd) && (!u('supn') || (c.supervisorNome || '(sem supervisor)') === s.supn)
     && (!u('semana') || (c.situacao !== 'atrasada' && c.situacao !== 'finalizado' && c.dias != null && Math.floor(c.dias / 7) === +s.semana))
     && (!u('aging') || (c.situacao === 'atrasada' && -c.dias >= AGING[+s.aging][1] && -c.dias <= AGING[+s.aging][2]));
@@ -1283,6 +1284,39 @@ function paginaFila() {
     { h: 'Card', txt: () => 'Abrir', html: r => lk(urlC(r.id), 'Abrir card') },
     { h: 'Ações', txt: () => '', html: r => r.situacao === 'naorealizada' ? '<span class="hint">Não realizada</span>' : r.situacao === 'finalizado' ? '<span class="hint">Realizada</span>' : `<button class="mini" data-reg="${r.id}">Registrar visita</button> <button class="mini" data-rep="${r.id}">Alterar visita</button>` }], 'fila-de-visitas')}`;
 }
+function paginaEnc() {
+  const F = dashFiltra(), ini = F.meses[0] + '-01';
+  const dia = c => c.visitaDia || c.encerradoEm || c.data || '';
+  const periodo = ex => dashFiltra(ex).cards.filter(c => c.situacao === 'finalizado' && dia(c) >= ini);
+  const enc = periodo(), n = enc.length;
+  const dd = (a, b) => Math.round((new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z')) / 864e5);
+  const fora = enc.filter(c => c.desvio > 0), ant = enc.filter(c => c.desvio < 0), noPrazo = n - fora.length;
+  const mediaAtr = fora.length ? Math.round(fora.reduce((a, c) => a + c.desvio, 0) / fora.length) : 0;
+  const comSup = enc.filter(c => c.supAcomp).length, comCont = enc.filter(c => (c.contatos || []).length).length, edit = enc.filter(c => c.editada).length;
+  const esperas = enc.filter(c => c.criado && c.visitaDia).map(c => dd(c.criado, c.visitaDia)).filter(x => x >= 0);
+  const espera = esperas.length ? Math.round(esperas.reduce((a, x) => a + x, 0) / esperas.length) : 0;
+  const mesAtual = DB.dados.hoje.slice(0, 7), mm = F.meses;
+  const nA = enc.filter(c => dia(c).slice(0, 7) === mesAtual).length;
+  const porVend = contar(periodo(['vnd']), c => c.vendedor || '(sem vendedor)').slice(0, 12).map(([k, v]) => [k, v, PBI[0]]);
+  const porSeg = contar(periodo(['seg']), c => c.segmento).map(([k, v], i) => [k, v, PBI[i % PBI.length]]);
+  const porClasse = ['A', 'B', 'C', 'E'].map((k, i) => [k === 'E' ? 'Estratégicos' : `Classe ${k}`, periodo(['classe']).filter(c => c.classe === k).length, PBI[i], k]);
+  const porSup = contar(periodo(['supa']), c => c.supAcomp || '(sem supervisor)').slice(0, 12).map(([k, v]) => [k, v, k === '(sem supervisor)' ? '#cbd5e1' : PBI[3]]);
+  const cx = mm.map(m => periodo(['mesE']).filter(c => dia(c).slice(0, 7) === m));
+  const det = [...enc].sort((a, b) => dia(b).localeCompare(dia(a)));
+  return `${n === 0 ? '<div class="info" style="margin-bottom:10px">Nenhuma visita encerrada no período e nos filtros escolhidos.</div>' : ''}
+   <div class="g5">${kpi('Visitas encerradas', nf(n), `últimos ${DB.f.meses} meses`, '#16a34a', null, null, null, '✓')}${kpi('No mês', nf(nA), 'encerradas neste mês', PBI[0], ['mesE'], [mesAtual], null, '▤')}${kpi('No prazo ou antecipadas', pct(noPrazo, n) + '%', `${nf(ant.length)} antecipada(s) · ${nf(noPrazo)} de ${nf(n)}`, pct(noPrazo, n) >= 80 ? '#16a34a' : pct(noPrazo, n) >= 50 ? '#F5A623' : '#D93A3A', ['prz'], ['no'], null, '◎')}${kpi('Atraso médio', mediaAtr ? mediaAtr + (mediaAtr === 1 ? ' dia' : ' dias') : '—', `${nf(fora.length)} fora do prazo`, COR.atrasada, ['prz'], ['fora'], null, '⏱')}${kpi('Espera até a visita', espera ? espera + ' dias' : '—', 'da criação do card até a visita', PBI[3], null, null, null, '⌛')}</div>
+   <div class="g4">${kpi('Com supervisor', pct(comSup, n) + '%', `${nf(comSup)} acompanhadas`, PBI[2], null, null, null, '👔')}${kpi('Com contato informado', pct(comCont, n) + '%', `${nf(comCont)} de ${nf(n)}`, PBI[5], null, null, null, '☎')}${kpi('Com registro editado', nf(edit), 'tiveram correções', PBI[3], null, null, null, '✎')}${kpi('Vendedores', nf(new Set(enc.map(c => c.vendedor)).size), 'com visitas encerradas', '#64748b', null, null, null, '☺')}</div>
+   <div class="g2w">${vz('Encerradas por mês (no prazo x fora do prazo)', colunas(mm.map(mesCurto), mm, [{ nome: 'No prazo / antecipadas', cor: PBI[0], valores: cx.map(a => a.filter(c => c.desvio == null || c.desvio <= 0).length) }, { nome: 'Fora do prazo', cor: COR.atrasada, valores: cx.map(a => a.filter(c => c.desvio > 0).length) }], 'mesE'))}
+     ${vz('Prazo da visita', rosca([{ nome: 'Antecipadas', valor: ant.length, cor: PBI[0], val: 'no' }, { nome: 'No dia', valor: noPrazo - ant.length, cor: PBI[1], val: 'no' }, { nome: 'Fora do prazo', valor: fora.length, cor: COR.atrasada, val: 'fora' }], 'prz'))}</div>
+   <div class="g3">${vz('Encerradas por vendedor', hbar(porVend, { keys: ['vnd'] }))}${vz('Por segmento', hbar(porSeg, { keys: ['seg'] }))}${vz('Por classe', hbar(porClasse, { keys: ['classe'] }))}</div>
+   <div class="g2">${vz('Acompanhadas por supervisor', hbar(porSup, { keys: ['supa'] }))}${vz('Contatos mais visitados (encerradas)', hbar(contar(enc.flatMap(c => c.contatos || []), x => x).slice(0, 10).map(([k, v]) => [k, v, PBI[5]]), { cor: PBI[5] }))}</div>
+   ${detalhe(det, [
+    { h: 'Visita em', txt: r => dia(r).split('-').reverse().join('/'), ord: r => dia(r) }, { h: 'Empresa', txt: r => r.empresa || '—', html: r => lk(urlE(r.empresaId), r.empresa || '—') }, { h: 'Linha', txt: r => r.segmento },
+    { h: 'Vendedor', txt: r => r.vendedor || '—' }, { h: 'Programada', txt: r => (r.data || '').split('-').reverse().join('/'), ord: r => r.data || '' },
+    { h: 'Prazo', txt: r => r.desvio == null ? '—' : r.desvio < 0 ? `${-r.desvio} d antes` : r.desvio === 0 ? 'No dia' : `${r.desvio} d depois`, ord: r => r.desvio ?? 0, html: r => r.desvio == null ? '—' : r.desvio < 0 ? `<b style="color:#059669">${-r.desvio} d antes</b>` : r.desvio === 0 ? 'No dia' : `<b style="color:${COR.atrasada}">${r.desvio} d depois</b>` },
+    { h: 'Supervisor', txt: r => r.supAcomp || '—' }, { h: 'Contatos', txt: r => (r.contatos || []).join(', ') || '—' },
+    { h: 'Ações', txt: () => '', html: r => `<button class="btn sm" data-dver="${r.id}">Ver registro</button> <button class="btn sm" data-dedc="${r.id}">✎ Editar</button>${r.editada ? ' <span class="hint">editado</span>' : ''}` }], 'visitas-encerradas')}`;
+}
 function paginaReg() {
   const F = dashFiltra(), v = F.visitas;
   const ant = v.filter(x => x.antecipada).length, cd = v.filter(x => x.desvio !== null), np = cd.filter(x => x.desvio <= 0).length, atr = cd.filter(x => x.desvio > 0);
@@ -1378,14 +1412,14 @@ function dashDesenha() {
   const vends = [...new Set([...d.cards.map(c => c.vendedor), ...d.visitas.map(v => v.vendedor), ...d.reprog.map(r => r.vendedor)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const ramos = [...new Set([...d.cards.map(c => c.ramo), ...d.visitas.map(v => v.ramo), ...d.reprog.map(r => r.ramo)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const empresas = [...new Set([...d.cards.map(c => c.empresa), ...d.visitas.map(v => v.empresa)].filter(Boolean))].sort((a, b) => a.localeCompare(b)).slice(0, 800);
-  const pagina = { fila: paginaFila, reg: paginaReg, rep: paginaRep, sup: paginaSup, nr: paginaNR }[DB.pag]();
+  const pagina = { fila: paginaFila, enc: paginaEnc, reg: paginaReg, rep: paginaRep, sup: paginaSup, nr: paginaNR }[DB.pag]();
   const chips = Object.entries(DB.sel).map(([k, v]) => `<span class="chip" data-rm="${k}">${esc(SELNOME[k] || k)}: <b>${esc(selTxt(k, v))}</b> ✕</span>`).join('');
   document.body.classList.add('wide');
   const scrollY = window.scrollY;
   $('#main').innerHTML = `<div class="pbi">
     <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${hmBR(d.geradoEm)} · <a href="#" id="s_r2">atualizar</a></span></div>
       <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend)}${sel('s_ra', 'Segmento da empresa', [['', 'Todos'], ...ramos.map(x => [x, x])], f.ramo)}${sel('s_s', 'Linha', [['', 'Todas'], ...segs.map(x => [x, x])], f.seg)}${supsNomes.length ? sel('s_su', 'Supervisor', [['', 'Todos'], ...supsNomes.map(x => [x, x])], f.sup) : ''}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C'], ['E', 'Estratégicos']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
-    <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Visitas alteradas'], ['sup', 'Supervisores'], ['nr', 'Não realizadas']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
+    <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['enc', 'Encerradas'], ['reg', 'Registro de visitas'], ['rep', 'Visitas alteradas'], ['sup', 'Supervisores'], ['nr', 'Não realizadas']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
     ${chips ? `<div class="chips-bar"><span>Filtros aplicados:</span>${chips}</div>` : '<div class="chips-bar dica">Dica: clique em qualquer barra, fatia, coluna ou indicador para filtrar a página e ver os registros abaixo.</div>'}
     <div class="pbi-cv">${pagina}</div>
 </div>`;
