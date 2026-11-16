@@ -31,6 +31,7 @@ function createWorld() {
       case 'crm.status.list': return { result: stages };
       case 'crm.company.get': { const c = w.companies[p.id]; return { result: c ? { ...c } : null }; }
       case 'crm.company.list': return { result: Object.values(w.companies).filter(c => match(c, p.filter)).map(c => ({ ID: c.ID })) };
+      case 'crm.contact.list': { const f = p.filter || {}; const l = Object.values(w.contacts || {}).filter(c => (f.COMPANY_ID === undefined || String(c.COMPANY_ID) === String(f.COMPANY_ID)) && (f.ID === undefined || [].concat(f.ID).map(String).includes(String(c.ID)))); return { result: l.map(c => ({ ...c })) }; }
       case 'crm.company.update': Object.assign(w.companies[p.id], p.fields); return { result: true };
       case 'crm.item.get': return { result: { item: w.items[p.entityTypeId][p.id] } };
       case 'crm.item.list': { const l = Object.values(w.items[p.entityTypeId]).filter(i => match(i, p.filter)); return { result: { items: l.map(i => ({ ...i })) } }; }

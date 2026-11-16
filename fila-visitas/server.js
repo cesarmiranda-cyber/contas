@@ -221,6 +221,14 @@ server.listen(PORT, () => {
     for (const seg of Object.keys(map.empresa)) { const k = map.empresa[seg].classe; out.empresa[seg] = [k, (meta[k] || {}).itens, ((map.alt || {})[seg] || {}).classe]; }
     const j = JSON.stringify(out); for (let i = 0; i < j.length; i += 1500) console.log('diag-classes', j.slice(i, i + 1500));
   } catch (e) { console.error('diag-classes:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_CONTATO) setTimeout(async () => { try {
+    const f = (await bitrix.call('crm.item.fields', { entityTypeId: 1032 })).result?.fields || {};
+    console.log('diag-contato campos', JSON.stringify(Object.entries(f).filter(([k, d]) => /contact|client|compan/i.test(k + (d.title || ''))).map(([k, d]) => [k, d.type, d.isMultiple])));
+    const c = (await bitrix.call('crm.contact.list', { filter: { COMPANY_ID: +process.env.DIAG_CONTATO }, select: ['ID', 'NAME', 'LAST_NAME', 'POST', 'PHONE', 'EMAIL'] })).result || [];
+    console.log('diag-contato lista', JSON.stringify(c.slice(0, 6)));
+    const it = (await bitrix.call('crm.item.list', { entityTypeId: 1032, select: ['id', 'companyId', 'contactId', 'contactIds'], order: { id: 'desc' } })).result?.items || [];
+    console.log('diag-contato visitas', JSON.stringify(it.slice(0, 3)));
+  } catch (e) { console.error('diag-contato:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;

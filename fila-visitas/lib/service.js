@@ -434,6 +434,45 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
 
   // ---------- formulário de registro: todos os campos do SPA 1032 ----------
   const TIPOS = { file: 'arquivo', string: 'texto', char: 'texto', integer: 'numero', double: 'numero', money: 'numero', date: 'data', datetime: 'datahora', boolean: 'sim_nao', enumeration: 'lista', employee: 'usuario', url: 'texto', address: 'texto' };
+  // ---------- contatos da empresa: quem foi visitado ----------
+  const fmtContato = c => ({ id: +c.ID, nome: [c.NAME, c.LAST_NAME].filter(Boolean).join(' ').trim() || `Contato ${c.ID}`, cargo: c.POST || '',
+    telefones: (c.PHONE || []).map(p => p.VALUE).filter(Boolean), emails: (c.EMAIL || []).map(p => p.VALUE).filter(Boolean) });
+  const SEL_CONTATO = ['ID', 'NAME', 'LAST_NAME', 'POST', 'PHONE', 'EMAIL'];
+  async function contatosDaEmpresa(empresaId) {
+    if (!empresaId) return [];
+    return memo(`contatos:${empresaId}`, 60e3, async () => {
+      const out = []; let start = 0;
+      for (;;) {
+        const r = await bitrix.call('crm.contact.list', { filter: { COMPANY_ID: empresaId }, select: SEL_CONTATO, order: { NAME: 'ASC' }, start });
+        out.push(...(r.result || []).map(fmtContato));
+        if (r.next === undefined || r.next === null) break;
+        start = r.next;
+      }
+      return out.sort((a, b) => a.nome.localeCompare(b.nome));
+    });
+  }
+  async function contatosPorId(ids) {
+    const lista = [...new Set((ids || []).map(Number).filter(Boolean))];
+    if (!lista.length) return [];
+    const r = await bitrix.call('crm.contact.list', { filter: { ID: lista }, select: SEL_CONTATO });
+    return (r.result || []).map(fmtContato);
+  }
+  // Histórico de contatos da empresa, a partir dos registros de visita (o log fica no Bitrix, em cada registro): do mais recente ao mais antigo.
+  async function historicoContatos(empresaId) {
+    const { map } = await campos();
+    const dh = map.visita.dataHora || 'begindate';
+    const regs = empresaId ? await listarItens({ entityTypeId: F.ETYPE.visita, filter: { companyId: empresaId }, select: ['id', 'createdTime', dh, 'contactIds', 'contactId'] }) : [];
+    const porContato = new Map();
+    for (const it of regs.sort((a, b) => String(b[dh] || b.createdTime).localeCompare(String(a[dh] || a.createdTime)) || (+b.id - +a.id))) {
+      const ids = (it.contactIds && it.contactIds.length ? it.contactIds : (it.contactId ? [it.contactId] : [])).map(Number).filter(Boolean);
+      for (const id of ids) { const g = porContato.get(id) || { id, visitas: 0, ultima: it[dh] || it.createdTime }; g.visitas++; porContato.set(id, g); }
+    }
+    const conhecidos = new Map((await contatosDaEmpresa(empresaId)).map(c => [c.id, c]));
+    const faltam = [...porContato.keys()].filter(id => !conhecidos.has(id));
+    for (const c of await contatosPorId(faltam)) conhecidos.set(c.id, c);
+    const lista = [...porContato.values()].map(g => ({ ...g, ...(conhecidos.get(g.id) || { nome: `Contato ${g.id}`, cargo: '', telefones: [], emails: [] }) }));
+    return { lista, ultimoId: lista[0]?.id || null };
+  }
   async function camposVisita(cardId) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
@@ -480,7 +519,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       });
     }
     lista.sort((a, b) => (b.destaque - a.destaque) || (b.obrigatorio - a.obrigatorio));
-    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null };
+    const contatos = await contatosDaEmpresa(card.empresaId).catch(() => []);
+    const hist = await historicoContatos(card.empresaId).catch(() => ({ lista: [], ultimoId: null }));
+    const padrao = hist.ultimoId && contatos.some(c => c.id === hist.ultimoId) ? hist.ultimoId : null;     // o contato da última visita já vem escolhido (dá para trocar)
+    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null, contatos, contatoPadraoId: padrao, urlEmpresa: null };
   }
 
   // O que o consultor lançou: os registros de visita (SPA 1032) ligados ao card, com todos os campos preenchidos, quem registrou e os anexos.
@@ -509,6 +551,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     };
     const nomeUsuarioCache = new Map();
     const quem = async id => { if (!id) return ''; if (!nomeUsuarioCache.has(id)) nomeUsuarioCache.set(id, await nomeUsuario(+id)); return nomeUsuarioCache.get(id); };
+    const idsContato = [...new Set(itens.flatMap(it => (it.contactIds && it.contactIds.length ? it.contactIds : (it.contactId ? [it.contactId] : [])).map(Number).filter(Boolean)))];
+    const doCadastro = new Map((await contatosDaEmpresa(card.empresaId).catch(() => [])).map(c => [c.id, c]));
+    for (const c of await contatosPorId(idsContato.filter(id => !doCadastro.has(id))).catch(() => [])) doCadastro.set(c.id, c);
+    const contatoDe = it => { const id = Number((it.contactIds && it.contactIds[0]) || it.contactId || 0); return id ? (doCadastro.get(id) || { id, nome: `Contato ${id}`, cargo: '', telefones: [], emails: [] }) : null; };
     const ocultos = new Set([v.filaId].filter(Boolean));
     const registros = [];
     for (const it of itens) {
@@ -532,9 +578,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       }
       campos_.sort((a, b) => (!!b.destaque - !!a.destaque));
       registros.push({ id: +it.id, titulo: it.title || '', quando: it[v.dataHora || 'begindate'] || it.createdTime || null, criadoEm: it.createdTime || null,
-        por: await quem(+it.assignedById || +it.createdBy), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
+        por: await quem(+it.assignedById || +it.createdBy), contato: contatoDe(it), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
     }
-    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data }, registros };
+    const hc = await historicoContatos(card.empresaId).catch(() => ({ lista: [] }));
+    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data }, registros, contatosHistorico: hc.lista };
   }
 
   // ---------- registrar visita ----------
@@ -592,7 +639,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       return { fileData: [nome, b64] };
     });
   }
-  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, campos: extra = {} }) {
+  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, contatoId = null, campos: extra = {} }) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
@@ -618,6 +665,11 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       title: `${card.empresa} - ${R.fmtBR(dia)}`, companyId: card.empresaId, assignedById: uid,
       [map.visita.dataHora || 'begindate']: quando.toISOString(),
     };
+    if (contatoId) {                                   // contato visitado: gravado no registro (o histórico de contatos nasce desses registros)
+      const lista = await contatosDaEmpresa(card.empresaId);
+      if (!lista.some(c => c.id === +contatoId)) throw erro('O contato escolhido não pertence a esta empresa.', 422);
+      f.contactId = +contatoId; f.contactIds = [+contatoId];
+    }
     const permitidos = new Map(form.campos.filter(c => !c.travado && c.key !== dhKey).map(c => [c.key, c]));
     for (const [k, val] of Object.entries(dados)) {
       const c = permitidos.get(k);

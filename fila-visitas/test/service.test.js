@@ -748,3 +748,33 @@ test('empresa que vira Clientes Estratégicos sem Última visita: o card vai par
   await svc.sincronizarEmpresa(1);
   assert.ok(vend.ufCrm_data.startsWith('2027-03-'), vend.ufCrm_data);
 });
+
+test('contato da visita: lista os contatos da empresa, grava no registro, lembra o último e mantém o histórico ao trocar', async () => {
+  const { w, svc } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  w.contacts = {
+    1: { ID: 1, COMPANY_ID: 1, NAME: 'Ana', LAST_NAME: 'Souza', POST: 'Compras', PHONE: [{ VALUE: '+5511999990001' }] },
+    2: { ID: 2, COMPANY_ID: 1, NAME: 'Bruno', LAST_NAME: 'Lima', POST: 'Manutenção', PHONE: [{ VALUE: '+5511999990002' }, { VALUE: '+551133334444' }] },
+    3: { ID: 3, COMPANY_ID: 9, NAME: 'Outro', LAST_NAME: 'Cliente' },
+  };
+  await svc.sincronizarEmpresa(1);
+  const v1 = cards(w)[0];
+  const f1 = await svc.camposVisita(v1.id);
+  assert.deepEqual(f1.contatos.map(c => c.nome), ['Ana Souza', 'Bruno Lima']);
+  assert.equal(f1.contatoPadraoId, null, 'primeira visita: nenhum contato anterior');
+  await assert.rejects(() => svc.registrarVisita(v1.id, { uid: 10, resultado: 'x', contatoId: 3 }), /não pertence/);
+  await svc.registrarVisita(v1.id, { uid: 10, resultado: 'Reunião com a Ana', contatoId: 1 });
+  const reg1 = Object.values(w.items[1032])[0];
+  assert.deepEqual(reg1.contactIds, [1]);
+  const r1 = await svc.registroVisita(v1.id);
+  assert.equal(r1.registros[0].contato.nome, 'Ana Souza');
+  assert.deepEqual(r1.registros[0].contato.telefones, ['+5511999990001']);
+  // próxima visita: o contato da última já vem escolhido; o cliente trocou para o Bruno
+  const v2 = cards(w).find(c => c.id !== v1.id && c.title.endsWith('| Vendedor') && c.stageId !== w.stages.finalizado);
+  const f2 = await svc.camposVisita(v2.id);
+  assert.equal(f2.contatoPadraoId, 1, 'o último contato vem como padrão');
+  await svc.registrarVisita(v2.id, { uid: 10, resultado: 'Agora com o Bruno', contatoId: 2 });
+  const r2 = await svc.registroVisita(v2.id);
+  assert.equal(r2.registros[0].contato.nome, 'Bruno Lima');
+  assert.deepEqual(r2.contatosHistorico.map(c => c.nome).sort(), ['Ana Souza', 'Bruno Lima'], 'o histórico mantém os dois contatos');
+  assert.equal(r2.contatosHistorico[0].id, 2, 'o mais recente primeiro');
+});

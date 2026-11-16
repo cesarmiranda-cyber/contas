@@ -309,6 +309,8 @@ body.wide main{padding-top:12px}
 .rg{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;background:var(--sf)}.rg-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin-bottom:8px}
 .rg-f{padding:7px 0;border-top:1px solid #eef2f6}.rg-f:first-of-type{border-top:0}.rg-f label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;margin-bottom:2px}
 .rg-t{white-space:pre-wrap;overflow-wrap:anywhere}.rg-f.dest{background:#f0f7ff;margin:0 -8px;padding:8px;border-radius:8px;border-top:0}.rg-f a{color:var(--brand)}
+
+.tel{position:relative;cursor:help;border-bottom:1px dotted #94a3b8}.tel:hover::after{content:attr(data-tip);position:absolute;left:0;top:100%;margin-top:4px;background:#1e293b;color:#fff;padding:5px 9px;border-radius:7px;font-size:12px;white-space:nowrap;z-index:50;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 </style>
 </head>
 <body>
@@ -627,11 +629,14 @@ async function verRegistro(id) {
   const c = r.card;
   const corpo = r.registros.length ? r.registros.map(g => `<div class="rg">
       <div class="rg-h"><b>${esc(g.titulo || 'Registro de visita')}</b><span class="hint">${g.quando ? esc(dhBR(g.quando)) : ''}${g.por ? ' · por ' + esc(g.por) : ''}</span>${g.urlRegistro ? ` <a href="${esc(g.urlRegistro)}" target="_top" class="hint">abrir no Bitrix</a>` : ''}</div>
+      ${g.contato ? `<div class="rg-f"><label>Contato da visita</label><div>${contatoTip(g.contato)}</div></div>` : ''}
       ${g.campos.length ? g.campos.map(f => `<div class="rg-f ${f.destaque ? 'dest' : ''}"><label>${esc(f.titulo)}</label>${f.tipo === 'arquivo' ? `<div>${f.arquivos.map(a => a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.nome)}</a>` : `📎 ${esc(a.nome)}`).join('<br>')}</div>` : `<div class="rg-t">${esc(f.texto)}</div>`}</div>`).join('') : '<div class="hint">Nenhum campo preenchido neste registro.</div>'}
     </div>`).join('') : '<div class="info">Não encontrei um registro de visita ligado a este card. Se a visita foi lançada direto no Bitrix, abra o card para ver.</div>';
   modal(`<div class="sh-h"><h3>Registro da visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span></div></div>
-    <div class="sh-b">${corpo}</div><div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button></div>`);
+    <div class="sh-b">${corpo}${(r.contatosHistorico || []).length ? `<div class="rg"><div class="rg-h"><b>Contatos que já tiveram visita</b><span class="hint">do mais recente ao mais antigo</span></div>${r.contatosHistorico.map(c => `<div class="rg-f"><div>${contatoTip(c)} <span class="hint">· ${c.visitas} visita(s)${c.ultima ? ' · última em ' + esc(dhBR(c.ultima).slice(0, 10)) : ''}</span></div></div>`).join('')}</div>` : ''}</div><div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button></div>`);
 }
+// Nome do contato com o telefone ao passar o mouse
+const contatoTip = c => `<span class="tel" data-tip="${esc([c.telefones.join(' · ') || 'sem telefone', c.cargo].filter(Boolean).join(' — '))}">👤 <b>${esc(c.nome)}</b>${c.cargo ? ` <span class="hint">${esc(c.cargo)}</span>` : ''}</span>`;
 const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
 function tabelaVisitas(v, verEquipe) {
@@ -764,6 +769,7 @@ async function registrar(id) {
   const ordem = [...GRUPOS.map(g => g[0]), 'Outras informações'].filter(n => secoes[n]);
   modal(`<div class="sh-h"><h3>Registrar visita</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span><span class="tag">Programada: ${fmt(c.data)}</span>${c.antecipada ? '<span class="tag warn">Visita antecipada</span>' : ''}${auto.filter(f => legivel(f) && !/fila|id/i.test(f.titulo)).map(f => `<span class="tag" title="${esc(f.titulo)}">${esc(f.titulo.replace(/\?$/, ''))}: ${esc(legivel(f))}</span>`).join('')}</div></div>
     <div class="sh-b">
+      <div class="sec"><h4>Contato da visita</h4>${(form.contatos || []).length ? `<div class="fld wide"><label>Com quem foi a visita?</label><select id="f_contato"><option value="">— não informar —</option>${form.contatos.map(c => `<option value="${c.id}" ${c.id === form.contatoPadraoId ? 'selected' : ''}>${esc(c.nome)}${c.cargo ? ' — ' + esc(c.cargo) : ''}</option>`).join('')}</select><div class="hint" id="f_contato_t"></div><div class="hint">${form.contatoPadraoId ? 'Já vem o contato da última visita. Se o cliente mudou, escolha o novo: o histórico dos contatos é mantido.' : 'Escolha entre os contatos cadastrados na empresa.'}</div></div>` : '<div class="hint">Nenhum contato cadastrado nesta empresa. Cadastre o contato no Bitrix para poder escolher aqui.</div>'}</div>
       ${quando ? `<div class="sec"><div class="grid2">${campoHTML(quando)}</div></div>` : ''}
       ${ordem.map(n => `<div class="sec"><h4>${esc(n)}</h4><div class="grid2">${secoes[n].map(campoHTML).join('')}</div></div>`).join('')}
       ${corpo.length || quando ? '' : '<div class="hint" style="margin:14px 0">O SPA de Registro de Visita não tem campos para preencher.</div>'}
@@ -771,6 +777,8 @@ async function registrar(id) {
       <div class="err" id="er"></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri" id="ok">Salvar visita</button></div>`);
   ligaAnexos();
+  const mostraTel = () => { const sel = $('#f_contato'); if (!sel) return; const c = (form.contatos || []).find(x => String(x.id) === sel.value); $('#f_contato_t').textContent = c ? [c.telefones.join(' · '), c.emails[0]].filter(Boolean).join('  |  ') : ''; };
+  if ($('#f_contato')) { $('#f_contato').onchange = mostraTel; mostraTel(); }
   document.querySelectorAll('#sheet textarea').forEach(t => { const ajusta = () => { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, 220) + 'px'; }; t.addEventListener('input', ajusta); ajusta(); });
   $('#ok').onclick = async () => {
     $('#ok').disabled = true; $('#er').classList.remove('on');
@@ -778,7 +786,7 @@ async function registrar(id) {
     const campos = {};
     for (const f of form.campos) { const v = lerCampo(f); if (v !== undefined) campos[f.key] = v; }
     try {
-      const r = await api(`/api/cards/${id}/registrar`, { method: 'POST', body: { campos, resultado: document.getElementById('f_resultado')?.value || '', dataHora: form.dataHoraKey ? campos[form.dataHoraKey] : undefined } });
+      const r = await api(`/api/cards/${id}/registrar`, { method: 'POST', body: { campos, contatoId: ($('#f_contato') && $('#f_contato').value) || null, resultado: document.getElementById('f_resultado')?.value || '', dataHora: form.dataHoraKey ? campos[form.dataHoraKey] : undefined } });
       modal(`<div class="sh-b"><div class="ok">Visita registrada${r.antecipada ? ' (antecipada)' : ''}.${r.proximaData ? ` Próxima visita: ${fmt(r.proximaData)}.` : ''}</div></div><div class="sh-f"><button class="btn pri" onclick="fecha();carrega()">Fechar</button></div>`);
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; $('#ok').textContent = 'Salvar visita'; $('#er').scrollIntoView({ block: 'nearest' }); }
   };
