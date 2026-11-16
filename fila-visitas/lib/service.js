@@ -1633,7 +1633,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const cards = b.cards.filter(c => (!permCards || permCards.has(+c.id)) && visivelPor(c.resp, c._eq)).map(({ _eq, ...c }) => c);
       const visitas = b.visitas.filter(x => (!permVis || permVis.has(+x.id)) && (todos || visivelPor(x.resp, null)));
       const reprog = b.reprog.filter(x => todos || [x._a, x._r].some(r => r && (+r === +uid || (time && time.has(+r))))).map(({ _a, _r, ...x }) => x);
-      const dados = { base: b.base, hoje: b.hoje, geradoEm: b.geradoEm, visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog };
+      const dados = { base: b.base, hoje: b.hoje, geradoEm: b.geradoEm, visao: todos ? 'tudo' : 'equipe', cards, visitas, reprog, edicoes: todos ? b.edicoes : b.edicoes.filter(e => visitas.some(v => +v.id === +e.visita)), removidas: todos ? b.removidas : [] };
       cacheDash.set(chave, { base: b, dados });
       return dados;
     })();
@@ -1679,7 +1679,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const dia = q ? R.todayBR(new Date(q)) : null;
       const antTxt = v.antecipada ? String(F.decode(meta, v.antecipada, it[v.antecipada])).toLowerCase() : '';
       const supId = supervisorDoRegistro(it, map);
-      visitas.push({ card: v.filaId ? (+it[v.filaId] || null) : null, supervisor: supId, supervisorNome: supId ? await nome(supId) : '', ramo: await nomeRamo((await empDe(+it.companyId || 0))?.ramo), vendedor: await nome(+it.assignedById), id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
+      const cids = (it.contactIds && it.contactIds.length ? it.contactIds : (it.contactId ? [it.contactId] : [])).map(Number).filter(Boolean);
+      visitas.push({ contatoIds: cids, editada: store.historico.filter(h => h.tipo === 'edicao-registro' && +h.visita === +it.id).length, card: v.filaId ? (+it[v.filaId] || null) : null, supervisor: supId, supervisorNome: supId ? await nome(supId) : '', ramo: await nomeRamo((await empDe(+it.companyId || 0))?.ramo), vendedor: await nome(+it.assignedById), id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
         antecipada: antTxt ? /^(sim|y|true|1)/.test(antTxt) : null, programada: progr, desvio: progr && dia ? R.dayDiff(progr, dia) : null, cargo: fila?.cargo || '' });
     }
     const faltam = [...new Set(visitas.map(x => x.empresaId).filter(Boolean))];
@@ -1689,10 +1690,16 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       try { for (const c of (await bitrix.call('crm.company.list', { filter: { ID: buscar.slice(i, i + 40) }, select: ['ID', 'TITLE'] })).result || []) nomeEmp.set(+c.ID, c.TITLE); } catch { /* segue sem o nome */ }
     }
     visitas.forEach(x => { x.empresa = nomeEmp.get(x.empresaId) || ''; });
+    // nomes dos contatos visitados (em lotes)
+    const nomesContato = new Map(), todosIds = [...new Set(visitas.flatMap(x => x.contatoIds))];
+    for (let i = 0; i < todosIds.length; i += 50) { try { for (const c of await contatosPorId(todosIds.slice(i, i + 50))) nomesContato.set(c.id, c.nome); } catch { /* segue sem o nome */ } }
+    visitas.forEach(x => { x.contatos = x.contatoIds.map(id => nomesContato.get(id) || `Contato ${id}`); });
     let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
     const reprog = store.historico.filter(x => !x.tipo).map(x => ({ _a: x.autor, _r: x.responsavel, ramo: '', vendedor: x.autorNome, card: x.card, empresaId: x.empresaId || null, empresa: x.empresa, at: x.at, segmento: x.segmento, cargo: x.cargo, quem: x.autorNome, dias: R.dayDiff(x.anterior, x.nova), motivo: x.motivo }));
     for (const x of reprog) if (x.empresaId) x.ramo = await nomeRamo((await empDe(x.empresaId))?.ramo);
-    return { base, hoje: h, geradoEm: new Date().toISOString(), cards, visitas, reprog };
+    const edicoes = store.historico.filter(x => x.tipo === 'edicao-registro').map(x => ({ at: x.at, visita: x.visita, card: x.card, empresa: x.empresa, por: x.autorNome, campos: (x.mudancas || []).map(m => m.campo) }));
+    const removidas = (store.logs || []).filter(l => l.tipo === 'card-excluido' || l.tipo === 'card-removido-auto').map(l => { const m = /\((.+?) \| (.+?) \| (.+?)\)/.exec(l.msg || ''); return { at: l.at, tipo: l.tipo === 'card-excluido' ? 'manual' : 'classe', empresa: m ? m[1] : '', linha: m ? m[2] : '', por: (/por (.+?)(?::|$)/.exec(l.msg || '') || [])[1] || (l.tipo === 'card-removido-auto' ? 'App (classe em branco)' : '') }; });
+    return { base, hoje: h, geradoEm: new Date().toISOString(), cards, visitas, reprog, edicoes, removidas };
   }
 
 
