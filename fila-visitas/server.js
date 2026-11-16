@@ -97,6 +97,7 @@ const routes = {
     if (p.acessoConfig && p.acessoConfig.length && id.uid && !p.acessoConfig.includes(+id.uid)) p.acessoConfig.push(+id.uid); // evita se trancar para fora
     if (['app', 'bitrix'].includes(b.visibilidade)) p.visibilidade = b.visibilidade;
     if (Array.isArray(b.cargosFila)) p.cargosFila = ['Vendedor', ...R.CARGOS.filter(c => c !== 'Vendedor' && b.cargosFila.includes(c))];
+    for (const k of ['supervisoresDepts', 'supervisoresExtras']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
     if (Array.isArray(b.verTudo)) p.verTudo = b.verTudo.map(Number).filter(Boolean);
     if (Array.isArray(b.admins)) p.admins = b.admins.map(Number).filter(Boolean);
     if (b.mapaManual && typeof b.mapaManual === 'object') p.mapaManual = b.mapaManual;
@@ -275,6 +276,7 @@ server.listen(PORT, () => {
     }
     const j = JSON.stringify(out); for (let i = 0; i < j.length; i += 1500) console.log('diag-e', j.slice(i, i + 1500)); if (!out.length) console.log('diag-e vazio');
   } catch (e) { console.error('diag-e:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_SUP) setTimeout(async () => { try { const l = await svc.supervisoresDoBitrix(); console.log('diag-sup', l.length, JSON.stringify(l.slice(0, 40).map(x => [x.id, x.nome, x.departamentos.join('/')]))); } catch (e) { console.error('diag-sup:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;

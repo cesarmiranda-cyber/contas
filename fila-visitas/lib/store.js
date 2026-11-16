@@ -12,6 +12,7 @@ function createStore(dir) {
   try { d = { ...d, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch { /* primeiro uso */ }
   const save = () => { const t = file + '.tmp'; fs.writeFileSync(t, JSON.stringify(d)); fs.renameSync(t, file); };
   return {
+    get cards() { return d.cards; },
     get config() { return { ...DEFAULT_CONFIG, ...d.config, intervalos: { ...DEFAULT_CONFIG.intervalos, ...(d.config.intervalos || {}) } }; },
     setConfig(p) { d.config = { ...d.config, ...p }; save(); return this.config; },
     // duplicidade: chave empresa+segmento+cargo -> id do card aberto

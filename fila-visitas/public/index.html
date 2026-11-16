@@ -948,6 +948,9 @@ async function cfg(d) {
       <label style="display:block;margin:4px 0"><input type="radio" name="vis" value="bitrix" style="width:auto" ${c.visibilidade === 'bitrix' ? 'checked' : ''}> <b>Papéis e departamentos do Bitrix</b>: o app mostra exatamente o que o Bitrix libera para a pessoa (Vendedor “só os seus”, Supervisor “departamento”, etc.). Configure os papéis no Bitrix antes de ativar e confira abaixo em “Ver como”.</label>
       <div class="hint">Sem a sessão da pessoa (por exemplo, fora do Bitrix) o app volta às regras dele, por segurança.</div>
       <h4 style="margin:14px 0 6px">Estrutura de departamentos do Bitrix</h4><div id="deptree" class="hint">Carregando…</div>
+      <h4 style="margin:14px 0 6px">Supervisores da Gestão</h4>
+      <div class="hint">Na seção <b>Gestão</b> do registro de visita o vendedor escolhe o supervisor que acompanhou. Aparecem os chefes dos departamentos marcados na tabela acima (nenhum marcado = chefes de todos os departamentos), as pessoas abaixo e os supervisores já indicados no cadastro das empresas.</div>
+      <div class="fld"><label>Pessoas que também aparecem como supervisor</label><div id="pk_se"></div></div>
       <h4 style="margin:14px 0 6px">Ver como</h4>
       <div class="fld"><select id="vc_u"><option value="">Escolha uma pessoa…</option>${users.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')}</select></div>
       <div id="vc_out" class="hint">Mostra quantas visitas a pessoa enxerga pelas regras do app. O recorte dos papéis do Bitrix só se aplica com a sessão dela.</div></div>
@@ -1015,8 +1018,8 @@ async function cfg(d) {
   };
   api('/api/departamentos').then(({ departamentos: ds }) => {
     const filhos = pai => ds.filter(d => (d.pai || null) === pai).sort((a, b) => a.nome.localeCompare(b.nome));
-    const linhas = (pai, nv) => filhos(pai).map(d => `<tr><td style="padding-left:${8 + nv * 18}px">${nv ? '↳ ' : ''}<b>${esc(d.nome)}</b></td><td>${d.chefeNome ? esc(d.chefeNome) : '<span class="hint">sem chefe</span>'}</td><td>${d.pessoas}</td></tr>${linhas(d.id, nv + 1)}`).join('');
-    $('#deptree').innerHTML = `<div class="tw"><table><tr><th>Departamento</th><th>Chefe</th><th>Pessoas</th></tr>${linhas(null, 0) || linhas(0, 0)}</table></div>`;
+    const linhas = (pai, nv) => filhos(pai).map(d => `<tr><td style="padding-left:${8 + nv * 18}px">${nv ? '↳ ' : ''}<b>${esc(d.nome)}</b></td><td>${d.chefeNome ? esc(d.chefeNome) : '<span class="hint">sem chefe</span>'}</td><td>${d.pessoas}</td><td>${d.chefe ? `<input type="checkbox" data-sd="${d.id}" style="width:auto" ${(c.supervisoresDepts || []).map(Number).includes(d.id) ? 'checked' : ''}>` : ''}</td></tr>${linhas(d.id, nv + 1)}`).join('');
+    $('#deptree').innerHTML = `<div class="tw"><table><tr><th>Departamento</th><th>Chefe</th><th>Pessoas</th><th title="O chefe aparece como supervisor na Gestão do registro de visita">Supervisor</th></tr>${linhas(null, 0) || linhas(0, 0)}</table></div>`;
   }).catch(e => { $('#deptree').textContent = e.message; });
   $('#vc_u').onchange = async e => {
     if (!e.target.value) return;
@@ -1026,6 +1029,7 @@ async function cfg(d) {
       $('#vc_out').innerHTML = `<b>${esc(r.nome)}</b> enxerga <b>${r.total}</b> visita(s) em aberto (${r.visao === 'tudo' ? 'visão de todos' : r.visao === 'equipe' ? 'visão de equipe' : 'só as suas'}) · atrasadas ${r.counts.atrasada} · hoje ${r.counts.dia} · próximas ${r.counts.aguardando}.${r.empresas.length ? '<br>' + r.empresas.map(x => `${esc(x.nome)} (${x.visitas})`).join(' · ') : ''}`;
     } catch (er) { $('#vc_out').textContent = er.message; }
   };
+  const lSe = pick('#pk_se', c.supervisoresExtras || [], 'Ninguém além dos chefes');
   const lVt = pick('#pk_vt', c.verTudo || [], 'Ninguém além do chefe do departamento'), lAd = pick('#pk_ad', c.admins || [], 'Nenhum administrador');
   const lCfg = pick('#pk_cfg', c.acessoConfig || []), lDash = pick('#pk_dash', c.acessoDashboard || []), lExc = pick('#pk_exc', c.acessoExcluir || [], 'Ninguém (só administradores)');
   $('#sac').onclick = async () => { try { await api('/api/config', { method: 'PUT', body: { acessoConfig: lCfg, acessoDashboard: lDash, acessoExcluir: lExc } }); eu = await api('/api/eu'); montaAbas(); $('#acout').textContent = 'Acessos salvos.'; } catch (e) { $('#acout').textContent = e.message; } };

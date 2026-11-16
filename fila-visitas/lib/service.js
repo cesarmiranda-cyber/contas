@@ -445,10 +445,13 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   // ---------- gestão: supervisor que acompanhou a visita ----------
   // Supervisores = chefes de departamento da estrutura do Bitrix24 (com o nome do departamento).
   async function supervisoresDoBitrix() {
-    return memo('supervisores', 600e3, async () => {
+    const cfg = store.config, restr = (cfg.supervisoresDepts || []).map(Number).filter(Boolean), extras = (cfg.supervisoresExtras || []).map(Number).filter(Boolean);
+    return memo(`supervisores:${restr.join(',')}:${extras.join(',')}`, 300e3, async () => {
       const deps = (await bitrix.call('department.get', {})).result || [];
       const por = new Map();
-      for (const d of deps) { const h = +d.UF_HEAD; if (h) (por.get(h) || por.set(h, []).get(h)).push(String(d.NAME || '').trim()); }
+      for (const d of deps) { const h = +d.UF_HEAD; if (h && (!restr.length || restr.includes(+d.ID))) (por.get(h) || por.set(h, []).get(h)).push(String(d.NAME || '').trim()); }
+      for (const id of extras) if (!por.has(id)) por.set(id, []);
+      for (const reg of Object.values(store.cards || {})) { const sup = +((reg.equipe || {}).supervisor); if (sup && !por.has(sup)) por.set(sup, []); }   // supervisores já indicados no cadastro das empresas
       const lista = await Promise.all([...por.entries()].map(async ([id, nomes]) => ({ id, nome: await nomeUsuario(id), departamentos: nomes })));
       return lista.sort((a, b) => a.nome.localeCompare(b.nome));
     });

@@ -34,6 +34,8 @@ const DEFAULT_CONFIG = {
   mapaManual: {},              // sobrescritas do mapeamento de campos
   sweepSegundos: 30,
   removerSemClasse: true,      // classe (A, B, C ou Estratégicos) em branco no cadastro = cliente sem visitas: o card aberto sai da fila sozinho
+  supervisoresDepts: [],       // departamentos cujos chefes aparecem como supervisor na Gestão (vazio = todos os chefes de departamento)
+  supervisoresExtras: [],      // usuários que também aparecem como supervisor (além dos chefes de departamento)
   visibilidade: 'app',         // 'app' = regras do app (equipe do cadastro, chefia do departamento) · 'bitrix' = papéis e departamentos do Bitrix
   cargosFila: ['Vendedor'],    // cargos que geram card próprio. Só o Vendedor por padrão: os demais acompanham o mesmo registro (ligue aqui para gerar um card por cargo)
   hierarquiaAuto: false,       // preenche Supervisor/Coordenador/Gerente/Diretor vazios pela estrutura da empresa

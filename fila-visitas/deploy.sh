@@ -36,6 +36,7 @@ if os.environ.get("CAMPO_LINHAS"): env["CAMPO_LINHAS"] = os.environ["CAMPO_LINHA
 if os.environ.get("DIAG_POPULA"): env["DIAG_POPULA"] = "1"
 if os.environ.get("DIAG_CARDS"): env["DIAG_CARDS"] = os.environ["DIAG_CARDS"]
 if os.environ.get("DIAG_E"): env["DIAG_E"] = "1"
+if os.environ.get("DIAG_SUP"): env["DIAG_SUP"] = "1"
 if os.environ.get("DIAG_DATAS"): env["DIAG_DATAS"] = "1"
 if os.environ.get("DIAG_CICLO"): env["DIAG_CICLO"] = "1"
 if os.environ.get("DIAG_FILTRO"): env["DIAG_FILTRO"] = os.environ["DIAG_FILTRO"]
