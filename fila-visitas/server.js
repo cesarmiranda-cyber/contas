@@ -286,6 +286,15 @@ server.listen(PORT, () => {
     const j = JSON.stringify(out); for (let i = 0; i < j.length; i += 1500) console.log('diag-e', j.slice(i, i + 1500)); if (!out.length) console.log('diag-e vazio');
   } catch (e) { console.error('diag-e:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_SUP) setTimeout(async () => { try { const l = await svc.supervisoresDoBitrix(); console.log('diag-sup', l.length, JSON.stringify(l.slice(0, 40).map(x => [x.id, x.nome, x.departamentos.join('/')]))); } catch (e) { console.error('diag-sup:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_ENC) setTimeout(async () => { try {
+    const { map } = await svc.campos(true);
+    const cards = (await bitrix.call('crm.item.list', { entityTypeId: 1036, filter: { stageId: map.etapas.concluidas }, select: ['*', 'uf*'] })).result?.items || [];
+    const regs = (await bitrix.call('crm.item.list', { entityTypeId: 1032, select: ['id', 'companyId', 'assignedById', 'createdBy', map.visita.filaId, map.visita.supervisor].filter(Boolean) })).result?.items || [];
+    const porCard = new Map(regs.map(r => [String(r[map.visita.filaId]), r]));
+    const out = [];
+    for (const it of cards) { const c = await svc.dadosCard(it); const r = porCard.get(String(it.id)); out.push([it.id, c.empresa, c.segmento, c.data, it.updatedTime, r ? { visita: r.id, por: r.assignedById, sup: map.visita.supervisor ? r[map.visita.supervisor] : null } : 'SEM REGISTRO']); }
+    const j = JSON.stringify({ encerrados: out.length, semRegistro: out.filter(x => x[5] === 'SEM REGISTRO').length, lista: out.slice(0, 30), podeEditarCfg: { admins: store.config.admins } }); for (let i = 0; i < j.length; i += 1500) console.log('diag-enc', j.slice(i, i + 1500));
+  } catch (e) { console.error('diag-enc:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;

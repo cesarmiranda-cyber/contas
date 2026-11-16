@@ -498,7 +498,7 @@ function gruposKanban(v) {                   // { coluna: [ [visitas da mesma em
 function kanban(v, verEquipe) {
   if (!v.length) return '<div class="vazio">Nenhuma visita neste filtro.</div>';
   const g = gruposKanban(v);
-  const cols = KCOLS.filter(([k]) => g[k].length || ['atrasada', 'dia', 'aguardando', 'finalizado'].includes(k) && (foco === 'abertas' || foco === 'todas' || foco === k));
+  const cols = KCOLS.filter(([k]) => g[k].length || foco === 'abertas' || foco === 'todas' || foco === k);       // todas as colunas (inclusive Não realizada) ficam sempre visíveis
   return `<div class="kb">${cols.map(([k, t, cor]) => {
     const n = g[k].reduce((a, x) => a + x.length, 0), tot = (dados.colunas && dados.colunas[k]) ?? n;
     return `<section class="kcol" data-kcol="${k}" style="--kc:${cor}"><header><b>${t}</b><span class="kn" title="${g[k].length} empresa(s) nesta tela">${tot}</span></header>

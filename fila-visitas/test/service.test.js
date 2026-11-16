@@ -857,6 +857,9 @@ test('gestão: supervisor que acompanhou vem da estrutura de departamentos, é g
   assert.equal((await svc.editarRegistro(card.id, rec.id, { uid: 10, campos: { ufCrm_res: 'Conversa inicial CORRIGIDA' } })).alterado, false, 'sem mudança não grava');
   const depois = await svc.registroVisita(card.id, { uid: 10 });
   assert.equal(depois.registros[0].edicoes.length, 1);
+  assert.equal((await svc.registroVisita(card.id, { uid: 20 })).registros[0].podeEditar, false, 'o supervisor foi trocado para o 30');
+  store.setConfig({ verTudo: [20] });
+  assert.equal((await svc.registroVisita(card.id, { uid: 20 })).registros[0].podeEditar, true, 'quem vê tudo também edita');
 });
 
 test('filtro de data "próximos meses" mostra só as visitas depois do mês corrente', async () => {
@@ -912,4 +915,19 @@ test('não realizada: motivo (lista + texto), tarefa para o vendedor com o link 
   const antes = w.tasks.length;
   await svc.marcarNaoRealizada(outra.id, { uid: 10, motivo: 'Vendedor sem tempo / agenda cheia' });
   assert.equal(w.tasks.filter(x => /Informar o motivo/.test(x.title)).length, 1, 'sem nova tarefa quando o vendedor mesmo informa');
+});
+
+test('não realizadas aparecem mesmo com o filtro padrão "este mês" e a coluna do Kanban nunca some; gestores com visão total editam registros', async () => {
+  const { w, svc, store } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  await svc.sincronizarEmpresa(1);
+  const card = cards(w)[0];
+  card.stageId = w.stages.naoreal || 'DT1036_1:NAOREAL';
+  w.stageList.push({ STATUS_ID: 'DT1036_1:NAOREAL', NAME: 'Não realizada' }); w.stages.naoreal = 'DT1036_1:NAOREAL'; card.stageId = 'DT1036_1:NAOREAL';
+  card.ufCrm_data = '2026-03-02'; card.closedate = '2026-03-02'; card.updatedTime = new Date(Date.now() + 1000).toISOString();
+  await svc.campos(true);
+  const r = await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', per: 'mes', page: 1, kanban: true });
+  assert.equal(r.colunas.naorealizada, 1, 'a visita não realizada de março aparece com o filtro "este mês"');
+  assert.equal(r.counts.naorealizada, 1);
+  const hoje = await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', per: 'hoje', page: 1 });
+  assert.equal(hoje.visitas.filter(v => v.situacao === 'naorealizada').length, 0, 'filtros explícitos continuam valendo');
 });

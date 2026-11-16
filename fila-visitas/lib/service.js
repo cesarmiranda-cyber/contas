@@ -578,7 +578,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     });
   }
   // ---------- editar registro de visita ----------
-  const podeEditarRegistro = (uid, rec, map) => !!uid && (+rec.assignedById === +uid || supervisorDoRegistro(rec, map) === +uid || isAdmin(uid));
+  const podeEditarRegistro = (uid, rec, map) => !!uid && (+rec.assignedById === +uid || supervisorDoRegistro(rec, map) === +uid || isAdmin(uid) || idsLista(store.config.verTudo).includes(+uid) || idsLista(store.config.acessoConfig).includes(+uid));
   async function lerRegistro(visitaId) {
     const it = (await bitrix.call('crm.item.get', { entityTypeId: F.ETYPE.visita, id: visitaId })).result?.item;
     if (!it) throw erro('Registro de visita não encontrado.', 404);
@@ -1525,8 +1525,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       if (per === 'custom') return [R.isoDate(de) || '0000-01-01', R.isoDate(ate) || '9999-12-31'];
       return null;
     })();
+    // Visitas não realizadas são, por definição, de meses anteriores: o filtro padrão "este mês" não as esconde.
+    const dentro = l => !faixa || (per === 'mes' && l.situacao === 'naorealizada') || !!(l.c.data && l.c.data >= faixa[0] && l.c.data <= faixa[1]);
     const counts = { abertas: 0, atrasada: 0, dia: 0, aguardando: 0, finalizado: 0, naorealizada: 0 };
-    for (const l of leves) { if (faixa && !(l.c.data && l.c.data >= faixa[0] && l.c.data <= faixa[1])) continue; counts[l.situacao]++; if (!l.fechado) counts.abertas++; }
+    for (const l of leves) { if (!dentro(l)) continue; counts[l.situacao]++; if (!l.fechado) counts.abertas++; }
     const nomeDe = id => memo(`nome:${id}`, 600e3, () => nomeUsuario(id));
     const vendIds = [...new Set(leves.map(l => l.vendId).filter(Boolean))], respIds = [...new Set(leves.map(l => +l.c.responsavel).filter(Boolean))];
     const opcoes = {
@@ -1539,7 +1541,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     // 3) filtros
     const busca = R.norm(q);
     let sel = leves.filter(l => (status === 'todas' || (status === 'abertas' ? !l.fechado : l.situacao === status))
-      && (!faixa || (l.c.data && l.c.data >= faixa[0] && l.c.data <= faixa[1]))
+      && dentro(l)
       && (!busca || R.norm(l.c.empresa).includes(busca)) && (!seg || l.c.segmento === seg) && (!classe || (l.c.classe || l.reg.classe) === classe)
       && (!resp || String(l.c.responsavel) === String(resp))
       && (!p.sup || (p.sup === 'todos' ? supIdx.has(String(l.c.id)) : String(supIdx.get(String(l.c.id))) === String(p.sup))));

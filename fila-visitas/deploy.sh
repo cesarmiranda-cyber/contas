@@ -38,6 +38,7 @@ if os.environ.get("DIAG_CARDS"): env["DIAG_CARDS"] = os.environ["DIAG_CARDS"]
 if os.environ.get("GERAR_PROXIMA_EXCLUIDAS"): env["GERAR_PROXIMA_EXCLUIDAS"] = "1"
 if os.environ.get("DIAG_E"): env["DIAG_E"] = "1"
 if os.environ.get("DIAG_SUP"): env["DIAG_SUP"] = "1"
+if os.environ.get("DIAG_ENC"): env["DIAG_ENC"] = "1"
 if os.environ.get("DIAG_DATAS"): env["DIAG_DATAS"] = "1"
 if os.environ.get("DIAG_CICLO"): env["DIAG_CICLO"] = "1"
 if os.environ.get("DIAG_FILTRO"): env["DIAG_FILTRO"] = os.environ["DIAG_FILTRO"]
