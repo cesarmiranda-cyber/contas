@@ -155,10 +155,12 @@ const server = http.createServer(async (req, res) => {
     const volta = (msg) => { res.writeHead(303, { Location: '/?bxerro=' + encodeURIComponent(String(msg).slice(0, 200)), 'Cache-Control': 'no-store' }); res.end(); };
     if (req.method === 'POST' && u.pathname === '/entrada/email') {   // automação (ex.: Google Apps Script) envia o e-mail já lido; autenticada por token, sem senha de e-mail no sistema
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
+      if (process.env.VIBE_GATEWAY_TRUST === '1' && req.headers['x-vibe-caller-kind'] !== 'external-api') return send(res, 403, { error: 'Use o endereço da API externa do aplicativo (Vibe+).' });
       return send(res, 200, await demApi.entradaEmail(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
     }
     if (req.method === 'POST' && u.pathname === '/entrada/formulario') {   // formulário do site (ou Google Forms via Apps Script) envia as respostas; autenticado por token
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
+      if (process.env.VIBE_GATEWAY_TRUST === '1' && req.headers['x-vibe-caller-kind'] !== 'external-api') return send(res, 403, { error: 'Use o endereço da API externa do aplicativo (Vibe+).' });
       return send(res, 200, await demApi.entradaFormulario(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
     }
     if (req.method === 'GET' && u.pathname === '/auth/bitrix/gateway') {   // Vibe+: usuário identificado pelo Gateway da plataforma

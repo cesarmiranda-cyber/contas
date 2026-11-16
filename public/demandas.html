@@ -203,7 +203,7 @@ const gestao = guarda(async () => {
     await api('PUT', '/gestao/config', { paradoDias: f.paradoDias.value, gestorIds: [...f.gestorIds.selectedOptions].map(o => o.value), equipe: eq, questionarios: qs, fechamentoAuto: f.fechamentoAuto.checked }); aviso('Configuração salva.'); gestao(); });
   $('#fft').onclick = guarda(async () => { const e = await api('GET', '/formulario/entrada/estado'); if (e.ativa && !confirm('Gerar um novo código desativa o atual. Continuar?')) return; const r = await api('POST', '/formulario/entrada/token', {});
     const ex = JSON.stringify({ processo: 'rotulagem', messageId: 'id-único-da-resposta', empresa: { nome: 'Padaria Sol', cnpj: '11.222.333/0001-81', email: 'contato@cliente.com' }, respostas: { 'Nome do produto': 'Pão de queijo', 'Ingredientes e quantidades (g)': 'Polvilho 500 g, queijo 200 g', 'Alergênicos presentes (RDC 727/22)': 'Leite e derivados', 'Contaminação cruzada com glúten?': 'Não' } }, null, 2);
-    $('#ffr').innerHTML = `<p class="msg">Código (aparece só agora — guarde-o): <b style="user-select:all;word-break:break-all">${h(r.token)}</b></p><p>Envie de servidor para servidor (o plugin de formulário do site ou um script do Google Forms), assim:</p><pre class="cod">POST ${h(location.origin)}/entrada/formulario\nContent-Type: application/json\nX-Entrada-Token: (o código acima)\n\n${h(ex)}</pre><p class="mut">processo: rotulagem, suplementos, fichas, tabelas ou multas. As respostas com o mesmo nome dos campos do questionário (nome do produto, ingredientes, alergênicos, glúten, SAC…) preenchem o card; as demais vão para o texto original. A empresa é identificada pelo CNPJ.</p>`; });
+    $('#ffr').innerHTML = `<p class="msg">Código (aparece só agora — guarde-o): <b style="user-select:all;word-break:break-all">${h(r.token)}</b></p><p>O servidor é fechado: o formulário (plugin do site ou script do Google Forms) deve chamar a <b>API externa do aplicativo</b>, de servidor para servidor:</p><pre class="cod">POST ${h((e.base || location.origin))}/entrada/formulario\nContent-Type: application/json\nX-Api-Key: (chave da API externa do aplicativo, gerada no Vibe+)\nX-Entrada-Token: (o código acima)\n\n${h(ex)}</pre><p class="mut">processo: rotulagem, suplementos, fichas, tabelas ou multas. As respostas com o mesmo nome dos campos do questionário (nome do produto, ingredientes, alergênicos, glúten, SAC…) preenchem o card; as demais vão para o texto original. A empresa é identificada pelo CNPJ.</p>`; });
   $('#fsim').onclick = guarda(async () => { const r = await api('POST', '/fechamento/processar', { simular: true });
     $('#fres').innerHTML = `<p class="mut">Negócios ganhos no funil comercial que ainda não viraram cartão:</p>${r.criados.length ? `<ul class="lst">${r.criados.map(x => `<li>#${h(x.negocioComercial)} → <b>${h(NOMES_PROC[x.processo])}</b>: ${h(x.titulo)}${x.valor ? ' (R$ ' + x.valor.toLocaleString('pt-BR') + ')' : ''}</li>`).join('')}</ul><div class="dr"><button class="btn p" id="fexe">Criar agora</button></div>` : '<p class="mut">Nenhum.</p>'}${r.semClassificar.length ? `<p class="msg e">Sem como identificar o serviço (crie o campo “Serviço contratado” no negócio ou use o nome do serviço no título): ${r.semClassificar.map(x => h(x.titulo)).join('; ')}</p>` : ''}`;
     if ($('#fexe')) $('#fexe').onclick = guarda(async () => { const x = await api('POST', '/fechamento/processar', { simular: false }); aviso(`${x.criados.length} cartão(ões) criado(s).${x.erros.length ? ' Avisos: ' + x.erros.join(' | ') : ''}`); gestao(); }); });
@@ -300,6 +300,7 @@ function novo() {
   $('#fnv').onsubmit = async e => { e.preventDefault(); try { const n = await api('POST', `/${K}/negocios`, Object.fromEntries(new FormData(e.target))); gavFecha(); await quadro(); abre(n.id); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
 }
 const SCRIPT = (url) => `// Google Apps Script — cole em script.google.com, na conta de e-mail que recebe os pedidos.
+// Em Propriedades do script, crie também CHAVE_API com a chave da API externa do aplicativo (Vibe+): o servidor é fechado e só aceita chamadas por esse canal.
 // 1) Crie o rótulo "Nutrimix" no Gmail e um filtro que aplique esse rótulo aos e-mails de solicitações.
 // 2) Em Propriedades do script, crie TOKEN com o código gerado no sistema. 3) Crie um acionador de tempo (a cada 5 minutos) para enviarSolicitacoes.
 function enviarSolicitacoes() {
@@ -307,17 +308,17 @@ function enviarSolicitacoes() {
   const rotulo = GmailApp.getUserLabelByName('Nutrimix'), enviado = GmailApp.getUserLabelByName('Nutrimix-enviado') || GmailApp.createLabel('Nutrimix-enviado');
   rotulo.getThreads(0, 20).forEach(t => {
     if (t.getLabels().some(l => l.getName() === 'Nutrimix-enviado')) return;
-    t.getMessages().forEach(m => UrlFetchApp.fetch('${url}/entrada/email', { method: 'post', contentType: 'application/json', headers: { 'X-Entrada-Token': token },
+    t.getMessages().forEach(m => UrlFetchApp.fetch('${url}/entrada/email', { method: 'post', contentType: 'application/json', headers: { 'X-Entrada-Token': token, 'X-Api-Key': PropertiesService.getScriptProperties().getProperty('CHAVE_API') },
       payload: JSON.stringify({ de: m.getFrom(), assunto: m.getSubject(), texto: m.getPlainBody(), messageId: m.getId(), data: m.getDate() }) }));
     t.addLabel(enviado);
   });
 }`;
 const entradaEmail = guarda(async () => {
-  const s = await api('GET', '/solicitacoes/entrada/estado');
+  const s = await api('GET', '/solicitacoes/entrada/estado'); window.BASE_ENTRADA = s.base || location.origin;
   gav(`${topo()}<h2 style="margin:0 0 6px">Entrada de solicitações por e-mail</h2><p class="mut" style="margin:0 0 12px">${s.ativa ? `Ativa. ${s.recebidos} e-mail(s) já viraram solicitação.` : 'Ainda não ativada.'} Cada e-mail vira um negócio no funil de Solicitações; o código BKN no assunto ou no texto liga a solicitação à unidade e à empresa.</p>
   <div class="box"><h2>Como ligar (sem compartilhar senha de e-mail)</h2><p>Um pequeno script na própria caixa de e-mail envia cada mensagem ao sistema usando um código secreto. Gerar um novo código desativa o anterior.</p><button class="btn p" id="gt">${s.ativa ? 'Gerar novo código' : 'Ativar e gerar código'}</button><div id="tk"></div></div>`);
   $('#gt').onclick = guarda(async () => { if (s.ativa && !confirm('Gerar um novo código desativa o atual. Continuar?')) return; const r = await api('POST', '/solicitacoes/entrada/token', {});
-    $('#tk').innerHTML = `<p class="msg">Código (aparece só agora — guarde-o): <b style="user-select:all;word-break:break-all">${h(r.token)}</b></p><p>Script para colar no Google Apps Script:</p><pre class="cod">${h(SCRIPT(location.origin))}</pre>`; });
+    $('#tk').innerHTML = `<p class="msg">Código (aparece só agora — guarde-o): <b style="user-select:all;word-break:break-all">${h(r.token)}</b></p><p>Script para colar no Google Apps Script:</p><pre class="cod">${h(SCRIPT(window.BASE_ENTRADA || location.origin))}</pre>`; });
 });
 
 (async () => {
