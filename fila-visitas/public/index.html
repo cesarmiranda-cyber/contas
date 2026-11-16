@@ -314,6 +314,10 @@ body.wide main{padding-top:12px}
 
 #lixeira{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#fee2e2;color:#991b1b;border:2px dashed #ef4444;border-radius:14px;padding:16px 28px;font-weight:700;display:none;z-index:98}#lixeira.on{display:block}#lixeira.alvo{background:#ef4444;color:#fff}
 .danger{color:#b91c1c}.btn.danger{border-color:#fecaca}.btn.danger:hover{background:#fee2e2;border-color:#ef4444;color:#991b1b}.btn.pri.danger{background:#dc2626;border-color:#dc2626;color:#fff}.btn.pri.danger:hover{background:#b91c1c;color:#fff}.links a.danger{color:#b91c1c}
+
+.ck-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px;max-height:210px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--sf)}
+.ck{display:flex;gap:9px;align-items:flex-start;padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent}.ck:hover{background:var(--sf2)}.ck:has(input:checked){background:var(--brandbg);border-color:color-mix(in srgb,var(--brand) 35%,transparent)}
+.ck input{width:auto;margin-top:3px}.ck span{display:flex;flex-direction:column;line-height:1.25}.ck i{font-style:normal;color:#64748b;font-size:12px}.ck small{color:#64748b;font-size:11.5px}
 </style>
 </head>
 <body>
@@ -647,7 +651,7 @@ async function verRegistro(id) {
   const c = r.card;
   const corpo = r.registros.length ? r.registros.map(g => `<div class="rg">
       <div class="rg-h"><b>${esc(g.titulo || 'Registro de visita')}</b><span class="hint">${g.quando ? esc(dhBR(g.quando)) : ''}${g.por ? ' · por ' + esc(g.por) : ''}</span>${g.urlRegistro ? ` <a href="${esc(g.urlRegistro)}" target="_top" class="hint">abrir no Bitrix</a>` : ''}${g.podeEditar ? ` <button class="btn sm" data-edr="${g.id}">✎ Editar registro</button>` : ''}</div>
-      ${g.contato ? `<div class="rg-f"><label>Contato da visita</label><div>${contatoTip(g.contato)}</div></div>` : ''}
+      ${(g.contatos || []).length ? `<div class="rg-f"><label>${g.contatos.length > 1 ? 'Contatos da visita' : 'Contato da visita'}</label><div>${g.contatos.map(contatoTip).join('<br>')}</div></div>` : ''}
       ${g.supervisor ? `<div class="rg-f"><label>Supervisor que acompanhou</label><div>👔 <b>${esc(g.supervisor.nome)}</b></div></div>` : ''}
       ${(g.edicoes || []).length ? `<div class="rg-f"><label>Edições</label>${g.edicoes.map(e => `<div class="hint">Editado por <b>${esc(e.por)}</b> em ${esc(dhBR(e.at))}: ${esc((e.mudancas || []).map(m => m.campo).join(', '))}</div>`).join('')}</div>` : ''}
       ${g.campos.length ? g.campos.map(f => `<div class="rg-f ${f.destaque ? 'dest' : ''}"><label>${esc(f.titulo)}</label>${f.tipo === 'arquivo' ? `<div>${f.arquivos.map(a => a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">📎 ${esc(a.nome)}</a>` : `📎 ${esc(a.nome)}`).join('<br>')}</div>` : `<div class="rg-t">${esc(f.texto)}</div>`}</div>`).join('') : '<div class="hint">Nenhum campo preenchido neste registro.</div>'}
@@ -855,7 +859,7 @@ async function registrar(id, edit = null) {
   const ordem = [...GRUPOS.map(g => g[0]), 'Outras informações'].filter(n => secoes[n]);
   modal(`<div class="sh-h"><h3>${edit ? 'Editar registro da visita' : 'Registrar visita'}</h3><div class="chips"><span class="tag seg">${esc(c.empresa)}</span><span class="tag">${esc(c.segmento)}</span><span class="tag">${esc(c.cargo)}</span><span class="tag">Programada: ${fmt(c.data)}</span>${c.antecipada ? '<span class="tag warn">Visita antecipada</span>' : ''}${auto.filter(f => legivel(f) && !/fila|id/i.test(f.titulo)).map(f => `<span class="tag" title="${esc(f.titulo)}">${esc(f.titulo.replace(/\?$/, ''))}: ${esc(legivel(f))}</span>`).join('')}</div></div>
     <div class="sh-b">
-      <div class="sec"><h4>Contato da visita</h4>${(form.contatos || []).length ? `<div class="fld wide"><label>Com quem foi a visita?</label><select id="f_contato"><option value="">— não informar —</option>${form.contatos.map(c => `<option value="${c.id}" ${c.id === form.contatoPadraoId ? 'selected' : ''}>${esc(c.nome)}${c.cargo ? ' — ' + esc(c.cargo) : ''}</option>`).join('')}</select><div class="hint" id="f_contato_t"></div><div class="hint">${form.contatoPadraoId ? 'Já vem o contato da última visita. Se o cliente mudou, escolha o novo: o histórico dos contatos é mantido.' : 'Escolha entre os contatos cadastrados na empresa.'}</div></div>` : '<div class="hint">Nenhum contato cadastrado nesta empresa. Cadastre o contato no Bitrix para poder escolher aqui.</div>'}</div>
+      <div class="sec"><h4>Contatos da visita</h4>${(form.contatos || []).length ? `<div class="fld wide"><label>Com quem foi a visita? <span class="hint">(marque todas as pessoas que participaram)</span></label><div id="f_contatos" class="ck-list">${form.contatos.map(c => `<label class="ck"><input type="checkbox" value="${c.id}" ${(form.contatoPadraoIds || []).includes(c.id) ? 'checked' : ''}><span><b>${esc(c.nome)}</b>${c.cargo ? ` <i>${esc(c.cargo)}</i>` : ''}<small>${esc([c.telefones.join(' · '), c.emails[0]].filter(Boolean).join('  |  ') || 'sem telefone')}</small></span></label>`).join('')}</div><div class="hint">${(form.contatoPadraoIds || []).length ? (edit ? 'Contatos já gravados neste registro.' : 'Já vêm marcados os contatos da última visita. Se o cliente mudou, ajuste: o histórico dos contatos é mantido.') : 'Escolha entre os contatos cadastrados na empresa.'}</div></div>` : '<div class="hint">Nenhum contato cadastrado nesta empresa. Cadastre o contato no Bitrix para poder escolher aqui.</div>'}</div>
       ${form.gestaoDisponivel ? `<div class="sec"><h4>Gestão</h4><div class="fld wide"><label>Supervisor que acompanhou a visita</label><select id="f_sup"><option value="">— ninguém acompanhou —</option>${(form.supervisores || []).map(x => `<option value="${x.id}" ${x.id === form.supervisorPadraoId && edit ? 'selected' : ''}>${esc(x.nome)}${(x.departamentos || []).length ? ' — ' + esc(x.departamentos.join(', ')) : ''}</option>`).join('')}</select>
         <div class="hint">Supervisores da estrutura de departamentos do Bitrix24. O supervisor escolhido também pode editar este registro.${!edit && form.supervisorPadraoId ? ` <a href="#" id="f_sup_sug">Escolher ${esc(((form.supervisores || []).find(x => x.id === form.supervisorPadraoId) || {}).nome || '')} (chefe do seu departamento)</a>` : ''}</div></div></div>` : ''}
       ${quando ? `<div class="sec"><div class="grid2">${campoHTML(quando)}</div></div>` : ''}
@@ -866,8 +870,7 @@ async function registrar(id, edit = null) {
     <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri" id="ok">${edit ? 'Salvar alterações' : 'Salvar visita'}</button></div>`);
   ligaAnexos();
   if ($('#f_sup_sug')) $('#f_sup_sug').onclick = e => { e.preventDefault(); $('#f_sup').value = String(form.supervisorPadraoId); sujo = true; };
-  const mostraTel = () => { const sel = $('#f_contato'); if (!sel) return; const c = (form.contatos || []).find(x => String(x.id) === sel.value); $('#f_contato_t').textContent = c ? [c.telefones.join(' · '), c.emails[0]].filter(Boolean).join('  |  ') : ''; };
-  if ($('#f_contato')) { $('#f_contato').onchange = mostraTel; mostraTel(); }
+  const contatosMarcados = () => [...document.querySelectorAll('#f_contatos input:checked')].map(x => +x.value);
   // Rascunho: o que o vendedor digita fica guardado neste navegador até a visita ser salva (sobrevive a um fechamento acidental)
   const chaveRasc = edit ? `fv.rascE.${edit}` : `fv.rasc.${id}`;
   const camposRasc = () => [...document.querySelectorAll('#sheet [id^="f_"]')].filter(el => /^(TEXTAREA|SELECT|INPUT)$/.test(el.tagName) && !['file', 'checkbox', 'radio', 'password'].includes(el.type) && !el.multiple);
@@ -885,13 +888,13 @@ async function registrar(id, edit = null) {
     for (const f of form.campos) { const v = lerCampo(f); if (v !== undefined) campos[f.key] = v; }
     try {
       if (edit) {
-        const r = await api(`/api/cards/${id}/registros/${edit}/editar`, { method: 'POST', body: { campos, contatoId: ($('#f_contato') && $('#f_contato').value) || null, supervisorId: $('#f_sup') ? ($('#f_sup').value || null) : undefined } });
+        const r = await api(`/api/cards/${id}/registros/${edit}/editar`, { method: 'POST', body: { campos, contatoIds: contatosMarcados(), supervisorId: $('#f_sup') ? ($('#f_sup').value || null) : undefined } });
         try { localStorage.removeItem(chaveRasc); } catch {}
         modal(`<div class="sh-b"><div class="ok">${r.alterado ? 'Registro atualizado. As alterações ficaram registradas no histórico.' : 'Nada foi alterado.'}</div></div><div class="sh-f"><button class="btn pri" id="vr">Ver o registro</button></div>`);
         $('#vr').onclick = () => verRegistro(id);
         return;
       }
-      const r = await api(`/api/cards/${id}/registrar`, { method: 'POST', body: { campos, supervisorId: $('#f_sup') ? ($('#f_sup').value || null) : undefined, contatoId: ($('#f_contato') && $('#f_contato').value) || null, resultado: document.getElementById('f_resultado')?.value || '', dataHora: form.dataHoraKey ? campos[form.dataHoraKey] : undefined } });
+      const r = await api(`/api/cards/${id}/registrar`, { method: 'POST', body: { campos, supervisorId: $('#f_sup') ? ($('#f_sup').value || null) : undefined, contatoIds: contatosMarcados(), resultado: document.getElementById('f_resultado')?.value || '', dataHora: form.dataHoraKey ? campos[form.dataHoraKey] : undefined } });
       try { localStorage.removeItem(chaveRasc); } catch {}
       modal(`<div class="sh-b"><div class="ok">Visita registrada${r.antecipada ? ' (antecipada)' : ''}.${r.proximaData ? ` Próxima visita: ${fmt(r.proximaData)}.` : ''}</div></div><div class="sh-f"><button class="btn pri" onclick="fecha();carrega()">Fechar</button></div>`);
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; $('#ok').textContent = edit ? 'Salvar alterações' : 'Salvar visita'; $('#er').scrollIntoView({ block: 'nearest' }); }

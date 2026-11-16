@@ -941,3 +941,29 @@ test('cards antigos de cargos que não geram visita (modelo anterior) não apare
   const r = await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', page: 1 });
   assert.deepEqual(r.visitas.map(v => v.cargo), ['Vendedor'], 'só o vendedor aparece');
 });
+
+test('contatos da visita: seleção múltipla é gravada, vem marcada na próxima visita e pode ser editada', async () => {
+  const { w, svc } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  w.contacts = {
+    1: { ID: 1, COMPANY_ID: 1, NAME: 'Ana', LAST_NAME: 'Souza', PHONE: [{ VALUE: '+5511999990001' }] },
+    2: { ID: 2, COMPANY_ID: 1, NAME: 'Bruno', LAST_NAME: 'Lima' },
+    3: { ID: 3, COMPANY_ID: 1, NAME: 'Carla', LAST_NAME: 'Dias' },
+    9: { ID: 9, COMPANY_ID: 7, NAME: 'Fora', LAST_NAME: 'Da Empresa' },
+  };
+  await svc.sincronizarEmpresa(1);
+  const v1 = cards(w)[0];
+  await assert.rejects(() => svc.registrarVisita(v1.id, { uid: 10, resultado: 'x', contatoIds: [1, 9] }), /não pertence/);
+  await svc.registrarVisita(v1.id, { uid: 10, resultado: 'Reunião com duas pessoas', contatoIds: [1, 2] });
+  const rec = Object.values(w.items[1032])[0];
+  assert.deepEqual(rec.contactIds, [1, 2]); assert.equal(rec.contactId, 1);
+  const r1 = await svc.registroVisita(v1.id);
+  assert.deepEqual(r1.registros[0].contatos.map(c => c.nome), ['Ana Souza', 'Bruno Lima']);
+  const v2 = cards(w).find(c => c.id !== v1.id && c.stageId !== w.stages.finalizado);
+  assert.deepEqual((await svc.camposVisita(v2.id, { uid: 10 })).contatoPadraoIds, [1, 2], 'os contatos da última visita vêm marcados');
+  // edição: troca Ana por Carla
+  const e = await svc.editarRegistro(v1.id, rec.id, { uid: 10, campos: {}, contatoIds: [2, 3] });
+  assert.equal(e.alterado, true); assert.deepEqual(rec.contactIds, [2, 3]);
+  assert.ok(e.mudancas.some(m => m.campo === 'Contatos da visita' && /Ana/.test(m.de) && /Carla/.test(m.para)));
+  const hist = (await svc.registroVisita(v1.id)).contatosHistorico.map(c => c.nome).sort();
+  assert.deepEqual(hist, ['Bruno Lima', 'Carla Dias']);
+});

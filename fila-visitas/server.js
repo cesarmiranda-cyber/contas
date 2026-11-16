@@ -152,7 +152,7 @@ const server = http.createServer(async (req, res) => {
       exige(); const ide = await quem(req, u);
       if (!ide.verificado) throw nega('Abra o app pelo Bitrix24 para editar o registro.');
       if (me[3] === 'form' && req.method === 'GET') return send(res, 200, await svc.formEdicao(+me[1], +me[2], { uid: ide.uid, bearer: ide.bearer }));
-      if (me[3] === 'editar' && req.method === 'POST') { const b = await readBody(req, 1e6); return send(res, 200, await svc.editarRegistro(+me[1], +me[2], { uid: ide.uid, bearer: ide.bearer, campos: b.campos, contatoId: b.contatoId, supervisorId: b.supervisorId })); }
+      if (me[3] === 'editar' && req.method === 'POST') { const b = await readBody(req, 1e6); return send(res, 200, await svc.editarRegistro(+me[1], +me[2], { uid: ide.uid, bearer: ide.bearer, campos: b.campos, contatoId: b.contatoId, contatoIds: b.contatoIds, supervisorId: b.supervisorId })); }
     }
     const mr = u.pathname.match(/^\/api\/cards\/(\d+)\/registro$/);
     if (mr && req.method === 'GET') { exige(); const idr = await quem(req, u); return send(res, 200, await svc.registroVisita(+mr[1], { bearer: idr.bearer, uid: idr.verificado ? idr.uid : null })); }

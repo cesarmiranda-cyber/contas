@@ -497,15 +497,17 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const dh = map.visita.dataHora || 'begindate';
     const regs = empresaId ? await listarItens({ entityTypeId: F.ETYPE.visita, filter: { companyId: empresaId }, select: ['id', 'createdTime', dh, 'contactIds', 'contactId'] }) : [];
     const porContato = new Map();
+    let ultimosIds = null;                              // contatos da visita mais recente
     for (const it of regs.sort((a, b) => String(b[dh] || b.createdTime).localeCompare(String(a[dh] || a.createdTime)) || (+b.id - +a.id))) {
       const ids = (it.contactIds && it.contactIds.length ? it.contactIds : (it.contactId ? [it.contactId] : [])).map(Number).filter(Boolean);
+      if (ultimosIds === null && ids.length) ultimosIds = ids;
       for (const id of ids) { const g = porContato.get(id) || { id, visitas: 0, ultima: it[dh] || it.createdTime }; g.visitas++; porContato.set(id, g); }
     }
     const conhecidos = new Map((await contatosDaEmpresa(empresaId)).map(c => [c.id, c]));
     const faltam = [...porContato.keys()].filter(id => !conhecidos.has(id));
     for (const c of await contatosPorId(faltam)) conhecidos.set(c.id, c);
     const lista = [...porContato.values()].map(g => ({ ...g, ...(conhecidos.get(g.id) || { nome: `Contato ${g.id}`, cargo: '', telefones: [], emails: [] }) }));
-    return { lista, ultimoId: lista[0]?.id || null };
+    return { lista, ultimoId: lista[0]?.id || null, ultimosIds: ultimosIds || [] };
   }
   async function camposVisita(cardId, { uid = null } = {}) {
     const { map, meta } = await campos();
@@ -556,14 +558,15 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     lista.sort((a, b) => (b.destaque - a.destaque) || (b.obrigatorio - a.obrigatorio));
     const contatos = await contatosDaEmpresa(card.empresaId).catch(() => []);
     const hist = await historicoContatos(card.empresaId).catch(() => ({ lista: [], ultimoId: null }));
-    const padrao = hist.ultimoId && contatos.some(c => c.id === hist.ultimoId) ? hist.ultimoId : null;     // o contato da última visita já vem escolhido (dá para trocar)
+    const padraoIds = (hist.ultimosIds || []).filter(id => contatos.some(c => c.id === id));      // os contatos da última visita já vêm marcados (dá para trocar)
+    const padrao = padraoIds[0] || null;
     const supervisores = v.supervisor ? await supervisoresDoBitrix().catch(() => []) : [];
     let supPadrao = null;
     if (supervisores.length) {
       const doDept = uid ? await chefeDe(uid) : null, doCadastro = +((emp?.segs?.[card.segmento] || {}).supervisor) || null;
       supPadrao = [doDept, doCadastro].find(id => id && supervisores.some(x => x.id === +id)) || null;
     }
-    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null, contatos, contatoPadraoId: padrao, supervisores, supervisorPadraoId: supPadrao, gestaoDisponivel: !!v.supervisor, urlEmpresa: null };
+    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null, contatos, contatoPadraoId: padrao, contatoPadraoIds: padraoIds, supervisores, supervisorPadraoId: supPadrao, gestaoDisponivel: !!v.supervisor, urlEmpresa: null };
   }
 
   // card -> supervisor que acompanhou (a partir dos registros de visita)
@@ -597,12 +600,13 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const dh = map.visita.dataHora;
     form.dataHoraKey = null;                                                         // data/hora da visita não muda por edição (ela define o ciclo)
     form.campos = form.campos.filter(c => c.key !== dh);
-    form.contatoPadraoId = Number((rec.contactIds && rec.contactIds[0]) || rec.contactId || 0) || null;
+    const idsRec = (rec.contactIds && rec.contactIds.length ? rec.contactIds : (rec.contactId ? [rec.contactId] : [])).map(Number).filter(Boolean);
+    form.contatoPadraoIds = idsRec; form.contatoPadraoId = idsRec[0] || null;
     form.supervisorPadraoId = supervisorDoRegistro(rec, map);
     form.visita = { id: +rec.id, quando: rec[dh || 'begindate'] || rec.createdTime };
     return form;
   }
-  async function editarRegistro(cardId, visitaId, { uid, campos: dados = {}, contatoId, supervisorId, bearer = null }) {
+  async function editarRegistro(cardId, visitaId, { uid, campos: dados = {}, contatoId, contatoIds, supervisorId, bearer = null }) {
     const { map } = await campos();
     const form = await formEdicao(cardId, visitaId, { uid, bearer });
     const rec = await lerRegistro(visitaId);
@@ -624,14 +628,16 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       mudancas.push({ campo: c.titulo, de: legivel(c, velho), para: legivel(c, novo) });
     }
     if (faltam.length) throw erro(`Preencha: ${faltam.join(', ')}.`, 422);
-    if (contatoId !== undefined) {
-      const novo = Number(contatoId) || 0, atual = Number((rec.contactIds && rec.contactIds[0]) || rec.contactId || 0);
-      if (novo !== atual) {
+    const pedido = contatoIds !== undefined ? contatoIds : (contatoId !== undefined ? (contatoId ? [contatoId] : []) : undefined);
+    if (pedido !== undefined) {
+      const novos = [...new Set([].concat(pedido || []).map(Number).filter(Boolean))].sort((x, y) => x - y);
+      const atuais = (rec.contactIds && rec.contactIds.length ? rec.contactIds : (rec.contactId ? [rec.contactId] : [])).map(Number).filter(Boolean).sort((x, y) => x - y);
+      if (JSON.stringify(novos) !== JSON.stringify(atuais)) {
         const lista = await contatosDaEmpresa(rec.companyId);
-        if (novo && !lista.some(c => c.id === novo)) throw erro('O contato escolhido não pertence a esta empresa.', 422);
-        f.contactId = novo; f.contactIds = novo ? [novo] : [];
-        const nome = id => id ? ((lista.find(c => c.id === id) || {}).nome || `Contato ${id}`) : '(nenhum)';
-        mudancas.push({ campo: 'Contato da visita', de: nome(atual), para: nome(novo) });
+        if (novos.some(id => !lista.some(c => c.id === id))) throw erro('Um dos contatos escolhidos não pertence a esta empresa.', 422);
+        f.contactIds = novos; f.contactId = novos[0] || 0;
+        const nomes = ids => ids.length ? ids.map(id => (lista.find(c => c.id === id) || {}).nome || `Contato ${id}`).join(', ') : '(nenhum)';
+        mudancas.push({ campo: 'Contatos da visita', de: nomes(atuais), para: nomes(novos) });
       }
     }
     if (supervisorId !== undefined && map.visita.supervisor) {
@@ -683,7 +689,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const idsContato = [...new Set(itens.flatMap(it => (it.contactIds && it.contactIds.length ? it.contactIds : (it.contactId ? [it.contactId] : [])).map(Number).filter(Boolean)))];
     const doCadastro = new Map((await contatosDaEmpresa(card.empresaId).catch(() => [])).map(c => [c.id, c]));
     for (const c of await contatosPorId(idsContato.filter(id => !doCadastro.has(id))).catch(() => [])) doCadastro.set(c.id, c);
-    const contatoDe = it => { const id = Number((it.contactIds && it.contactIds[0]) || it.contactId || 0); return id ? (doCadastro.get(id) || { id, nome: `Contato ${id}`, cargo: '', telefones: [], emails: [] }) : null; };
+    const contatosDe = it => (it.contactIds && it.contactIds.length ? it.contactIds : (it.contactId ? [it.contactId] : [])).map(Number).filter(Boolean).map(id => doCadastro.get(id) || { id, nome: `Contato ${id}`, cargo: '', telefones: [], emails: [] });
     const ocultos = new Set([v.filaId].filter(Boolean));
     const registros = [];
     for (const it of itens) {
@@ -707,7 +713,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       }
       campos_.sort((a, b) => (!!b.destaque - !!a.destaque));
       registros.push({ id: +it.id, titulo: it.title || '', quando: it[v.dataHora || 'begindate'] || it.createdTime || null, criadoEm: it.createdTime || null,
-        por: await quem(+it.assignedById || +it.createdBy), contato: contatoDe(it), supervisor: supervisorDoRegistro(it, map) ? { id: supervisorDoRegistro(it, map), nome: await quem(supervisorDoRegistro(it, map)) } : null,
+        por: await quem(+it.assignedById || +it.createdBy), contatos: contatosDe(it), contato: contatosDe(it)[0] || null, supervisor: supervisorDoRegistro(it, map) ? { id: supervisorDoRegistro(it, map), nome: await quem(supervisorDoRegistro(it, map)) } : null,
         podeEditar: podeEditarRegistro(uid, it, map, Object.values((store.card(cardId) || {}).equipe || {})), edicoes: store.historico.filter(h => h.tipo === 'edicao-registro' && +h.visita === +it.id).slice(0, 5).map(h => ({ at: h.at, por: h.autorNome, mudancas: h.mudancas })), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
     }
     const hc = await historicoContatos(card.empresaId).catch(() => ({ lista: [] }));
@@ -769,7 +775,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       return { fileData: [nome, b64] };
     });
   }
-  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, contatoId = null, supervisorId = null, campos: extra = {} }) {
+  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, contatoId = null, contatoIds = null, supervisorId = null, campos: extra = {} }) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
@@ -795,10 +801,11 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       title: `${card.empresa} - ${R.fmtBR(dia)}`, companyId: card.empresaId, assignedById: uid,
       [map.visita.dataHora || 'begindate']: quando.toISOString(),
     };
-    if (contatoId) {                                   // contato visitado: gravado no registro (o histórico de contatos nasce desses registros)
+    const escolhidos = [...new Set([].concat(contatoIds || (contatoId ? [contatoId] : [])).map(Number).filter(Boolean))];
+    if (escolhidos.length) {                           // contatos visitados: gravados no registro (o histórico de contatos nasce desses registros)
       const lista = await contatosDaEmpresa(card.empresaId);
-      if (!lista.some(c => c.id === +contatoId)) throw erro('O contato escolhido não pertence a esta empresa.', 422);
-      f.contactId = +contatoId; f.contactIds = [+contatoId];
+      if (escolhidos.some(id => !lista.some(c => c.id === id))) throw erro('Um dos contatos escolhidos não pertence a esta empresa.', 422);
+      f.contactId = escolhidos[0]; f.contactIds = escolhidos;
     }
     if (supervisorId) {                                 // Gestão: supervisor que acompanhou (da estrutura de departamentos do Bitrix)
       if (!map.visita.supervisor) throw erro('O campo "Supervisor que acompanhou" ainda não existe no Registro de Visita. Peça a um administrador para usar "Preparar o Bitrix" em Configurações.', 422);
