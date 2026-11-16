@@ -50,10 +50,11 @@ function primeiraVisitaData(hojeIso, n = 0) {
   const dow = ((new Date(hojeIso + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1;   // 1 = segunda ... 7 = domingo
   return addDays(hojeIso, 8 - dow + (Math.abs(n) % 5));
 }
-// Dias úteis (seg-sex) de `inicioIso` até `inicioIso + janela - 1`.
+// Dias úteis (seg-sex, sem os feriados nacionais fixos) de `inicioIso` até `inicioIso + janela - 1`.
+const FERIADOS_FIXOS = new Set(['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25']);
 function diasUteis(inicioIso, janela) {
   const out = [];
-  for (let i = 0; i < janela; i++) { const d = addDays(inicioIso, i), dow = new Date(d + 'T12:00:00Z').getUTCDay(); if (dow !== 0 && dow !== 6) out.push(d); }
+  for (let i = 0; i < janela; i++) { const d = addDays(inicioIso, i), dow = new Date(d + 'T12:00:00Z').getUTCDay(); if (dow !== 0 && dow !== 6 && !FERIADOS_FIXOS.has(d.slice(5))) out.push(d); }
   return out;
 }
 // Espalha `n` itens de forma uniforme pelas datas `dias` (a posição j cai no meio de sua fatia).
