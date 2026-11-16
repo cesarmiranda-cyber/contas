@@ -587,7 +587,7 @@ function reagendarGrupo(ids) {
     $('#ok').disabled = true; $('#er').classList.remove('on');
     const falhas = [];
     for (const x of grp) { try { await api(`/api/cards/${x.id}/reprogramar`, { method: 'POST', body: { nova: $('#nd').value, motivo: $('#mo').value } }); } catch (e) { falhas.push(`${x.segmento} · ${x.cargo}: ${e.message}`); } }
-    if (!falhas.length) { fecha(); carrega(); return; }
+    if (!falhas.length) { fecha(true); carrega(); return; }
     $('#er').textContent = falhas.join(' | '); $('#er').classList.add('on'); $('#ok').disabled = false; carregaVisitas();
   };
 }
@@ -611,7 +611,7 @@ function participantes(id) {
     document.querySelectorAll('[data-rm]').forEach(a => a.onclick = e => { e.preventDefault(); extras = extras.filter(x => +x.id !== +a.dataset.rm); desenha(); });
     $('#ok').onclick = async () => {
       $('#ok').disabled = true;
-      try { await api(`/api/cards/${id}/participantes`, { method: 'POST', body: { ids: extras.map(x => x.id) } }); fecha(); carregaVisitas(); }
+      try { await api(`/api/cards/${id}/participantes`, { method: 'POST', body: { ids: extras.map(x => x.id) } }); fecha(true); carregaVisitas(); }
       catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; }
     };
   };
@@ -682,9 +682,21 @@ function linha(c) {
     <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>${c.situacao === 'finalizado' ? `<div class="acts"><button class="btn pri" data-ver="${c.id}">Ver registro</button></div>` : ''}` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
       <div class="links">${c.situacao !== 'finalizado' && c.situacao !== 'naorealizada' ? `<a href="#" data-part="${c.id}">Participantes${(c.participantes || []).length ? ` (${c.participantes.length})` : ''}</a>` : ''}${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
 }
-const modal = html => { $('#sheet').innerHTML = html; $('#m').classList.add('on'); };
-const fecha = () => $('#m').classList.remove('on');
-$('#m').onclick = e => { if (e.target.id === 'm') fecha(); };
+// Janela: clicar FORA dela não fecha (o que o usuário digitou não se perde). Fechar pelos botões pergunta antes se houver algo digitado.
+let sujo = false;
+const modal = html => { $('#sheet').innerHTML = html; delete $('#sheet').dataset.rasc; $('#m').classList.add('on'); sujo = false; };
+const fecha = (forcar = false) => {
+  if (!forcar && sujo && !confirm('Fechar sem salvar? O que você digitou será perdido.')) return false;
+  $('#m').classList.remove('on'); sujo = false; return true;
+};
+$('#sheet').addEventListener('input', () => { sujo = true; });
+$('#sheet').addEventListener('change', () => { sujo = true; });
+$('#m').onclick = e => {
+  if (e.target.id !== 'm') return;
+  if ($('#sheet').querySelector('textarea, input:not([type=hidden]), select')) return;      // formulário aberto: ignora o clique fora
+  fecha();
+};
+window.addEventListener('beforeunload', e => { if (sujo && $('#m').classList.contains('on')) { e.preventDefault(); e.returnValue = ''; } });
 const achar = id => dados.visitas.find(x => x.id === id);
 const TZ = 'America/Sao_Paulo';                                   // tudo no app é horário de Brasília, seja qual for o fuso do navegador
 const dhBR = v => new Date(v).toLocaleString('pt-BR', { timeZone: TZ });
@@ -779,6 +791,15 @@ async function registrar(id) {
   ligaAnexos();
   const mostraTel = () => { const sel = $('#f_contato'); if (!sel) return; const c = (form.contatos || []).find(x => String(x.id) === sel.value); $('#f_contato_t').textContent = c ? [c.telefones.join(' · '), c.emails[0]].filter(Boolean).join('  |  ') : ''; };
   if ($('#f_contato')) { $('#f_contato').onchange = mostraTel; mostraTel(); }
+  // Rascunho: o que o vendedor digita fica guardado neste navegador até a visita ser salva (sobrevive a um fechamento acidental)
+  const chaveRasc = `fv.rasc.${id}`;
+  const camposRasc = () => [...document.querySelectorAll('#sheet [id^="f_"]')].filter(el => /^(TEXTAREA|SELECT|INPUT)$/.test(el.tagName) && !['file', 'checkbox', 'radio', 'password'].includes(el.type) && !el.multiple);
+  try {
+    const rasc = JSON.parse(localStorage.getItem(chaveRasc) || 'null');
+    if (rasc) { let n = 0; for (const el of camposRasc()) if (rasc[el.id] && !el.value) { el.value = rasc[el.id]; n++; } if (n) { sujo = true; const av = document.createElement('div'); av.className = 'info'; av.textContent = 'Recuperei o que você já tinha digitado nesta visita.'; $('#sheet .sh-b').prepend(av); } }
+  } catch {}
+  $('#sheet').dataset.rasc = chaveRasc;
+  $('#sheet').oninput = () => { if ($('#sheet').dataset.rasc !== chaveRasc) return; try { const o = {}; for (const el of camposRasc()) if (el.value) o[el.id] = el.value; localStorage.setItem(chaveRasc, JSON.stringify(o)); } catch {} };
   document.querySelectorAll('#sheet textarea').forEach(t => { const ajusta = () => { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, 220) + 'px'; }; t.addEventListener('input', ajusta); ajusta(); });
   $('#ok').onclick = async () => {
     $('#ok').disabled = true; $('#er').classList.remove('on');
@@ -787,6 +808,7 @@ async function registrar(id) {
     for (const f of form.campos) { const v = lerCampo(f); if (v !== undefined) campos[f.key] = v; }
     try {
       const r = await api(`/api/cards/${id}/registrar`, { method: 'POST', body: { campos, contatoId: ($('#f_contato') && $('#f_contato').value) || null, resultado: document.getElementById('f_resultado')?.value || '', dataHora: form.dataHoraKey ? campos[form.dataHoraKey] : undefined } });
+      try { localStorage.removeItem(chaveRasc); } catch {}
       modal(`<div class="sh-b"><div class="ok">Visita registrada${r.antecipada ? ' (antecipada)' : ''}.${r.proximaData ? ` Próxima visita: ${fmt(r.proximaData)}.` : ''}</div></div><div class="sh-f"><button class="btn pri" onclick="fecha();carrega()">Fechar</button></div>`);
     } catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; $('#ok').textContent = 'Salvar visita'; $('#er').scrollIntoView({ block: 'nearest' }); }
   };
@@ -808,7 +830,7 @@ function reagendarVisita(id) {
   if (semDia) return;
   $('#ok').onclick = async () => {
     $('#ok').disabled = true; $('#er').classList.remove('on');
-    try { await api(`/api/cards/${id}/reprogramar`, { method: 'POST', body: { nova: $('#nd').value, motivo: $('#mo').value } }); fecha(); carrega(); }
+    try { await api(`/api/cards/${id}/reprogramar`, { method: 'POST', body: { nova: $('#nd').value, motivo: $('#mo').value } }); fecha(true); carrega(); }
     catch (e) { $('#er').textContent = e.message; $('#er').classList.add('on'); $('#ok').disabled = false; }
   };
 }
