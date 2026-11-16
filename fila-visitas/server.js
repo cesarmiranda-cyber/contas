@@ -55,6 +55,7 @@ function exigeDashboard(id) {
   if (!id.verificado) throw nega('Abra o app pelo Bitrix24 para ver o dashboard.');
   if (!svc.podeDashboard(id.uid)) throw nega('Você não tem acesso ao dashboard.');
 }
+const store_historico_para = lista => { const ids = lista.split(',').map(Number); return store.historico.filter(h => ids.includes(+h.card)).slice(0, 10).map(h => [h.at, h.tipo || 'reprog', h.anterior, h.nova, h.autorNome]); };
 const routes = {
   'GET /health': async () => ({ ok: true }),
   'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '', podeConfig: svc.acessoRestrito() ? !!(id.verificado && svc.podeConfigurar(id.uid)) : true, podeDashboard: svc.acessoRestrito() ? !!(id.verificado && svc.podeDashboard(id.uid)) : true, podeExcluir: !!(id.verificado && svc.podeExcluir(id.uid)) }),
@@ -251,6 +252,11 @@ server.listen(PORT, () => {
     const def = (await bitrix.call('crm.item.fields', { entityTypeId: 1032 })).result?.fields || {};
     console.log('diag-popula item', JSON.stringify(Object.entries(def).filter(([k, d]) => /popula|regime/i.test(d.title || '')).map(([k, d]) => [k, d.type, d.title])));
   } catch (e) { console.error('diag-popula:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_CARDS) setTimeout(async () => { try {
+    const { map } = await svc.campos();
+    for (const id of process.env.DIAG_CARDS.split(',').map(Number)) { const it = (await bitrix.call('crm.item.get', { entityTypeId: 1036, id })).result?.item || {}; const d = await svc.dadosCard(it); console.log('diag-card', id, JSON.stringify({ stage: it.stageId, data: d.data, classe: d.classe, campoData: it[map.fila.data], closedate: it.closedate, criado: it.createdTime, atualizado: it.updatedTime })); }
+    const h = store_historico_para(process.env.DIAG_CARDS); console.log('diag-card historico', JSON.stringify(h));
+  } catch (e) { console.error('diag-card:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;
