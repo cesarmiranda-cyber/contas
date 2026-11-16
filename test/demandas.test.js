@@ -275,3 +275,18 @@ test('suplementos: formulação, memorial de cálculo com %VD do Anexo VIII, lim
   await call('POST', `/suplementos/negocios/${n.id}/artigo`, { artigoId: a.id }); assert.equal((await call('GET', `/suplementos/negocios/${n.id}`)).artigosDossie.length, 1);
   const ds = await call('GET', `/suplementos/negocios/${n.id}/dossie`); assert.match(ds.memorial.texto, /MEMORIAL DE CÁLCULO/); assert.equal(ds.artigos[0].titulo, 'Zinc and immunity');
 });
+
+test('formulário do Bitrix24: o negócio criado pelo formulário no funil Serviços técnicos vira cartão com o questionário, sem duplicar o negócio', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fb-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  bitrix.deals.push({ ID: '201', CATEGORY_ID: 12, TITLE: 'Rotulagem — Padaria Sol', STAGE_ID: 'C12:A', COMPANY_ID: '5', ASSIGNED_BY_ID: '11', COMMENTS: 'veio do formulário', UF_PROD: 'Pão de queijo', UF_ING: 'Polvilho 500 g, queijo 200 g', UF_GLU: '2' },
+    { ID: '202', CATEGORY_ID: 12, TITLE: 'Contato qualquer', STAGE_ID: 'C12:A', COMMENTS: '' }, { ID: '203', CATEGORY_ID: 12, TITLE: '[Rotulagem] criado pelo app', STAGE_ID: 'C12:A', COMMENTS: 'Gerido no app Nutrimix (Rotulagem nutricional, cartão R9).' });
+  const sim = await call('POST', '/formulario/importar', {}); assert.equal(sim.simulacao, true); assert.deepEqual(sim.criados.map(x => [x.negocioBitrix, x.processo, x.respostas]), [['201', 'rotulagem', 3]]); assert.deepEqual(sim.semClassificar.map(x => x.id), ['202']); assert.equal(Object.keys(api.dados().importados).length, 0);
+  const n0 = bitrix.deals.length, real = await call('POST', '/formulario/importar', { simular: false }); assert.equal(real.criados.length, 1); assert.equal(bitrix.deals.length, n0);   // não cria outro negócio no Bitrix24
+  const c = await call('GET', `/rotulagem/negocios/${real.criados[0].id}`); assert.equal(c.titulo, 'Rotulagem — Padaria Sol'); assert.equal(c.empresaId, '5'); assert.equal(c.responsavel, '11'); assert.equal(c.dadosIa['nome do produto'], 'Pão de queijo'); assert.equal(c.dadosIa['contaminação cruzada com glúten?'], 'Não'); assert.equal(c.origem, 'formulario-bitrix'); assert.equal(c.comentarios, 'veio do formulário');
+  const dl = bitrix.deals.find(x => x.ID === '201'); assert.equal(dl.STAGE_ID, 'C12:B'); assert.equal(dl.COMMENTS, 'veio do formulário'); assert.equal(dl.TITLE, 'Rotulagem — Padaria Sol');   // espelho atualiza a etapa; não apaga o texto do cliente
+  await call('POST', `/rotulagem/negocios/${c.id}/mover`, { etapa: 'r2' }); assert.equal(bitrix.deals.find(x => x.ID === '201').STAGE_ID, 'C12:A');
+  assert.equal((await call('POST', '/formulario/importar', { simular: false })).criados.length, 0);   // não importa duas vezes
+  assert.ok(Array.isArray((await call('GET', `/rotulagem/negocios/${c.id}/respostas`)).respostas));
+  assert.equal((await call('PUT', '/gestao/config', { importarFormularios: false })).importarFormularios, false);
+});
