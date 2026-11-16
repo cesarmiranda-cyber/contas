@@ -50,6 +50,14 @@ function primeiraVisitaData(hojeIso, n = 0) {
   const dow = ((new Date(hojeIso + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1;   // 1 = segunda ... 7 = domingo
   return addDays(hojeIso, 8 - dow + (Math.abs(n) % 5));
 }
+// Dias úteis (seg-sex) de `inicioIso` até `inicioIso + janela - 1`.
+function diasUteis(inicioIso, janela) {
+  const out = [];
+  for (let i = 0; i < janela; i++) { const d = addDays(inicioIso, i), dow = new Date(d + 'T12:00:00Z').getUTCDay(); if (dow !== 0 && dow !== 6) out.push(d); }
+  return out;
+}
+// Espalha `n` itens de forma uniforme pelas datas `dias` (a posição j cai no meio de sua fatia).
+const espalhar = (n, dias, j) => dias[Math.min(dias.length - 1, Math.floor((j + 0.5) * dias.length / n))];
 const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z')) / 864e5);
 const sameMonth = (a, b) => !!a && !!b && a.slice(0, 7) === b.slice(0, 7);
 const fmtBR = iso => (iso ? iso.split('-').reverse().join('/') : '');
@@ -120,6 +128,6 @@ const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLow
 const chaveFila = (empresaId, seg, cargo) => `${empresaId}|${norm(seg)}|${norm(cargo)}`;
 
 module.exports = {
-  primeiraVisitaData, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, parseBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
+  primeiraVisitaData, diasUteis, espalhar, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, parseBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
   mesLimite, ultimoDiaDoMes, brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
 };

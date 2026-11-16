@@ -693,3 +693,24 @@ test('ver o registro: mostra o que o consultor lançou (resultado, campos, quem 
   assert.ok(reg.por !== undefined);
   assert.equal(r.card.empresa, 'Acme Marítima');
 });
+
+test('datas iniciais por classe: espalha pelo período da classe em dias úteis e não mexe em quem já tem visita registrada ou foi alterado', async () => {
+  const { w, svc, store } = setup({ UF_CRM_MOT_ULTIMA: '', __cfg: { cargosFila: ['Vendedor'] } });
+  w.empresa(2, 'Beta Ltda', { UF_CRM_MOT_CLASSE: '3', UF_CRM_MOT_VENDEDOR: '10' });          // classe C
+  w.empresa(3, 'Gama Ltda', { UF_CRM_MOT_CLASSE: '2', UF_CRM_MOT_VENDEDOR: '10' });          // classe B, já tem visita registrada
+  await svc.sincronizarEmpresa(1); await svc.sincronizarEmpresa(2); await svc.sincronizarEmpresa(3);
+  w.items[1032][900] = { id: 900, companyId: 3, title: 'Gama - registro', ufCrm_setor: 'Motores' };
+  const prev = await svc.ajustarDatasIniciais({ aplicar: false });
+  assert.equal(prev.classes.A.cards, 1); assert.equal(prev.classes.C.cards, 1);
+  assert.equal(prev.fora.comRegistro, 1, 'empresa com visita registrada fica de fora');
+  assert.equal(prev.classes.A.periodoDias, 30); assert.equal(prev.classes.C.periodoDias, 90);
+  const antesGama = cards(w).find(c => c.title.startsWith('Gama')).ufCrm_data;
+  const r = await svc.ajustarDatasIniciais({ aplicar: true });
+  assert.equal(r.aplicados, 2);
+  const A = cards(w).find(c => c.title.startsWith('Acme')).ufCrm_data, C = cards(w).find(c => c.title.startsWith('Beta')).ufCrm_data;
+  assert.ok(A < C, 'classe A (30 dias) fica antes da C (90 dias)');
+  assert.equal(cards(w).find(c => c.title.startsWith('Gama')).ufCrm_data, antesGama, 'não mexeu na que já tem registro');
+  assert.ok(store.historico.some(h => h.tipo === 'ajuste-inicial'));
+  const de = await svc.ajustarDatasIniciais({ aplicar: true });
+  assert.equal(de.aplicados, 0, 'idempotente');
+});

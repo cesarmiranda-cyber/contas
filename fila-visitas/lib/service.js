@@ -780,6 +780,61 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       return job;
     } finally { cicloRodando = false; }
   }
+  // Primeiras visitas (empresa sem Última visita e sem nenhum registro): espalha pelo período da classe (A 30 dias, B 60, C 90), só em
+  // dias úteis, a partir da segunda-feira seguinte, de forma uniforme por vendedor. Não mexe em quem já teve visita registrada,
+  // em cards que o vendedor já alterou, nem em empresas sem Vendedor/Classe. `aplicar: false` só mostra o plano.
+  async function ajustarDatasIniciais({ aplicar = false } = {}) {
+    const h = hoje(), cfg = store.config, { map, meta } = await campos();
+    const inicio = R.primeiraVisitaData(h, 0);                       // segunda-feira da semana seguinte
+    // empresas+linhas que já têm registro de visita no SPA 1032
+    const regs = await listarItens({ entityTypeId: F.ETYPE.visita, select: ['id', 'companyId', ...[map.visita.segmento].filter(Boolean)] });
+    const comRegistro = new Set(regs.map(r => `${+r.companyId}|${R.norm(map.visita.segmento ? F.decode(meta, map.visita.segmento, r[map.visita.segmento]) : '')}`));
+    const comRegistroEmpresa = new Set(regs.map(r => +r.companyId));
+    const abertos = await cardsAbertos();
+    const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))];
+    const emps = new Map(); { let i = 0; await Promise.all(Array.from({ length: 6 }, async () => { while (i < ids.length) { const id = ids[i++]; emps.set(id, await lerEmpresa(id).catch(() => null)); } })); }
+    const alterados = new Set(store.historico.filter(x => !x.tipo || x.tipo === 'ajuste-inicial').map(x => +x.card));
+    const grupos = {}; const fora = { comUltima: 0, comRegistro: 0, alteradoPeloVendedor: 0, semClasseOuVendedor: 0, outroCargo: 0, jaAjustado: 0 };
+    for (const it of abertos) {
+      const c = await dadosCard(it);
+      if (c.cargo !== 'Vendedor') { fora.outroCargo++; continue; }
+      const sg = emps.get(c.empresaId)?.segs?.[c.segmento] || {};
+      if (sg.ultima) { fora.comUltima++; continue; }
+      if (!sg.vendedor || !R.CLASSES.includes(sg.classe)) { fora.semClasseOuVendedor++; continue; }
+      if (comRegistro.has(`${c.empresaId}|${R.norm(c.segmento)}`) || (!map.visita.segmento && comRegistroEmpresa.has(c.empresaId))) { fora.comRegistro++; continue; }
+      if (store.historico.some(x => x.tipo === 'ajuste-inicial' && +x.card === c.id)) { fora.jaAjustado++; continue; }
+      if (store.historico.some(x => !x.tipo && +x.card === c.id)) { fora.alteradoPeloVendedor++; continue; }
+      ((grupos[sg.classe] ||= {})[sg.vendedor] ||= []).push({ c, it });
+    }
+    const plano = { inicio, hoje: h, fora, classes: {}, aplicados: 0, erros: [] };
+    const tarefas = [];
+    for (const classe of Object.keys(grupos).sort()) {
+      const n = R.intervalo(cfg, 'Vendedor', classe), dias = R.diasUteis(inicio, n);
+      const semanas = {}; let total = 0;
+      for (const lista of Object.values(grupos[classe])) {
+        lista.sort((a, b) => a.c.empresa.localeCompare(b.c.empresa) || a.c.segmento.localeCompare(b.c.segmento));
+        lista.forEach((x, j) => { const data = R.espalhar(lista.length, dias, j); x.nova = data; total++; const sem = R.addDays(data, -((new Date(data + 'T12:00:00Z').getUTCDay() + 6) % 7)); semanas[sem] = (semanas[sem] || 0) + 1; tarefas.push(x); });
+      }
+      plano.classes[classe] = { periodoDias: n, cards: total, ate: dias[dias.length - 1], porSemana: Object.entries(semanas).sort() };
+    }
+    if (!aplicar) return plano;
+    await mapaPar(tarefas, 3, async x => {
+      try {
+        await comTrava(`empresa:${x.c.empresaId}`, async () => {
+          const card = { ...x.c, stageId: x.it.stageId };
+          const ok = await atualizarCard(card, { data: x.nova }, 'ajuste das datas iniciais por classe');
+          if (ok) {
+            store.addHistorico({ tipo: 'ajuste-inicial', card: x.c.id, empresaId: x.c.empresaId, empresa: x.c.empresa, segmento: x.c.segmento, cargo: x.c.cargo, anterior: x.c.data, nova: x.nova, motivo: 'Ajuste das datas iniciais por classe (A 30, B 60, C 90 dias)', autorNome: 'App' });
+            if (store.config.tarefaAtiva) await moverPrazoTarefas(x.c.id, x.nova).catch(() => {});
+            plano.aplicados++;
+          }
+        });
+      } catch (e) { plano.erros.push(`${x.c.id}: ${e.message}`.slice(0, 140)); }
+    });
+    invalida();
+    store.log('ajuste-datas', `Datas iniciais ajustadas por classe: ${plano.aplicados} card(s), ${plano.erros.length} erro(s)`);
+    return plano;
+  }
   // Prévia (só leitura) de "encerrar a fila atual e começar um novo ciclo": para cada card aberto calcula a data que o card teria
   // se fosse recriado hoje pelas regras (mesma conta da sincronização). Não escreve nada no Bitrix.
   async function previaNovoCiclo() {
@@ -1313,6 +1368,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, lerEmpresa, dadosCard, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, lerEmpresa, dadosCard, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };
