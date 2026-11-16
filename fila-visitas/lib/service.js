@@ -870,6 +870,15 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   }
 
   const nomes = new Map();
+  // Preenche o cache de nomes com todos os usuários ativos de uma vez.
+  let nomesPreenchidos = 0;
+  async function prepararNomes() {
+    if (Date.now() - nomesPreenchidos < 600e3) return;
+    try {
+      for (const u of await todosUsuarios({ ACTIVE: true })) nomes.set(+u.ID, `${u.NAME || ''} ${u.LAST_NAME || ''}`.trim() || `#${u.ID}`);
+      nomesPreenchidos = Date.now();
+    } catch { /* cai na busca individual */ }
+  }
   async function nomeUsuario(id) {
     if (!id) return '';
     if (!nomes.has(id)) {
@@ -1656,11 +1665,14 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const naoReal = map.etapas.naoRealizada ? await listarItens({ entityTypeId: F.ETYPE.fila, filter: { stageId: [map.etapas.naoRealizada], '>updatedTime': R.brIso(desde) }, select: ['*', 'uf*'] }) : [];
     const nomes = new Map();
     const nome = async id => { if (!nomes.has(id)) nomes.set(id, await nomeUsuario(id)); return nomes.get(id); };
-    const tipos = new Map(), emps = new Map();
-    const empDe = async id => { if (!id) return null; let e = emps.get(id); if (e === undefined) { e = await lerEmpresa(id).catch(() => null); emps.set(id, e); } return e; };
+    // Sem ler cada empresa no Bitrix (era o que deixava o cálculo lento): o segmento da empresa e a equipe vêm do índice local dos cards.
+    const ramoPorEmpresa = new Map();
+    for (const r of Object.values(store.cards || {})) if (r && r.empresaId && r.ramo) ramoPorEmpresa.set(+r.empresaId, r.ramo);
+    const tipos = new Map();
+    const semRegistro = new Set([...abertos, ...fin, ...naoReal].filter(it => !(store.card(it.id) || {}).equipe).map(it => +it.companyId).filter(Boolean));   // cards antigos, sem índice local: só esses leem a empresa
+    const empDe = async id => (!id ? null : semRegistro.has(+id) ? (await empresaCurta(+id)) : { ramo: ramoPorEmpresa.get(+id) || '', segs: {} });
     const tipoDe = async id => { if (!id) return ''; if (!tipos.has(id)) tipos.set(id, await tipoDaEmpresa(await empDe(id))); return tipos.get(id); };
-    const pre = [...new Set([...abertos, ...fin, ...naoReal].map(it => +it.companyId).filter(Boolean))];
-    { let i = 0; await Promise.all(Array.from({ length: 8 }, async () => { while (i < pre.length) await empDe(pre[i++]); })); }
+    await prepararNomes();
     const cards = [];
     for (const [lista, finalizado, naoRealizada] of [[abertos, false, false], [fin, true, false], [naoReal, false, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
