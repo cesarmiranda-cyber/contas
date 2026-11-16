@@ -229,6 +229,25 @@ server.listen(PORT, () => {
     const it = (await bitrix.call('crm.item.list', { entityTypeId: 1032, select: ['id', 'companyId', 'contactId', 'contactIds'], order: { id: 'desc' } })).result?.items || [];
     console.log('diag-contato visitas', JSON.stringify(it.slice(0, 3)));
   } catch (e) { console.error('diag-contato:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.CAMPO_LINHAS) setTimeout(async () => {          // "id:linhas,id:linhas": deixa o campo de texto do SPA 1032 com várias linhas no Bitrix
+    for (const par of process.env.CAMPO_LINHAS.split(',')) {
+      try {
+        const [id, linhas] = par.split(':').map(Number);
+        const lista = (await bitrix.call('userfieldconfig.list', { moduleId: 'crm', filter: { entityId: 'CRM_9' } })).result?.fields || [];
+        const f = lista.find(x => +x.id === id);
+        if (!f || f.userTypeId !== 'string') { console.log('campo-linhas', id, 'não é um campo de texto'); continue; }
+        await bitrix.call('userfieldconfig.update', { moduleId: 'crm', id, field: { settings: { ...(f.settings || {}), ROWS: linhas } } });
+        console.log('campo-linhas', id, 'ROWS', f.settings?.ROWS, '->', linhas);
+      } catch (e) { console.error('campo-linhas:', e.message); }
+    }
+  }, 2500);
+  if (bitrix.enabled && process.env.DIAG_POPULA) setTimeout(async () => { try {
+    const lista = (await bitrix.call('userfieldconfig.list', { moduleId: 'crm', filter: { entityId: 'CRM_9' } })).result?.fields || [];
+    console.log('diag-popula total', lista.length, JSON.stringify(lista.slice(0, 3).map(f => f.fieldName))); const alvo = lista.filter(f => /1777735855|1777735863/.test(String(f.fieldName)));
+    console.log('diag-popula', JSON.stringify(alvo.map(f => ({ id: f.id, fieldName: f.fieldName, userTypeId: f.userTypeId, multiple: f.multiple, settings: f.settings, label: f.editFormLabel }))));
+    const def = (await bitrix.call('crm.item.fields', { entityTypeId: 1032 })).result?.fields || {};
+    console.log('diag-popula item', JSON.stringify(Object.entries(def).filter(([k, d]) => /popula|regime/i.test(d.title || '')).map(([k, d]) => [k, d.type, d.title])));
+  } catch (e) { console.error('diag-popula:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;

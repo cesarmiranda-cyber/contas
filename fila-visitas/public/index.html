@@ -710,7 +710,7 @@ const GRUPOS = [
   ['Oportunidades e próximos passos', /oportunid|mapeament|acompanh|pr[oó]xim|retorno|proposta|negoci/i],
   ['Anexos', /anexo|arquivo|documento|foto|imagem/i],
 ];
-const LONGO = /fato|interess|sentiment|valor|mapeament|observ|resultado|descri|conclus|motivo|acompanh|necessid|problema|coment/i;
+const LONGO = /fato|interess|sentiment|valor|mapeament|observ|resultado|descri|conclus|motivo|acompanh|necessid|problema|coment|popula/i;
 const grupoDe = c => (GRUPOS.find(([, re]) => re.test(c.titulo)) || ['Outras informações'])[0];
 const legivel = c => c.tipo === 'sim_nao' ? (c.valor === 'Y' ? 'Sim' : c.valor === 'N' ? 'Não' : '') : c.tipo === 'lista' ? [].concat(c.valor || []).map(v => (c.itens.find(i => i.id === String(v)) || {}).nome || '').filter(Boolean).join(', ') : String(c.valor || '');
 const ANEXOS = {};                       // chave do campo -> [{ nome, base64, tamanho }]
@@ -741,7 +741,7 @@ function ligaAnexos() {
 function campoHTML(c) {
   const id = 'f_' + c.key, req = c.obrigatorio ? ' <i>*</i>' : '';
   let ctl;
-  if (c.tipo === 'texto') ctl = c.destaque || LONGO.test(c.titulo) ? `<textarea id="${id}" rows="3" placeholder="Descreva aqui…">${esc(c.valor)}</textarea>` : `<input id="${id}" value="${esc(c.valor)}">`;
+  if (c.tipo === 'texto') ctl = c.destaque || LONGO.test(c.titulo) ? `<textarea id="${id}" rows="${/popula/i.test(c.titulo) ? 5 : 3}" placeholder="Descreva aqui…">${esc(c.valor)}</textarea>` : `<input id="${id}" value="${esc(c.valor)}">`;
   else if (c.tipo === 'numero') ctl = `<input id="${id}" type="number" step="any" inputmode="decimal" value="${esc(c.valor)}">`;
   else if (c.tipo === 'data') ctl = `<input id="${id}" type="date" value="${esc(String(c.valor).slice(0, 10))}">`;
   else if (c.tipo === 'datahora') ctl = `<input id="${id}" type="datetime-local" value="${localDT(c.valor || null)}">`;
