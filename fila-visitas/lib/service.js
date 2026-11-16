@@ -299,7 +299,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return atual;
   }
   const sincronizarEmpresa = (id, op) => comTrava(`empresa:${id}`, async () => { const r = await sincronizarEmpresaSemTrava(id, op); if ((r.criados || []).length || (r.atualizados || []).length) envelhece(); return r; });
-  // Rodízio por vendedor (0..4): espalha as primeiras visitas pelos dias da semana seguinte.
+  // Contador por vendedor+classe: espalha as primeiras visitas pelo período da classe.
   function proximoRodizio(vendedor) {
     const m = { ...(store.job('rodizio') || {}) }, n = m[vendedor] || 0;
     m[vendedor] = n + 1; store.setJob('rodizio', m);
@@ -347,7 +347,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         // Empresa nunca visitada (sem Última Visita): a primeira visita do Vendedor já entra na fila para HOJE.
         // Com Última Visita: Última + intervalo da classe. Cargos acima do Vendedor sempre seguem o intervalo.
         const primeira = cargo === 'Vendedor' && !s.ultima;
-        const calc = primeira ? R.primeiraVisitaData(hoje(), proximoRodizio(resp)) : R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
+        const calc = primeira ? R.primeiraVisitaClasse(cfg, hoje(), s.classe, proximoRodizio(`${resp}|${s.classe}`)) : R.dataProgramada(cfg, { cargo, classe: s.classe, ultima: s.ultima, hoje: hoje() });
         // Empresa que já tem Última e Próxima Visita: o card do Vendedor NASCE na data da Próxima Visita (sem partir de uma visita nova).
         const dataNova = (cargo === 'Vendedor' && s.ultima && s.proxima) ? s.proxima : calc;
         const existente = abertos.get(chave);

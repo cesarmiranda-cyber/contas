@@ -55,3 +55,14 @@ test('data/hora sem fuso é horário de Brasília', () => {
   assert.equal(R.parseBR('2026-11-05T20:30:00Z').toISOString(), '2026-11-05T20:30:00.000Z');
   assert.equal(R.todayBR(R.parseBR('2026-11-05T23:30')), '2026-11-05');       // 23h30 em Brasília ainda é dia 05
 });
+
+test('primeira visita por classe: cai dentro do período da classe, em dia útil, e se espalha', () => {
+  const R = require('../lib/rules'), cfg = R.DEFAULT_CONFIG;
+  const datas = { A: new Set(), B: new Set(), C: new Set() };
+  for (const k of Object.keys(datas)) for (let n = 0; n < 30; n++) datas[k].add(R.primeiraVisitaClasse(cfg, '2026-11-16', k, n));
+  const max = k => [...datas[k]].sort().pop();
+  assert.ok(max('A') <= '2026-12-22' && max('B') <= '2027-01-21' && max('C') <= '2027-02-19');
+  assert.ok(datas.A.size > 10 && datas.C.size > 20, 'não junta tudo no mesmo dia');
+  for (const k of Object.keys(datas)) for (const d of datas[k]) { const dow = new Date(d + 'T12:00:00Z').getUTCDay(); assert.ok(dow !== 0 && dow !== 6); assert.ok(d >= '2026-11-23'); }
+  assert.equal(R.primeiraVisitaClasse(cfg, '2026-11-16', 'A', 0), '2026-11-23');
+});

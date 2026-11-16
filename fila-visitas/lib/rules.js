@@ -57,6 +57,12 @@ function diasUteis(inicioIso, janela) {
   for (let i = 0; i < janela; i++) { const d = addDays(inicioIso, i), dow = new Date(d + 'T12:00:00Z').getUTCDay(); if (dow !== 0 && dow !== 6 && !FERIADOS_FIXOS.has(d.slice(5))) out.push(d); }
   return out;
 }
+// Primeira visita de empresa nova (sem Última visita): dentro do período da classe (A 30, B 60, C 90 dias), a partir da segunda-feira
+// seguinte, só em dias úteis. `n` é o contador do vendedor+classe: a razão áurea espalha as datas sem juntar tudo no começo.
+function primeiraVisitaClasse(cfg, hojeIso, classe, n = 0) {
+  const per = intervalo(cfg, 'Vendedor', classe) || 30, dias = diasUteis(primeiraVisitaData(hojeIso, 0), per);
+  return dias[Math.min(dias.length - 1, Math.floor(((Math.abs(n) * 0.6180339887) % 1) * dias.length))];
+}
 // Espalha `n` itens de forma uniforme pelas datas `dias` (a posição j cai no meio de sua fatia).
 const espalhar = (n, dias, j) => dias[Math.min(dias.length - 1, Math.floor((j + 0.5) * dias.length / n))];
 const dayDiff = (a, b) => Math.round((new Date(b + 'T12:00:00Z') - new Date(a + 'T12:00:00Z')) / 864e5);
@@ -129,6 +135,6 @@ const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLow
 const chaveFila = (empresaId, seg, cargo) => `${empresaId}|${norm(seg)}|${norm(cargo)}`;
 
 module.exports = {
-  primeiraVisitaData, diasUteis, espalhar, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, parseBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
+  primeiraVisitaData, primeiraVisitaClasse, diasUteis, espalhar, SEGMENTOS, CARGOS, CLASSES, INTERVALOS, DEFAULT_CONFIG, todayBR, hourBR, parseBR, addDays, dayDiff, sameMonth, fmtBR, isoDate,
   mesLimite, ultimoDiaDoMes, brIso, intervalo, dataProgramada, antecipada, etapaPara, validarReprogramacao, prazoUtil, norm, chaveFila,
 };
