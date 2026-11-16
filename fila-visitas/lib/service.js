@@ -1035,7 +1035,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const c = store.config;
     return !!uid && (idsLista(c.acessoExcluir).includes(+uid) || idsLista(c.admins).includes(+uid));
   }
-  async function excluirCard(cardId, { uid, motivo = '', bearer = null }) {
+  async function excluirCard(cardId, { uid, motivo = '', bearer = null, gerarProxima: querProxima = true }) {
     if (!podeExcluir(uid)) throw erro('Você não tem permissão para excluir visitas. Peça a um administrador em Configurações → Acesso.', 403);
     if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
     const { map } = await campos();
@@ -1048,7 +1048,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.removido } });
       if (store.chave(chave) === card.id) store.setChave(chave, null);
       const ex = { ...(store.job('excluidos') || {}) };
-      ex[chave] = { card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, stageAntes: card.stageId, por: +uid, em: new Date().toISOString(), motivo: String(motivo || '').trim() };
+      if (querProxima) delete ex[chave];                // vai nascer a próxima visita do ciclo: nada a bloquear
+      else ex[chave] = { card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, stageAntes: card.stageId, por: +uid, em: new Date().toISOString(), motivo: String(motivo || '').trim() };
       store.setJob('excluidos', ex);
       store.setSnapCard(card.id, { data: card.data, resp: card.responsavel });
     });
@@ -1056,8 +1057,39 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `Visita excluída por ${nome} em ${clock().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.${motivo ? `\nMotivo: ${String(motivo).trim()}` : ''}` } }); } catch { /* comentário é opcional */ }
     await encerrarTarefas(card.id, 'Visita excluída.');
     store.log('card-excluido', `Card ${card.id} (${card.titulo}) excluído por ${nome}${motivo ? `: ${String(motivo).trim()}` : ''}`, { card: card.id });
+    const prox = querProxima ? await gerarProximaVisita(card) : null;
     invalida();
-    return { ok: true, id: card.id };
+    return { ok: true, id: card.id, proxima: prox };
+  }
+  // Próxima visita do ciclo depois de pular/excluir uma: parte da data do card (ou de hoje, se ele já estava atrasado) + intervalo da classe.
+  async function gerarProximaVisita(card) {
+    const emp = await lerEmpresa(card.empresaId).catch(() => null);
+    if (!emp) return { criada: false, motivo: 'empresa não encontrada' };
+    const s = emp.segs?.[card.segmento] || {}, classe = s.classe, resp = s[String(card.cargo).toLowerCase()] || card.responsavel;      // vale o que está no cadastro da empresa
+    if (!R.CLASSES.includes(classe)) return { criada: false, motivo: 'a empresa está sem classe no cadastro' };
+    if (!resp) return { criada: false, motivo: 'sem responsável no cargo' };
+    const chave = R.chaveFila(card.empresaId, card.segmento, card.cargo);
+    const jaTem = (await cardsAbertosDaEmpresa(card.empresaId)).some(it => R.chaveFila(card.empresaId, ...String(it.title).split(' | ').slice(1, 3)) === chave);
+    if (jaTem) return { criada: false, motivo: 'já existe uma visita aberta' };
+    const h = hoje(), base = card.data && card.data > h ? card.data : h;
+    const data = classe === 'E' ? R.addMonths(base, 6) : R.addDays(base, R.intervalo(store.config, card.cargo, classe) || 30);
+    const id = await comTrava(`empresa:${card.empresaId}`, () => criarCard({ empresa: emp, seg: card.segmento, cargo: card.cargo, classe, responsavel: resp, data }));
+    store.log('card-criado', `Próxima visita ${id} gerada após exclusão do card ${card.id}: ${R.fmtBR(data)}`, { card: id });
+    if (store.config.atualizarProxima) await gravarProxima(emp, card.segmento).catch(() => {});
+    return { criada: true, id, data };
+  }
+  // Para visitas já excluídas (lista de excluídas): libera a recriação e gera a próxima do ciclo.
+  async function gerarProximaDeExcluida(cardId, { uid }) {
+    if (!podeExcluir(uid)) throw erro('Você não tem permissão para isso.', 403);
+    const { map } = await campos();
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    if (card.stageId !== map.etapas.removido) throw erro('Esta visita não está excluída.', 409);
+    const chave = R.chaveFila(card.empresaId, card.segmento, card.cargo);
+    const ex = { ...(store.job('excluidos') || {}) }; delete ex[chave]; store.setJob('excluidos', ex);
+    const r = await gerarProximaVisita(card);
+    invalida();
+    return { ok: true, proxima: r };
   }
   async function restaurarCard(cardId, { uid }) {
     if (!podeExcluir(uid)) throw erro('Você não tem permissão para restaurar visitas.', 403);
@@ -1648,6 +1680,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, lerEmpresa, dadosCard, camposVisita, formEdicao, editarRegistro, supervisoresDoBitrix, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, lerEmpresa, dadosCard, camposVisita, formEdicao, editarRegistro, supervisoresDoBitrix, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, gerarProximaDeExcluida, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

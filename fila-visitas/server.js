@@ -155,13 +155,14 @@ const server = http.createServer(async (req, res) => {
     }
     const mr = u.pathname.match(/^\/api\/cards\/(\d+)\/registro$/);
     if (mr && req.method === 'GET') { exige(); const idr = await quem(req, u); return send(res, 200, await svc.registroVisita(+mr[1], { bearer: idr.bearer, uid: idr.verificado ? idr.uid : null })); }
-    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes|excluir|restaurar)$/);
+    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes|excluir|restaurar|proxima)$/);
     if (m && req.method === 'POST') {
       exige();
       const id = await quem(req, u), b = await readBody(req, m[2] === 'registrar' ? 36e6 : 1e6);
       if (!(await svc.podeVerCard(id.bearer, +m[1]))) throw nega('Você não tem permissão no Bitrix24 para este registro.');
       const uid = id.verificado ? id.uid : +(b.uid || id.uid) || null;
-      if (m[2] === 'excluir') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24 para excluir visitas.'); return send(res, 200, await svc.excluirCard(+m[1], { uid: id.uid, motivo: b.motivo, bearer: id.bearer })); }
+      if (m[2] === 'excluir') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24 para excluir visitas.'); return send(res, 200, await svc.excluirCard(+m[1], { uid: id.uid, motivo: b.motivo, bearer: id.bearer, gerarProxima: b.gerarProxima !== false })); }
+      if (m[2] === 'proxima') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24.'); return send(res, 200, await svc.gerarProximaDeExcluida(+m[1], { uid: id.uid })); }
       if (m[2] === 'restaurar') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24.'); return send(res, 200, await svc.restaurarCard(+m[1], { uid: id.uid })); }
       if (m[2] === 'participantes') return send(res, 200, await svc.definirParticipantes(+m[1], { ids: b.ids, uid, bearer: id.bearer }));
       return send(res, 200, m[2] === 'registrar' ? await svc.registrarVisita(+m[1], { ...b, uid }) : await svc.reprogramar(+m[1], { ...b, uid }));
@@ -265,6 +266,12 @@ server.listen(PORT, () => {
     for (const id of process.env.DIAG_CARDS.split(',').map(Number)) { const it = (await bitrix.call('crm.item.get', { entityTypeId: 1036, id })).result?.item || {}; const d = await svc.dadosCard(it); console.log('diag-card', id, JSON.stringify({ stage: it.stageId, data: d.data, classe: d.classe, campoData: it[map.fila.data], closedate: it.closedate, criado: it.createdTime, atualizado: it.updatedTime })); }
     const h = store_historico_para(process.env.DIAG_CARDS); console.log('diag-card historico', JSON.stringify(h));
   } catch (e) { console.error('diag-card:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.GERAR_PROXIMA_EXCLUIDAS) setTimeout(async () => {      // uma vez: libera e gera a próxima das visitas já excluídas
+    try {
+      const uid = [...(store.config.acessoExcluir || []), ...(store.config.admins || [])][0];
+      for (const x of await svc.listarExcluidos()) { const r = await svc.gerarProximaDeExcluida(x.card, { uid }); console.log('proxima-excluida', x.card, x.empresa, x.segmento, JSON.stringify(r.proxima)); }
+    } catch (e) { console.error('proxima-excluida:', e.message); }
+  }, 5000);
   if (bitrix.enabled && process.env.DIAG_E) setTimeout(async () => { try {
     const { map, meta } = await svc.campos(true); const out = [];
     for (const seg of Object.keys(map.empresa)) {

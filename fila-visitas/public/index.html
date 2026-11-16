@@ -659,16 +659,18 @@ const contatoTip = c => `<span class="tel" data-tip="${esc([c.telefones.join(' �
 function excluirCards(ids) {
   const lista = ids.map(achar).filter(Boolean); if (!lista.length) return;
   modal(`<div class="sh-h"><h3>Excluir ${lista.length > 1 ? lista.length + ' visitas' : 'visita'}</h3></div>
-    <div class="sh-b"><div class="info">A visita sai da fila e <b>não é recriada</b> sozinha. Ela vai para a etapa <b>Removido</b> do Bitrix e as tarefas ligadas são encerradas. Um administrador pode restaurá-la depois em Configurações.</div>
+    <div class="sh-b"><div class="info">A visita sai da fila e vai para a etapa <b>Removido</b> do Bitrix; as tarefas ligadas são encerradas. Com a opção abaixo marcada, a <b>próxima visita do ciclo</b> é criada na hora. Desmarcando, a empresa/linha fica <b>sem visita</b> até você restaurar em Configurações.</div>
       <div class="tw"><table><tr><th>Empresa</th><th>Linha</th><th>Cargo</th><th>Programada</th></tr>${lista.map(x => `<tr><td>${esc(x.empresa)}</td><td>${esc(x.segmento)}</td><td>${esc(x.cargo)}</td><td>${fmt(x.data)}</td></tr>`).join('')}</table></div>
       ${lista.some(x => x.situacao === 'finalizado') ? '<div class="err on">Atenção: há visita já encerrada (com registro). O registro da visita não é apagado, mas o card sai da fila.</div>' : ''}
-      <div class="fld" style="margin-top:10px"><label>Motivo <span class="hint">(opcional)</span></label><textarea id="dmo" placeholder="Por que excluir?"></textarea></div><div class="err" id="er"></div></div>
+      <label style="display:block;margin:10px 0"><input type="checkbox" id="dprox" checked style="width:auto"> <b>Gerar a próxima visita do ciclo</b> <span class="hint">(a data é a da visita, ou hoje se estiver atrasada, mais o intervalo da classe. O cadastro da empresa continua valendo.)</span></label>
+      <div class="fld"><label>Motivo <span class="hint">(opcional)</span></label><textarea id="dmo" placeholder="Por que excluir?"></textarea></div><div class="err" id="er"></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri danger" id="ok">Excluir</button></div>`);
   $('#ok').onclick = async () => {
     $('#ok').disabled = true; $('#er').classList.remove('on');
     const falhas = [];
-    for (const x of lista) { try { await api(`/api/cards/${x.id}/excluir`, { method: 'POST', body: { motivo: $('#dmo').value } }); } catch (e) { falhas.push(`${x.empresa} · ${x.segmento}: ${e.message}`); } }
-    if (!falhas.length) { fecha(true); aviso(`${lista.length > 1 ? lista.length + ' visitas excluídas' : 'Visita excluída'}.`); carrega(); return; }
+    const prox = $('#dprox').checked, semProx = [];
+    for (const x of lista) { try { const r = await api(`/api/cards/${x.id}/excluir`, { method: 'POST', body: { motivo: $('#dmo').value, gerarProxima: prox } }); if (prox && r.proxima && !r.proxima.criada) semProx.push(`${x.empresa} · ${x.segmento}: ${r.proxima.motivo}`); } catch (e) { falhas.push(`${x.empresa} · ${x.segmento}: ${e.message}`); } }
+    if (!falhas.length) { fecha(true); aviso(`${lista.length > 1 ? lista.length + ' visitas excluídas' : 'Visita excluída'}${prox ? (semProx.length ? `. Próxima NÃO gerada: ${semProx.join(' | ')}` : ' e a próxima visita foi gerada') : ''}.`, !!semProx.length); carrega(); return; }
     $('#er').textContent = falhas.join(' | '); $('#er').classList.add('on'); $('#ok').disabled = false;
   };
 }
@@ -1034,7 +1036,8 @@ async function cfg(d) {
   const lCfg = pick('#pk_cfg', c.acessoConfig || []), lDash = pick('#pk_dash', c.acessoDashboard || []), lExc = pick('#pk_exc', c.acessoExcluir || [], 'Ninguém (só administradores)');
   $('#sac').onclick = async () => { try { await api('/api/config', { method: 'PUT', body: { acessoConfig: lCfg, acessoDashboard: lDash, acessoExcluir: lExc } }); eu = await api('/api/eu'); montaAbas(); $('#acout').textContent = 'Acessos salvos.'; } catch (e) { $('#acout').textContent = e.message; } };
   const carregaExcluidas = () => api('/api/excluidos').then(({ excluidos }) => {
-    $('#exc').innerHTML = excluidos.length ? `<div class="tw"><table><tr><th>Empresa</th><th>Linha</th><th>Programada</th><th>Excluída por</th><th>Quando</th><th>Motivo</th><th></th></tr>${excluidos.map(x => `<tr><td>${esc(x.empresa)}</td><td>${esc(x.segmento)}</td><td>${fmt(x.data)}</td><td>${esc(x.porNome || '')}</td><td>${dhBR(x.em)}</td><td>${esc(x.motivo || '—')}</td><td><button class="btn sm" data-rest="${x.card}">Restaurar</button></td></tr>`).join('')}</table></div>` : 'Nenhuma visita excluída.';
+    $('#exc').innerHTML = excluidos.length ? `<div class="tw"><table><tr><th>Empresa</th><th>Linha</th><th>Programada</th><th>Excluída por</th><th>Quando</th><th>Motivo</th><th></th></tr>${excluidos.map(x => `<tr><td>${esc(x.empresa)}</td><td>${esc(x.segmento)}</td><td>${fmt(x.data)}</td><td>${esc(x.porNome || '')}</td><td>${dhBR(x.em)}</td><td>${esc(x.motivo || '—')}</td><td style="white-space:nowrap"><button class="btn sm pri" data-prox="${x.card}" title="Libera a empresa/linha e gera a próxima visita do ciclo">Gerar próxima</button> <button class="btn sm" data-rest="${x.card}" title="Volta este mesmo card para a fila">Restaurar</button></td></tr>`).join('')}</table></div>` : 'Nenhuma visita excluída.';
+    document.querySelectorAll('[data-prox]').forEach(b => b.onclick = async () => { b.disabled = true; try { const r = await api(`/api/cards/${b.dataset.prox}/proxima`, { method: 'POST', body: {} }); aviso(r.proxima && r.proxima.criada ? `Próxima visita gerada para ${fmt(r.proxima.data)}.` : `Próxima não gerada: ${(r.proxima || {}).motivo || ''}`, !(r.proxima && r.proxima.criada)); carregaExcluidas(); } catch (e) { b.disabled = false; alert(e.message); } });
     document.querySelectorAll('[data-rest]').forEach(b => b.onclick = async () => { b.disabled = true; try { await api(`/api/cards/${b.dataset.rest}/restaurar`, { method: 'POST', body: {} }); carregaExcluidas(); } catch (e) { b.disabled = false; alert(e.message); } });
   }).catch(e => { $('#exc').textContent = e.message; });
   carregaExcluidas();

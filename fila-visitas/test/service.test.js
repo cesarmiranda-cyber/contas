@@ -786,7 +786,7 @@ test('excluir visitas: só quem tem permissão; o card vai para Removido, não �
   await assert.rejects(() => svc.excluirCard(card.id, { uid: 10 }), /permissão/);
   store.setConfig({ acessoExcluir: [20] });
   assert.equal(svc.podeExcluir(20), true); assert.equal(svc.podeExcluir(10), false);
-  const r = await svc.excluirCard(card.id, { uid: 20, motivo: 'Cadastro duplicado' });
+  const r = await svc.excluirCard(card.id, { uid: 20, motivo: 'Cadastro duplicado', gerarProxima: false });
   assert.equal(r.ok, true); assert.equal(card.stageId, w.stages.removido);
   assert.ok(w.comments.some(c => /excluída/.test(c.COMMENT || '')));
   await svc.sincronizarEmpresa(1);
@@ -865,4 +865,25 @@ test('filtro de data "próximos meses" mostra só as visitas depois do mês corr
   const c = cards(w)[0]; c.ufCrm_data = '2026-07-15'; c.closedate = '2026-07-15';       // hoje = 10/05/2026
   assert.equal((await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'abertas', per: 'proximos', page: 1 })).visitas.length, 1);
   assert.equal((await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'abertas', per: 'mes', page: 1 })).visitas.length, 0);
+});
+
+test('excluir com "gerar a próxima": a visita some e nasce a próxima do ciclo (data + intervalo da classe), sem bloquear a empresa', async () => {
+  const { w, svc, store } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  await svc.sincronizarEmpresa(1);
+  const card = cards(w)[0];                                      // classe A (30 dias), programada 20/05/2026, hoje 10/05/2026
+  store.setConfig({ acessoExcluir: [20] });
+  const r = await svc.excluirCard(card.id, { uid: 20, motivo: 'Visita antiga' });
+  assert.equal(r.proxima.criada, true); assert.equal(r.proxima.data, '2026-06-19', 'data do card (20/05) + 30 dias');
+  assert.equal(card.stageId, w.stages.removido);
+  const abertos = cards(w).filter(c => c.stageId !== w.stages.removido);
+  assert.equal(abertos.length, 1); assert.equal(abertos[0].ufCrm_data, '2026-06-19');
+  assert.equal((await svc.listarExcluidos()).length, 0, 'nada bloqueado');
+  // visita atrasada: a próxima parte de hoje
+  abertos[0].ufCrm_data = '2026-03-01'; abertos[0].closedate = '2026-03-01';
+  const r2 = await svc.excluirCard(abertos[0].id, { uid: 20 });
+  assert.equal(r2.proxima.data, '2026-06-09', 'hoje (10/05) + 30 dias');
+  // sem classe no cadastro: não gera
+  w.companies[1].UF_CRM_MOT_CLASSE = '';
+  const vivo = cards(w).find(c => c.stageId !== w.stages.removido);
+  assert.equal((await svc.excluirCard(vivo.id, { uid: 20 })).proxima.criada, false);
 });
