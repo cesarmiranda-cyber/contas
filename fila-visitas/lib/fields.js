@@ -55,7 +55,7 @@ async function descobrir(bitrix, cfg) {
   const fila = await itemMap(ETYPE.fila, { segmento: /segmento|setor/, cargo: /cargo/, classe: /classe/, data: /data (programada|prevista)|programada/ });
   const visita = await itemMap(ETYPE.visita, {
     segmento: /setor|segmento/, filaId: /id da fila|fila/, antecipada: /antecipad/, resultado: /resultado|observac|conclus/,
-    acompanhamento: /acompanhamento/, dataHora: /data.*(hora|visita)/, responsavel: /responsavel|vendedor/,
+    acompanhamento: /^acompanhamento/, supervisor: /supervisor.*acompanh/, dataHora: /data.*(hora|visita)/, responsavel: /responsavel|vendedor/,
   });
 
   // etapas do kanban da fila (categoria padrão)

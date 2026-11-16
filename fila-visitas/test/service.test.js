@@ -823,3 +823,38 @@ test('classe em branco no cadastro: o card aberto é removido sozinho e volta qu
   w.companies[1].UF_CRM_MOT_CLASSE = '';
   assert.equal((await svc.reconciliarSemClasse()).removidos, 0, 'regra desligada em configuração');
 });
+
+test('gestão: supervisor que acompanhou vem da estrutura de departamentos, é gravado no registro, filtra a lista e o registro pode ser editado', async () => {
+  const { w, svc, store } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  w.extraFields = { 1032: { ufCrm_sup: { title: 'Supervisor que acompanhou', type: 'employee' }, ufCrm_ctt: { title: 'Observação extra', type: 'string' } } };
+  await svc.campos(true);
+  const sups = await svc.supervisoresDoBitrix();
+  assert.deepEqual(sups.map(s => s.id).sort(), [20, 30], 'chefes de departamento (Comercial e Diretoria)');
+  await svc.sincronizarEmpresa(1);
+  const card = cards(w)[0];
+  const form = await svc.camposVisita(card.id, { uid: 10 });
+  assert.equal(form.gestaoDisponivel, true); assert.equal(form.supervisorPadraoId, 20, 'padrão = chefe do departamento do vendedor');
+  assert.ok(!form.campos.some(c => c.key === 'ufCrm_sup'), 'supervisor tem seção própria, fora dos campos genéricos');
+  await assert.rejects(() => svc.registrarVisita(card.id, { uid: 10, resultado: 'x', supervisorId: 999 }), /estrutura de departamentos/);
+  await svc.registrarVisita(card.id, { uid: 10, resultado: 'Conversa inicial', supervisorId: 20 });
+  const rec = Object.values(w.items[1032])[0];
+  assert.equal(rec.ufCrm_sup, 20);
+  // filtro por supervisor na lista
+  const l = await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', sup: '20', page: 1 });
+  assert.equal(l.visitas.length, 1); assert.equal(l.visitas[0].supervisorNome, 'Gil Gerente');
+  assert.equal((await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', sup: '30', page: 1 })).visitas.length, 0);
+  assert.ok(l.opcoes.supervisores.some(x => x.id === 20));
+  // edição: vendedor e supervisor escolhido podem; outra pessoa não
+  const rv = await svc.registroVisita(card.id, { uid: 20 });
+  assert.equal(rv.registros[0].podeEditar, true); assert.equal(rv.registros[0].supervisor.id, 20);
+  assert.equal((await svc.registroVisita(card.id, { uid: 777 })).registros[0].podeEditar, false);
+  await assert.rejects(() => svc.formEdicao(card.id, rec.id, { uid: 777 }), /Só quem registrou/);
+  const ed = await svc.formEdicao(card.id, rec.id, { uid: 10 });
+  assert.equal(ed.supervisorPadraoId, 20);
+  const r = await svc.editarRegistro(card.id, rec.id, { uid: 20, campos: { ufCrm_res: 'Conversa inicial CORRIGIDA' }, supervisorId: 30 });
+  assert.equal(r.alterado, true); assert.equal(rec.ufCrm_res, 'Conversa inicial CORRIGIDA'); assert.equal(rec.ufCrm_sup, 30);
+  assert.ok(store.historico.some(h => h.tipo === 'edicao-registro' && h.mudancas.some(m => m.campo === 'Supervisor que acompanhou')));
+  assert.equal((await svc.editarRegistro(card.id, rec.id, { uid: 10, campos: { ufCrm_res: 'Conversa inicial CORRIGIDA' } })).alterado, false, 'sem mudança não grava');
+  const depois = await svc.registroVisita(card.id, { uid: 10 });
+  assert.equal(depois.registros[0].edicoes.length, 1);
+});

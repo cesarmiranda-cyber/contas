@@ -442,6 +442,28 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
 
   // ---------- formulário de registro: todos os campos do SPA 1032 ----------
   const TIPOS = { file: 'arquivo', string: 'texto', char: 'texto', integer: 'numero', double: 'numero', money: 'numero', date: 'data', datetime: 'datahora', boolean: 'sim_nao', enumeration: 'lista', employee: 'usuario', url: 'texto', address: 'texto' };
+  // ---------- gestão: supervisor que acompanhou a visita ----------
+  // Supervisores = chefes de departamento da estrutura do Bitrix24 (com o nome do departamento).
+  async function supervisoresDoBitrix() {
+    return memo('supervisores', 600e3, async () => {
+      const deps = (await bitrix.call('department.get', {})).result || [];
+      const por = new Map();
+      for (const d of deps) { const h = +d.UF_HEAD; if (h) (por.get(h) || por.set(h, []).get(h)).push(String(d.NAME || '').trim()); }
+      const lista = await Promise.all([...por.entries()].map(async ([id, nomes]) => ({ id, nome: await nomeUsuario(id), departamentos: nomes })));
+      return lista.sort((a, b) => a.nome.localeCompare(b.nome));
+    });
+  }
+  // Chefe do departamento de uma pessoa (se ela mesma for a chefe, o da hierarquia acima).
+  async function chefeDe(uid) {
+    try {
+      const u = ((await bitrix.call('user.get', { ID: uid })).result || [])[0];
+      const deps = (await bitrix.call('department.get', {})).result || [];
+      let d = deps.find(x => String(x.ID) === String([].concat(u?.UF_DEPARTMENT || [])[0]));
+      for (let i = 0; d && i < 10; i++) { const h = +d.UF_HEAD; if (h && h !== +uid) return h; d = deps.find(x => String(x.ID) === String(d.PARENT)); }
+    } catch { /* sem departamento */ }
+    return null;
+  }
+  const supervisorDoRegistro = (it, map) => (map.visita.supervisor && +it[map.visita.supervisor]) || null;
   // ---------- contatos da empresa: quem foi visitado ----------
   const fmtContato = c => ({ id: +c.ID, nome: [c.NAME, c.LAST_NAME].filter(Boolean).join(' ').trim() || `Contato ${c.ID}`, cargo: c.POST || '',
     telefones: (c.PHONE || []).map(p => p.VALUE).filter(Boolean), emails: (c.EMAIL || []).map(p => p.VALUE).filter(Boolean) });
@@ -481,7 +503,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const lista = [...porContato.values()].map(g => ({ ...g, ...(conhecidos.get(g.id) || { nome: `Contato ${g.id}`, cargo: '', telefones: [], emails: [] }) }));
     return { lista, ultimoId: lista[0]?.id || null };
   }
-  async function camposVisita(cardId) {
+  async function camposVisita(cardId, { uid = null } = {}) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
@@ -510,9 +532,10 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       pre[k] = d.isMultiple ? ids : (doCard ? doCard.id : (ids[0] || ''));
       alcadaKeys.push(k);
     }
-    const travados = new Set([v.segmento, v.filaId, v.antecipada, ...alcadaKeys].filter(Boolean));
+    const travados = new Set([v.segmento, v.filaId, v.antecipada, v.supervisor, ...alcadaKeys].filter(Boolean));
     const lista = [];
     const ocultos = new Set(Duplicados.agrupar(defs, Object.values(map.visita)).flatMap(g => g.outros)); // duplicados: mostra só o campo padrão
+    if (v.supervisor) ocultos.add(v.supervisor);                                  // o supervisor tem seção própria (Gestão)
     const temArquivo = Object.values(defs).some(x => x.type === 'file');
     if (temArquivo) for (const [k, d] of Object.entries(defs)) if (d.type !== 'file' && /^(anexos?|arquivos?)$/.test(R.norm(d.title || ''))) ocultos.add(k); // campo de texto não guarda arquivo
     for (const [k, d] of Object.entries(defs)) {
@@ -530,11 +553,105 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const contatos = await contatosDaEmpresa(card.empresaId).catch(() => []);
     const hist = await historicoContatos(card.empresaId).catch(() => ({ lista: [], ultimoId: null }));
     const padrao = hist.ultimoId && contatos.some(c => c.id === hist.ultimoId) ? hist.ultimoId : null;     // o contato da última visita já vem escolhido (dá para trocar)
-    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null, contatos, contatoPadraoId: padrao, urlEmpresa: null };
+    const supervisores = v.supervisor ? await supervisoresDoBitrix().catch(() => []) : [];
+    let supPadrao = null;
+    if (supervisores.length) {
+      const doDept = uid ? await chefeDe(uid) : null, doCadastro = +((emp?.segs?.[card.segmento] || {}).supervisor) || null;
+      supPadrao = [doDept, doCadastro].find(id => id && supervisores.some(x => x.id === +id)) || null;
+    }
+    return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, antecipada: ant }, campos: lista, dataHoraKey: v.dataHora || null, resultadoKey: v.resultado || null, contatos, contatoPadraoId: padrao, supervisores, supervisorPadraoId: supPadrao, gestaoDisponivel: !!v.supervisor, urlEmpresa: null };
   }
 
+  // card -> supervisor que acompanhou (a partir dos registros de visita)
+  async function supervisorPorCard() {
+    const { map } = await campos();
+    if (!map.visita.supervisor || !map.visita.filaId) return new Map();
+    return memo('sup-por-card', 60e3, async () => {
+      const regs = await listarItens({ entityTypeId: F.ETYPE.visita, select: ['id', map.visita.filaId, map.visita.supervisor] });
+      const m = new Map();
+      for (const r of regs) { const c = +r[map.visita.filaId], sup = +r[map.visita.supervisor]; if (c && sup) m.set(String(c), sup); }
+      return m;
+    });
+  }
+  // ---------- editar registro de visita ----------
+  const podeEditarRegistro = (uid, rec, map) => !!uid && (+rec.assignedById === +uid || supervisorDoRegistro(rec, map) === +uid || isAdmin(uid));
+  async function lerRegistro(visitaId) {
+    const it = (await bitrix.call('crm.item.get', { entityTypeId: F.ETYPE.visita, id: visitaId })).result?.item;
+    if (!it) throw erro('Registro de visita não encontrado.', 404);
+    return it;
+  }
+  async function formEdicao(cardId, visitaId, { uid, bearer = null }) {
+    if (!uid) throw erro('Usuário não identificado.', 401);
+    if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
+    const { map } = await campos();
+    const rec = await lerRegistro(visitaId);
+    if (map.visita.filaId && String(rec[map.visita.filaId]) !== String(cardId)) throw erro('Este registro não pertence a esta visita.', 409);
+    if (!podeEditarRegistro(uid, rec, map)) throw erro('Só quem registrou a visita, o supervisor que a acompanhou ou um administrador pode editar.', 403);
+    const form = await camposVisita(cardId, { uid });
+    form.campos = form.campos.filter(c => c.tipo !== 'arquivo');                    // anexos não são editados aqui
+    for (const c of form.campos) { if (c.travado) continue; const val = rec[c.key]; c.valor = val === undefined || val === null ? '' : val; }
+    const dh = map.visita.dataHora;
+    form.dataHoraKey = null;                                                         // data/hora da visita não muda por edição (ela define o ciclo)
+    form.campos = form.campos.filter(c => c.key !== dh);
+    form.contatoPadraoId = Number((rec.contactIds && rec.contactIds[0]) || rec.contactId || 0) || null;
+    form.supervisorPadraoId = supervisorDoRegistro(rec, map);
+    form.visita = { id: +rec.id, quando: rec[dh || 'begindate'] || rec.createdTime };
+    return form;
+  }
+  async function editarRegistro(cardId, visitaId, { uid, campos: dados = {}, contatoId, supervisorId, bearer = null }) {
+    const { map } = await campos();
+    const form = await formEdicao(cardId, visitaId, { uid, bearer });
+    const rec = await lerRegistro(visitaId);
+    const vazio = x => x === undefined || x === null || (Array.isArray(x) ? !x.length : String(x).trim() === '');
+    const f = {}, mudancas = [];
+    const legivel = (c, val) => { if (vazio(val)) return '(vazio)'; if (c.tipo === 'sim_nao') return val === 'Y' || val === true ? 'Sim' : 'Não'; if (c.tipo === 'lista') return [].concat(val).map(x => (c.itens.find(i => i.id === String(x)) || {}).nome || String(x)).join(', '); return String(val).slice(0, 300); };
+    const faltam = [];
+    for (const c of form.campos) {
+      if (c.travado) continue;
+      const tem = Object.prototype.hasOwnProperty.call(dados, c.key);
+      const novoBruto = tem ? dados[c.key] : rec[c.key];
+      if (c.obrigatorio && vazio(novoBruto)) faltam.push(c.titulo);
+      if (!tem) continue;
+      const novo = c.tipo === 'sim_nao' ? (novoBruto === true || novoBruto === 'Y' || novoBruto === 'true' ? 'Y' : 'N') : (c.tipo === 'numero' && !vazio(novoBruto) ? Number(novoBruto) : novoBruto);
+      const velho = rec[c.key];
+      const igual = JSON.stringify([].concat(vazio(novo) ? [] : novo).map(String)) === JSON.stringify([].concat(vazio(velho) ? [] : velho).map(String));
+      if (igual) continue;
+      f[c.key] = vazio(novo) ? (Array.isArray(velho) ? [] : '') : novo;
+      mudancas.push({ campo: c.titulo, de: legivel(c, velho), para: legivel(c, novo) });
+    }
+    if (faltam.length) throw erro(`Preencha: ${faltam.join(', ')}.`, 422);
+    if (contatoId !== undefined) {
+      const novo = Number(contatoId) || 0, atual = Number((rec.contactIds && rec.contactIds[0]) || rec.contactId || 0);
+      if (novo !== atual) {
+        const lista = await contatosDaEmpresa(rec.companyId);
+        if (novo && !lista.some(c => c.id === novo)) throw erro('O contato escolhido não pertence a esta empresa.', 422);
+        f.contactId = novo; f.contactIds = novo ? [novo] : [];
+        const nome = id => id ? ((lista.find(c => c.id === id) || {}).nome || `Contato ${id}`) : '(nenhum)';
+        mudancas.push({ campo: 'Contato da visita', de: nome(atual), para: nome(novo) });
+      }
+    }
+    if (supervisorId !== undefined && map.visita.supervisor) {
+      const novo = Number(supervisorId) || 0, atual = supervisorDoRegistro(rec, map) || 0;
+      if (novo !== atual) {
+        const sups = await supervisoresDoBitrix();
+        if (novo && !sups.some(x => x.id === novo)) throw erro('O supervisor escolhido não está na estrutura de departamentos do Bitrix24.', 422);
+        f[map.visita.supervisor] = novo || '';
+        mudancas.push({ campo: 'Supervisor que acompanhou', de: atual ? await nomeUsuario(atual) : '(nenhum)', para: novo ? await nomeUsuario(novo) : '(nenhum)' });
+      }
+    }
+    if (!mudancas.length) return { ok: true, alterado: false };
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.visita, id: visitaId, fields: f });
+    const nome = await nomeUsuario(uid);
+    store.addHistorico({ tipo: 'edicao-registro', visita: +visitaId, card: +cardId, empresaId: +rec.companyId || null, empresa: rec.title || '', autor: +uid, autorNome: nome, mudancas });
+    try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: +visitaId, ENTITY_TYPE: DYN(F.ETYPE.visita), COMMENT: `Registro editado por ${nome} em ${clock().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.\n${mudancas.map(m => `${m.campo}: ${m.de} → ${m.para}`).join('\n')}` } }); } catch { /* opcional */ }
+    const avisa = new Set([+rec.assignedById, supervisorDoRegistro(rec, map), Number(supervisorId) || null].filter(x => x && x !== +uid));
+    for (const u of avisa) await notificar(u, `${nome} editou o registro de visita "${rec.title || visitaId}" (${mudancas.map(m => m.campo).join(', ')}).`).catch(() => {});
+    store.log('registro-editado', `Registro ${visitaId} editado por ${nome}: ${mudancas.map(m => m.campo).join(', ')}`, { visita: +visitaId, card: +cardId });
+    invalida();
+    return { ok: true, alterado: true, mudancas };
+  }
   // O que o consultor lançou: os registros de visita (SPA 1032) ligados ao card, com todos os campos preenchidos, quem registrou e os anexos.
-  async function registroVisita(cardId, { bearer = null } = {}) {
+  async function registroVisita(cardId, { bearer = null, uid = null } = {}) {
     if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
@@ -586,7 +703,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       }
       campos_.sort((a, b) => (!!b.destaque - !!a.destaque));
       registros.push({ id: +it.id, titulo: it.title || '', quando: it[v.dataHora || 'begindate'] || it.createdTime || null, criadoEm: it.createdTime || null,
-        por: await quem(+it.assignedById || +it.createdBy), contato: contatoDe(it), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
+        por: await quem(+it.assignedById || +it.createdBy), contato: contatoDe(it), supervisor: supervisorDoRegistro(it, map) ? { id: supervisorDoRegistro(it, map), nome: await quem(supervisorDoRegistro(it, map)) } : null,
+        podeEditar: podeEditarRegistro(uid, it, map), edicoes: store.historico.filter(h => h.tipo === 'edicao-registro' && +h.visita === +it.id).slice(0, 5).map(h => ({ at: h.at, por: h.autorNome, mudancas: h.mudancas })), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
     }
     const hc = await historicoContatos(card.empresaId).catch(() => ({ lista: [] }));
     return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data }, registros, contatosHistorico: hc.lista };
@@ -647,7 +765,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       return { fileData: [nome, b64] };
     });
   }
-  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, contatoId = null, campos: extra = {} }) {
+  async function registrarVisita(cardId, { uid, resultado, acompanhamento, dataHora, contatoId = null, supervisorId = null, campos: extra = {} }) {
     const { map, meta } = await campos();
     const card = await lerCard(cardId);
     if (!card) throw erro('Card da fila não encontrado.', 404);
@@ -677,6 +795,11 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const lista = await contatosDaEmpresa(card.empresaId);
       if (!lista.some(c => c.id === +contatoId)) throw erro('O contato escolhido não pertence a esta empresa.', 422);
       f.contactId = +contatoId; f.contactIds = [+contatoId];
+    }
+    if (supervisorId) {                                 // Gestão: supervisor que acompanhou (da estrutura de departamentos do Bitrix)
+      if (!map.visita.supervisor) throw erro('O campo "Supervisor que acompanhou" ainda não existe no Registro de Visita. Peça a um administrador para usar "Preparar o Bitrix" em Configurações.', 422);
+      if (!(await supervisoresDoBitrix()).some(x => x.id === +supervisorId)) throw erro('O supervisor escolhido não está na estrutura de departamentos do Bitrix24.', 422);
+      f[map.visita.supervisor] = +supervisorId;
     }
     const permitidos = new Map(form.campos.filter(c => !c.travado && c.key !== dhKey).map(c => [c.key, c]));
     for (const [k, val] of Object.entries(dados)) {
@@ -1298,6 +1421,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const situacao = fechado ? (it.stageId === map.etapas.naoRealizada ? 'naorealizada' : 'finalizado') : R.etapaPara(c.data, h);
       leves.push({ it, c, reg, fechado, situacao, vendId: (eq || {}).vendedor || null, part: reg.participantes || [] });
     }
+    const supIdx = await supervisorPorCard().catch(() => new Map());
     // 2) contadores e opções (sobre o que o usuário pode ver, dentro do período escolhido)
     const faixa = (() => {
       if (per === 'hoje') return [h, h];
@@ -1315,13 +1439,15 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       ramos: (await listaRamos()).map(r => ({ id: r.id, nome: r.nome })).sort((a, b) => a.nome.localeCompare(b.nome)),
       vendedores: (await Promise.all(vendIds.map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
       responsaveis: (await Promise.all(respIds.map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
+      supervisores: (await Promise.all([...new Set(leves.map(l => supIdx.get(String(l.c.id))).filter(Boolean))].map(async id => ({ id, nome: await nomeDe(id) })))).sort((a, b) => a.nome.localeCompare(b.nome)),
     };
     // 3) filtros
     const busca = R.norm(q);
     let sel = leves.filter(l => (status === 'todas' || (status === 'abertas' ? !l.fechado : l.situacao === status))
       && (!faixa || (l.c.data && l.c.data >= faixa[0] && l.c.data <= faixa[1]))
       && (!busca || R.norm(l.c.empresa).includes(busca)) && (!seg || l.c.segmento === seg) && (!classe || (l.c.classe || l.reg.classe) === classe)
-      && (!resp || String(l.c.responsavel) === String(resp)));
+      && (!resp || String(l.c.responsavel) === String(resp))
+      && (!p.sup || (p.sup === 'todos' ? supIdx.has(String(l.c.id)) : String(supIdx.get(String(l.c.id))) === String(p.sup))));
     if (p.cardId) sel = sel.filter(l => String(l.c.id) === String(p.cardId));
     if (vend) {
       const out = [];
@@ -1365,7 +1491,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       for (const k of ['vendedor', 'supervisor', 'coordenador', 'gerente', 'diretor']) if (sg[k]) equipe[k] = await nomeDe(sg[k]);
       if (emp && (JSON.stringify(reg.equipe) !== JSON.stringify(equipeIds(sg)) || reg.ramo !== (emp.ramo || ''))) store.setCard(it.id, { ...reg, empresaId: c.empresaId, empresa: emp.nome, seg: c.segmento, cargo: c.cargo, equipe: equipeIds(sg), ramo: emp.ramo || '' });
       const tipoEmp = await memo(`tipo:${c.empresaId}`, 300e3, () => tipoDaEmpresa(emp));
-      return ({ ...c, segmentoEmpresa: await nomeRamo(emp?.ramo), tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
+      return ({ ...c, supervisorId: supIdx.get(String(c.id)) || null, supervisorNome: supIdx.get(String(c.id)) ? await nomeDe(supIdx.get(String(c.id))) : '', segmentoEmpresa: await nomeRamo(emp?.ramo), tipoEmpresa: tipoEmp || '', responsavelNome: await nomeDe(c.responsavel), classe: c.classe || reg.classe || '', situacao: l.situacao,
         encerradoEm: l.fechado && it.updatedTime ? R.todayBR(new Date(it.updatedTime)) : null, dias: !l.fechado && c.data ? R.dayDiff(h, c.data) : null,
         ultima: sg.ultima || null, diasDesdeUltima: sg.ultima ? R.dayDiff(sg.ultima, h) : null, ciclo: R.intervalo(store.config, c.cargo, c.classe || reg.classe),
         livre: c.classe === 'E', altMin: c.classe === 'E' ? h : R.addDays(h, 1), altMax: c.classe === 'E' ? R.addDays(h, 730) : R.ultimoDiaDoMes(R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null) || h.slice(0, 7)),
@@ -1444,7 +1570,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const progr = fila?.data || null;
       const dia = q ? R.todayBR(new Date(q)) : null;
       const antTxt = v.antecipada ? String(F.decode(meta, v.antecipada, it[v.antecipada])).toLowerCase() : '';
-      visitas.push({ ramo: await nomeRamo((await empDe(+it.companyId || 0))?.ramo), vendedor: await nome(+it.assignedById), id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
+      const supId = supervisorDoRegistro(it, map);
+      visitas.push({ card: v.filaId ? (+it[v.filaId] || null) : null, supervisor: supId, supervisorNome: supId ? await nome(supId) : '', ramo: await nomeRamo((await empDe(+it.companyId || 0))?.ramo), vendedor: await nome(+it.assignedById), id: +it.id, empresaId: +it.companyId || null, empresa: '', quando: q, dia, resp: +it.assignedById, respNome: await nome(+it.assignedById), segmento: v.segmento ? F.decode(meta, v.segmento, it[v.segmento]) : '',
         antecipada: antTxt ? /^(sim|y|true|1)/.test(antTxt) : null, programada: progr, desvio: progr && dia ? R.dayDiff(progr, dia) : null, cargo: fila?.cargo || '' });
     }
     const faltam = [...new Set(visitas.map(x => x.empresaId).filter(Boolean))];
@@ -1517,6 +1644,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, lerEmpresa, dadosCard, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, lerEmpresa, dadosCard, camposVisita, formEdicao, editarRegistro, supervisoresDoBitrix, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

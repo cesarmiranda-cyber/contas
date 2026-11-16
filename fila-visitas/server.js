@@ -64,7 +64,7 @@ const routes = {
   'GET /api/visitas': async (u, _, id) => {
     exige();
     const g = k => u.searchParams.get(k) || '';
-    if (g('page')) return svc.listarVisitasPag({ uid: id.uid, bearer: id.bearer, escopo: g('escopo') || 'auto', page: +g('page'), size: +g('size') || 20, kanban: g('kanban') === '1', q: g('q'), status: g('status') || 'abertas', per: g('per'), de: g('de'), ate: g('ate'), seg: g('seg'), tipo: g('tipo'), classe: g('classe'), resp: g('resp'), vend: g('vend'), ramo: g('ramo'), ord: g('ord') || 'data', dir: +g('dir') || 1, cardId: g('cardId'), soIds: g('soIds') === '1' }); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto', bearer: id.bearer, encerradas: u.searchParams.get('encerradas') === '1' }); },
+    if (g('page')) return svc.listarVisitasPag({ uid: id.uid, bearer: id.bearer, escopo: g('escopo') || 'auto', page: +g('page'), size: +g('size') || 20, kanban: g('kanban') === '1', sup: g('sup'), q: g('q'), status: g('status') || 'abertas', per: g('per'), de: g('de'), ate: g('ate'), seg: g('seg'), tipo: g('tipo'), classe: g('classe'), resp: g('resp'), vend: g('vend'), ramo: g('ramo'), ord: g('ord') || 'data', dir: +g('dir') || 1, cardId: g('cardId'), soIds: g('soIds') === '1' }); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto', bearer: id.bearer, encerradas: u.searchParams.get('encerradas') === '1' }); },
   'GET /api/ver-como': async (u, __, id) => { exigeConfig(id); exige(); const alvo = +u.searchParams.get('usuario'); if (!alvo) throw Object.assign(new Error('Escolha um usuário.'), { status: 400 }); return svc.verComo(alvo); },
   'GET /api/excluidos': async (_, __, id) => { exigeConfig(id); exige(); return { excluidos: await svc.listarExcluidos() }; },
   'GET /api/departamentos': async (_, __, id) => { exigeConfig(id); exige(); return { departamentos: await svc.departamentos() }; },
@@ -144,9 +144,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await routes[key](u, body, id));
     }
     const mf = u.pathname.match(/^\/api\/cards\/(\d+)\/form$/);
-    if (mf && req.method === 'GET') { exige(); { const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); } return send(res, 200, await svc.camposVisita(+mf[1])); }
+    if (mf && req.method === 'GET') { exige(); { const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); } return send(res, 200, await svc.camposVisita(+mf[1], { uid: idf.verificado ? idf.uid : null })); }
+    const me = u.pathname.match(/^\/api\/cards\/(\d+)\/registros\/(\d+)\/(form|editar)$/);
+    if (me) {
+      exige(); const ide = await quem(req, u);
+      if (!ide.verificado) throw nega('Abra o app pelo Bitrix24 para editar o registro.');
+      if (me[3] === 'form' && req.method === 'GET') return send(res, 200, await svc.formEdicao(+me[1], +me[2], { uid: ide.uid, bearer: ide.bearer }));
+      if (me[3] === 'editar' && req.method === 'POST') { const b = await readBody(req, 1e6); return send(res, 200, await svc.editarRegistro(+me[1], +me[2], { uid: ide.uid, bearer: ide.bearer, campos: b.campos, contatoId: b.contatoId, supervisorId: b.supervisorId })); }
+    }
     const mr = u.pathname.match(/^\/api\/cards\/(\d+)\/registro$/);
-    if (mr && req.method === 'GET') { exige(); const idr = await quem(req, u); return send(res, 200, await svc.registroVisita(+mr[1], { bearer: idr.bearer })); }
+    if (mr && req.method === 'GET') { exige(); const idr = await quem(req, u); return send(res, 200, await svc.registroVisita(+mr[1], { bearer: idr.bearer, uid: idr.verificado ? idr.uid : null })); }
     let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes|excluir|restaurar)$/);
     if (m && req.method === 'POST') {
       exige();
