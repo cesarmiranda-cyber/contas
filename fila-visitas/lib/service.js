@@ -1430,6 +1430,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       if (per === 'hoje') return [h, h];
       if (per === 'semana') { const dow = (new Date(h + 'T12:00:00Z').getUTCDay() + 6) % 7; return [R.addDays(h, -dow), R.addDays(h, 6 - dow)]; }
       if (per === 'mes') return [`${h.slice(0, 7)}-01`, R.ultimoDiaDoMes(h.slice(0, 7))];
+      if (per === 'proximos') return [R.addDays(R.ultimoDiaDoMes(h.slice(0, 7)), 1), '9999-12-31'];        // meses seguintes (próximos ciclos)
       if (per === 'custom') return [R.isoDate(de) || '0000-01-01', R.isoDate(ate) || '9999-12-31'];
       return null;
     })();

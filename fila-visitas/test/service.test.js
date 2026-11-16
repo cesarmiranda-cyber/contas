@@ -858,3 +858,11 @@ test('gestão: supervisor que acompanhou vem da estrutura de departamentos, é g
   const depois = await svc.registroVisita(card.id, { uid: 10 });
   assert.equal(depois.registros[0].edicoes.length, 1);
 });
+
+test('filtro de data "próximos meses" mostra só as visitas depois do mês corrente', async () => {
+  const { w, svc } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  await svc.sincronizarEmpresa(1);
+  const c = cards(w)[0]; c.ufCrm_data = '2026-07-15'; c.closedate = '2026-07-15';       // hoje = 10/05/2026
+  assert.equal((await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'abertas', per: 'proximos', page: 1 })).visitas.length, 1);
+  assert.equal((await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'abertas', per: 'mes', page: 1 })).visitas.length, 0);
+});

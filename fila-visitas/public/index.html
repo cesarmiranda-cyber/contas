@@ -421,7 +421,7 @@ function lista() {
     <div class="filters ${FX.aberto ? 'open' : ''}">
       <input id="fq" type="search" placeholder="Buscar empresa…" value="${esc(F.q || '')}">
       <select id="fst" title="Status">${opt([['abertas', 'Status: Em aberto'], ['atrasada', 'Status: Atrasadas'], ['dia', 'Status: Hoje'], ['finalizado', 'Status: Encerradas'], ['naorealizada', 'Status: Não realizadas'], ['todas', 'Status: Todas']], foco)}</select>
-      <select id="fdt" title="Data programada">${opt([['', 'Data: qualquer'], ['hoje', 'Data: hoje'], ['semana', 'Data: esta semana'], ['mes', 'Data: este mês'], ['custom', 'Data: personalizado']], VD.per)}</select>
+      <select id="fdt" title="Data programada">${opt([['', 'Data: qualquer'], ['hoje', 'Data: hoje'], ['semana', 'Data: esta semana'], ['mes', 'Data: este mês'], ['proximos', 'Data: próximos meses'], ['custom', 'Data: personalizado']], VD.per)}</select>
       ${VD.per === 'custom' ? `<input id="fde" type="date" value="${VD.de}" title="De"><input id="fate" type="date" value="${VD.ate}" title="Até">` : ''}
       ${verEquipe ? `<select id="fr"><option value="">Todos os responsáveis</option>${opt(op.responsaveis.map(x => [x.id, x.nome]), F.resp)}</select>` : ''}
       ${(op.supervisores || []).length || F.sup ? `<select id="fsup" title="Visitas que o supervisor acompanhou"><option value="">Supervisor: todos</option><option value="todos" ${F.sup === 'todos' ? 'selected' : ''}>Com supervisor (qualquer)</option>${opt((op.supervisores || []).map(x => [x.id, x.nome]), F.sup)}</select>` : ''}
