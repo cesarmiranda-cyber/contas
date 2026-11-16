@@ -146,7 +146,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await routes[key](u, body, id));
     }
     const mf = u.pathname.match(/^\/api\/cards\/(\d+)\/form$/);
-    if (mf && req.method === 'GET') { exige(); { const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); } return send(res, 200, await svc.camposVisita(+mf[1], { uid: idf.verificado ? idf.uid : null })); }
+    if (mf && req.method === 'GET') { exige(); const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); return send(res, 200, await svc.camposVisita(+mf[1], { uid: idf.verificado ? idf.uid : null })); }
     const me = u.pathname.match(/^\/api\/cards\/(\d+)\/registros\/(\d+)\/(form|editar)$/);
     if (me) {
       exige(); const ide = await quem(req, u);
