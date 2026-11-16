@@ -176,3 +176,15 @@ Multas, rotulagem e suplementos deixaram de depender de um funil próprio no Bit
 ## Rotulagem: calculadora e conferência pelas normas
 
 O card de rotulagem tem a **calculadora da tabela nutricional** (RDC 429/2020 + IN 75/2020): arredondamento (Anexo III), valores não significativos (Anexo IV), porção e %VD (Anexo II), valor energético (Anexo XXII), número de porções (Anexo VI), se a lupa é obrigatória, qual modelo (Anexo XVII), área mínima e tamanho de fonte (Anexo XVIII) e tolerância de 20% contra a análise laboratorial (art. 33). O resultado fica registrado no card e no histórico. A conferência por IA usa 31 itens com a RDC 429, a IN 75 e a RDC 727 citadas por artigo e anexo, e o pedido envia à IA um resumo das três normas.
+
+## Gestão dos processos, fechamento comercial e módulos novos
+
+- **Painel do gestor** (administrador): por processo e por pessoa, prazos vencidos e cartões parados (sem etapa, nota, checklist ou aprovação por N dias). Responsável e gestores recebem aviso no Bitrix24 uma vez por marco. **Prioridade** (alta, normal, baixa) e **sugestão de responsável** pela menor carga entre quem atua no processo.
+- **Multas**: ligação com a unidade BK (BKN), órgão, nº do auto, data de ciência e prazo legal (calcula o prazo da defesa) e ficha de procedimento.
+- **Fichas técnicas** e **tabela nutricional avulsa** como processos próprios, com cobrança 50/50 e questionário por serviço.
+- **Fechamento comercial**: negócio ganho no funil comercial vira o cartão do serviço (identificado pelo campo "Serviço contratado" ou pelo título) com a cobrança de 50% de entrada. Manual (simular antes) ou automático.
+- **Dossiê de aprovação** com selo SHA-256, **rascunho do relatório de adequação** e **entrada pelo formulário do site** (`POST /entrada/formulario` com token).
+- **Biblioteca de modelos de manuais e POPs** (segmento, localidade, legislação, versão e vigência; importação de planilha; aviso aos gestores 30, 7 e 0 dias antes de uma norma entrar em vigor).
+- **Qualidade do cadastro** na Carteira (o que falta e duplicados por CNPJ e nome).
+- **Suplementos**: formulação por cápsula, memorial de cálculo com %VD do Anexo VIII da IN 75, limites cadastrados pela equipe, ordem de produção imprimível e biblioteca de artigos para o dossiê.
+- Roteiro de testes e treinamento em `docs/TREINAMENTO.md`.

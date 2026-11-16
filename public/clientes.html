@@ -92,7 +92,7 @@ const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp
 const api = (m, u, b) => nmJson(m, '/api/car' + u, b);
 const dt = s => s ? s.split('-').reverse().join('/') : '—';
 const brl = v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const ABAS = [['clientes', 'Clientes'], ['resumo', 'Resumo de serviços'], ['vencimentos', 'Contratos a vencer'], ['email', 'E-mail marketing'], ['processo', 'Como funciona']];
+const ABAS = [['clientes', 'Clientes'], ['resumo', 'Resumo de serviços'], ['vencimentos', 'Contratos a vencer'], ['email', 'E-mail marketing'], ['qualidade', 'Qualidade do cadastro'], ['processo', 'Como funciona']];
 const ITENS = { treinamento: 'Treinamento', mbpPop: 'Manual de Boas Práticas e POP', alvara: 'Alvará da vigilância', licenca: 'Licença de funcionamento' };
 const TXT = { sim: 'Sim', nao: 'Não', andamento: 'Em andamento' };
 let ME = {}, BOOT = {}, aba = 'clientes', podeEditar = false, podeAdmin = false, CL = { aba: 'ativos', q: '', tipo: '', venc: false, page: 1 }, RS = { q: '', pendencia: false }, VD = 60;
@@ -102,16 +102,29 @@ function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#g
 function gavFecha() { $('#gav').hidden = true; $('#gbk').hidden = true; $('#gav').innerHTML = ''; }
 $('#gbk').onclick = gavFecha; addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gav').hidden) gavFecha(); });
 const topo = () => '<div class="top"><span class="sp"></span><button class="btn" data-x aria-label="Fechar">✕</button></div>';
-const recarrega = () => ({ clientes, resumo, vencimentos, email, processo })[aba]();
+const recarrega = () => ({ clientes, resumo, vencimentos, email, qualidade, processo })[aba]();
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
 function abrirAba(a) {
   aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
-  gavFecha(); history.replaceState(null, '', '#' + a); ({ clientes, resumo, vencimentos, email, processo })[a]();
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ clientes, resumo, vencimentos, email, qualidade, processo })[a]();
 }
 const bxCli = id => `https://${BOOT.host}/crm/company/details/${id}/`;
 const badgeContrato = s => s.estado === 'sem' ? '<span class="mut">—</span>' : s.estado === 'vencido' ? `<span class="sel b">vencido há ${-s.dias} d</span>` : s.estado === 'vencendo' ? `<span class="sel w">vence em ${s.dias} d</span>` : `<span class="sel ok">até ${dt(s.fim)}</span>`;
 
+
+// ---------- Qualidade do cadastro ----------
+let QF = { problema: '' };
+const qualidade = guarda(async () => {
+  const q = await api('GET', '/qualidade'), r = q.resumo, link = id => `https://${q.host}/crm/company/details/${id}/`;
+  const chip = (k, n, t) => `<button class="btn" data-qp="${k}" aria-pressed="${QF.problema === k}">${t} <b>${n}</b></button>`;
+  const lista = q.itens.filter(i => !QF.problema || i.problemas.includes(QF.problema));
+  $('#tela').innerHTML = `<h1>Qualidade do cadastro</h1><p class="sub">${q.total} empresas no Bitrix24. Cadastro limpo e sem duplicidade evita cobrança, visita e contrato no cliente errado. Corrija no Bitrix24 (ou use “Completar cadastros pelo CNPJ”).</p>
+  <div class="tools">${chip('', q.itens.length, 'Com algum problema')}${chip('sem CNPJ', r.semCnpj, 'Sem CNPJ')}${chip('CNPJ inválido', r.cnpjInvalido, 'CNPJ inválido')}${chip('sem cidade', r.semCidade, 'Sem cidade')}${chip('sem estado', r.semUf, 'Sem estado')}${chip('sem razão social', r.semRazao, 'Sem razão social')}${chip('sem responsável', r.semResponsavel, 'Sem responsável')}${chip('sem e-mail', r.semEmail, 'Sem e-mail')}</div>
+  <div class="box"><h2>Possíveis duplicados (${q.duplicados.length})</h2>${q.duplicados.map(g => `<div class="ck"><span class="sel w">${h(g.motivo)}</span><span style="flex:1">${g.empresas.map(e => `<a href="${link(e.id)}" target="_blank" rel="noopener">${h(e.nome)}</a>${e.cnpj ? ` <small class="mut">${h(e.cnpj)}</small>` : ''}`).join(' · ')}</span></div>`).join('') || '<p class="mut">Nenhum duplicado por CNPJ ou nome.</p>'}<p class="mut" style="margin:8px 0 0">Para unir, use “Mesclar” no Bitrix24 (CRM → Empresas → selecione → Mesclar). No Cronograma também há a fusão de clientes duplicados.</p></div>
+  <div class="box tw"><h2>${lista.length} empresa(s)${QF.problema ? ' — ' + h(QF.problema) : ''}</h2><table><tr><th>Empresa</th><th>CNPJ</th><th>Cidade/UF</th><th>O que falta</th></tr>${lista.slice(0, 300).map(i => `<tr><td><a href="${link(i.id)}" target="_blank" rel="noopener">${h(i.nome)}</a></td><td>${h(i.cnpj || '—')}</td><td>${h([i.cidade, i.uf].filter(Boolean).join('/') || '—')}</td><td>${i.problemas.map(p => `<span class="sel w">${h(p)}</span>`).join(' ')}</td></tr>`).join('')}</table>${lista.length > 300 ? '<p class="mut">Mostrando as 300 primeiras.</p>' : ''}</div>`;
+  $('#tela').querySelectorAll('[data-qp]').forEach(b => b.onclick = () => { QF.problema = b.dataset.qp; qualidade(); });
+});
 // ---------- Clientes ----------
 const clientes = guarda(async () => {
   await boot(); const l = await api('GET', '/clientes?' + new URLSearchParams({ ...CL, venc: CL.venc ? '1' : '0' }));

@@ -157,6 +157,10 @@ const server = http.createServer(async (req, res) => {
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
       return send(res, 200, await demApi.entradaEmail(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
     }
+    if (req.method === 'POST' && u.pathname === '/entrada/formulario') {   // formulário do site (ou Google Forms via Apps Script) envia as respostas; autenticado por token
+      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
+      return send(res, 200, await demApi.entradaFormulario(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
+    }
     if (req.method === 'POST' && u.pathname === '/auth/bitrix/codigo') {
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
       const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?', b = await readBody(req, 5000);

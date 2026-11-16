@@ -12,7 +12,7 @@ const F = require('../lib/feriados');
 
 const fake = () => {
   const deals = [], notif = [];
-  const est = { 0: [['C0:NEW', 'Novo contato', ''], ['C0:WON', 'Ganho', 'S']], 8: [['C8:NEW', 'Aviso recebido', ''], ['C8:A', 'Plano de ação', ''], ['C8:W', 'Resolvido', 'S']], 12: [['C12:A', 'Em andamento', ''], ['C12:B', 'Aguardando cliente', ''], ['C12:W', 'Concluído', 'S']], 17: [['C17:N', 'Solicitação recebida', ''], ['C17:D', 'Entregue / Concluído', 'S']] };
+  const est = { 0: [['C0:NEW', 'Novo contato', ''], ['C0:WON', 'Ganho', 'S']], 4: [['C4:A', 'Kickoff', ''], ['C4:W', 'Entregue', 'S']], 8: [['C8:NEW', 'Aviso recebido', ''], ['C8:A', 'Plano de ação', ''], ['C8:W', 'Resolvido', 'S']], 12: [['C12:A', 'Em andamento', ''], ['C12:B', 'Aguardando cliente', ''], ['C12:W', 'Concluído', 'S']], 17: [['C17:N', 'Solicitação recebida', ''], ['C17:D', 'Entregue / Concluído', 'S']] };
   return { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', deals, notif, async call(m, p) {
     if (m === 'crm.deal.fields') return { result: { UF_PROD: { formLabel: 'Nome do Produto' }, UF_ING: { formLabel: 'Ingredientes e quantidades (g)' }, UF_GLU: { formLabel: 'Contaminação cruzada com Glúten?', items: [{ ID: '1', VALUE: 'Sim' }, { ID: '2', VALUE: 'Não' }] }, UF_SAC: { formLabel: 'SAC' } } };
     if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' } } };
@@ -217,4 +217,61 @@ test('gestão: prioridade, cartão parado, painel por pessoa, sugestão de respo
   const real = await call('POST', '/fechamento/processar', { simular: false }); assert.equal(real.criados[0].cobrado, true); assert.equal(fin.receber.all().filter(x => x.demandaProcesso === 'rotulagem' && /BK Anhaia/.test(x.descricao)).length, 2);
   assert.equal((await call('POST', '/fechamento/processar', { simular: false })).criados.length, 0);   // não duplica
   const novo = await call('GET', `/rotulagem/negocios/${real.criados[0].id}`); assert.equal(novo.origem, 'comercial'); assert.equal(novo.empresaId, '5');
+});
+
+test('formulário do site cria o cartão com as respostas; dossiê de aprovação tem selo de integridade', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  await assert.rejects(api.entradaFormulario({ processo: 'rotulagem' }, 'x'), /não foi ativada/);
+  const { token } = await call('POST', '/formulario/entrada/token'); await assert.rejects(api.entradaFormulario({ processo: 'rotulagem' }, 'errado'), /Token inválido/); await assert.rejects(api.entradaFormulario({ processo: 'bk' }, token), /Processo inválido/);
+  const r = await api.entradaFormulario({ processo: 'rotulagem', messageId: 'a1', empresa: { nome: 'Padaria Sol', cnpj: '11.222.333/0001-81', email: 'a@b.com' }, respostas: { 'Nome do Produto': 'Pão de queijo', 'Ingredientes e quantidades (g)': 'Polvilho 500 g', 'Contaminação cruzada com glúten?': 'Não', 'Cor da embalagem': 'azul' } }, token);
+  const c = await call('GET', `/rotulagem/negocios/${r.id}`); assert.equal(c.titulo, 'Pão de queijo — Padaria Sol'); assert.equal(c.dadosIa['nome do produto'], 'Pão de queijo'); assert.equal(c.dadosIa['contaminação cruzada com glúten?'], 'Não'); assert.match(c.comentarios, /cor da embalagem: azul/); assert.match(c.comentarios, /Empresa não encontrada/); assert.equal(c.origem, 'formulario');
+  assert.equal((await api.entradaFormulario({ processo: 'rotulagem', messageId: 'a1' }, token)).duplicado, true);
+  await call('POST', `/rotulagem/negocios/${r.id}/aprovacao`, { decisao: 'aprovado', nota: 'ok' }, { id: 'u1', nome: 'Ana' }); await call('POST', `/rotulagem/negocios/${r.id}/rodada`, { resultado: 'ok' }, { id: 'u1', nome: 'Ana' });
+  const ds = await call('GET', `/rotulagem/negocios/${r.id}/dossie`); assert.match(ds.selo, /^[0-9a-f]{64}$/); assert.equal(ds.aprovacoes[0].nome, 'Ana'); assert.equal(ds.rodadas.length, 1); assert.ok(ds.historico.length >= 2);
+  const ds2 = await call('GET', `/rotulagem/negocios/${r.id}/dossie`); assert.equal(ds2.selo, ds.selo);   // mesmo conteúdo, mesmo selo
+  await call('POST', `/rotulagem/negocios/${r.id}/nota`, { texto: 'nova' }); assert.notEqual((await call('GET', `/rotulagem/negocios/${r.id}/dossie`)).selo, ds.selo);
+});
+
+test('biblioteca de modelos de manuais: filtros, importação da planilha, aplicar ao cartão e aviso de norma que entra em vigor', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'md-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  await assert.rejects(call('POST', '/manuais/modelos', { titulo: 'x' }), /título/); await assert.rejects(call('POST', '/manuais/modelos', { titulo: 'Manual padaria', uf: 'São Paulo' }), /sigla/); await assert.rejects(call('POST', '/manuais/modelos', { titulo: 'Manual padaria', link: 'javascript:1' }), /Link inválido/);
+  const em = F.somaDias(R.todayBR(), 5);
+  const imp = await call('POST', '/manuais/modelos/importar', { texto: `Título;Segmento;Atividade;UF;Município;Legislação;Link;Versão;Entra em vigor\nManual de boas práticas — padaria;Padaria;Panificação;SP;São Paulo;Portaria SMS 2619/2011;https://drive.google.com/a;v3;\nManual — restaurante de sushi;Restaurante;Comida japonesa;SP;;Nova CVS (em vigor);https://drive.google.com/b;v1;${em}\nManual indústria;Indústria;Alimentos industrializados;;;RDC 275/2002;https://drive.google.com/c;v2;\nRuim;Teste;;;;;javascript:x;;` });
+  assert.equal(imp.novos, 3); assert.equal(imp.erros.length, 1); assert.match(imp.erros[0], /Linha 5/);
+  assert.equal((await call('POST', '/manuais/modelos/importar', { texto: `Título;Segmento;UF;Versão\nManual indústria;Indústria;;v9` })).atualizados, 1);   // mesmo título/segmento/UF atualiza em vez de duplicar
+  const todos = await call('GET', '/manuais/modelos'); assert.equal(todos.total, 3); assert.deepEqual(todos.segmentos, ['Indústria', 'Padaria', 'Restaurante']);
+  assert.equal((await call('GET', '/manuais/modelos?segmento=padaria')).modelos.length, 1); assert.equal((await call('GET', '/manuais/modelos?q=sushi')).modelos[0].emVigorEm, 5); assert.equal((await call('GET', '/manuais/modelos?uf=RJ')).modelos.length, 1);   // sem UF vale para todo o país
+  const m = todos.modelos.find(x => /padaria/.test(x.titulo)), n = await call('POST', '/manuais/negocios', { titulo: 'Manual — Padaria Sol', empresaId: '5' });
+  const a = await call('POST', `/manuais/negocios/${n.id}/modelo`, { modeloId: m.id }); assert.ok(a.links.some(l => /Modelo base: Manual de boas práticas — padaria/.test(l.nome))); assert.equal(a.modeloBase.legislacao, 'Portaria SMS 2619/2011');
+  await call('PUT', '/gestao/config', { gestorIds: ['10'] }); const av = await call('POST', '/avisar', { simular: false }); assert.ok(av.enviados.some(e => /Entra em vigor em 5 dia/.test(e.msg))); assert.ok(bitrix.notif.some(x => x.USER_ID === '10' && /Nova CVS/.test(x.MESSAGE)));
+  assert.equal((await call('POST', '/avisar', { simular: false })).enviados.filter(e => /Entra em vigor/.test(e.msg)).length, 0);   // não repete o mesmo marco
+});
+
+test('qualidade do cadastro: lista o que falta e os duplicados por CNPJ e por nome', async () => {
+  const { createCarteiraApi } = require('../lib/carteiraApi'); const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-'));
+  const emp = [{ id: '1', nome: 'TR Fit', cnpj: '11222333000181', cidade: 'Santos', uf: 'SP', razao: 'TR Fit Ltda', responsavel: '10', email: 'a@a.com' }, { id: '2', nome: 'TR FIT', cnpj: '11222333000181', cidade: '', uf: '', razao: '', responsavel: '', email: '' }, { id: '3', nome: 'Sem Dados', cnpj: '', cidade: '', uf: '', razao: '', responsavel: '', email: '' }];
+  const api = createCarteiraApi({ bitrix: { enabled: true, async call() { return { result: [] }; } }, bx: { listar: async () => emp, host: () => 'p.bitrix24.com.br', completar: async () => 0 }, funil: { negocios: async () => [], estagios: async () => [], camposNegocio: async () => ({}) }, store: { log() {} }, dir, cnpjApi: { cnpjValido: c => c === '11222333000181' } });
+  const q = (await api.handle('GET', '/api/car/qualidade', new URL('http://x/api/car/qualidade'), async () => ({}), { perfil: 'admin' })).json;
+  assert.equal(q.total, 3); assert.equal(q.resumo.semCnpj, 1); assert.equal(q.resumo.duplicados, 2); assert.deepEqual(q.duplicados.map(g => g.motivo).sort(), ['mesmo CNPJ', 'mesmo nome']); assert.deepEqual(q.itens.map(i => i.id), ['2', '3']); assert.ok(q.itens[1].problemas.includes('sem CNPJ'));
+});
+
+test('suplementos: formulação, memorial de cálculo com %VD do Anexo VIII, limites cadastrados, ordem de produção e artigos do dossiê', async () => {
+  const S = require('../lib/suplementosCalc'); const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  assert.equal(S.VDR.length, 42); assert.equal(S.achaVdr('Vitamina B12')[0], 'Vitamina B12'); assert.equal(S.achaVdr('vitamina b1')[0], 'Tiamina'); assert.equal(S.achaVdr('Cafeína'), null);
+  const n = await call('POST', '/suplementos/negocios', { titulo: 'Suplemento Mix', empresaId: '5' });
+  await assert.rejects(call('PUT', `/suplementos/negocios/${n.id}/formulacao`, { grupo: 'xx', itens: [] }), /grupo populacional/); await assert.rejects(call('POST', `/suplementos/negocios/${n.id}/memorial`), /Preencha e salve/);
+  await call('PUT', `/suplementos/negocios/${n.id}/formulacao`, { grupo: '19a', capsulasPorDose: '2', dosesPorDia: '1', capacidadeCapsulaMg: '500', lote: '1000', itens: [{ materiaPrima: 'Ácido ascórbico 99%', ativo: 'Vitamina C', un: 'mg', qtd: '100', teor: '99' }, { materiaPrima: 'Zinco quelato', ativo: 'Zinco', un: 'mg', qtd: '5', teor: '20' }, { materiaPrima: 'Celulose', massaMg: '150' }, { materiaPrima: 'Cafeína', ativo: 'Cafeína', un: 'mg', qtd: '100' }] });
+  await assert.rejects(call('PUT', '/suplementos/limites', { ativo: 'Zinco', un: 'mg' }), /mínimo e\/ou o máximo/); await call('PUT', '/suplementos/limites', { ativo: 'Zinco', max: '8', un: 'mg', ref: 'norma de suplementos' });
+  const r = await call('POST', `/suplementos/negocios/${n.id}/memorial`, {}, { nome: 'Ana' }); const m = r.memorial;
+  assert.match(m.texto, /Vitamina C .*100 mg\/cápsula → 200 mg\/dose → 200 mg\/dia · %VD da dose: 200% \(VDR 100 mg\)/); assert.match(m.texto, /Zinco .*%VD da dose: 90,9%.*limite NÃO atendido/); assert.match(m.texto, /ORDEM DE PRODUÇÃO — lote de 1000 cápsulas/); assert.match(m.texto, /Ácido ascórbico 99% : ?101,01 g|Ácido ascórbico 99%: 101,01 g/);
+  assert.ok(m.alertas.some(a => /Zinco: 10 mg\/dia fora do limite/.test(a))); assert.ok(m.alertas.some(a => /Cafeína: sem VDR no Anexo VIII/.test(a))); assert.equal(m.linhas.find(l => l.ativo === 'Vitamina C').vd, 200);
+  const peq = S.memorial({ grupo: '19a', capsulasPorDose: 1, dosesPorDia: 1, capacidadeCapsulaMg: 100, itens: [{ materiaPrima: 'X', massaMg: '150' }] }); assert.ok(peq.alertas.some(a => /maior que a capacidade/.test(a)));
+  assert.equal(S.memorial({ grupo: '1-3a', itens: [{ ativo: 'Potássio', un: 'g', qtd: '0.35', materiaPrima: 'KCl' }] }).linhas[0].vd, 11.7);   // 350 mg / 3.000 mg; conversão g → mg
+  const a = await call('POST', '/suplementos/artigos', { ingrediente: 'Zinco', titulo: 'Zinc and immunity', link: 'https://pubmed.example/1', ano: '2020' }); await assert.rejects(call('POST', '/suplementos/artigos', { ingrediente: 'X', titulo: 'y', link: 'javascript:1' }), /Link inválido/);
+  assert.equal((await call('GET', '/suplementos/artigos?q=imunity')).artigos.length, 0); assert.equal((await call('GET', '/suplementos/artigos?q=zinc')).artigos.length, 1);
+  await call('POST', `/suplementos/negocios/${n.id}/artigo`, { artigoId: a.id }); assert.equal((await call('GET', `/suplementos/negocios/${n.id}`)).artigosDossie.length, 1);
+  const ds = await call('GET', `/suplementos/negocios/${n.id}/dossie`); assert.match(ds.memorial.texto, /MEMORIAL DE CÁLCULO/); assert.equal(ds.artigos[0].titulo, 'Zinc and immunity');
 });
