@@ -306,6 +306,9 @@ server.listen(PORT, () => {
     const d = await svc.dashboardDados({ uid: +process.env.DIAG_DASH, espera: 300000 });
     console.log('diag-dash', JSON.stringify({ visitas: (d.visitas || []).length, comSup: (d.visitas || []).filter(v => v.supervisor).length, amostra: (d.visitas || []).slice(0, 3).map(v => [v.id, v.dia, v.supervisor, v.supervisorNome, v.resp]), carregando: d.carregando || false, visao: d.visao }));
   } catch (e) { console.error('diag-dash:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_FORM) setTimeout(async () => { try {
+    for (const et of [1032, 1036]) { const f = (await bitrix.call('crm.item.fields', { entityTypeId: et })).result?.fields || {}; console.log('diag-form', et, JSON.stringify(Object.entries(f).filter(([k]) => k.startsWith('ufCrm')).map(([k, d]) => [String(d.title || d.formLabel || k).trim(), d.type, d.isRequired ? 'obrig' : '', d.isMultiple ? 'multi' : '', (d.items || []).length ? (d.items || []).length + ' opções' : '']))); }
+  } catch (e) { console.error('diag-form:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;

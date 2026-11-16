@@ -41,6 +41,7 @@ if os.environ.get("DIAG_SUP"): env["DIAG_SUP"] = "1"
 if os.environ.get("DIAG_ENC"): env["DIAG_ENC"] = "1"
 if os.environ.get("DIAG_SUPREG"): env["DIAG_SUPREG"] = "1"
 if os.environ.get("DIAG_DASH"): env["DIAG_DASH"] = os.environ["DIAG_DASH"]
+if os.environ.get("DIAG_FORM"): env["DIAG_FORM"] = "1"
 if os.environ.get("DIAG_DATAS"): env["DIAG_DATAS"] = "1"
 if os.environ.get("DIAG_CICLO"): env["DIAG_CICLO"] = "1"
 if os.environ.get("DIAG_FILTRO"): env["DIAG_FILTRO"] = os.environ["DIAG_FILTRO"]
