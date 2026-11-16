@@ -828,7 +828,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       try {
         await comTrava(`empresa:${x.c.empresaId}`, async () => {
           const card = { ...x.c, stageId: x.it.stageId };
-          const ok = await atualizarCard(card, { data: x.nova }, 'ajuste das datas iniciais por classe');
+          const ok = await atualizarCard(card, { data: x.nova, classe: x.classe }, 'ajuste das datas iniciais por classe');
           if (ok) {
             store.addHistorico({ tipo: 'ajuste-inicial', classe: x.classe, card: x.c.id, empresaId: x.c.empresaId, empresa: x.c.empresa, segmento: x.c.segmento, cargo: x.c.cargo, anterior: x.c.data, nova: x.nova, motivo: 'Ajuste das datas iniciais por classe (A 30, B 60, C 90 dias; estratégicos em março)', autorNome: 'App' });
             if (store.config.tarefaAtiva) await moverPrazoTarefas(x.c.id, x.nova).catch(() => {});
