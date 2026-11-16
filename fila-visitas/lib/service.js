@@ -578,7 +578,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     });
   }
   // ---------- editar registro de visita ----------
-  const podeEditarRegistro = (uid, rec, map) => !!uid && (+rec.assignedById === +uid || supervisorDoRegistro(rec, map) === +uid || isAdmin(uid) || idsLista(store.config.verTudo).includes(+uid) || idsLista(store.config.acessoConfig).includes(+uid));
+  const podeEditarRegistro = (uid, rec, map, equipe = []) => !!uid && (equipe.map(Number).includes(+uid) || +rec.assignedById === +uid || supervisorDoRegistro(rec, map) === +uid || isAdmin(uid) || idsLista(store.config.verTudo).includes(+uid) || idsLista(store.config.acessoConfig).includes(+uid));
   async function lerRegistro(visitaId) {
     const it = (await bitrix.call('crm.item.get', { entityTypeId: F.ETYPE.visita, id: visitaId })).result?.item;
     if (!it) throw erro('Registro de visita não encontrado.', 404);
@@ -590,7 +590,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const { map } = await campos();
     const rec = await lerRegistro(visitaId);
     if (map.visita.filaId && String(rec[map.visita.filaId]) !== String(cardId)) throw erro('Este registro não pertence a esta visita.', 409);
-    if (!podeEditarRegistro(uid, rec, map)) throw erro('Só quem registrou a visita, o supervisor que a acompanhou ou um administrador pode editar.', 403);
+    if (!podeEditarRegistro(uid, rec, map, Object.values((store.card(cardId) || {}).equipe || {}))) throw erro('Você não tem permissão para editar este registro. Podem editar: quem registrou a visita, o supervisor que a acompanhou, as pessoas do cadastro da empresa (vendedor, supervisor, coordenador, gerente, diretor) e quem vê tudo ou administra o app.', 403);
     const form = await camposVisita(cardId, { uid });
     form.campos = form.campos.filter(c => c.tipo !== 'arquivo');                    // anexos não são editados aqui
     for (const c of form.campos) { if (c.travado) continue; const val = rec[c.key]; c.valor = val === undefined || val === null ? '' : val; }
@@ -708,7 +708,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       campos_.sort((a, b) => (!!b.destaque - !!a.destaque));
       registros.push({ id: +it.id, titulo: it.title || '', quando: it[v.dataHora || 'begindate'] || it.createdTime || null, criadoEm: it.createdTime || null,
         por: await quem(+it.assignedById || +it.createdBy), contato: contatoDe(it), supervisor: supervisorDoRegistro(it, map) ? { id: supervisorDoRegistro(it, map), nome: await quem(supervisorDoRegistro(it, map)) } : null,
-        podeEditar: podeEditarRegistro(uid, it, map), edicoes: store.historico.filter(h => h.tipo === 'edicao-registro' && +h.visita === +it.id).slice(0, 5).map(h => ({ at: h.at, por: h.autorNome, mudancas: h.mudancas })), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
+        podeEditar: podeEditarRegistro(uid, it, map, Object.values((store.card(cardId) || {}).equipe || {})), edicoes: store.historico.filter(h => h.tipo === 'edicao-registro' && +h.visita === +it.id).slice(0, 5).map(h => ({ at: h.at, por: h.autorNome, mudancas: h.mudancas })), campos: campos_, urlRegistro: base ? `${base}/crm/type/${F.ETYPE.visita}/details/${it.id}/` : null });
     }
     const hc = await historicoContatos(card.empresaId).catch(() => ({ lista: [] }));
     return { card: { id: card.id, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data }, registros, contatosHistorico: hc.lista };
@@ -1499,9 +1499,11 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     // índice de equipe (campos da empresa) por card: o que vale é quem está no cadastro da empresa, não o responsável do Bitrix
     const semEquipe = [...new Set([...abertosL, ...fechadosL].filter(it => !(store.card(it.id) || {}).equipe && it.companyId).map(it => +it.companyId))];
     if (semEquipe.length) await Promise.all(semEquipe.slice(0, 40).map(id => empresaCurta(id)));
+    const cargosAtivos = new Set(['Vendedor', ...(store.config.cargosFila || [])]);       // cards antigos de Supervisor/Coordenador/etc. (modelo anterior) não aparecem
     for (const [lista, fechado] of [[abertosL, false], [fechadosL, true]]) for (const it of lista) {
       if (permitidos && !permitidos.has(+it.id)) continue;
       const c = await dadosCard(it), reg = store.card(it.id) || {};
+      if (!cargosAtivos.has(c.cargo)) continue;
       let eq = reg.equipe;
       if (!eq) { const e = await empresaCurta(c.empresaId); eq = e ? equipeIds(e.segs?.[c.segmento]) : null; }
       if ((reg.participantes || []).length) eq = { ...(eq || {}), ...Object.fromEntries(reg.participantes.map((u, i) => ['extra' + i, u])) };
@@ -1651,6 +1653,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const cards = [];
     for (const [lista, finalizado, naoRealizada] of [[abertos, false, false], [fin, true, false], [naoReal, false, true]]) for (const it of lista) {
       const d = await dadosCard(it), reg = store.card(it.id) || {};
+      if (!['Vendedor', ...(store.config.cargosFila || [])].includes(d.cargo)) continue;
       const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
       cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel), _eq: { ...(reg.equipe || {}), ...Object.fromEntries((reg.participantes || []).map((u, i) => ['extra' + i, u])) },
         motivo: d.motivoNR, detalhe: d.detalheNR, supervisorId: +((reg.equipe || {}).supervisor) || null, supervisorNome: (reg.equipe || {}).supervisor ? await nome(+reg.equipe.supervisor) : '', vendedorId: +((reg.equipe || {}).vendedor) || null,

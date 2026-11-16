@@ -848,7 +848,7 @@ test('gestão: supervisor que acompanhou vem da estrutura de departamentos, é g
   const rv = await svc.registroVisita(card.id, { uid: 20 });
   assert.equal(rv.registros[0].podeEditar, true); assert.equal(rv.registros[0].supervisor.id, 20);
   assert.equal((await svc.registroVisita(card.id, { uid: 777 })).registros[0].podeEditar, false);
-  await assert.rejects(() => svc.formEdicao(card.id, rec.id, { uid: 777 }), /Só quem registrou/);
+  await assert.rejects(() => svc.formEdicao(card.id, rec.id, { uid: 777 }), /não tem permissão para editar/);
   const ed = await svc.formEdicao(card.id, rec.id, { uid: 10 });
   assert.equal(ed.supervisorPadraoId, 20);
   const r = await svc.editarRegistro(card.id, rec.id, { uid: 20, campos: { ufCrm_res: 'Conversa inicial CORRIGIDA' }, supervisorId: 30 });
@@ -857,9 +857,10 @@ test('gestão: supervisor que acompanhou vem da estrutura de departamentos, é g
   assert.equal((await svc.editarRegistro(card.id, rec.id, { uid: 10, campos: { ufCrm_res: 'Conversa inicial CORRIGIDA' } })).alterado, false, 'sem mudança não grava');
   const depois = await svc.registroVisita(card.id, { uid: 10 });
   assert.equal(depois.registros[0].edicoes.length, 1);
-  assert.equal((await svc.registroVisita(card.id, { uid: 20 })).registros[0].podeEditar, false, 'o supervisor foi trocado para o 30');
-  store.setConfig({ verTudo: [20] });
-  assert.equal((await svc.registroVisita(card.id, { uid: 20 })).registros[0].podeEditar, true, 'quem vê tudo também edita');
+  assert.equal((await svc.registroVisita(card.id, { uid: 20 })).registros[0].podeEditar, true, 'quem está no cadastro da empresa (gerente) também edita');
+  assert.equal((await svc.registroVisita(card.id, { uid: 555 })).registros[0].podeEditar, false);
+  store.setConfig({ verTudo: [555] });
+  assert.equal((await svc.registroVisita(card.id, { uid: 555 })).registros[0].podeEditar, true, 'quem vê tudo também edita');
 });
 
 test('filtro de data "próximos meses" mostra só as visitas depois do mês corrente', async () => {
@@ -930,4 +931,13 @@ test('não realizadas aparecem mesmo com o filtro padrão "este mês" e a coluna
   assert.equal(r.counts.naorealizada, 1);
   const hoje = await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', per: 'hoje', page: 1 });
   assert.equal(hoje.visitas.filter(v => v.situacao === 'naorealizada').length, 0, 'filtros explícitos continuam valendo');
+});
+
+test('cards antigos de cargos que não geram visita (modelo anterior) não aparecem nas listas', async () => {
+  const { w, svc, store } = setup();                                  // modelo antigo: 1 card por cargo
+  await svc.sincronizarEmpresa(1);
+  assert.equal((await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', page: 1 })).visitas.length, 5);
+  store.setConfig({ cargosFila: ['Vendedor'] });
+  const r = await svc.listarVisitasPag({ uid: 30, escopo: 'todas', status: 'todas', page: 1 });
+  assert.deepEqual(r.visitas.map(v => v.cargo), ['Vendedor'], 'só o vendedor aparece');
 });
