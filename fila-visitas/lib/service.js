@@ -1623,10 +1623,11 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
   // O dashboard é pesado: o cálculo (igual para todos) roda uma vez em segundo plano e fica em memória; cada pessoa só recebe
   // o recorte dela (equipe + permissões do Bitrix). A tela nunca espera o cálculo: se ainda não houver nada, responde "carregando".
   let baseDash = null, baseEm = 0, baseTrab = null;
+  { const salvo = store.blob && store.blob('dashboard-base'); if (salvo && salvo.dados) { baseDash = salvo.dados; baseEm = salvo.em || 0; } }   // depois de reiniciar, o dashboard abre na hora com o último cálculo
   function baseDashboard() {
     if (baseTrab) return baseTrab;
     const t0 = Date.now();
-    baseTrab = dashboardBase().then(d => { baseDash = d; baseEm = Date.now(); console.log(`dashboard-base ${Date.now() - t0}ms cards=${d.cards.length} visitas=${d.visitas.length}`); return d; })
+    baseTrab = dashboardBase().then(d => { baseDash = d; baseEm = Date.now(); if (store.setBlob) store.setBlob('dashboard-base', { em: baseEm, dados: d }); console.log(`dashboard-base ${Date.now() - t0}ms cards=${d.cards.length} visitas=${d.visitas.length}`); return d; })
       .catch(e => { console.error(`dashboard-base erro: ${e.message}`); store.log('erro', `Dashboard: ${e.message}`); throw e; }).finally(() => { baseTrab = null; });
     return baseTrab;
   }
