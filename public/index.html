@@ -48,6 +48,11 @@ footer{padding:16px;text-align:center;color:var(--mut);font-size:12.5px}
 <body>
 <!-- Antes do login esta página não mostra nem consulta dado algum. -->
 <section id="vLogin" class="entrada" hidden>
+  <div class="cartao" id="fAuto" hidden>
+    <div class="marca"><b>N</b>Nutrimix</div>
+    <h1>Entrando…</h1>
+    <p class="sub">Identificando o seu usuário do Bitrix24.</p>
+  </div>
   <form class="cartao" id="fBx" novalidate>
     <div class="marca"><b>N</b>Nutrimix</div>
     <h1>Entrar com o Bitrix24</h1>
@@ -57,7 +62,7 @@ footer{padding:16px;text-align:center;color:var(--mut);font-size:12.5px}
     <p class="erro" id="eBx" role="alert" hidden></p>
     <div id="passoEmail"><label>E-mail da sua conta do Bitrix24<input id="bxEmail" type="email" name="email" autocomplete="email" autocapitalize="off" spellcheck="false" required></label><button class="btn" id="bxEnviar">Enviar código</button></div>
     <div id="passoCodigo" hidden><p class="nota" id="bxInfo" style="text-align:left"></p><label>Código de 6 dígitos<input id="bxCod" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000"></label><button class="btn" id="bxEntrar">Entrar</button><p class="nota"><button type="button" class="link" id="bxVoltar">Usar outro e-mail</button></p></div>
-    <p class="nota">Abrindo o app pelo menu do Bitrix24, a entrada é automática. Sem acesso? Fale com o administrador do sistema.</p>
+    <p class="nota" id="notaAuto">Abrindo o app pelo menu de Aplicativos do Bitrix24, a entrada é automática. Sem acesso? Fale com o administrador do sistema.</p>
   </form>
   <form class="cartao" id="fLogin" autocomplete="on" novalidate hidden>
     <div class="marca"><b>N</b>Nutrimix</div>
@@ -166,10 +171,28 @@ $('#fSenha').onsubmit = async e => {
     NM.token = j.token; await entrou(j.usuario);
   } catch (x) { er.textContent = x.message; er.hidden = false; } finally { $('#bSenha').disabled = false; }
 };
+// Dentro do Bitrix24 a entrada é automática: a página pede o usuário logado ao próprio Bitrix24 (aplicativo local) e o sistema confirma no portal.
+const dentroDoBitrix = (() => { try { return window.self !== window.top; } catch { return true; } })();
+function entraPeloBitrix() {
+  return new Promise(res => {
+    let feito = false; const fim = ok => { if (!feito) { feito = true; clearTimeout(t); res(ok); } }, t = setTimeout(() => fim(false), 7000);
+    const s = document.createElement('script'); s.src = 'https://api.bitrix24.com/api/v1/'; s.onerror = () => fim(false);
+    s.onload = () => { try { BX24.init(async () => { try { const a = BX24.getAuth(); if (!a || !a.access_token) return fim(false);
+      const r = await nmFetch('/auth/bitrix/sdk', { method: 'POST', body: { AUTH_ID: a.access_token, DOMAIN: a.domain } }), j = await r.json().catch(() => ({}));
+      if (!r.ok) { bxErro(j.error || ''); return fim(false); } NM.token = j.token; await entrou(j.usuario); fim(true); } catch { fim(false); } }); } catch { fim(false); } };
+    document.head.appendChild(s);
+  });
+}
+async function semSessao() {
+  if (!dentroDoBitrix) { mostra('#vLogin'); focaLogin(); return; }
+  $('#fBx').hidden = true; $('#fAuto').hidden = false; mostra('#vLogin');
+  if (await entraPeloBitrix()) return;
+  $('#fAuto').hidden = true; $('#fBx').hidden = false; $('#notaAuto').textContent = 'Não consegui identificar o seu usuário automaticamente. Abra o Nutrimix pelo menu Aplicativos do Bitrix24 (o administrador precisa cadastrá-lo como aplicativo local) ou use o código acima.'; focaLogin();
+}
 (async () => {
-  if (!NM.token) { mostra('#vLogin'); focaLogin(); return; }
+  if (!NM.token) return semSessao();
   try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; await entrou(j.usuario); }
-  catch { NM.token = ''; mostra('#vLogin'); focaLogin(); }
+  catch { NM.token = ''; semSessao(); }
 })();
 </script>
 </body>

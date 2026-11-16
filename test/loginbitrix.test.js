@@ -47,3 +47,12 @@ test('código no Bitrix24: limites por e-mail e por IP, usuário desativado e Bi
   await d.bx.pedirCodigo('cris@nutrimix.com.br', '7.7.7.7'); assert.equal(d.notif.length, 0);   // desativado não recebe código
   bitrix.enabled = false; await assert.rejects(bx.pedirCodigo('cesar@manda4.com.br', '8.8.8.8'), /não está conectado/);
 });
+
+test('entrada automática dentro do Bitrix24 (SDK): só do portal autorizado, token válido e com limite por IP', async () => {
+  const { bx } = await cenario({ ADMIN_BITRIX_IDS: '10' });
+  await assert.rejects(bx.porSdk({ AUTH_ID: 'a'.repeat(32), DOMAIN: 'outro.bitrix24.com' }, '1.1.1.1'), /não é o autorizado/);
+  await assert.rejects(bx.porSdk({ AUTH_ID: 'curto', DOMAIN: 'p.bitrix24.com.br' }, '1.1.1.1'), /Token do Bitrix24 inválido/);
+  await assert.rejects(bx.porSdk({ AUTH_ID: 'x y', DOMAIN: 'p.bitrix24.com.br' }, '1.1.1.1'), /inválido/);
+  for (let i = 0; i < 40; i++) await bx.porSdk({ AUTH_ID: 'curto', DOMAIN: 'p.bitrix24.com.br' }, '9.9.9.9').catch(() => {});
+  await assert.rejects(bx.porSdk({ AUTH_ID: 'curto', DOMAIN: 'p.bitrix24.com.br' }, '9.9.9.9'), /Muitas tentativas/);
+});

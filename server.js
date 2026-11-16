@@ -143,7 +143,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 const FRAME = ["'self'", ...['com', 'com.br', 'eu', 'es', 'de', 'fr', 'it', 'pl', 'in', 'ru', 'ua', 'co.uk', 'com.tr', 'vn', 'id', 'kz', 'by', 'uk', 'jp', 'cn'].map(t => `https://*.bitrix24.${t}`)].join(' ');
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cross-Origin-Resource-Policy': 'same-origin',
-  'Content-Security-Policy': `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors ${FRAME}`,
+  'Content-Security-Policy': `default-src 'self'; script-src 'self' 'unsafe-inline' https://api.bitrix24.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors ${FRAME}`,
 };
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
@@ -160,6 +160,15 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && u.pathname === '/entrada/formulario') {   // formulário do site (ou Google Forms via Apps Script) envia as respostas; autenticado por token
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
       return send(res, 200, await demApi.entradaFormulario(await readBody(req, 300000), String(req.headers['x-entrada-token'] || '')));
+    }
+    if (req.method === 'POST' && u.pathname === '/auth/bitrix/sdk') {   // entrada automática dentro do Bitrix24 (aplicativo local): o token vem do BX24.getAuth()
+      if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
+      const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?', b = await readBody(req, 5000);
+      return send(res, 200, await bxLogin.porSdk({ AUTH_ID: b.AUTH_ID, DOMAIN: b.DOMAIN }, ip));
+    }
+    if (u.pathname === '/instalar' && ['GET', 'POST'].includes(req.method)) {   // página de instalação do aplicativo local no Bitrix24
+      req.resume(); res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end('<!doctype html><meta charset="utf-8"><title>Nutrimix</title><body style="font-family:Arial,sans-serif;padding:24px"><p>Instalando o Nutrimix…</p><script src="https://api.bitrix24.com/api/v1/"></script><script>BX24.init(function(){BX24.installFinish();document.body.innerHTML="<p>Nutrimix instalado. Abra o aplicativo pelo menu do Bitrix24.</p>";});</script></body>');
     }
     if (req.method === 'POST' && u.pathname === '/auth/bitrix/codigo') {
       if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return send(res, 415, { error: 'Envie JSON.' });
