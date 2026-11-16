@@ -478,6 +478,7 @@ function lista() {
   document.querySelectorAll('[data-part]').forEach(b => b.onclick = e => { e.preventDefault(); participantes(+b.dataset.part); });
   document.querySelectorAll('[data-ver]').forEach(b => b.onclick = e => { e.stopPropagation(); verRegistro(+b.dataset.ver); });
   document.querySelectorAll('[data-del]').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); excluirCards([+b.dataset.del]); });
+  document.querySelectorAll('[data-nrm]').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); motivoNR([+b.dataset.nrm]); });
   if (VP.view === 'kanban') ligaKanban();
 }
 
@@ -502,7 +503,7 @@ function kanban(v, verEquipe) {
     const n = g[k].reduce((a, x) => a + x.length, 0), tot = (dados.colunas && dados.colunas[k]) ?? n;
     return `<section class="kcol" data-kcol="${k}" style="--kc:${cor}"><header><b>${t}</b><span class="kn" title="${g[k].length} empresa(s) nesta tela">${tot}</span></header>
       <div class="kbody">${g[k].map(grp => cartaoKanban(grp, k, verEquipe)).join('') || '<div class="kvazio">Solte aqui</div>'}${tot > n ? `<button class="btn sm" data-kmais="1">Mostrando ${n} de ${tot} · ver mais</button>` : ''}</div></section>`;
-  }).join('')}</div><div class="hint" style="margin:8px 2px">Arraste um cartão: para <b>Encerrado</b> abre o registro da visita; para <b>Aguardando visita</b> abre a alteração de data. As colunas Atrasada e Dia da visita seguem a data programada. Clique na empresa para abrir e editar o agrupamento.</div>`;
+  }).join('')}</div><div class="hint" style="margin:8px 2px">Arraste um cartão: para <b>Encerrado</b> abre o registro da visita; para <b>Aguardando visita</b> abre a alteração de data; para <b>Não realizada</b> pede o motivo. As colunas Atrasada e Dia da visita seguem a data programada. Clique na empresa para abrir e editar o agrupamento.</div>`;
 }
 function cartaoKanban(grp, col, verEquipe) {
   const c0 = grp[0], key = `${col}|${c0.empresaId || c0.id}`, aberto = KABERTOS.has(key);
@@ -511,14 +512,14 @@ function cartaoKanban(grp, col, verEquipe) {
   const resp = [...new Set(grp.map(x => x.responsavelNome).filter(Boolean))];
   const abertas = col === 'atrasada' || col === 'dia' || col === 'aguardando';
   const linhaItem = x => `<div class="ki" draggable="true" data-kid="${x.id}" data-kcol="${col}"><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span><span class="kid" title="${esc(prazoTxt(x))}">${fmt(x.data)}</span>
-      <span class="kia">${eu.podeExcluir ? `<button class="btn sm danger" data-del="${x.id}" title="Excluir visita">🗑</button>` : ''}${col === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${abertas ? `<button class="btn sm pri" data-reg="${x.id}" title="Registrar visita">Registrar</button><button class="btn sm" data-rep="${x.id}" title="Alterar visita (nova data)">↻</button>` : ''}</span></div>`;
+      <span class="kia">${col === 'naorealizada' ? `<button class="btn sm ${x.motivoNR ? '' : 'pri'}" data-nrm="${x.id}" title="${esc(x.motivoNR || 'Motivo não informado')}">${x.motivoNR ? 'Motivo' : 'Informar motivo'}</button>` : ''}${eu.podeExcluir ? `<button class="btn sm danger" data-del="${x.id}" title="Excluir visita">🗑</button>` : ''}${col === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${abertas ? `<button class="btn sm pri" data-reg="${x.id}" title="Registrar visita">Registrar</button><button class="btn sm" data-rep="${x.id}" title="Alterar visita (nova data)">↻</button>` : ''}</span></div>`;
   return `<article class="kc ${col}" draggable="true" data-kkey="${esc(key)}" data-ids="${ids.join(',')}" data-kcol="${col}">
     <div class="kc-h"><a href="#" class="kc-n" data-kg="${esc(key)}" title="Abrir agrupamento">${esc(c0.empresa)}</a>${grp.length > 1 ? `<span class="kn2" title="${grp.length} visitas">${grp.length}</span>` : ''}</div>
     <div class="kc-m">${esc([c0.segmentoEmpresa, c0.tipoEmpresa].filter(Boolean).join(' · '))}</div>
     <div class="kc-l">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join('')}</div>
     <div class="kc-d"><b>${fmt(pior.data)}</b><span class="kp">${prazoTxt(pior)}</span></div>
     ${verEquipe && resp.length ? `<div class="kc-r" title="${esc(resp.join(', '))}"><i>${esc(ini(resp[0]))}</i>${esc(resp[0])}${resp.length > 1 ? ` <em>+${resp.length - 1}</em>` : ''}</div>` : ''}
-    <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : col === 'finalizado' ? `<button class="btn sm pri" data-ver="${c0.id}">Ver registro</button>` : ''}${eu.podeExcluir && grp.length === 1 ? `<button class="btn sm danger" data-del="${c0.id}" title="Excluir visita">🗑</button>` : ''}</div>
+    <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : col === 'finalizado' ? `<button class="btn sm pri" data-ver="${c0.id}">Ver registro</button>` : col === 'naorealizada' ? `<button class="btn sm ${c0.motivoNR ? '' : 'pri'}" data-nrm="${c0.id}">${c0.motivoNR ? 'Motivo' : 'Informar motivo'}</button>` : ''}${eu.podeExcluir && grp.length === 1 ? `<button class="btn sm danger" data-del="${c0.id}" title="Excluir visita">🗑</button>` : ''}</div>
     ${grp.length > 1 ? `<div class="kc-i" ${aberto ? '' : 'hidden'}>${grp.map(linhaItem).join('')}</div>` : ''}</article>`;
 }
 function aviso(msg, erro) {
@@ -557,7 +558,7 @@ function moveKanban(ids, de, para) {
   if (de === 'finalizado' || de === 'naorealizada') return aviso('Visitas encerradas ou não realizadas não podem ser movidas.', true);
   if (para === 'finalizado') return ids.length === 1 ? registrar(ids[0]) : abreGrupoIds(ids, 'Registre a visita de cada linha para encerrar o grupo.');
   if (para === 'aguardando') return ids.length === 1 ? reagendarVisita(ids[0]) : reagendarGrupo(ids);
-  if (para === 'naorealizada') return aviso('A visita vira "Não realizada" sozinha quando o mês termina sem registro.', true);
+  if (para === 'naorealizada') return motivoNR(ids, true);
   aviso(`A coluna "${para === 'dia' ? 'Dia da visita' : 'Atrasada'}" é definida pela data programada. Para mudar a data, solte em "Aguardando visita" (Alterar visita).`, true);
 }
 function abreGrupo(key) {
@@ -575,13 +576,14 @@ function abreGrupoIds(ids, nota) {
       <div class="chips">${c0.segmentoEmpresa ? `<span class="tag emp">${esc(c0.segmentoEmpresa)}</span>` : ''}${c0.tipoEmpresa ? `<span class="tag">${esc(c0.tipoEmpresa)}</span>` : ''}<span class="tag">${grp.length} visita(s)</span></div></div>
     <div class="sh-b">${nota ? `<div class="info">${esc(nota)}</div>` : ''}${eq ? `<div class="kg-eq">${eq}</div>` : ''}
       <div class="tw"><table><tr><th>Linha</th><th>Cargo</th><th>Classe</th><th>Responsável</th><th>Última visita</th><th>Programada</th><th>Prazo</th><th></th></tr>${grp.map(x => `<tr><td><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span></td><td>${esc(x.cargo)}</td><td>${esc(x.classe === 'E' ? 'Estratégico' : x.classe)}</td><td>${esc(x.responsavelNome)}</td><td>${x.ultima ? fmt(x.ultima) : '—'}</td><td>${fmt(x.data)}</td><td><span class="pl2" style="background:${pl[x.situacao][0]};color:${pl[x.situacao][1]}">${prazoTxt(x)}</span></td>
-        <td style="white-space:nowrap">${eu.podeExcluir ? `<button class="btn sm danger" data-del="${x.id}" title="Excluir visita">🗑</button> ` : ''}${x.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
+        <td style="white-space:nowrap">${x.situacao === 'naorealizada' ? `<button class="btn sm ${x.motivoNR ? '' : 'pri'}" data-nrm="${x.id}">${x.motivoNR ? 'Motivo' : 'Informar motivo'}</button> ` : ''}${eu.podeExcluir ? `<button class="btn sm danger" data-del="${x.id}" title="Excluir visita">🗑</button> ` : ''}${x.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button>${abertas.length > 1 ? '<button class="btn" id="gall">Alterar a data de todas</button>' : ''}</div>`);
   document.querySelectorAll('[data-greg]').forEach(b => b.onclick = () => registrar(+b.dataset.greg));
   document.querySelectorAll('[data-grep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.grep));
   document.querySelectorAll('[data-gpart]').forEach(b => b.onclick = () => participantes(+b.dataset.gpart));
   document.querySelectorAll('#sheet [data-ver]').forEach(b => b.onclick = () => verRegistro(+b.dataset.ver));
   document.querySelectorAll('#sheet [data-del]').forEach(b => b.onclick = () => excluirCards([+b.dataset.del]));
+  document.querySelectorAll('#sheet [data-nrm]').forEach(b => b.onclick = () => motivoNR([+b.dataset.nrm]));
   if ($('#gall')) $('#gall').onclick = () => reagendarGrupo(abertas.map(x => x.id));
 }
 // Alterar a data de várias visitas da mesma empresa de uma vez (mesmas regras: do dia seguinte em diante, dentro do mês, motivo obrigatório).
@@ -674,6 +676,27 @@ function excluirCards(ids) {
     $('#er').textContent = falhas.join(' | '); $('#er').classList.add('on'); $('#ok').disabled = false;
   };
 }
+
+// ---- Não realizada: motivo (lista + texto). `marcar` = marcar à mão uma visita em aberto; senão só informa/altera o motivo ----
+function motivoNR(ids, marcar = false) {
+  const lista = ids.map(achar).filter(Boolean); if (!lista.length) return;
+  const motivos = (dados && dados.motivosNR) || [];
+  const atual = !marcar && lista.length === 1 ? lista[0] : null;
+  modal(`<div class="sh-h"><h3>${marcar ? 'Marcar como não realizada' : 'Motivo da visita não realizada'}</h3><div class="chips">${lista.map(x => `<span class="tag seg">${esc(x.empresa)} · ${esc(x.segmento)}</span>`).join('')}</div></div>
+    <div class="sh-b">${marcar ? '<div class="info">A visita sai da fila como <b>não realizada</b>, a data não poderá mais ser alterada e a próxima visita do ciclo é criada. Informe o motivo.</div>' : ''}
+      <div class="fld"><label>Motivo <i>*</i></label><select id="nr_m"><option value="">Escolha…</option>${motivos.map(m => `<option ${atual && atual.motivoNR === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>
+      <div class="fld"><label>Detalhes <span class="hint" id="nr_h">(opcional)</span></label><textarea id="nr_d" rows="4" placeholder="Conte o que aconteceu…">${esc(atual ? atual.detalheNR : '')}</textarea></div><div class="err" id="er"></div></div>
+    <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri" id="ok">${marcar ? 'Marcar como não realizada' : 'Salvar motivo'}</button></div>`);
+  const dica = () => { $('#nr_h').textContent = /^outro/i.test($('#nr_m').value) ? '(obrigatório para "Outro")' : '(opcional)'; };
+  $('#nr_m').onchange = dica; dica();
+  $('#ok').onclick = async () => {
+    $('#ok').disabled = true; $('#er').classList.remove('on');
+    const falhas = [];
+    for (const x of lista) { try { await api(`/api/cards/${x.id}/${marcar ? 'nao-realizada' : 'motivo'}`, { method: 'POST', body: { motivo: $('#nr_m').value, detalhe: $('#nr_d').value } }); } catch (e) { falhas.push(`${x.empresa} · ${x.segmento}: ${e.message}`); } }
+    if (!falhas.length) { fecha(true); aviso(marcar ? 'Visita marcada como não realizada. A tarefa foi criada para o vendedor quando for o caso.' : 'Motivo salvo.'); carrega(); return; }
+    $('#er').textContent = falhas.join(' | '); $('#er').classList.add('on'); $('#ok').disabled = false;
+  };
+}
 const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
 function tabelaVisitas(v, verEquipe) {
@@ -681,7 +704,7 @@ function tabelaVisitas(v, verEquipe) {
   const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
   const linhaTab = (c, filha) => {
     const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe === 'E' ? 'Estratégico' : c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${c.id}">Ver registro</button>` : c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}${eu.podeExcluir ? ` <button class="btn sm danger" data-del="${c.id}" title="Excluir visita">🗑</button>` : ''}</td></tr>`;
+    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe === 'E' ? 'Estratégico' : c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${c.id}">Ver registro</button>` : c.situacao === 'naorealizada' ? `<button class="btn sm ${c.motivoNR ? '' : 'pri'}" data-nrm="${c.id}" title="${esc(c.motivoNR ? c.motivoNR + (c.detalheNR ? ' — ' + c.detalheNR : '') : 'Motivo não informado')}">${c.motivoNR ? 'Motivo' : 'Informar motivo'}</button>` : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}${eu.podeExcluir ? ` <button class="btn sm danger" data-del="${c.id}" title="Excluir visita">🗑</button>` : ''}</td></tr>`;
   };
   const grupos = [];                                                  // linhas seguidas da mesma empresa viram um grupo recolhível
   for (const c of v) { const g = grupos[grupos.length - 1]; if (g && c.empresaId && g[0].empresaId === c.empresaId) g.push(c); else grupos.push([c]); }
@@ -711,12 +734,12 @@ function linha(c) {
   return `<div class="item ${c.situacao}">
     <div class="main">
       <div class="emp">${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</div>
-      <div class="tags"><span class="tag seg">${esc(c.segmento)}</span>${c.supervisorNome ? `<span class="tag" title="Supervisor que acompanhou">👔 ${esc(c.supervisorNome)}</span>` : ''}<span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag ${c.classe === 'E' ? 'warn' : ''}">${c.classe === 'E' ? esc(clsNome(c.classe)) : 'Classe ' + esc(c.classe)}</span>` : ''}${c.segmentoEmpresa ? `<span class="tag emp" title="Segmento da empresa">${esc(c.segmentoEmpresa)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
+      <div class="tags"><span class="tag seg">${esc(c.segmento)}</span>${c.situacao === 'naorealizada' ? (c.motivoNR ? `<span class="tag warn" title="${esc(c.detalheNR || '')}">Motivo: ${esc(c.motivoNR)}</span>` : '<span class="tag warn">Motivo não informado</span>') : ''}${c.supervisorNome ? `<span class="tag" title="Supervisor que acompanhou">👔 ${esc(c.supervisorNome)}</span>` : ''}<span class="tag">${esc(c.cargo)}</span>${c.classe ? `<span class="tag ${c.classe === 'E' ? 'warn' : ''}">${c.classe === 'E' ? esc(clsNome(c.classe)) : 'Classe ' + esc(c.classe)}</span>` : ''}${c.segmentoEmpresa ? `<span class="tag emp" title="Segmento da empresa">${esc(c.segmentoEmpresa)}</span>` : ''}${c.tipoEmpresa ? `<span class="tag">${esc(c.tipoEmpresa)}</span>` : ''}${c.reprogramacoes ? `<span class="tag warn">Alterada ${c.reprogramacoes}×</span>` : ''}</div>
       <div class="meta"><span>Última visita: <b>${c.ultima ? fmt(c.ultima) : 'nunca registrada'}</b>${c.diasDesdeUltima !== null && c.diasDesdeUltima !== undefined ? ` (há ${c.diasDesdeUltima} dias)` : ''}</span>${c.ciclo ? `<span>Ciclo: <b>a cada ${c.ciclo} dias</b></span>` : ''}${dados.visao !== 'minhas' ? `<span>Responsável: <b>${esc(c.responsavelNome)}</b></span>` : ''}</div>
       ${eq || extras ? `<div class="pessoas">${eq}${extras}</div>` : ''}
     </div>
     <div class="due"><small>Programada</small><b>${fmt(c.data)}</b><span>${q}</span></div>
-    <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>${c.situacao === 'finalizado' ? `<div class="acts"><button class="btn pri" data-ver="${c.id}">Ver registro</button></div>` : ''}` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
+    <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>${c.situacao === 'finalizado' ? `<div class="acts"><button class="btn pri" data-ver="${c.id}">Ver registro</button></div>` : `<div class="acts"><button class="btn ${c.motivoNR ? '' : 'pri'}" data-nrm="${c.id}">${c.motivoNR ? 'Alterar motivo' : 'Informar motivo'}</button></div>`}` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
       <div class="links">${eu.podeExcluir ? `<a href="#" class="danger" data-del="${c.id}">Excluir</a>` : ''}${c.situacao !== 'finalizado' && c.situacao !== 'naorealizada' ? `<a href="#" data-part="${c.id}">Participantes${(c.participantes || []).length ? ` (${c.participantes.length})` : ''}</a>` : ''}${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
 }
 // Janela: clicar FORA dela não fecha (o que o usuário digitou não se perde). Fechar pelos botões pergunta antes se houver algo digitado.
@@ -963,6 +986,7 @@ async function cfg(d) {
  <label><input type="checkbox" id="ha" style="width:auto" ${c.hierarquiaAuto ? 'checked' : ''}> Preencher Supervisor, Coordenador, Gerente e Diretor vazios pela estrutura da empresa (a partir do departamento do Vendedor)</label>
     <label><input type="checkbox" id="ap" style="width:auto" ${c.atualizarProxima ? 'checked' : ''}> Gravar "Próxima Visita" do segmento na empresa</label>
     <div class="fld"><label>Motores: qual par de datas é o oficial?</label><select id="md"><option value="secao" ${c.motoresDatas === 'secao' ? 'selected' : ''}>Campos da seção (Próxima/Última Visita)</option><option value="extra" ${c.motoresDatas === 'extra' ? 'selected' : ''}>Campos extras (Data Próxima Visita / Última Visita)</option></select></div>
+    <div class="fld"><label>Motivos de visita não realizada <span class="hint">(um por linha; é a lista que o vendedor escolhe. "Outro" exige texto)</span></label><textarea id="mnr" rows="6">${esc((c.motivosNaoRealizada || []).join('\n'))}</textarea></div>
     <label style="display:block"><input type="checkbox" id="rsc" style="width:auto" ${c.removerSemClasse !== false ? 'checked' : ''}> <b>Remover a visita quando a classe ficar em branco</b> no cadastro da empresa (A, B, C ou Clientes Estratégicos). É automático: o card sai da fila, as tarefas são encerradas e a visita volta a nascer se a classe for preenchida de novo.</label>
     <label><input type="checkbox" id="rb" style="width:auto" ${c.respeitarBitrix !== false ? 'checked' : ''}> <b>Respeitar as permissões do Bitrix24</b> — o usuário só vê aqui os registros que o Bitrix24 também permite ver (recomendado)</label>
     <div class="fld"><label>Quem enxerga todas as visitas. O chefe do departamento raiz já enxerga tudo.</label><div id="pk_vt"></div></div>
@@ -1072,7 +1096,7 @@ const SIT = { atrasada: 'Atrasada', dia: 'Hoje', aguardando: 'No prazo', finaliz
 const DB = { dados: null, pag: 'fila', f: { meses: 6, seg: '', ramo: '', resp: '', tipo: '', classe: '', emp: '', vend: '' }, sel: {}, tab: { col: null, dir: 1, q: '', pg: 0 } };
 const nf = n => Number(n).toLocaleString('pt-BR');
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
-const SELNOME = { sup: 'Supervisor', seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
+const SELNOME = { mnr: 'Motivo', vnd: 'Vendedor', supn: 'Supervisor', sup: 'Supervisor', seg: 'Segmento', cargo: 'Cargo', situacao: 'Situação', resp: 'Responsável', classe: 'Classe', semana: 'Semana', aging: 'Atraso', mes: 'Mês', ant: 'Antecipada', prazo: 'Prazo', motivo: 'Motivo', quem: 'Vendedor' };
 let dashTent = 0;
 async function dashboard() {
   const espera = msg => { $('#main').innerHTML = `<div class="vazio">${msg}</div>`; setTimeout(() => { if (aba === 'dash') dashboard().catch(e => { $('#main').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; }); }, 3000); };
@@ -1114,6 +1138,7 @@ function dashFiltra(ex = []) {
   const okR = r => !f.ramo || r.ramo === f.ramo;
   const okC = c => eq(c.empresa) && okR(c) && (!f.vend || c.vendedor === f.vend) && (!f.seg || c.segmento === f.seg) && (!f.resp || String(c.resp) === f.resp) && (!f.tipo || (c.tipo || '').toLowerCase() === f.tipo) && (!f.classe || c.classe === f.classe)
     && (!u('seg') || c.segmento === s.seg) && (!u('cargo') || c.cargo === s.cargo) && (!u('situacao') || c.situacao === s.situacao) && (!u('resp') || String(c.resp) === s.resp) && (!u('classe') || c.classe === s.classe)
+    && (!u('mnr') || (c.motivo || '(não informado)') === s.mnr) && (!u('vnd') || c.vendedor === s.vnd) && (!u('supn') || (c.supervisorNome || '(sem supervisor)') === s.supn)
     && (!u('semana') || (c.situacao !== 'atrasada' && c.situacao !== 'finalizado' && c.dias != null && Math.floor(c.dias / 7) === +s.semana))
     && (!u('aging') || (c.situacao === 'atrasada' && -c.dias >= AGING[+s.aging][1] && -c.dias <= AGING[+s.aging][2]));
   const cards = d.cards.filter(okC);
@@ -1283,6 +1308,32 @@ function paginaSup() {
     { h: 'Supervisor', txt: r => r.supervisorNome || '—' }, { h: 'Segmento', txt: r => r.segmento }, { h: 'Programada', txt: r => (r.programada || '').split('-').reverse().join('/'), ord: r => r.programada || '' },
     { h: 'Ações', txt: () => '', html: r => r.card ? `<button class="btn sm" data-dver="${r.card}">Ver registro</button>` : '' }], 'participacao-supervisores')}`;
 }
+function paginaNR() {
+  const F = dashFiltra(), ini = F.meses[0] + '-01';
+  const periodo = ex => dashFiltra(ex).cards.filter(c => (c.situacao === 'naorealizada' || c.situacao === 'finalizado') && c.data && c.data >= ini);
+  const base = periodo(), nr = base.filter(c => c.situacao === 'naorealizada'), re = base.filter(c => c.situacao === 'finalizado');
+  const comMotivo = nr.filter(c => c.motivo).length;
+  const taxa = pct(re.length, re.length + nr.length);
+  const vendNR = new Set(nr.map(c => c.vendedor)).size;
+  const topMot = contar(nr, c => c.motivo || '(não informado)')[0];
+  const porMotivo = contar(periodo(['mnr']).filter(c => c.situacao === 'naorealizada'), c => c.motivo || '(não informado)').map(([k, n], i) => [k, n, k === '(não informado)' ? '#cbd5e1' : PBI[i % PBI.length]]);
+  const porSup = contar(periodo(['supn']).filter(c => c.situacao === 'naorealizada'), c => c.supervisorNome || '(sem supervisor)').slice(0, 12).map(([k, n]) => [k, n, PBI[3]]);
+  const vend = (() => { const m = new Map(); for (const c of periodo(['vnd'])) { const g = m.get(c.vendedor || '(sem vendedor)') || { r: 0, n: 0 }; c.situacao === 'finalizado' ? g.r++ : g.n++; m.set(c.vendedor || '(sem vendedor)', g); } return [...m.entries()].map(([n, g]) => ({ n, g, t: pct(g.r, g.r + g.n) })).sort((a, b) => a.t - b.t || b.g.n - a.g.n); })();
+  const cor = t => t >= 80 ? '#16a34a' : t >= 50 ? '#F5A623' : '#D93A3A';
+  const porVend = vend.slice(0, 15).map(x => [`${x.n} (${x.g.r} feitas / ${x.g.n} não)`, x.t, cor(x.t), x.n]);
+  const mm = F.meses, bm = periodo([]);
+  const det = [...nr].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  const semCampo = nr.length && comMotivo === 0;
+  return `${semCampo ? '<div class="info" style="margin-bottom:10px">Nenhuma visita não realizada tem motivo informado ainda. O vendedor recebe uma tarefa para informar; também dá para informar na tela principal (filtro Não realizadas).</div>' : ''}
+   <div class="g5">${kpi('Não realizadas', nf(nr.length), `últimos ${DB.f.meses} meses`, '#64748b', null, null, null, '✕')}${kpi('Taxa de registro', taxa + '%', `${nf(re.length)} registradas / ${nf(re.length + nr.length)} no período`, cor(taxa), null, null, null, '✓')}${kpi('Com motivo informado', pct(comMotivo, nr.length) + '%', `${nf(comMotivo)} de ${nf(nr.length)}`, comMotivo === nr.length ? '#16a34a' : '#F5A623', null, null, null, '✎')}${kpi('Vendedores com não realizadas', nf(vendNR), `${nf(vend.filter(x => x.t >= 80).length)} com taxa de 80% ou mais`, PBI[2], null, null, null, '☺')}${kpi('Motivo mais comum', topMot ? `<span style="font-size:15px;line-height:1.25;display:block">${esc(topMot[0])}</span>` : '—', topMot ? `${nf(topMot[1])} visita(s)` : '', PBI[3], null, null, null, '?')}</div>
+   <div class="g2w">${vz('Realizadas x não realizadas por mês', colunas(mm.map(mesCurto), mm, [{ nome: 'Registradas', cor: PBI[0], valores: mm.map(m => bm.filter(c => c.situacao === 'finalizado' && c.data.slice(0, 7) === m).length) }, { nome: 'Não realizadas', cor: COR.atrasada, valores: mm.map(m => bm.filter(c => c.situacao === 'naorealizada' && c.data.slice(0, 7) === m).length) }], 'mes'))}
+     ${vz('Motivos', hbar(porMotivo, { keys: ['mnr'] }))}</div>
+   <div class="g2">${vz('Está registrando? Taxa de registro por vendedor (verde ≥ 80%, amarelo ≥ 50%, vermelho abaixo)', hbar(porVend, { keys: ['vnd'], f: n => n + '%' }))}${vz('Não realizadas por supervisor', hbar(porSup, { keys: ['supn'] }))}</div>
+   ${detalhe(det, [
+    { h: 'Vendedor', txt: r => r.vendedor || '—' }, { h: 'Supervisor', txt: r => r.supervisorNome || '—' }, { h: 'Data da visita', txt: r => (r.data || '').split('-').reverse().join('/'), ord: r => r.data || '' },
+    { h: 'Empresa', txt: r => r.empresa || '—', html: r => lk(urlE(r.empresaId), r.empresa || '—') }, { h: 'Linha', txt: r => r.segmento }, { h: 'Motivo', txt: r => r.motivo || '(não informado)', html: r => r.motivo ? esc(r.motivo) : '<b style="color:#D93A3A">(não informado)</b>' },
+    { h: 'Detalhe', txt: r => r.detalhe || '' }, { h: 'Card', txt: () => '', html: r => DB.dados.base ? lk(`${DB.dados.base}/crm/type/1036/details/${r.id}/`, 'Abrir card') : '' }], 'visitas-nao-realizadas')}`;
+}
 function paginaRep() {
   const F = dashFiltra(), r = F.reprog, mediaD = r.length ? Math.round(r.reduce((a, x) => a + x.dias, 0) / r.length) : 0;
   const ro = ex => dashFiltra(ex).reprog, mm = F.meses;
@@ -1303,14 +1354,14 @@ function dashDesenha() {
   const vends = [...new Set([...d.cards.map(c => c.vendedor), ...d.visitas.map(v => v.vendedor), ...d.reprog.map(r => r.vendedor)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const ramos = [...new Set([...d.cards.map(c => c.ramo), ...d.visitas.map(v => v.ramo), ...d.reprog.map(r => r.ramo)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const empresas = [...new Set([...d.cards.map(c => c.empresa), ...d.visitas.map(v => v.empresa)].filter(Boolean))].sort((a, b) => a.localeCompare(b)).slice(0, 800);
-  const pagina = { fila: paginaFila, reg: paginaReg, rep: paginaRep, sup: paginaSup }[DB.pag]();
+  const pagina = { fila: paginaFila, reg: paginaReg, rep: paginaRep, sup: paginaSup, nr: paginaNR }[DB.pag]();
   const chips = Object.entries(DB.sel).map(([k, v]) => `<span class="chip" data-rm="${k}">${esc(SELNOME[k] || k)}: <b>${esc(selTxt(k, v))}</b> ✕</span>`).join('');
   document.body.classList.add('wide');
   const scrollY = window.scrollY;
   $('#main').innerHTML = `<div class="pbi">
     <div class="pbi-top"><div class="pbi-t"><b>Indicadores de visitas</b><span>${d.visao === 'tudo' ? 'Todos os responsáveis' : 'Sua equipe'} · atualizado ${hmBR(d.geradoEm)} · <a href="#" id="s_r2">atualizar</a></span></div>
       <div class="pbi-s">${sel('s_m', 'Período', [[3, 'Últimos 3 meses'], [6, 'Últimos 6 meses'], [12, 'Últimos 12 meses']], f.meses)}<label class="sl"><span>Empresa</span><input id="s_e" list="dl_emp" placeholder="Buscar empresa…" value="${esc(f.emp)}"><datalist id="dl_emp">${empresas.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>${sel('s_v', 'Vendedor', [['', 'Todos'], ...vends.map(x => [x, x])], f.vend)}${sel('s_ra', 'Segmento da empresa', [['', 'Todos'], ...ramos.map(x => [x, x])], f.ramo)}${sel('s_s', 'Linha', [['', 'Todas'], ...segs.map(x => [x, x])], f.seg)}${resps.length > 1 ? sel('s_r', 'Responsável', [['', 'Todos'], ...resps], f.resp) : ''}${temTipo ? sel('s_t', 'Tipo', [['', 'Todos'], ['industrial', 'Industrial'], ['marítimo', 'Marítimo']], f.tipo) : ''}${sel('s_c', 'Classe', [['', 'Todas'], ['A', 'A'], ['B', 'B'], ['C', 'C'], ['E', 'Estratégicos']], f.classe)}<button class="sl-x" id="s_x">Limpar tudo</button></div></div>
-    <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Visitas alteradas'], ['sup', 'Supervisores']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
+    <div class="pbi-pg">${[['fila', 'Fila de visitas'], ['reg', 'Registro de visitas'], ['rep', 'Visitas alteradas'], ['sup', 'Supervisores'], ['nr', 'Não realizadas']].map(([k, t]) => `<button class="${DB.pag === k ? 'on' : ''}" data-pg="${k}">${t}</button>`).join('')}</div>
     ${chips ? `<div class="chips-bar"><span>Filtros aplicados:</span>${chips}</div>` : '<div class="chips-bar dica">Dica: clique em qualquer barra, fatia, coluna ou indicador para filtrar a página e ver os registros abaixo.</div>'}
     <div class="pbi-cv">${pagina}</div>
 </div>`;

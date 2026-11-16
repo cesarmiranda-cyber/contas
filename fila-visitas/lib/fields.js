@@ -52,7 +52,7 @@ async function descobrir(bitrix, cfg) {
     }
     return { out, meta, fs };
   };
-  const fila = await itemMap(ETYPE.fila, { segmento: /segmento|setor/, cargo: /cargo/, classe: /classe/, data: /data (programada|prevista)|programada/ });
+  const fila = await itemMap(ETYPE.fila, { segmento: /segmento|setor/, cargo: /cargo/, classe: /classe/, data: /data (programada|prevista)|programada/, motivoNR: /motivo.*nao realiz/, detalheNR: /detalhe.*motivo/ });
   const visita = await itemMap(ETYPE.visita, {
     segmento: /setor|segmento/, filaId: /id da fila|fila/, antecipada: /antecipad/, resultado: /resultado|observac|conclus/,
     acompanhamento: /^acompanhamento/, supervisor: /supervisor.*acompanh/, dataHora: /data.*(hora|visita)/, responsavel: /responsavel|vendedor/,

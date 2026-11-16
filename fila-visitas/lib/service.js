@@ -247,6 +247,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       segmento: g('segmento') || reg.seg || parts[1], cargo: g('cargo') || reg.cargo || parts[2],
       classe: R.classeDe(g('classe')) || reg.classe || '', responsavel: +it.assignedById || null,
       data: (R.isoDate(map.fila.data ? it[map.fila.data] : null) || R.isoDate(it.closedate)), stageId: it.stageId, criadoEm: it.createdTime || null,
+      motivoNR: (map.fila.motivoNR && it[map.fila.motivoNR]) || '', detalheNR: (map.fila.detalheNR && it[map.fila.detalheNR]) || '',
     };
   };
 
@@ -870,6 +871,43 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
 
   // ---------- guardas (edição direta é revertida) ----------
   // Visita que não aconteceu até o fim do mês dela: vira "Não realizada" (sem poder alterar a data) e a próxima do ciclo é gerada.
+  // Marca um card como "Não realizada": etapa, comentário, tarefas antigas encerradas, próxima visita do ciclo e uma tarefa para o
+  // vendedor informar o motivo (com o link do registro). Usado no fim do mês (automático) e quando alguém marca à mão.
+  async function naoRealizarCard(it, c, { texto, motivo = '', detalhe = '', porUid = null } = {}) {
+    const { map } = await campos();
+    const h = hoje();
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: c.id, fields: { stageId: map.etapas.naoRealizada, ...(motivo && map.fila.motivoNR ? { [map.fila.motivoNR]: motivo } : {}), ...(detalhe && map.fila.detalheNR ? { [map.fila.detalheNR]: detalhe } : {}) } });
+    const chave = R.chaveFila(c.empresaId, c.segmento, c.cargo);
+    if (store.chave(chave) === c.id) store.setChave(chave, null);
+    store.log('nao-realizada', `Card ${c.id} marcado como não realizada (${c.titulo}, programada ${R.fmtBR(c.data)})${motivo ? ` — motivo: ${motivo}` : ''}`, { card: c.id });
+    try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: c.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `${texto || 'Visita não realizada.'}${motivo ? `\nMotivo: ${motivo}${detalhe ? ` — ${detalhe}` : ''}` : ''}` } }); } catch { /* sem comentário */ }
+    await encerrarTarefas(c.id, 'Visita não realizada.');
+    const reg = store.card(c.id) || {};
+    const vendedor = +((reg.equipe || {}).vendedor) || c.responsavel;
+    await notificar(c.responsavel, `A visita "${c.titulo}" foi marcada como não realizada.`);
+    // tarefa para o vendedor informar o motivo (some quando o motivo for informado)
+    if (!motivo || (porUid && +porUid !== +vendedor)) await criarTarefaMotivo(c, vendedor);
+    const aberto = (await cardsAbertosDaEmpresa(c.empresaId)).some(x => String(x.title).split(' | ').slice(1).join('|') === String(it.title).split(' | ').slice(1).join('|'));
+    const emp = await lerEmpresa(c.empresaId);
+    const sg = emp?.segs?.[c.segmento] || {};
+    const classe = sg.classe || c.classe;
+    if (!aberto && emp && R.CLASSES.includes(classe)) {
+      const nova = classe === 'E' ? R.addMonths([c.data, h].sort().pop(), 6) : [R.addDays(c.data, R.intervalo(store.config, c.cargo, classe) || 30), R.addDays(h, 1)].sort().pop();
+      const novoId = await criarCard({ empresa: emp, seg: c.segmento, cargo: c.cargo, classe, responsavel: sg[c.cargo.toLowerCase()] || c.responsavel, data: nova });
+      store.log('card-criado', `Próximo card ${novoId} gerado após não realizada: ${R.fmtBR(nova)}`, { card: novoId });
+      if (store.config.atualizarProxima) await gravarProxima(emp, c.segmento).catch(() => {});
+    }
+  }
+  async function criarTarefaMotivo(c, vendedor) {
+    try {
+      let base = ''; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ }
+      const link = base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : '';
+      const desc = `A visita de ${c.empresa} (${c.segmento} · ${c.cargo}), programada para ${R.fmtBR(c.data)}, ficou como NÃO REALIZADA.\n\n${link ? `[URL=${link}]Abrir o registro da visita[/URL]\n\n` : ''}No app Registro de Visitas, abra a visita (filtro "Não realizadas") e clique em "Informar motivo". Esta tarefa fecha sozinha quando o motivo for informado.`;
+      const r = await bitrix.call('tasks.task.add', { fields: { TITLE: `Informar o motivo da visita não realizada - ${c.empresa} (${c.segmento})`, DESCRIPTION: desc, RESPONSIBLE_ID: vendedor, DEADLINE: R.prazoUtil(clock(), 16), UF_CRM_TASK: [vinculoCard(c.id)] } });
+      store.log('tarefa', `Tarefa criada para ${vendedor}: informar o motivo da visita não realizada (card ${c.id})`, { card: c.id });
+      return r.result?.task?.id || null;
+    } catch (e) { store.log('aviso', `Tarefa do motivo (card ${c.id}) não criada: ${e.message}`); return null; }
+  }
   async function encerrarNaoRealizadas() {
     const { map } = await campos();
     if (!map.etapas.naoRealizada) return { marcadas: 0, semEtapa: true };
@@ -880,30 +918,51 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       if (c.classe === 'E') continue;                    // estratégicos não vencem no fim do mês
       const lim = R.mesLimite(c.data, it.createdTime ? R.todayBR(new Date(it.createdTime)) : null);
       if (!lim || lim >= mesHoje) continue;
-      await comTrava(`empresa:${c.empresaId}`, async () => {
-        await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: c.id, fields: { stageId: map.etapas.naoRealizada } });
-        const reg = store.card(c.id);
-        const chave = R.chaveFila(c.empresaId, c.segmento, c.cargo);
-        if (store.chave(chave) === c.id) store.setChave(chave, null);
-        store.log('nao-realizada', `Card ${c.id} marcado como não realizada (${c.titulo}, programada ${R.fmtBR(c.data)})`, { card: c.id });
-        try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: c.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `Visita não realizada no mês (${lim.split('-').reverse().join('/')}). A data não pode mais ser alterada.` } }); } catch { /* sem comentário */ }
-        await encerrarTarefas(c.id, 'Visita não realizada no mês.');
-        await notificar(c.responsavel, `A visita "${c.titulo}" não foi realizada no mês e foi marcada como não realizada.`);
-        const aberto = (await cardsAbertosDaEmpresa(c.empresaId)).some(x => String(x.title).split(' | ').slice(1).join('|') === String(it.title).split(' | ').slice(1).join('|'));
-        const emp = await lerEmpresa(c.empresaId);
-        const sg = emp?.segs?.[c.segmento] || {};
-        const classe = sg.classe || c.classe;
-        const n = R.intervalo(store.config, c.cargo, classe);
-        if (!aberto && emp && n) {
-          const nova = [R.addDays(c.data, n), R.addDays(h, 1)].sort().pop();
-          const novoId = await criarCard({ empresa: emp, seg: c.segmento, cargo: c.cargo, classe, responsavel: sg[c.cargo.toLowerCase()] || c.responsavel, data: nova });
-          store.log('card-criado', `Próximo card ${novoId} gerado após não realizada: ${R.fmtBR(nova)}`, { card: novoId });
-          if (store.config.atualizarProxima) await gravarProxima(emp, c.segmento).catch(() => {});
-        }
-      });
+      await comTrava(`empresa:${c.empresaId}`, () => naoRealizarCard(it, c, { texto: `Visita não realizada no mês (${lim.split('-').reverse().join('/')}). A data não pode mais ser alterada.` }));
       marcadas++;
     }
     return { marcadas };
+  }
+  // Marcar à mão como "Não realizada" (com o motivo) e informar/alterar o motivo depois.
+  const motivosPermitidos = () => store.config.motivosNaoRealizada || [];
+  function validaMotivo(motivo, detalhe) {
+    if (!String(motivo || '').trim()) throw erro('Escolha o motivo.', 422);
+    if (!motivosPermitidos().includes(motivo)) throw erro('Motivo inválido: escolha um da lista.', 422);
+    if (/^outro/i.test(motivo) && String(detalhe || '').trim().length < 3) throw erro('Descreva o motivo no campo de texto.', 422);
+  }
+  async function marcarNaoRealizada(cardId, { uid, motivo, detalhe = '', bearer = null }) {
+    if (!uid) throw erro('Usuário não identificado.', 401);
+    if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
+    validaMotivo(motivo, detalhe);
+    const { map } = await campos();
+    const it = (await bitrix.call('crm.item.get', { entityTypeId: F.ETYPE.fila, id: cardId })).result?.item;
+    if (!it) throw erro('Card da fila não encontrado.', 404);
+    const c = await dadosCard(it);
+    if (!(map.etapas.abertas || []).includes(it.stageId)) throw erro('Só uma visita em aberto pode ser marcada como não realizada.', 409);
+    const nome = await nomeUsuario(uid);
+    await comTrava(`empresa:${c.empresaId}`, () => naoRealizarCard(it, c, { texto: `Visita marcada como não realizada por ${nome}.`, motivo, detalhe: String(detalhe || '').trim(), porUid: uid }));
+    invalida();
+    return { ok: true };
+  }
+  async function informarMotivo(cardId, { uid, motivo, detalhe = '', bearer = null }) {
+    if (!uid) throw erro('Usuário não identificado.', 401);
+    if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
+    validaMotivo(motivo, detalhe);
+    const { map } = await campos();
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    if (card.stageId !== map.etapas.naoRealizada) throw erro('O motivo só se aplica a visitas não realizadas.', 409);
+    const f = {};
+    if (map.fila.motivoNR) f[map.fila.motivoNR] = motivo;
+    if (map.fila.detalheNR) f[map.fila.detalheNR] = String(detalhe || '').trim();
+    if (!map.fila.motivoNR) throw erro('O campo "Motivo da não realização" ainda não existe na Fila. Peça a um administrador para usar "Preparar o Bitrix" em Configurações.', 422);
+    await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: cardId, fields: f });
+    const nome = await nomeUsuario(uid);
+    try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: +cardId, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `Motivo informado por ${nome}: ${motivo}${String(detalhe || '').trim() ? ` — ${String(detalhe).trim()}` : ''}` } }); } catch { /* opcional */ }
+    await encerrarTarefas(cardId, `Motivo informado por ${nome}.`);
+    store.log('motivo-nao-realizada', `Card ${cardId}: motivo informado por ${nome}: ${motivo}`, { card: +cardId });
+    invalida();
+    return { ok: true };
   }
   // Participantes extras de uma visita (além da equipe do cadastro da empresa): passam a enxergar e a poder registrar a visita.
   async function definirParticipantes(cardId, { uid, ids = [], bearer = null }) {
@@ -1534,7 +1593,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         equipe, participantes: await Promise.all((l.part || []).map(async id => ({ id, nome: await nomeDe(id) }))), reprogramacoes: store.historico.filter(x => x.card === c.id && !x.tipo).length,
         urlEmpresa: base && c.empresaId ? `${base}/crm/company/details/${c.empresaId}/` : null, urlCard: base ? `${base}/crm/type/${F.ETYPE.fila}/details/${c.id}/` : null });
     });
-    return { hoje: h, bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || leves.some(l => +l.c.responsavel !== +uid) ? 'equipe' : 'minhas'), total, pagina, paginas, tamanho: size, colunas, counts, opcoes, visitas };
+    return { hoje: h, bitrix: !!permitidos, visao: todos ? 'tudo' : (time.size > 1 || leves.some(l => +l.c.responsavel !== +uid) ? 'equipe' : 'minhas'), total, pagina, paginas, tamanho: size, colunas, counts, opcoes, visitas, motivosNR: store.config.motivosNaoRealizada || [] };
   }
   // Dados em nível de linha para o dashboard (a tela agrega e filtra). Respeita a visibilidade de quem consulta.
   const cacheDash = new Map();
@@ -1592,6 +1651,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
       const d = await dadosCard(it), reg = store.card(it.id) || {};
       const vendId = (reg.equipe || {}).vendedor || ((await empDe(d.empresaId))?.segs?.[d.segmento] || {}).vendedor;
       cards.push({ ramo: await nomeRamo((await empDe(d.empresaId))?.ramo), vendedor: vendId ? await nome(vendId) : '', id: d.id, empresaId: d.empresaId, empresa: d.empresa, segmento: d.segmento, cargo: d.cargo, classe: d.classe || reg.classe || '', tipo: await tipoDe(d.empresaId), resp: d.responsavel, respNome: await nome(d.responsavel), _eq: { ...(reg.equipe || {}), ...Object.fromEntries((reg.participantes || []).map((u, i) => ['extra' + i, u])) },
+        motivo: d.motivoNR, detalhe: d.detalheNR, supervisorId: +((reg.equipe || {}).supervisor) || null, supervisorNome: (reg.equipe || {}).supervisor ? await nome(+reg.equipe.supervisor) : '', vendedorId: +((reg.equipe || {}).vendedor) || null,
         data: d.data, situacao: naoRealizada ? 'naorealizada' : finalizado ? 'finalizado' : R.etapaPara(d.data, h), dias: d.data ? R.dayDiff(h, d.data) : null });
     }
     // registros de visita
@@ -1680,6 +1740,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, lerEmpresa, dadosCard, camposVisita, formEdicao, editarRegistro, supervisoresDoBitrix, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, gerarProximaDeExcluida, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, lerEmpresa, dadosCard, marcarNaoRealizada, informarMotivo, camposVisita, formEdicao, editarRegistro, supervisoresDoBitrix, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, gerarProximaDeExcluida, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

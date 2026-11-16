@@ -887,3 +887,29 @@ test('excluir com "gerar a próxima": a visita some e nasce a próxima do ciclo 
   const vivo = cards(w).find(c => c.stageId !== w.stages.removido);
   assert.equal((await svc.excluirCard(vivo.id, { uid: 20 })).proxima.criada, false);
 });
+
+test('não realizada: motivo (lista + texto), tarefa para o vendedor com o link do registro, que fecha quando o motivo é informado', async () => {
+  const { w, svc, store } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  w.extraFields = { 1036: { ufCrm_mot: { title: 'Motivo da não realização', type: 'string' }, ufCrm_det: { title: 'Detalhe do motivo', type: 'string' } } };
+  await svc.campos(true);
+  await svc.sincronizarEmpresa(1);
+  const card = cards(w)[0];
+  await assert.rejects(() => svc.marcarNaoRealizada(card.id, { uid: 20, motivo: 'Inventado' }), /Motivo inválido/);
+  await assert.rejects(() => svc.marcarNaoRealizada(card.id, { uid: 20, motivo: 'Outro' }), /Descreva/);
+  // supervisor/gerente (uid 20) marca com motivo: o vendedor recebe a tarefa
+  await svc.marcarNaoRealizada(card.id, { uid: 20, motivo: 'Cliente adiou ou cancelou', detalhe: 'Fábrica em parada' });
+  assert.equal(card.ufCrm_mot, 'Cliente adiou ou cancelou'); assert.equal(card.ufCrm_det, 'Fábrica em parada');
+  const t = w.tasks.find(x => /Informar o motivo/.test(x.title));
+  assert.ok(t, 'tarefa criada'); assert.equal(t.status, 2);
+  assert.ok(cards(w).some(c => c.id !== card.id && c.stageId !== w.stages.removido), 'a próxima visita do ciclo nasce');
+  // vendedor informa/ajusta o motivo: a tarefa fecha
+  await svc.informarMotivo(card.id, { uid: 10, motivo: 'Cliente indisponível / sem agenda', detalhe: '' });
+  assert.equal(card.ufCrm_mot, 'Cliente indisponível / sem agenda');
+  assert.equal(w.tasks.find(x => /Informar o motivo/.test(x.title)).status, 5, 'tarefa encerrada');
+  await assert.rejects(() => svc.informarMotivo(cards(w).find(c => c.id !== card.id).id, { uid: 10, motivo: 'Outro', detalhe: 'xx yy' }), /não realizadas/);
+  // o próprio vendedor marcando com motivo não gera tarefa
+  const outra = cards(w).find(c => c.id !== card.id && c.stageId !== w.stages.removido);
+  const antes = w.tasks.length;
+  await svc.marcarNaoRealizada(outra.id, { uid: 10, motivo: 'Vendedor sem tempo / agenda cheia' });
+  assert.equal(w.tasks.filter(x => /Informar o motivo/.test(x.title)).length, 1, 'sem nova tarefa quando o vendedor mesmo informa');
+});

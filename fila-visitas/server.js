@@ -96,6 +96,7 @@ const routes = {
     for (const k of ['acessoConfig', 'acessoDashboard', 'acessoExcluir']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
     if (p.acessoConfig && p.acessoConfig.length && id.uid && !p.acessoConfig.includes(+id.uid)) p.acessoConfig.push(+id.uid); // evita se trancar para fora
     if (['app', 'bitrix'].includes(b.visibilidade)) p.visibilidade = b.visibilidade;
+    if (Array.isArray(b.motivosNaoRealizada)) p.motivosNaoRealizada = [...new Set(b.motivosNaoRealizada.map(x => String(x).trim()).filter(Boolean))].slice(0, 30);
     if (Array.isArray(b.cargosFila)) p.cargosFila = ['Vendedor', ...R.CARGOS.filter(c => c !== 'Vendedor' && b.cargosFila.includes(c))];
     for (const k of ['supervisoresDepts', 'supervisoresExtras']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
     if (Array.isArray(b.verTudo)) p.verTudo = b.verTudo.map(Number).filter(Boolean);
@@ -155,13 +156,14 @@ const server = http.createServer(async (req, res) => {
     }
     const mr = u.pathname.match(/^\/api\/cards\/(\d+)\/registro$/);
     if (mr && req.method === 'GET') { exige(); const idr = await quem(req, u); return send(res, 200, await svc.registroVisita(+mr[1], { bearer: idr.bearer, uid: idr.verificado ? idr.uid : null })); }
-    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes|excluir|restaurar|proxima)$/);
+    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes|excluir|restaurar|proxima|nao-realizada|motivo)$/);
     if (m && req.method === 'POST') {
       exige();
       const id = await quem(req, u), b = await readBody(req, m[2] === 'registrar' ? 36e6 : 1e6);
       if (!(await svc.podeVerCard(id.bearer, +m[1]))) throw nega('Você não tem permissão no Bitrix24 para este registro.');
       const uid = id.verificado ? id.uid : +(b.uid || id.uid) || null;
       if (m[2] === 'excluir') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24 para excluir visitas.'); return send(res, 200, await svc.excluirCard(+m[1], { uid: id.uid, motivo: b.motivo, bearer: id.bearer, gerarProxima: b.gerarProxima !== false })); }
+      if (m[2] === 'nao-realizada' || m[2] === 'motivo') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24.'); const f = m[2] === 'motivo' ? svc.informarMotivo : svc.marcarNaoRealizada; return send(res, 200, await f(+m[1], { uid: id.uid, motivo: b.motivo, detalhe: b.detalhe, bearer: id.bearer })); }
       if (m[2] === 'proxima') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24.'); return send(res, 200, await svc.gerarProximaDeExcluida(+m[1], { uid: id.uid })); }
       if (m[2] === 'restaurar') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24.'); return send(res, 200, await svc.restaurarCard(+m[1], { uid: id.uid })); }
       if (m[2] === 'participantes') return send(res, 200, await svc.definirParticipantes(+m[1], { ids: b.ids, uid, bearer: id.bearer }));

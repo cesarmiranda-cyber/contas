@@ -35,6 +35,8 @@ async function preparar(bitrix, svc) {
   const eFila = `CRM_${(d.map.fila.segmento || '').match(/^ufCrm(\d+)_/)?.[1] || 11}`, eVis = `CRM_${(d.map.visita.segmento || '').match(/^ufCrm(\d+)_/)?.[1] || 9}`;
   if (!d.map.fila.cargo) await criar(eFila, 'Fila', 'CARGO', 'string', 'Cargo');
   if (!d.map.fila.data) await criar(eFila, 'Fila', 'DATA_PROGRAMADA', 'date', 'Data programada');
+  if (!d.map.fila.motivoNR) await criar(eFila, 'Fila', 'MOTIVO_NAO_REALIZADA', 'string', 'Motivo da não realização');
+  if (!d.map.fila.detalheNR) await criar(eFila, 'Fila', 'DETALHE_MOTIVO', 'string', 'Detalhe do motivo', { settings: { ROWS: 4 } });
   if (!d.map.visita.resultado) await criar(eVis, 'Registro', 'RESULTADO', 'string', 'Resultado / observações', { settings: { ROWS: 5 } });
   if (!d.map.visita.acompanhamento) await criar(eVis, 'Registro', 'ACOMPANHAMENTO', 'string', 'Acompanhamento');
   if (!d.map.visita.supervisor) await criar(eVis, 'Registro', 'SUPERVISOR', 'employee', 'Supervisor que acompanhou');
