@@ -778,3 +778,24 @@ test('contato da visita: lista os contatos da empresa, grava no registro, lembra
   assert.deepEqual(r2.contatosHistorico.map(c => c.nome).sort(), ['Ana Souza', 'Bruno Lima'], 'o histórico mantém os dois contatos');
   assert.equal(r2.contatosHistorico[0].id, 2, 'o mais recente primeiro');
 });
+
+test('excluir visitas: só quem tem permissão; o card vai para Removido, não é recriado e pode ser restaurado', async () => {
+  const { w, svc, store } = setup({ __cfg: { cargosFila: ['Vendedor'] } });
+  await svc.sincronizarEmpresa(1);
+  const card = cards(w)[0];
+  await assert.rejects(() => svc.excluirCard(card.id, { uid: 10 }), /permissão/);
+  store.setConfig({ acessoExcluir: [20] });
+  assert.equal(svc.podeExcluir(20), true); assert.equal(svc.podeExcluir(10), false);
+  const r = await svc.excluirCard(card.id, { uid: 20, motivo: 'Cadastro duplicado' });
+  assert.equal(r.ok, true); assert.equal(card.stageId, w.stages.removido);
+  assert.ok(w.comments.some(c => /excluída/.test(c.COMMENT || '')));
+  await svc.sincronizarEmpresa(1);
+  assert.equal(cards(w).filter(c => c.stageId !== w.stages.removido).length, 0, 'a sincronização não recria o card excluído');
+  assert.equal((await svc.listarExcluidos()).length, 1);
+  await assert.rejects(() => svc.excluirCard(card.id, { uid: 20 }), /já foi excluída/);
+  await svc.restaurarCard(card.id, { uid: 20 });
+  assert.notEqual(card.stageId, w.stages.removido);
+  assert.equal((await svc.listarExcluidos()).length, 0);
+  store.setConfig({ admins: [30] });
+  assert.equal(svc.podeExcluir(30), true, 'administrador também pode');
+});

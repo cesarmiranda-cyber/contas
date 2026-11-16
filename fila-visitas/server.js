@@ -57,7 +57,7 @@ function exigeDashboard(id) {
 }
 const routes = {
   'GET /health': async () => ({ ok: true }),
-  'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '', podeConfig: svc.acessoRestrito() ? !!(id.verificado && svc.podeConfigurar(id.uid)) : true, podeDashboard: svc.acessoRestrito() ? !!(id.verificado && svc.podeDashboard(id.uid)) : true }),
+  'GET /api/eu': async (_, __, id) => ({ ...id, admin: id.uid ? svc.isAdmin(id.uid) : false, nome: id.uid ? await svc.nomeUsuario(id.uid) : '', podeConfig: svc.acessoRestrito() ? !!(id.verificado && svc.podeConfigurar(id.uid)) : true, podeDashboard: svc.acessoRestrito() ? !!(id.verificado && svc.podeDashboard(id.uid)) : true, podeExcluir: !!(id.verificado && svc.podeExcluir(id.uid)) }),
   'GET /api/dashboard': async (_, __, id) => { exige(); exigeDashboard(id); return svc.dashboardDados({ uid: id.uid, bearer: id.bearer }); },
   'GET /api/usuarios': async () => { exige(); return svc.usuarios(); },
   'GET /api/visitas': async (u, _, id) => {
@@ -65,6 +65,7 @@ const routes = {
     const g = k => u.searchParams.get(k) || '';
     if (g('page')) return svc.listarVisitasPag({ uid: id.uid, bearer: id.bearer, escopo: g('escopo') || 'auto', page: +g('page'), size: +g('size') || 20, kanban: g('kanban') === '1', q: g('q'), status: g('status') || 'abertas', per: g('per'), de: g('de'), ate: g('ate'), seg: g('seg'), tipo: g('tipo'), classe: g('classe'), resp: g('resp'), vend: g('vend'), ramo: g('ramo'), ord: g('ord') || 'data', dir: +g('dir') || 1, cardId: g('cardId'), soIds: g('soIds') === '1' }); return svc.listarVisitas({ uid: id.uid, escopo: u.searchParams.get('escopo') || 'auto', bearer: id.bearer, encerradas: u.searchParams.get('encerradas') === '1' }); },
   'GET /api/ver-como': async (u, __, id) => { exigeConfig(id); exige(); const alvo = +u.searchParams.get('usuario'); if (!alvo) throw Object.assign(new Error('Escolha um usuário.'), { status: 400 }); return svc.verComo(alvo); },
+  'GET /api/excluidos': async (_, __, id) => { exigeConfig(id); exige(); return { excluidos: await svc.listarExcluidos() }; },
   'GET /api/departamentos': async (_, __, id) => { exigeConfig(id); exige(); return { departamentos: await svc.departamentos() }; },
   'GET /api/ramos': async (_, __, id) => { exigeConfig(id); exige(); return { ramos: await svc.listaRamos() }; },
   'GET /api/historico': async (_, __, id) => { let base = null; try { base = new URL(bitrix.base).origin; } catch { /* sem webhook */ } return { reprogramacoes: id.uid ? await svc.historicoVisivel(id.uid, id.bearer) : [], base }; },
@@ -91,7 +92,7 @@ const routes = {
       }
     }
     if (b.tipoPorRamo && typeof b.tipoPorRamo === 'object') { p.tipoPorRamo = {}; for (const [k, t] of Object.entries(b.tipoPorRamo)) if (['Industrial', 'Marítimo', ''].includes(t) && /^[\w-]+$/.test(k)) p.tipoPorRamo[k] = t; }
-    for (const k of ['acessoConfig', 'acessoDashboard']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
+    for (const k of ['acessoConfig', 'acessoDashboard', 'acessoExcluir']) if (Array.isArray(b[k])) p[k] = b[k].map(Number).filter(Boolean);
     if (p.acessoConfig && p.acessoConfig.length && id.uid && !p.acessoConfig.includes(+id.uid)) p.acessoConfig.push(+id.uid); // evita se trancar para fora
     if (['app', 'bitrix'].includes(b.visibilidade)) p.visibilidade = b.visibilidade;
     if (Array.isArray(b.cargosFila)) p.cargosFila = ['Vendedor', ...R.CARGOS.filter(c => c !== 'Vendedor' && b.cargosFila.includes(c))];
@@ -145,12 +146,14 @@ const server = http.createServer(async (req, res) => {
     if (mf && req.method === 'GET') { exige(); { const idf = await quem(req, u); if (!(await svc.podeVerCard(idf.bearer, +mf[1]))) throw nega('Você não tem permissão no Bitrix24 para ver este registro.'); } return send(res, 200, await svc.camposVisita(+mf[1])); }
     const mr = u.pathname.match(/^\/api\/cards\/(\d+)\/registro$/);
     if (mr && req.method === 'GET') { exige(); const idr = await quem(req, u); return send(res, 200, await svc.registroVisita(+mr[1], { bearer: idr.bearer })); }
-    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes)$/);
+    let m = u.pathname.match(/^\/api\/cards\/(\d+)\/(registrar|reprogramar|participantes|excluir|restaurar)$/);
     if (m && req.method === 'POST') {
       exige();
       const id = await quem(req, u), b = await readBody(req, m[2] === 'registrar' ? 36e6 : 1e6);
       if (!(await svc.podeVerCard(id.bearer, +m[1]))) throw nega('Você não tem permissão no Bitrix24 para este registro.');
       const uid = id.verificado ? id.uid : +(b.uid || id.uid) || null;
+      if (m[2] === 'excluir') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24 para excluir visitas.'); return send(res, 200, await svc.excluirCard(+m[1], { uid: id.uid, motivo: b.motivo, bearer: id.bearer })); }
+      if (m[2] === 'restaurar') { if (!id.verificado) throw nega('Abra o app pelo Bitrix24.'); return send(res, 200, await svc.restaurarCard(+m[1], { uid: id.uid })); }
       if (m[2] === 'participantes') return send(res, 200, await svc.definirParticipantes(+m[1], { ids: b.ids, uid, bearer: id.bearer }));
       return send(res, 200, m[2] === 'registrar' ? await svc.registrarVisita(+m[1], { ...b, uid }) : await svc.reprogramar(+m[1], { ...b, uid }));
     }

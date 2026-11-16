@@ -351,6 +351,7 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
         // Empresa que já tem Última e Próxima Visita: o card do Vendedor NASCE na data da Próxima Visita (sem partir de uma visita nova).
         const dataNova = (cargo === 'Vendedor' && s.ultima && s.proxima) ? s.proxima : calc;
         const existente = abertos.get(chave);
+        if (!existente && (store.job('excluidos') || {})[chave]) continue;     // visita excluída por um usuário: não recria até restaurar
         if (!existente) {
           const idx = store.chave(chave);
           if (idx) { // índice local aponta para card que já não está aberto: libera a chave
@@ -893,6 +894,62 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     store.log('ajuste-datas', `Datas iniciais ajustadas por classe: ${plano.aplicados} card(s), ${plano.erros.length} erro(s)`);
     return plano;
   }
+  // ---------- excluir visitas (controle de acesso) ----------
+  // "Excluir" move o card para a etapa Removido (não apaga do Bitrix: dá para restaurar), encerra as tarefas e impede que a
+  // sincronização recrie o card dessa empresa/linha até alguém restaurar.
+  const idsLista = l => (l || []).map(Number).filter(Boolean);
+  function podeExcluir(uid) {
+    const c = store.config;
+    return !!uid && (idsLista(c.acessoExcluir).includes(+uid) || idsLista(c.admins).includes(+uid));
+  }
+  async function excluirCard(cardId, { uid, motivo = '', bearer = null }) {
+    if (!podeExcluir(uid)) throw erro('Você não tem permissão para excluir visitas. Peça a um administrador em Configurações → Acesso.', 403);
+    if (!await podeVerCard(bearer, cardId)) throw erro('Você não tem acesso a esta visita.', 403);
+    const { map } = await campos();
+    if (!map.etapas.removido) throw erro('Não encontrei a etapa "Removido" no kanban da Fila.', 500);
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    if (card.stageId === map.etapas.removido) throw erro('Esta visita já foi excluída.', 409);
+    const chave = R.chaveFila(card.empresaId, card.segmento, card.cargo);
+    await comTrava(`empresa:${card.empresaId}`, async () => {
+      await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.removido } });
+      if (store.chave(chave) === card.id) store.setChave(chave, null);
+      const ex = { ...(store.job('excluidos') || {}) };
+      ex[chave] = { card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, stageAntes: card.stageId, por: +uid, em: new Date().toISOString(), motivo: String(motivo || '').trim() };
+      store.setJob('excluidos', ex);
+      store.setSnapCard(card.id, { data: card.data, resp: card.responsavel });
+    });
+    const nome = await nomeUsuario(uid);
+    try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `Visita excluída por ${nome} em ${clock().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.${motivo ? `\nMotivo: ${String(motivo).trim()}` : ''}` } }); } catch { /* comentário é opcional */ }
+    await encerrarTarefas(card.id, 'Visita excluída.');
+    store.log('card-excluido', `Card ${card.id} (${card.titulo}) excluído por ${nome}${motivo ? `: ${String(motivo).trim()}` : ''}`, { card: card.id });
+    invalida();
+    return { ok: true, id: card.id };
+  }
+  async function restaurarCard(cardId, { uid }) {
+    if (!podeExcluir(uid)) throw erro('Você não tem permissão para restaurar visitas.', 403);
+    const { map } = await campos();
+    const card = await lerCard(cardId);
+    if (!card) throw erro('Card da fila não encontrado.', 404);
+    if (card.stageId !== map.etapas.removido) throw erro('Esta visita não está excluída.', 409);
+    const chave = R.chaveFila(card.empresaId, card.segmento, card.cargo);
+    const abertos = (await cardsAbertosDaEmpresa(card.empresaId)).filter(it => R.chaveFila(card.empresaId, ...String(it.title).split(' | ').slice(1, 3)) === chave);
+    if (abertos.length) throw erro('Já existe uma visita aberta para esta empresa e linha.', 409);
+    const stage = map.etapas[R.etapaPara(card.data, hoje())] || map.etapas.aguardando;
+    await comTrava(`empresa:${card.empresaId}`, async () => {
+      await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: stage } });
+      store.setChave(chave, card.id);
+      const ex = { ...(store.job('excluidos') || {}) }; delete ex[chave]; store.setJob('excluidos', ex);
+      store.setSnapCard(card.id, { data: card.data, resp: card.responsavel });
+    });
+    store.log('card-restaurado', `Card ${card.id} (${card.titulo}) restaurado por ${await nomeUsuario(uid)}`, { card: card.id });
+    invalida();
+    return { ok: true, id: card.id };
+  }
+  async function listarExcluidos() {
+    const ex = store.job('excluidos') || {};
+    return Promise.all(Object.values(ex).sort((a, b) => String(b.em).localeCompare(String(a.em))).map(async x => ({ ...x, porNome: await nomeUsuario(x.por) })));
+  }
   // Prévia (só leitura) de "encerrar a fila atual e começar um novo ciclo": para cada card aberto calcula a data que o card teria
   // se fosse recriado hoje pelas regras (mesma conta da sincronização). Não escreve nada no Bitrix.
   async function previaNovoCiclo() {
@@ -1427,6 +1484,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, lerEmpresa, dadosCard, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, lerEmpresa, dadosCard, camposVisita, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, podeExcluir, excluirCard, restaurarCard, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

@@ -311,6 +311,9 @@ body.wide main{padding-top:12px}
 .rg-t{white-space:pre-wrap;overflow-wrap:anywhere}.rg-f.dest{background:#f0f7ff;margin:0 -8px;padding:8px;border-radius:8px;border-top:0}.rg-f a{color:var(--brand)}
 
 .tel{position:relative;cursor:help;border-bottom:1px dotted #94a3b8}.tel:hover::after{content:attr(data-tip);position:absolute;left:0;top:100%;margin-top:4px;background:#1e293b;color:#fff;padding:5px 9px;border-radius:7px;font-size:12px;white-space:nowrap;z-index:50;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+
+#lixeira{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#fee2e2;color:#991b1b;border:2px dashed #ef4444;border-radius:14px;padding:16px 28px;font-weight:700;display:none;z-index:98}#lixeira.on{display:block}#lixeira.alvo{background:#ef4444;color:#fff}
+.danger{color:#b91c1c}.btn.danger{border-color:#fecaca}.btn.danger:hover{background:#fee2e2;border-color:#ef4444;color:#991b1b}.btn.pri.danger{background:#dc2626;border-color:#dc2626;color:#fff}.btn.pri.danger:hover{background:#b91c1c;color:#fff}.links a.danger{color:#b91c1c}
 </style>
 </head>
 <body>
@@ -472,6 +475,7 @@ function lista() {
   document.querySelectorAll('[data-rep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.rep));
   document.querySelectorAll('[data-part]').forEach(b => b.onclick = e => { e.preventDefault(); participantes(+b.dataset.part); });
   document.querySelectorAll('[data-ver]').forEach(b => b.onclick = e => { e.stopPropagation(); verRegistro(+b.dataset.ver); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation(); excluirCards([+b.dataset.del]); });
   if (VP.view === 'kanban') ligaKanban();
 }
 
@@ -505,14 +509,14 @@ function cartaoKanban(grp, col, verEquipe) {
   const resp = [...new Set(grp.map(x => x.responsavelNome).filter(Boolean))];
   const abertas = col === 'atrasada' || col === 'dia' || col === 'aguardando';
   const linhaItem = x => `<div class="ki" draggable="true" data-kid="${x.id}" data-kcol="${col}"><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span><span class="kid" title="${esc(prazoTxt(x))}">${fmt(x.data)}</span>
-      <span class="kia">${col === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${abertas ? `<button class="btn sm pri" data-reg="${x.id}" title="Registrar visita">Registrar</button><button class="btn sm" data-rep="${x.id}" title="Alterar visita (nova data)">↻</button>` : ''}</span></div>`;
+      <span class="kia">${eu.podeExcluir ? `<button class="btn sm danger" data-del="${x.id}" title="Excluir visita">🗑</button>` : ''}${col === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${abertas ? `<button class="btn sm pri" data-reg="${x.id}" title="Registrar visita">Registrar</button><button class="btn sm" data-rep="${x.id}" title="Alterar visita (nova data)">↻</button>` : ''}</span></div>`;
   return `<article class="kc ${col}" draggable="true" data-kkey="${esc(key)}" data-ids="${ids.join(',')}" data-kcol="${col}">
     <div class="kc-h"><a href="#" class="kc-n" data-kg="${esc(key)}" title="Abrir agrupamento">${esc(c0.empresa)}</a>${grp.length > 1 ? `<span class="kn2" title="${grp.length} visitas">${grp.length}</span>` : ''}</div>
     <div class="kc-m">${esc([c0.segmentoEmpresa, c0.tipoEmpresa].filter(Boolean).join(' · '))}</div>
     <div class="kc-l">${linhas.map(l => `<span class="lin lin-${esc(R_norm(l))}">${esc(l)}</span>`).join('')}</div>
     <div class="kc-d"><b>${fmt(pior.data)}</b><span class="kp">${prazoTxt(pior)}</span></div>
     ${verEquipe && resp.length ? `<div class="kc-r" title="${esc(resp.join(', '))}"><i>${esc(ini(resp[0]))}</i>${esc(resp[0])}${resp.length > 1 ? ` <em>+${resp.length - 1}</em>` : ''}</div>` : ''}
-    <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : col === 'finalizado' ? `<button class="btn sm pri" data-ver="${c0.id}">Ver registro</button>` : ''}</div>
+    <div class="kc-a"><button class="btn sm" data-kg="${esc(key)}">Abrir</button>${grp.length > 1 ? `<button class="btn sm" data-ktg="${esc(key)}">${aberto ? 'Recolher ▴' : 'Ver linhas ▾'}</button>` : abertas ? `<button class="btn sm pri" data-reg="${c0.id}">Registrar</button>` : col === 'finalizado' ? `<button class="btn sm pri" data-ver="${c0.id}">Ver registro</button>` : ''}${eu.podeExcluir && grp.length === 1 ? `<button class="btn sm danger" data-del="${c0.id}" title="Excluir visita">🗑</button>` : ''}</div>
     ${grp.length > 1 ? `<div class="kc-i" ${aberto ? '' : 'hidden'}>${grp.map(linhaItem).join('')}</div>` : ''}</article>`;
 }
 function aviso(msg, erro) {
@@ -529,9 +533,16 @@ function ligaKanban() {
       e.stopPropagation();
       arrastando = el.classList.contains('ki') ? { ids: [+el.dataset.kid], col: el.dataset.kcol } : { ids: el.dataset.ids.split(',').map(Number), col: el.dataset.kcol };
       el.classList.add('arrasta'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', arrastando.ids.join(',')); } catch {}
+      if (eu.podeExcluir) $('#lixeira').classList.add('on');
     };
-    el.ondragend = () => { el.classList.remove('arrasta'); document.querySelectorAll('.kcol.alvo').forEach(c => c.classList.remove('alvo')); arrastando = null; };
+    el.ondragend = () => { el.classList.remove('arrasta'); document.querySelectorAll('.kcol.alvo').forEach(c => c.classList.remove('alvo')); arrastando = null; const lx = $('#lixeira'); if (lx) lx.classList.remove('on', 'alvo'); };
   });
+  if (eu.podeExcluir) {                                            // arrastar para a lixeira exclui (pede confirmação)
+    let lx = $('#lixeira'); if (!lx) { lx = document.createElement('div'); lx.id = 'lixeira'; lx.textContent = '🗑 Solte aqui para excluir a visita'; document.body.appendChild(lx); }
+    lx.ondragover = e => { if (!arrastando) return; e.preventDefault(); lx.classList.add('alvo'); };
+    lx.ondragleave = () => lx.classList.remove('alvo');
+    lx.ondrop = e => { e.preventDefault(); lx.classList.remove('on', 'alvo'); const ids = arrastando ? arrastando.ids : []; arrastando = null; if (ids.length) excluirCards(ids); };
+  }
   document.querySelectorAll('.kcol').forEach(col => {
     col.ondragover = e => { if (!arrastando) return; e.preventDefault(); col.classList.add('alvo'); };
     col.ondragleave = e => { if (!col.contains(e.relatedTarget)) col.classList.remove('alvo'); };
@@ -562,12 +573,13 @@ function abreGrupoIds(ids, nota) {
       <div class="chips">${c0.segmentoEmpresa ? `<span class="tag emp">${esc(c0.segmentoEmpresa)}</span>` : ''}${c0.tipoEmpresa ? `<span class="tag">${esc(c0.tipoEmpresa)}</span>` : ''}<span class="tag">${grp.length} visita(s)</span></div></div>
     <div class="sh-b">${nota ? `<div class="info">${esc(nota)}</div>` : ''}${eq ? `<div class="kg-eq">${eq}</div>` : ''}
       <div class="tw"><table><tr><th>Linha</th><th>Cargo</th><th>Classe</th><th>Responsável</th><th>Última visita</th><th>Programada</th><th>Prazo</th><th></th></tr>${grp.map(x => `<tr><td><span class="lin lin-${esc(R_norm(x.segmento))}">${esc(x.segmento)}</span></td><td>${esc(x.cargo)}</td><td>${esc(x.classe === 'E' ? 'Estratégico' : x.classe)}</td><td>${esc(x.responsavelNome)}</td><td>${x.ultima ? fmt(x.ultima) : '—'}</td><td>${fmt(x.data)}</td><td><span class="pl2" style="background:${pl[x.situacao][0]};color:${pl[x.situacao][1]}">${prazoTxt(x)}</span></td>
-        <td style="white-space:nowrap">${x.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
+        <td style="white-space:nowrap">${eu.podeExcluir ? `<button class="btn sm danger" data-del="${x.id}" title="Excluir visita">🗑</button> ` : ''}${x.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${x.id}">Ver registro</button>` : ''}${aberta(x) ? `<button class="btn sm pri" data-greg="${x.id}">Registrar</button> <button class="btn sm" data-grep="${x.id}">Alterar</button> <button class="btn sm" data-gpart="${x.id}">Participantes</button>` : ''}${x.urlCard ? ` <a href="${esc(x.urlCard)}" target="_top" class="hint">card</a>` : ''}</td></tr>`).join('')}</table></div></div>
     <div class="sh-f"><button class="btn" onclick="fecha()">Fechar</button>${abertas.length > 1 ? '<button class="btn" id="gall">Alterar a data de todas</button>' : ''}</div>`);
   document.querySelectorAll('[data-greg]').forEach(b => b.onclick = () => registrar(+b.dataset.greg));
   document.querySelectorAll('[data-grep]').forEach(b => b.onclick = () => reagendarVisita(+b.dataset.grep));
   document.querySelectorAll('[data-gpart]').forEach(b => b.onclick = () => participantes(+b.dataset.gpart));
   document.querySelectorAll('#sheet [data-ver]').forEach(b => b.onclick = () => verRegistro(+b.dataset.ver));
+  document.querySelectorAll('#sheet [data-del]').forEach(b => b.onclick = () => excluirCards([+b.dataset.del]));
   if ($('#gall')) $('#gall').onclick = () => reagendarGrupo(abertas.map(x => x.id));
 }
 // Alterar a data de várias visitas da mesma empresa de uma vez (mesmas regras: do dia seguinte em diante, dentro do mês, motivo obrigatório).
@@ -637,6 +649,24 @@ async function verRegistro(id) {
 }
 // Nome do contato com o telefone ao passar o mouse
 const contatoTip = c => `<span class="tel" data-tip="${esc([c.telefones.join(' · ') || 'sem telefone', c.cargo].filter(Boolean).join(' — '))}">👤 <b>${esc(c.nome)}</b>${c.cargo ? ` <span class="hint">${esc(c.cargo)}</span>` : ''}</span>`;
+
+// ---- Excluir visitas (só para quem tem permissão em Configurações → Acesso) ----
+function excluirCards(ids) {
+  const lista = ids.map(achar).filter(Boolean); if (!lista.length) return;
+  modal(`<div class="sh-h"><h3>Excluir ${lista.length > 1 ? lista.length + ' visitas' : 'visita'}</h3></div>
+    <div class="sh-b"><div class="info">A visita sai da fila e <b>não é recriada</b> sozinha. Ela vai para a etapa <b>Removido</b> do Bitrix e as tarefas ligadas são encerradas. Um administrador pode restaurá-la depois em Configurações.</div>
+      <div class="tw"><table><tr><th>Empresa</th><th>Linha</th><th>Cargo</th><th>Programada</th></tr>${lista.map(x => `<tr><td>${esc(x.empresa)}</td><td>${esc(x.segmento)}</td><td>${esc(x.cargo)}</td><td>${fmt(x.data)}</td></tr>`).join('')}</table></div>
+      ${lista.some(x => x.situacao === 'finalizado') ? '<div class="err on">Atenção: há visita já encerrada (com registro). O registro da visita não é apagado, mas o card sai da fila.</div>' : ''}
+      <div class="fld" style="margin-top:10px"><label>Motivo <span class="hint">(opcional)</span></label><textarea id="dmo" placeholder="Por que excluir?"></textarea></div><div class="err" id="er"></div></div>
+    <div class="sh-f"><button class="btn" onclick="fecha()">Cancelar</button><button class="btn pri danger" id="ok">Excluir</button></div>`);
+  $('#ok').onclick = async () => {
+    $('#ok').disabled = true; $('#er').classList.remove('on');
+    const falhas = [];
+    for (const x of lista) { try { await api(`/api/cards/${x.id}/excluir`, { method: 'POST', body: { motivo: $('#dmo').value } }); } catch (e) { falhas.push(`${x.empresa} · ${x.segmento}: ${e.message}`); } }
+    if (!falhas.length) { fecha(true); aviso(`${lista.length > 1 ? lista.length + ' visitas excluídas' : 'Visita excluída'}.`); carrega(); return; }
+    $('#er').textContent = falhas.join(' | '); $('#er').classList.add('on'); $('#ok').disabled = false;
+  };
+}
 const GA = new Set();                       // grupos de empresa expandidos na tabela
 const R_norm = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]+/g, '');
 function tabelaVisitas(v, verEquipe) {
@@ -644,7 +674,7 @@ function tabelaVisitas(v, verEquipe) {
   const pl = { atrasada: ['#D93A3A', '#fff'], dia: ['#F5A623', '#2b1d00'], aguardando: ['#2066b0', '#fff'], finalizado: ['#16a34a', '#fff'], naorealizada: ['#94a3b8', '#fff'] };
   const linhaTab = (c, filha) => {
     const q = c.situacao === 'finalizado' ? `Encerrada${c.encerradoEm ? ' em ' + fmt(c.encerradoEm) : ''}` : c.situacao === 'naorealizada' ? 'Não realizada' : c.dias === null ? 'Sem data' : c.situacao === 'dia' ? 'Hoje' : c.dias < 0 ? `${-c.dias} dia(s) de atraso` : `em ${c.dias} dia(s)`;
-    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe === 'E' ? 'Estratégico' : c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${c.id}">Ver registro</button>` : c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}</td></tr>`;
+    return `<tr class="t-${c.situacao}${filha ? ' gc' : ''}"${filha ? ` data-gc="${filha}" ${GA.has(filha) ? '' : 'hidden'}` : ''}><td>${filha ? '<span class="hint">↳</span>' : `<b>${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">${esc(c.empresa)}</a>` : esc(c.empresa)}</b>${c.tipoEmpresa ? `<div class="hint">${esc(c.tipoEmpresa)}</div>` : ''}`}</td><td>${filha ? '' : esc(c.segmentoEmpresa || '—')}</td><td><span class="lin lin-${esc(R_norm(c.segmento))}">${esc(c.segmento)}</span></td><td>${esc(c.cargo)}</td><td>${esc(c.classe === 'E' ? 'Estratégico' : c.classe)}</td>${verEquipe ? `<td>${esc(c.responsavelNome)}</td>` : ''}<td>${c.ultima ? fmt(c.ultima) : '—'}</td><td>${fmt(c.data)}</td><td><span class="pl2" style="background:${pl[c.situacao][0]};color:${pl[c.situacao][1]}">${q}</span></td><td style="white-space:nowrap">${c.situacao === 'finalizado' ? `<button class="btn sm pri" data-ver="${c.id}">Ver registro</button>` : c.situacao === 'naorealizada' ? '' : `<button class="btn sm pri" data-reg="${c.id}">Registrar</button> <button class="btn sm" data-rep="${c.id}">Alterar visita</button>`}${eu.podeExcluir ? ` <button class="btn sm danger" data-del="${c.id}" title="Excluir visita">🗑</button>` : ''}</td></tr>`;
   };
   const grupos = [];                                                  // linhas seguidas da mesma empresa viram um grupo recolhível
   for (const c of v) { const g = grupos[grupos.length - 1]; if (g && c.empresaId && g[0].empresaId === c.empresaId) g.push(c); else grupos.push([c]); }
@@ -680,7 +710,7 @@ function linha(c) {
     </div>
     <div class="due"><small>Programada</small><b>${fmt(c.data)}</b><span>${q}</span></div>
     <div class="side">${c.situacao === 'finalizado' || c.situacao === 'naorealizada' ? `<div class="enc ${c.situacao}">${c.situacao === 'finalizado' ? '✓ Encerrada' : '✕ Não realizada'}${c.encerradoEm ? `<small>${fmt(c.encerradoEm)}</small>` : ''}</div>${c.situacao === 'finalizado' ? `<div class="acts"><button class="btn pri" data-ver="${c.id}">Ver registro</button></div>` : ''}` : `<div class="acts"><button class="btn pri" data-reg="${c.id}">Registrar visita</button><button class="btn" data-rep="${c.id}">Alterar visita</button></div>`}
-      <div class="links">${c.situacao !== 'finalizado' && c.situacao !== 'naorealizada' ? `<a href="#" data-part="${c.id}">Participantes${(c.participantes || []).length ? ` (${c.participantes.length})` : ''}</a>` : ''}${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
+      <div class="links">${eu.podeExcluir ? `<a href="#" class="danger" data-del="${c.id}">Excluir</a>` : ''}${c.situacao !== 'finalizado' && c.situacao !== 'naorealizada' ? `<a href="#" data-part="${c.id}">Participantes${(c.participantes || []).length ? ` (${c.participantes.length})` : ''}</a>` : ''}${c.urlEmpresa ? `<a href="${esc(c.urlEmpresa)}" target="_top">Abrir empresa</a>` : ''}${c.urlCard ? `<a href="${esc(c.urlCard)}" target="_top">Abrir card</a>` : ''}</div></div></div>`;
 }
 // Janela: clicar FORA dela não fecha (o que o usuário digitou não se perde). Fechar pelos botões pergunta antes se houver algo digitado.
 let sujo = false;
@@ -932,9 +962,11 @@ async function cfg(d) {
     <h2>Acesso</h2><div class="panel"><p class="hint">Defina quem pode abrir as <b>Configurações</b> e quem pode ver o <b>Dashboard</b>. Lista vazia = todos. Administradores e quem acessa Configurações também veem o Dashboard. Com listas definidas, o app só libera quem estiver logado pelo Bitrix24.</p>
       <div class="fld"><label>Quem acessa as Configurações</label><div id="pk_cfg"></div></div>
       <div class="fld"><label>Quem vê o Dashboard</label><div id="pk_dash"></div></div>
+      <div class="fld"><label>Quem pode excluir visitas <span class="hint">(administradores também podem)</span></label><div id="pk_exc"></div></div>
       <button class="btn pri" id="sac">Salvar acessos</button> <span class="hint" id="acout"></span></div>
     <h2>Testar com uma empresa</h2><div class="panel"><p class="hint">Gera a fila de <b>uma</b> empresa só (funciona mesmo com o app desativado). Use o número que aparece na URL da empresa no Bitrix (…/crm/company/details/<b>123</b>/).</p>
       <div style="display:flex;gap:8px"><input id="eid" type="number" inputmode="numeric" placeholder="ID da empresa" style="max-width:200px"><button class="btn pri" id="bt">Gerar fila desta empresa</button></div><pre id="tout" class="hint" style="white-space:pre-wrap"></pre></div>
+    <h2>Visitas excluídas</h2><div id="exc" class="panel hint">Carregando…</div>
     <h2>Auditoria</h2><div id="aud" class="hint">Carregando…</div>
     <h2>Ações</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="b1">Sincronizar todas as empresas</button><button class="btn" id="b2">Rodar job diário agora</button></div><p class="hint" id="out"></p></div>`;
   $('#sv').onclick = async () => {
@@ -979,8 +1011,13 @@ async function cfg(d) {
     } catch (er) { $('#vc_out').textContent = er.message; }
   };
   const lVt = pick('#pk_vt', c.verTudo || [], 'Ninguém além do chefe do departamento'), lAd = pick('#pk_ad', c.admins || [], 'Nenhum administrador');
-  const lCfg = pick('#pk_cfg', c.acessoConfig || []), lDash = pick('#pk_dash', c.acessoDashboard || []);
-  $('#sac').onclick = async () => { try { await api('/api/config', { method: 'PUT', body: { acessoConfig: lCfg, acessoDashboard: lDash } }); eu = await api('/api/eu'); montaAbas(); $('#acout').textContent = 'Acessos salvos.'; } catch (e) { $('#acout').textContent = e.message; } };
+  const lCfg = pick('#pk_cfg', c.acessoConfig || []), lDash = pick('#pk_dash', c.acessoDashboard || []), lExc = pick('#pk_exc', c.acessoExcluir || [], 'Ninguém (só administradores)');
+  $('#sac').onclick = async () => { try { await api('/api/config', { method: 'PUT', body: { acessoConfig: lCfg, acessoDashboard: lDash, acessoExcluir: lExc } }); eu = await api('/api/eu'); montaAbas(); $('#acout').textContent = 'Acessos salvos.'; } catch (e) { $('#acout').textContent = e.message; } };
+  const carregaExcluidas = () => api('/api/excluidos').then(({ excluidos }) => {
+    $('#exc').innerHTML = excluidos.length ? `<div class="tw"><table><tr><th>Empresa</th><th>Linha</th><th>Programada</th><th>Excluída por</th><th>Quando</th><th>Motivo</th><th></th></tr>${excluidos.map(x => `<tr><td>${esc(x.empresa)}</td><td>${esc(x.segmento)}</td><td>${fmt(x.data)}</td><td>${esc(x.porNome || '')}</td><td>${dhBR(x.em)}</td><td>${esc(x.motivo || '—')}</td><td><button class="btn sm" data-rest="${x.card}">Restaurar</button></td></tr>`).join('')}</table></div>` : 'Nenhuma visita excluída.';
+    document.querySelectorAll('[data-rest]').forEach(b => b.onclick = async () => { b.disabled = true; try { await api(`/api/cards/${b.dataset.rest}/restaurar`, { method: 'POST', body: {} }); carregaExcluidas(); } catch (e) { b.disabled = false; alert(e.message); } });
+  }).catch(e => { $('#exc').textContent = e.message; });
+  carregaExcluidas();
   api('/api/log').then(d => { $('#aud').innerHTML = auditoriaHTML(d); }).catch(e => { $('#aud').textContent = e.message; });
   $('#sa').onclick = async () => {
     const alcadas = {}; document.querySelectorAll('[data-al]').forEach(s => { if (!s.value) return; const [d, k] = s.dataset.al.split('.'); (alcadas[d] ||= {})[k] = +s.value; });
