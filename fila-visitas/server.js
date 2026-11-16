@@ -257,11 +257,22 @@ server.listen(PORT, () => {
     for (const id of process.env.DIAG_CARDS.split(',').map(Number)) { const it = (await bitrix.call('crm.item.get', { entityTypeId: 1036, id })).result?.item || {}; const d = await svc.dadosCard(it); console.log('diag-card', id, JSON.stringify({ stage: it.stageId, data: d.data, classe: d.classe, campoData: it[map.fila.data], closedate: it.closedate, criado: it.createdTime, atualizado: it.updatedTime })); }
     const h = store_historico_para(process.env.DIAG_CARDS); console.log('diag-card historico', JSON.stringify(h));
   } catch (e) { console.error('diag-card:', e.message); } }, 3000);
+  if (bitrix.enabled && process.env.DIAG_E) setTimeout(async () => { try {
+    const { map, meta } = await svc.campos(true); const out = [];
+    for (const seg of Object.keys(map.empresa)) {
+      const keys = [map.empresa[seg].classe, ...(((map.alt || {})[seg] || {}).classe || [])].filter(Boolean);
+      for (const k of keys) { const it = ((meta[k] || {}).itens || []).find(i => /estrat/i.test(i.value)); if (!it) continue;
+        const r = (await bitrix.call('crm.company.list', { filter: { [k]: it.id }, select: ['ID', 'TITLE', 'DATE_MODIFY'] })).result || [];
+        for (const c of r) { const cards = (await bitrix.call('crm.item.list', { entityTypeId: 1036, filter: { companyId: +c.ID }, select: ['id', 'title', 'stageId', 'createdTime', 'updatedTime', map.fila.data, map.fila.classe].filter(Boolean) })).result?.items || []; out.push({ seg, campo: k, empresa: c.ID, titulo: c.TITLE, mod: c.DATE_MODIFY, cards: cards.filter(x => String(x.title).includes(seg)).map(x => [x.id, x.stageId, x[map.fila.data] || '', x[map.fila.classe] || '', x.createdTime]) }); }
+      }
+    }
+    const j = JSON.stringify(out); for (let i = 0; i < j.length; i += 1500) console.log('diag-e', j.slice(i, i + 1500)); if (!out.length) console.log('diag-e vazio');
+  } catch (e) { console.error('diag-e:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_DATAS) setTimeout(async () => { try {
     const abertos = await svc.cardsAbertos(); const por = {}, ex = [];
     const ids = [...new Set(abertos.map(it => +it.companyId).filter(Boolean))]; const emps = new Map(); let i = 0;
     await Promise.all(Array.from({ length: 6 }, async () => { while (i < ids.length) { const id = ids[i++]; emps.set(id, await svc.lerEmpresa(id).catch(() => null)); } }));
-    for (const it of abertos) { const t = String(it.title).split(' | '); const e = emps.get(+it.companyId), sg = e?.segs?.[t[1]] || {}; const d = (await svc.dadosCard(it)).data || '', k = `${sg.ultima ? 'COM' : 'SEM'}-ultima classe=${sg.classe || '?'} data=${d}`; por[k] = (por[k] || 0) + 1; if (/Aggreko Energia Locação de Geradores LTDA - Macaé/i.test(it.title)) ex.push([it.id, it.title, d, it.stageId, sg.classe, sg.ultima || null, sg.proxima || null]); }
+    for (const it of abertos) { const t = String(it.title).split(' | '); const e = emps.get(+it.companyId), sg = e?.segs?.[t[1]] || {}; const d = (await svc.dadosCard(it)).data || '', k = `${sg.ultima ? 'COM' : 'SEM'}-ultima classe=${sg.classe || '?'} data=${d}`; por[k] = (por[k] || 0) + 1; if (sg.classe === 'E') ex.push([it.id, it.title, d, it.stageId, sg.classe, sg.ultima || null, sg.proxima || null]); }
     const j = JSON.stringify({ total: abertos.length, distribuicao: Object.entries(por).sort(), aggrekoMacae: ex }); for (let k = 0; k < j.length; k += 1500) console.log('diag-datas', j.slice(k, k + 1500));
   } catch (e) { console.error('diag-datas:', e.message); } }, 3000);
   if (bitrix.enabled && process.env.DIAG_CICLO) setTimeout(async () => { try { const r = await svc.previaNovoCiclo(); const j = JSON.stringify(r); for (let i = 0; i < j.length; i += 1500) console.log('previa-ciclo', j.slice(i, i + 1500)); } catch (e) { console.error('previa-ciclo:', e.message); } }, 3000);
