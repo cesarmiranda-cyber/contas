@@ -343,3 +343,40 @@ test('abrir o processo sincroniza: o pedido novo do formulário já aparece, e a
   assert.ok(!(await call('GET', '/rotulagem/quadro')).negocios.some(n => n.titulo === 'Rotulagem — Padaria Sol'));   // dentro dos 2 minutos: espera a próxima sincronia
   await call('POST', '/gestao/sincronia', {}); assert.ok((await call('GET', '/rotulagem/quadro')).negocios.some(n => n.titulo === 'Rotulagem — Padaria Sol'));   // "Sincronizar agora" força
 });
+
+test('movimentação automática: só com prova objetiva; sugestões de um clique; regras podem ser desligadas', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'au-')), bitrix = fake(), fin = createFinStore(dir); fin.empresas.add({ id: 'e1', nome: 'Nutri Mix', ativa: true });
+  const api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix, ttl: 0 }), bk: { unidades: () => [] }, fin, store: { log() {} }, dir });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  await call('PUT', '/config', { empresaFaturaId: 'e1' }); const D = api.dados();
+  // 1) pagamento + questionário tiram o cartão da primeira etapa
+  const r = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Sol', empresaId: '5', responsavel: '11' }); const P = `/rotulagem/negocios/${r.id}`;
+  const cb = await call('POST', `${P}/cobranca`, { valor: 1000 }); await call('PUT', `${P}/dados`, { 'nome do produto': 'Pão' });
+  assert.equal((await call('POST', '/gestao/sincronia', {})).automatico.length, 0);   // questionário chegou, mas a entrada ainda não foi paga
+  fin.receber.put({ ...fin.receber.get(cb.cobranca.entrada.id), status: 'pago', pagoEm: '2026-11-10' });
+  const s1 = await call('POST', '/gestao/sincronia', {}); assert.deepEqual(s1.automatico.map(x => [x.id, x.para]), [[r.id, 'Conferência das informações']]); assert.equal((await call('GET', P)).etapa, 'r2'); assert.match((await call('GET', P)).notas.map(x => x.t).join(' '), /Movido automaticamente.*entrada de 50% paga/); assert.ok(bitrix.notif.some(n => /avançou sozinho/.test(n.MESSAGE)));
+  assert.equal((await call('POST', '/gestao/sincronia', {})).automatico.length, 0);   // não anda duas vezes
+  // 2) arte anexada ANTES de entrar na etapa não conta; só a nova depois de "Enviado ao cliente"
+  await call('POST', `${P}/link`, { nome: 'Artes recebidas e corrigidas', url: 'https://drive.google.com/1' }); await call('POST', `${P}/mover`, { etapa: 'r5' });
+  assert.equal((await call('POST', '/gestao/sincronia', {})).automatico.length, 0); assert.equal((await call('GET', P)).etapa, 'r5');
+  await call('POST', `${P}/link`, { nome: 'Artes recebidas e corrigidas', url: 'https://drive.google.com/2' }); assert.equal((await call('GET', P)).etapa, 'r6');   // gatilho imediato ao anexar
+  // 3) sugestão de um clique (não anda sozinho): aprovação final
+  await call('POST', `${P}/rodada`, { resultado: 'ok' }); await call('PUT', `${P}/campos`, { versaoAprovada: 'arte_v3.pdf' }); fin.receber.put({ ...fin.receber.get(cb.cobranca.final.id), status: 'pago', pagoEm: '2026-11-12' });
+  await call('POST', `${P}/aprovacao`, { decisao: 'aprovado' }, { id: 'u1', nome: 'Ana' }); await call('POST', `${P}/aprovacao`, { decisao: 'aprovado' }, { id: 'u2', nome: 'Bia' });
+  const sg = await call('GET', P); assert.equal(sg.sugestao.nome, 'Aprovação final'); assert.equal(sg.etapa, 'r6'); assert.equal((await call('GET', '/rotulagem/quadro')).negocios[0].pronto, 'Aprovação final');
+  assert.equal((await call('POST', '/gestao/sincronia', {})).automatico.length, 0); assert.equal((await call('GET', P)).etapa, 'r6');   // só sugere
+  assert.equal((await call('POST', `${P}/mover`, { etapa: sg.sugestao.etapa })).etapa, 'r7');
+  // 4) multas: dados do auto → registrado; defesa protocolada → em cumprimento de prazo
+  const m = await call('POST', '/multas/negocios', { titulo: 'Auto loja' }); const M = `/multas/negocios/${m.id}`;
+  await call('PUT', `${M}/campos`, { orgao: 'CVS', numeroAuto: '123', dataCiencia: R.todayBR() }); assert.equal((await call('GET', M)).etapa, 'm1');   // falta a cópia do auto
+  await call('POST', `${M}/link`, { nome: 'Auto de infração / notificação', url: 'https://drive.google.com/a' }); assert.equal((await call('GET', M)).etapa, 'm3');
+  await call('POST', `${M}/link`, { nome: 'Defesa protocolada (comprovante)', url: 'https://drive.google.com/b' }); assert.equal((await call('GET', M)).etapa, 'm5');
+  // 5) regra desligada não move
+  await call('PUT', '/gestao/config', { automacoes: { 'multa-registrada': false } }); const m2 = await call('POST', '/multas/negocios', { titulo: 'Auto 2' }); const M2 = `/multas/negocios/${m2.id}`;
+  await call('PUT', `${M2}/campos`, { orgao: 'CVS', numeroAuto: '9', dataCiencia: R.todayBR() }); await call('POST', `${M2}/link`, { nome: 'Auto de infração / notificação', url: 'https://drive.google.com/c' }); assert.equal((await call('GET', M2)).etapa, 'm1');
+  assert.equal((await call('GET', '/gestao')).config.automacoes['multa-registrada'], false); assert.ok((await call('GET', '/gestao')).regras.length >= 10);
+  // 6) manuais (negócio lido direto do Bitrix24): entrada paga + questionário do manual
+  bitrix.deals.push({ ID: '701', CATEGORY_ID: 4, TITLE: 'Manual — Padaria', STAGE_ID: 'C4:A', COMPANY_ID: '5', UF_CRM_MBP_ESTAB: 'Padaria Sol' });
+  const mb = await call('POST', '/manuais/negocios/701/cobranca', { valor: 800 }); assert.equal((await call('POST', '/gestao/sincronia', {})).automatico.filter(x => x.processo === 'manuais').length, 0);
+  fin.receber.put({ ...fin.receber.get(mb.cobranca.entrada.id), status: 'pago', pagoEm: '2026-11-10' }); const s6 = await call('POST', '/gestao/sincronia', {}); assert.deepEqual(s6.automatico.filter(x => x.processo === 'manuais').map(x => x.para), ['Entregue']); assert.equal(bitrix.deals.find(x => x.ID === '701').STAGE_ID, 'C4:W');
+});

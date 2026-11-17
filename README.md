@@ -188,3 +188,7 @@ O card de rotulagem tem a **calculadora da tabela nutricional** (RDC 429/2020 + 
 - **Qualidade do cadastro** na Carteira (o que falta e duplicados por CNPJ e nome).
 - **Suplementos**: formulação por cápsula, memorial de cálculo com %VD do Anexo VIII da IN 75, limites cadastrados pela equipe, ordem de produção imprimível e biblioteca de artigos para o dossiê.
 - Roteiro de testes e treinamento em `docs/TREINAMENTO.md`.
+
+## Movimentação automática dos cartões
+
+O cartão só avança sozinho com prova objetiva; aprovar, concluir e decidir continuam manuais (aparece o botão “Avançar” quando está pronto). Regras (ligáveis em Gestão): entrada de 50% paga + questionário recebido sai da primeira etapa (rotulagem, tabela, fichas, suplementos e manuais); arte corrigida anexada → conferência das correções; estabilidade definida + relatório/dossiê → notificação na Anvisa; dados do auto completos → auto registrado; defesa protocolada → em cumprimento de prazo. Sugestões de um clique: aprovação final e conclusão (rotulagem), entrega (tabela) e finalização (suplementos). Cada avanço fica no histórico como “automático” e avisa o responsável. Roda nas rodadas do servidor, ao abrir o processo e ao anexar documentos/campos.
