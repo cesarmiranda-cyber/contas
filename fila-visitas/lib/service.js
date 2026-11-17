@@ -1216,7 +1216,8 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     const alvo = cs.filter(c => c.data && c.data <= ate);
     const porVendedor = {}, porEtapa = {};
     for (const c of alvo) { porVendedor[c.responsavelNome || c.responsavel || '?'] = (porVendedor[c.responsavelNome || c.responsavel || '?'] || 0) + 1; porEtapa[c.stageId] = (porEtapa[c.stageId] || 0) + 1; }
-    const res = { ate, abertos: cs.length, alvo: alvo.length, mantidos: cs.length - alvo.length, porVendedor, porEtapa, aplicado: !!aplicar, removidos: 0, proximas: 0, falhas: 0 };
+    const porMes = {}; for (const c of cs) { const k = String(c.data || 'sem data').slice(0, 7); porMes[k] = (porMes[k] || 0) + 1; }
+    const res = { ate, porMes, abertos: cs.length, alvo: alvo.length, mantidos: cs.length - alvo.length, porVendedor, porEtapa, aplicado: !!aplicar, removidos: 0, proximas: 0, falhas: 0 };
     if (!aplicar) return res;
     for (const c of alvo) {
       try {
