@@ -316,3 +316,30 @@ test('solicitações criadas por formulário do Bitrix24: o BKN do título apare
   bitrix.deals.push({ ID: '501', CATEGORY_ID: 17, TITLE: 'BKN 23735 — pedido de rótulo', STAGE_ID: 'C17:N', COMPANY_ID: '5' });
   const u = new URL('http://x/api/dem/solicitacoes/quadro'); const q = (await api.handle('GET', u.pathname, u, async () => ({}))).json; assert.equal(q.negocios[0].bkn, '23735');
 });
+
+test('garantia nos dois sentidos: negócio apagado ou com falha é refeito; pedido sem classificação entra escolhendo o processo; abrir o processo sincroniza', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gr-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix, ttl: 0 }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  const c = await call('POST', '/rotulagem/negocios', { titulo: 'Rótulo Sol', empresaId: '5' }); assert.ok(c.dealId);
+  // 1) negócio apagado no Bitrix24: a sincronia recria
+  bitrix.deals.splice(bitrix.deals.findIndex(x => x.ID === c.dealId), 1);
+  const ver = await call('GET', '/gestao/sincronia'); assert.equal(ver.espelho.semNegocio.length, 1); assert.match(ver.espelho.semNegocio[0].motivo, /apagado/); assert.equal(bitrix.deals.length, 0);   // verificar não altera nada
+  const ex = await call('POST', '/gestao/sincronia', {}); assert.equal(ex.espelho.refeitos, 1); const c2 = await call('GET', `/rotulagem/negocios/${c.id}`); assert.ok(c2.dealId); assert.equal(bitrix.deals.length, 1); assert.match(c2.notas.map(x => x.t).join(' '), /criado de novo/);
+  // 2) falha anterior (sincErro) é tentada de novo
+  api.dados().itens[c.id].sincErro = 'Bitrix fora do ar'; const ex2 = await call('POST', '/gestao/sincronia', {}); assert.equal(ex2.espelho.refeitos, 1); assert.equal(api.dados().itens[c.id].sincErro, ''); assert.equal(bitrix.deals.length, 1);   // atualiza o mesmo, não duplica
+  // 3) pedido que não dá para classificar entra quando a equipe escolhe o processo
+  bitrix.deals.push({ ID: '601', CATEGORY_ID: 12, TITLE: 'Contato do site', STAGE_ID: 'C12:A', COMPANY_ID: '5', COMMENTS: '' });
+  const v2 = await call('GET', '/gestao/sincronia'); assert.deepEqual(v2.importar.semClassificar.map(x => x.id), ['601']);
+  const ex3 = await call('POST', '/gestao/sincronia', { classificar: { 601: 'multas' } }); assert.equal(ex3.importar.criados[0].processo, 'multas'); assert.equal(Object.values(api.dados().locais).filter(x => x.processo === 'multas').length, 1);
+  assert.equal((await call('POST', '/gestao/sincronia', { classificar: { 601: 'bk' } })).importar.criados.length, 0);   // processo inválido é ignorado
+});
+
+test('abrir o processo sincroniza: o pedido novo do formulário já aparece, e a sincronia não roda de novo em menos de 2 minutos', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ab-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix, ttl: 0 }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/dem' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
+  bitrix.deals.push({ ID: '602', CATEGORY_ID: 12, TITLE: 'Rotulagem — Padaria Lua', STAGE_ID: 'C12:A', COMPANY_ID: '5', COMMENTS: '', UF_PROD: 'Pão' });
+  const q = await call('GET', '/rotulagem/quadro'); assert.ok(q.negocios.some(n => n.titulo === 'Rotulagem — Padaria Lua'));
+  bitrix.deals.push({ ID: '603', CATEGORY_ID: 12, TITLE: 'Rotulagem — Padaria Sol', STAGE_ID: 'C12:A', COMPANY_ID: '5', COMMENTS: '', UF_PROD: 'Bolo' });
+  assert.ok(!(await call('GET', '/rotulagem/quadro')).negocios.some(n => n.titulo === 'Rotulagem — Padaria Sol'));   // dentro dos 2 minutos: espera a próxima sincronia
+  await call('POST', '/gestao/sincronia', {}); assert.ok((await call('GET', '/rotulagem/quadro')).negocios.some(n => n.titulo === 'Rotulagem — Padaria Sol'));   // "Sincronizar agora" força
+});
