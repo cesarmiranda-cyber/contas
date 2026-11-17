@@ -967,3 +967,18 @@ test('contatos da visita: seleção múltipla é gravada, vem marcada na próxim
   const hist = (await svc.registroVisita(v1.id)).contatosHistorico.map(c => c.nome).sort();
   assert.deepEqual(hist, ['Bruno Lima', 'Carla Dias']);
 });
+
+test('limparAbertas: prévia não altera; aplicar remove os abertos até a data e gera a próxima', async () => {
+  const { w, svc } = setup();
+  await svc.sincronizarEmpresa(1);
+  const vend = cards(w).find(c => c.title.endsWith('| Vendedor'));
+  const antes = cards(w).filter(c => c.stageId !== w.stages.removido).length;
+  const p = await svc.limparAbertas({ ate: '2026-12-31' });
+  assert.equal(p.aplicado, false); assert.ok(p.alvo >= 1);
+  assert.equal(cards(w).filter(c => c.stageId !== w.stages.removido).length, antes);
+  const r = await svc.limparAbertas({ ate: '2026-05-31', aplicar: true });
+  assert.ok(r.removidos >= 1 && r.falhas === 0);
+  assert.equal(w.items[1036][vend.id].stageId, w.stages.removido);
+  const novo = cards(w).find(c => c.title.endsWith('| Vendedor') && c.id !== vend.id && c.stageId !== w.stages.removido);
+  assert.ok(novo && novo.ufCrm_data > '2026-05-31', 'próxima visita gerada depois da data limite');
+});

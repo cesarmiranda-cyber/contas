@@ -1206,6 +1206,42 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     envelhece();
     return true;
   }
+  // Limpeza do passivo: tira da lista (etapa Removido) os cards ainda abertos com data programada até `ate` (AAAA-MM-DD).
+  // Sem `aplicar` só mostra a prévia. Com `gerarProxima` (padrão) nasce a próxima visita do ciclo, como na exclusão normal.
+  async function limparAbertas({ ate, aplicar = false, gerarProxima = true, motivo = '' } = {}) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(ate || ''))) throw erro('Informe a data limite (AAAA-MM-DD).', 400);
+    const { map } = await campos();
+    if (!map.etapas.removido) throw erro('Não encontrei a etapa "Removido" no kanban da Fila.', 500);
+    const cs = []; for (const it of await cardsAbertos()) cs.push(await dadosCard(it));
+    const alvo = cs.filter(c => c.data && c.data <= ate);
+    const porVendedor = {}, porEtapa = {};
+    for (const c of alvo) { porVendedor[c.responsavelNome || c.responsavel || '?'] = (porVendedor[c.responsavelNome || c.responsavel || '?'] || 0) + 1; porEtapa[c.stageId] = (porEtapa[c.stageId] || 0) + 1; }
+    const res = { ate, abertos: cs.length, alvo: alvo.length, mantidos: cs.length - alvo.length, porVendedor, porEtapa, aplicado: !!aplicar, removidos: 0, proximas: 0, falhas: 0 };
+    if (!aplicar) return res;
+    for (const c of alvo) {
+      try {
+        const card = await lerCard(c.id);
+        if (!card || card.stageId === map.etapas.removido) continue;
+        const chave = R.chaveFila(card.empresaId, card.segmento, card.cargo);
+        await comTrava(`empresa:${card.empresaId}`, async () => {
+          await bitrix.call('crm.item.update', { entityTypeId: F.ETYPE.fila, id: card.id, fields: { stageId: map.etapas.removido } });
+          if (store.chave(chave) === card.id) store.setChave(chave, null);
+          const ex = { ...(store.job('excluidos') || {}) };
+          if (gerarProxima) delete ex[chave];
+          else ex[chave] = { card: card.id, empresaId: card.empresaId, empresa: card.empresa, segmento: card.segmento, cargo: card.cargo, data: card.data, stageAntes: card.stageId, por: 0, em: new Date().toISOString(), motivo: motivo || `Limpeza das visitas abertas até ${R.fmtBR(ate)}` };
+          store.setJob('excluidos', ex);
+          store.setSnapCard(card.id, { data: card.data, resp: card.responsavel });
+        });
+        try { await bitrix.call('crm.timeline.comment.add', { fields: { ENTITY_ID: card.id, ENTITY_TYPE: DYN(F.ETYPE.fila), COMMENT: `Visita removida da lista na limpeza das visitas abertas até ${R.fmtBR(ate)}.` } }); } catch { /* opcional */ }
+        await encerrarTarefas(card.id, 'Visita removida na limpeza da fila.');
+        store.log('card-removido-limpeza', `Card ${card.id} (${card.titulo}) removido: aberto com data até ${R.fmtBR(ate)}`, { card: card.id });
+        res.removidos++;
+        if (gerarProxima) { const r = await gerarProximaVisita(card).catch(() => null); if (r?.criada) res.proximas++; }
+      } catch (e) { res.falhas++; store.log('erro', `Limpeza do card ${c.id}: ${e.message}`); }
+    }
+    invalida();
+    return res;
+  }
   // Rede de segurança: confere de hora em hora as empresas que ainda têm card aberto e sincroniza as que ficaram sem classe.
   async function reconciliarSemClasse() {
     if (store.config.removerSemClasse === false) return { empresas: 0, removidos: 0 };
@@ -1779,6 +1815,6 @@ function createService({ bitrix, store, acesso = null, clock = () => new Date() 
     return (r.result?.items || []).slice(0, limit).map(i => ({ id: +i.id, titulo: i.title, responsavel: +i.assignedById, em: i.createdTime }));
   }
 
-  return { campos, lerEmpresa, dadosCard, marcarNaoRealizada, informarMotivo, camposVisita, formEdicao, editarRegistro, supervisoresDoBitrix, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, gerarProximaDeExcluida, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
+  return { campos, lerEmpresa, dadosCard, marcarNaoRealizada, informarMotivo, camposVisita, formEdicao, editarRegistro, supervisoresDoBitrix, sincronizarEmpresa, sincronizarTodas, jobDiario, registrarVisita, reprogramar, corrigirVisita, varrer, listarVisitas, usuarios, departamentos, reconciliarCadastros, listarVisitasPag, encerrarNaoRealizadas, tarefasAbertas, migrarFinalizadas, reconciliarVisitas, historicoVisivel, podeVerCard, podeConfigurar, podeDashboard, acessoRestrito, dashboardDados, registroVisita, verComo, aquecer, previaNovoCiclo, limparAbertas, novoCiclo, reconciliarSemClasse, podeExcluir, excluirCard, restaurarCard, gerarProximaDeExcluida, listarExcluidos, ajustarDatasIniciais, definirParticipantes, listaRamos, visitasRegistradas, isAdmin, nomeUsuario, lerCard, guardarVisitas, guardarCards, cardsAbertos };
 }
 module.exports = { createService };

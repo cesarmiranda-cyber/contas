@@ -27,6 +27,8 @@ if os.environ.get("DIAG_CAMPO"): env["DIAG_CAMPO"] = os.environ["DIAG_CAMPO"]
 if os.environ.get("DIAG_EMP_RAW"): env["DIAG_EMP_RAW"] = os.environ["DIAG_EMP_RAW"]
 if os.environ.get("DIAG_VEND"): env["DIAG_VEND"] = os.environ["DIAG_VEND"]
 if os.environ.get("DIAG_PROX"): env["DIAG_PROX"] = os.environ["DIAG_PROX"]
+for k in ("LIMPAR_ABERTAS_ATE","LIMPAR_APLICAR","LIMPAR_SEM_PROXIMA"):
+    if os.environ.get(k): env[k] = os.environ[k]
 if os.environ.get("NOVO_CICLO"): env["NOVO_CICLO"] = "1"
 if os.environ.get("DIAG_CAMPOS36"): env["DIAG_CAMPOS36"] = "1"
 if os.environ.get("AJUSTAR_DATAS"): env["AJUSTAR_DATAS"] = os.environ["AJUSTAR_DATAS"]
