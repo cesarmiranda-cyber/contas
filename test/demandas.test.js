@@ -310,3 +310,9 @@ test('formulário do Bitrix24: o título do negócio decide o processo (rotulage
   t.forEach((x, i) => bitrix.deals.push({ ID: String(400 + i), CATEGORY_ID: 12, TITLE: x, STAGE_ID: 'C12:A', COMMENTS: '' }));
   const r = await call('POST', '/formulario/importar', {}); assert.deepEqual(r.criados.map(x => x.processo), ['rotulagem', 'tabelas', 'fichas', 'suplementos', 'multas']); assert.deepEqual(r.semClassificar.map(x => x.titulo), ['Manual — F']);
 });
+
+test('solicitações criadas por formulário do Bitrix24: o BKN do título aparece no cartão', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-')), bitrix = fake(), api = createDemandasApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), bk: { unidades: () => [] }, store: { log() {} }, dir });
+  bitrix.deals.push({ ID: '501', CATEGORY_ID: 17, TITLE: 'BKN 23735 — pedido de rótulo', STAGE_ID: 'C17:N', COMPANY_ID: '5' });
+  const u = new URL('http://x/api/dem/solicitacoes/quadro'); const q = (await api.handle('GET', u.pathname, u, async () => ({}))).json; assert.equal(q.negocios[0].bkn, '23735');
+});
