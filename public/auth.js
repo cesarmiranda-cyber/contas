@@ -17,7 +17,7 @@ async function nmJson(m, u, b, { semRedirect } = {}) {
   const r = await nmFetch(u, { method: m, body: b }), j = await r.json().catch(() => ({}));
   if (r.status === 401 && j.auth && !semRedirect) { NM.paraLogin(); throw new Error('Sessão expirada. Faça login novamente.'); }
   if (r.status === 403 && j.trocarSenha && !semRedirect) { location.href = '/'; throw new Error('Defina uma nova senha.'); }
-  if (!r.ok) throw new Error(j.error || ('Erro ' + r.status));
+  if (!r.ok) { const m = j.error && typeof j.error === 'object' ? (j.error.message || j.error.description || JSON.stringify(j.error)) : (j.error || j.message); throw new Error(m || ('Erro ' + r.status)); }
   return j;
 }
 // download de arquivo protegido (anexos, CSV): busca com o token e entrega ao navegador
