@@ -1,0 +1,9 @@
+{
+  "name": "registro-de-visitas",
+  "version": "1.0.0",
+  "description": "Registro de Visitas: fila automática e registro de visitas comerciais (Bitrix24, Vibe+)",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node --test" },
+  "engines": { "node": ">=20" }
+}
