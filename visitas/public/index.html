@@ -5,55 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Registro de Visitas</title>
 <link rel="icon" href="/_gw/icon">
-<style>
-:root{--bg:#f5f7f8;--card:#fff;--tx:#2b3138;--mut:#6a737d;--bd:#e1e6ea;--pri:#2067b0;--pri2:#e8f1fb;--ok:#1f8a4c;--warn:#b7791f;--bad:#c5382e;--acc:#00a3d9;--sh:0 1px 2px rgba(20,30,40,.08)}
-@media (prefers-color-scheme:dark){:root{--bg:#161a1e;--card:#20262c;--tx:#e6eaee;--mut:#9aa5b0;--bd:#323a42;--pri:#5aa2e6;--pri2:#203245;--ok:#4cc27f;--warn:#e0a94a;--bad:#ef7268;--acc:#3cc4ee}}
-*{box-sizing:border-box}html,body{margin:0}body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx)}
-button,input,select,textarea{font:inherit;color:inherit}
-header{background:var(--card);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5}
-.bar{display:flex;gap:4px;padding:0 16px;overflow-x:auto;align-items:center}
-.bar h1{font-size:16px;margin:0 16px 0 0;white-space:nowrap}
-.tab{border:0;background:none;padding:14px 12px;cursor:pointer;color:var(--mut);border-bottom:3px solid transparent;white-space:nowrap}
-.tab.on{color:var(--pri);border-color:var(--pri);font-weight:600}
-main{padding:16px;max-width:1400px;margin:0 auto}
-.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-bottom:12px}
-.filtros label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:2px}
-input,select,textarea{border:1px solid var(--bd);border-radius:6px;padding:7px 9px;background:var(--card);min-width:0}
-textarea{width:100%;resize:vertical}
-.btn{border:1px solid var(--bd);background:var(--card);border-radius:6px;padding:7px 12px;cursor:pointer}
-.btn:hover{background:var(--pri2)}.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}.btn.pri:hover{filter:brightness(1.1)}
-.btn.bad{color:var(--bad)}.btn.sm{padding:4px 8px;font-size:12px}.btn[disabled]{opacity:.5;cursor:default}
-.seg{display:inline-flex}.seg .btn{border-radius:0;margin-left:-1px}.seg .btn:first-child{border-radius:6px 0 0 6px;margin:0}.seg .btn:last-child{border-radius:0 6px 6px 0}.seg .btn.on{background:var(--pri);color:#fff;border-color:var(--pri)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:6px}
-.card h3{margin:0;font-size:15px}.mut{color:var(--mut);font-size:12px}
-.acoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-.tag{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;background:var(--pri2);color:var(--pri);white-space:nowrap}
-.tag.NEW{background:var(--pri2);color:var(--pri)}.tag.PREPARATION{background:#fff3d6;color:#8a5a00}.tag.LATE{background:#fde3e0;color:var(--bad)}.tag.ENC{background:#dff3e7;color:var(--ok)}.tag.NAOREAL{background:#e9ecef;color:#555}.tag.FAIL{background:#e9ecef;color:#555}
-table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
-th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{font-size:12px;color:var(--mut);background:var(--bg)}
-.scroll{overflow-x:auto}
-.kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(260px,1fr);gap:12px;overflow-x:auto;align-items:start}
-.col{background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:120px}
-.col h4{margin:2px 4px;font-size:13px}
-.modal-bg{position:fixed;inset:0;background:rgba(10,15,20,.55);display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:20}
-.modal{background:var(--card);border-radius:12px;max-width:760px;width:100%;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
-.modal h2{margin:0 0 4px;font-size:18px}.f{display:flex;flex-direction:column;gap:3px;margin:10px 0}.f>span{font-size:12px;color:var(--mut)}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:640px){.row2{grid-template-columns:1fr}}
-.foot{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
-.aviso{padding:10px 12px;border-radius:8px;background:#fff3d6;color:#6b4800;margin-bottom:12px}.erro{background:#fde3e0;color:#8a1f17}
-.contatos{max-height:170px;overflow:auto;border:1px solid var(--bd);border-radius:6px;padding:6px}.contatos label{display:flex;gap:6px;align-items:center;padding:3px}
-.dash{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-.kpi{font-size:28px;font-weight:700}.barra{display:grid;grid-template-columns:minmax(80px,38%) 1fr auto;gap:8px;align-items:center;margin:4px 0;font-size:13px}
-.barra i{display:block;height:12px;border-radius:4px;background:var(--acc);min-width:2px}.barra span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sec{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:12px}.sec h3{margin:0 0 8px}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.chip{background:var(--pri2);border-radius:99px;padding:2px 4px 2px 10px;display:inline-flex;gap:4px;align-items:center}.chip button{border:0;background:none;cursor:pointer;color:var(--mut)}
-.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:9px 16px;border-radius:8px;z-index:50;max-width:90%}
-.vazio{padding:30px;text-align:center;color:var(--mut)}
-</style>
+<link rel="stylesheet" href="/app.css">
 </head>
 <body>
-<header><div class="bar"><h1>Registro de Visitas</h1><div id="tabs" style="display:flex"></div></div></header>
+<header><div class="top"><div class="brand"><div class="logo" id="logo"></div><span>Registro de Visitas</span></div><nav id="tabs" aria-label="Seções"></nav><div class="me" id="me"></div></div></header>
 <main id="app"><div class="vazio">Carregando…</div></main>
 <script src="/app.js" defer></script>
 </body>
