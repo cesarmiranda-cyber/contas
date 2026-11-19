@@ -18,6 +18,7 @@ const DEFAULT_CONFIG = {
   motivosNaoRealizada: MOTIVOS,
   verTudo: [],                 // usuários que veem tudo
   admins: [],                  // acesso às configurações (vazio = administradores do portal)
+  deptsAcesso: [],             // departamentos com acesso ao app (vazio = todos do portal); inclui subdepartamentos
   podeExcluir: [],             // usuários autorizados a excluir
   visibilidade: 'app',         // app | bitrix
   hierarquiaAuto: false, ativo: false,

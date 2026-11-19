@@ -63,18 +63,20 @@ const CFG_CAMPOS = {
   cargosFila: v => (Array.isArray(v) ? v.filter(x => R.CARGOS.includes(x)) : []),
   supervisoresDepts: v => ids(v), supervisoresExtras: v => ids(v), verTudo: v => ids(v), admins: v => ids(v), podeExcluir: v => ids(v),
   motivosNaoRealizada: v => (Array.isArray(v) ? v.map(x => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 30) : []),
+  deptsAcesso: v => ids(v),
   visibilidade: v => (v === 'bitrix' ? 'bitrix' : 'app'),
 };
 const ids = v => (Array.isArray(v) ? v.map(String).filter(x => /^\d{1,12}$/.test(x)).slice(0, 500) : []);
 
 const routes = {
-  'GET /api/eu': async (u, b, user) => ({ id: user.id, nome: user.nome, papel: user.papel, config: user.config, podeExcluir: svc.podeExcluir(user), hoje: svc.hoje(), webhook: bitrix.enabled, ativo: store.ativo }),
+  'GET /api/eu': async (u, b, user) => ({ acesso: await svc.temAcesso(user).catch(() => true), id: user.id, nome: user.nome, papel: user.papel, config: user.config, podeExcluir: svc.podeExcluir(user), hoje: svc.hoje(), webhook: bitrix.enabled, ativo: store.ativo }),
   'GET /api/config': async (u, b, user) => { exigeConfig(user); return { config: store.config, webhook: bitrix.enabled, motivosPadrao: R.MOTIVOS }; },
   'PUT /api/config': async (u, body, user) => {
     exigeConfig(user);
     const p = {}; for (const [k, f] of Object.entries(CFG_CAMPOS)) if (body[k] !== undefined) p[k] = f(body[k]);
     if (p.cargosFila && !p.cargosFila.length) throw bad(400, 'Escolha ao menos um cargo que gera fila.');
     if (p.motivosNaoRealizada && !p.motivosNaoRealizada.length) throw bad(400, 'Mantenha ao menos um motivo.');
+    svc.invalidar();
     store.log('config', `Configuração alterada por ${user.nome || user.id}: ${Object.keys(p).join(', ')}`);
     return store.setConfig(p);
   },
@@ -124,6 +126,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname.startsWith('/api/')) {
       const user = usuario(req.headers);
       if (!user) throw bad(401, 'Não consegui identificar seu usuário. Abra o app pelo Bitrix24.');
+      if (u.pathname !== '/api/eu' && !(await svc.temAcesso(user))) throw bad(403, 'Seu departamento não tem acesso a este app. Peça a um administrador.');
       const w = ['POST', 'PUT'].includes(req.method);
       if (routes[key]) return send(res, 200, await routes[key](u, w ? await readBody(req) : {}, user));
       let m = u.pathname.match(/^\/api\/cards\/(\d+)\/([a-z-]+)$/);

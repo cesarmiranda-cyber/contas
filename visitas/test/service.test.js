@@ -98,3 +98,12 @@ test('dashboard agrega por etapa', async () => {
   const { svc } = mundo(); await svc.sync(); const d = await svc.dashboard(admin);
   assert.equal(d.fila.porEtapa.NEW, 2); assert.equal(d.fila.porSegmento.Motores, 2);
 });
+test('acesso por departamento (com subdepartamentos); admin sempre entra', async () => {
+  const { f, svc, store } = mundo();
+  f.bx.call = (orig => async (m, p) => (m === 'user.get' && p?.FILTER?.ID ? { result: [{ ID: p.FILTER.ID, UF_DEPARTMENT: p.FILTER.ID === '7' ? ['1'] : ['99'] }] } : orig(m, p)))(f.bx.call);
+  assert.equal(await svc.temAcesso({ id: '8', papel: 'usuario' }), true);          // sem restrição = todos
+  store.setConfig({ deptsAcesso: ['1'] }); svc.invalidar();
+  assert.equal(await svc.temAcesso({ id: '7', papel: 'usuario' }), true);
+  assert.equal(await svc.temAcesso({ id: '8', papel: 'usuario' }), false);
+  assert.equal(await svc.temAcesso({ id: '8', papel: 'admin' }), true);
+});

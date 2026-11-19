@@ -113,6 +113,17 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       return set;
     });
   }
+  // Acesso ao app por departamento (inclui subdepartamentos). Vazio = todos. Administradores sempre entram.
+  async function temAcesso(user) {
+    const allow = cfg().deptsAcesso.map(String);
+    if (!allow.length || user.papel === 'admin' || !bx.enabled) return true;
+    return cached(`acc:${user.id}:${allow.join(',')}`, 300000, async () => {
+      const ds = await departamentos(), ok = new Set(allow);
+      for (let ch = true; ch;) { ch = false; for (const d of ds) if (!ok.has(d.id) && ok.has(d.pai)) { ok.add(d.id); ch = true; } }
+      const r = await bx.call('user.get', { FILTER: { ID: user.id } });
+      return A(r.result?.[0]?.UF_DEPARTMENT).map(String).some(d => ok.has(d));
+    });
+  }
   async function supervisores() {
     const c = cfg(), ids = new Set(c.supervisoresExtras.map(String));
     const ds = await departamentos();
@@ -507,6 +518,6 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   return { modelo, sync, varrer, listar, dashboard, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    preparar, camposInfo, supervisores, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    preparar, camposInfo, supervisores, temAcesso, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };
