@@ -148,3 +148,16 @@ test('validação: anexo inválido, motivo fora da lista e texto gigante são tr
   await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'x'.repeat(50000), contatos: Array(80).fill(5) }, vendedor);
   assert.equal(f.s.itens[1032][0].ufFatos.length, 20000); assert.equal(f.s.itens[1032][0].contactIds.length, 50);
 });
+test('cache da lista: serve o antigo na hora após expirar, e uma gravação nunca é mascarada', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  let agora = Date.now(); const real = Date.now; Date.now = () => agora;
+  try {
+    await svc.listar(admin, {}); f.s.chamadas.length = 0;
+    agora += 60000;                                                    // expirou (45 s), mas dentro do limite "stale"
+    const r = await svc.listar(admin, {}); assert.equal(r.total, 2);
+    await new Promise(ok => setTimeout(ok, 20)); assert.ok(f.s.chamadas.includes('crm.item.list'));   // atualizou em segundo plano
+    const card = f.s.itens[1036].find(c => c.companyId == 100);
+    await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'ok' }, vendedor);
+    const depois = await svc.listar(admin, {}); assert.equal(depois.itens.find(i => i.id === card.id).etapa, 'ENC');   // sem dado velho após gravar
+  } finally { Date.now = real; }
+});

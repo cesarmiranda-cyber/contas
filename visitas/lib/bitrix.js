@@ -30,12 +30,22 @@ function createBitrix(webhook, { limit = 4 } = {}) {
       }
     } finally { release(); }
   }
+  // Lista paginada: lê a 1ª página, e se o Bitrix informar o total busca as demais em paralelo (o semáforo limita a 4 chamadas simultâneas).
+  const itensDe = r => (Array.isArray(r.result) ? r.result : (r.result?.items || []));
   async function listAll(method, params = {}) {
-    const out = []; let start = 0;
+    const first = await call(method, { ...params, start: 0 }), out = [...itensDe(first)];
+    if (first.next === undefined || first.next === null) return out;
+    const total = +first.total;
+    if (Number.isFinite(total) && total > first.next) {
+      const starts = []; for (let st = first.next; st < total; st += first.next || 50) starts.push(st);
+      for (let i = 0; i < starts.length; i += 8) for (const r of await Promise.all(starts.slice(i, i + 8).map(st => call(method, { ...params, start: st })))) out.push(...itensDe(r));
+      const vistos = new Set();       // deslocamento concorrente a gravações pode repetir um item
+      return out.filter(x => { const k = x?.id ?? x?.ID; if (k === undefined) return true; if (vistos.has(k)) return false; vistos.add(k); return true; });
+    }
+    let start = first.next;
     for (;;) {
       const r = await call(method, { ...params, start });
-      const res = Array.isArray(r.result) ? r.result : (r.result?.items || []);
-      out.push(...res);
+      out.push(...itensDe(r));
       if (r.next === undefined || r.next === null) break;
       start = r.next;
     }

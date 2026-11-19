@@ -21,15 +21,19 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     modeloC = await F.descobrir(bx); modeloAt = Date.now(); return modeloC;
   }
   const memo = new Map();
-  async function cached(key, ttl, fn) {
-    const c = memo.get(key);
-    if (c && Date.now() - c.at < ttl) return c.v;
-    if (c?.p) return c.p;
-    const p = fn().then(v => { memo.set(key, { at: Date.now(), v }); return v; }, e => { memo.delete(key); throw e; });
+  let epoca = 0;     // invalidar() muda a época: uma busca iniciada antes de uma gravação não pode repor dado velho no cache
+  // Cache com "stale-while-revalidate": dentro de `ttl` é fresco; até `stale` devolve o antigo na hora e atualiza em segundo plano.
+  async function cached(key, ttl, fn, stale = 0) {
+    const c = memo.get(key), idade = c ? Date.now() - c.at : Infinity, temV = c && c.v !== undefined;
+    if (temV && idade < ttl) return c.v;
+    if (c?.p) return stale && temV && idade < stale ? c.v : c.p;
+    const e0 = epoca;
+    const p = fn().then(v => { if (e0 === epoca) memo.set(key, { at: Date.now(), v }); return v; }, err => { const cur = memo.get(key); if (cur?.p === p) { if (cur.v === undefined) memo.delete(key); else delete cur.p; } throw err; });
     memo.set(key, { at: c?.at || 0, v: c?.v, p });
+    if (stale && temV && idade < stale) { p.catch(() => {}); return c.v; }
     return p;
   }
-  const invalidar = (...ks) => { for (const k of ks.length ? ks : [...memo.keys()]) memo.delete(k); };
+  const invalidar = (...ks) => { epoca++; for (const k of ks.length ? ks : [...memo.keys()]) memo.delete(k); };
   const travas = new Map();
   async function comTrava(k, fn) {
     const ant = travas.get(k) || Promise.resolve();
@@ -151,7 +155,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const sel = ['id', 'title', 'companyId', 'stageId', 'assignedById', 'createdTime', ...['segmento', 'cargo', 'classe', 'data', 'motivo', 'detalhe'].map(k => f[k]).filter(Boolean)];
     return (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.fila, select: sel, filter: { categoryId: m.categoryId, ...extra }, order: { id: 'ASC' } })).map(i => paraCard(m, i));
   }
-  const cardsC = m => cached('cards', 15000, () => cardsTodos(m));
+  const cardsC = m => cached('cards', 45000, () => cardsTodos(m), 600000);
   async function umCard(m, id) {
     const r = await bx.call('crm.item.get', { entityTypeId: ETYPE.fila, id });
     const it = r.result?.item || r.result;
@@ -246,18 +250,23 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     return sincronizando;
   }
   // Varredura leve (a cada ~30 s): só ajusta as etapas dos cards abertos conforme a data.
+  let varrendo = false;
   async function varrer() {
     if (!store.ativo) return { ok: true, ativo: false };
-    const m = await modelo(), h = hoje();
-    const abertos = (await cardsTodos(m)).filter(c => ABERTAS.includes(c.etapa) && c.data);
-    let n = 0;
-    for (const c of abertos) {
-      const alvo = R.etapaPorData(c.data, h);
-      if (alvo === c.etapa) continue;
-      n++;
-      if (alvo === 'NAOREAL') await naoRealizadaAuto(m, c); else await mover(m, c.id, alvo);
-    }
-    return { ok: true, ajustados: n };
+    if (varrendo || sincronizando) return { ok: true, ocupado: true };
+    varrendo = true;
+    try {
+      const m = await modelo(), h = hoje();
+      const abertos = (await cardsC(m)).filter(c => ABERTAS.includes(c.etapa) && c.data);     // usa o cache: não refaz a leitura inteira a cada 30 s
+      let n = 0;
+      for (const c of abertos) {
+        const alvo = R.etapaPorData(c.data, h);
+        if (alvo === c.etapa) continue;
+        n++;
+        if (alvo === 'NAOREAL') await naoRealizadaAuto(m, c); else await mover(m, c.id, alvo);
+      }
+      return { ok: true, ajustados: n };
+    } finally { varrendo = false; }
   }
   async function naoRealizadaAuto(m, c) {
     await comTrava(`c:${c.empresaId}`, async () => {
@@ -472,7 +481,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     return { hoje: h, de, ate, total: cards.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: nm(c.vendedorId), podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
   async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
-  async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i))); }
+  async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i)), 600000); }
   // Cards no escopo do usuário + filtros do painel (período na data programada). `sem` ignora um filtro (para as opções dos seletores).
   async function filtrados(user, q = {}, sem = []) {
     const m = await modelo();

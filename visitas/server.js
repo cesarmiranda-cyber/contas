@@ -202,7 +202,7 @@ if (require.main === module) server.listen(PORT, () => {
       if (ultimoJob !== h && horaBR >= store.config.horaJob) { ultimoJob = h; await svc.sync(); store.log('job', 'Job diário concluído'); }
     } catch (e) { store.log('erro', `rotina: ${e.message}`.slice(0, 300)); }
   };
-  const agenda = () => setTimeout(async () => { await tique(); agenda(); }, Math.max(10, store.config.sweepSegundos) * 1000);
+  const agenda = () => setTimeout(async () => { await tique(); agenda(); }, Math.max(30, store.config.sweepSegundos) * 1000);
   setTimeout(agenda, 5000);
 });
 module.exports = { server, svc, store };

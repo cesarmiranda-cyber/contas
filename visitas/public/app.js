@@ -12,6 +12,11 @@ try { Object.assign(S.f, JSON.parse(localStorage.getItem('vis.f') || '{}')); S.v
 const dtBR = d => (d ? d.slice(0, 10).split('-').reverse().join('/') : '—');
 const dthBR = d => (d ? `${dtBR(d)} ${d.length > 10 ? d.slice(11, 16) : ''}` : '—');
 
+// Resposta atrasada de uma tela que já foi trocada é descartada em silêncio (evita escrever em tela inexistente).
+class Stale extends Error {}
+const gen = { n: 0 };
+async function vapi(url) { const g = gen.n; const r = await api(url); if (g !== gen.n) throw new Stale(); return r; }
+window.addEventListener('unhandledrejection', e => { if (e.reason instanceof Stale) e.preventDefault(); });
 async function api(url, method = 'GET', body) {
   const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
   let j = {}; try { j = await r.json(); } catch {}
@@ -19,7 +24,7 @@ async function api(url, method = 'GET', body) {
   return j;
 }
 let tt; function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.append(t); clearTimeout(tt); tt = setTimeout(() => t.remove(), 3500); setTimeout(() => t.remove(), 3600); }
-const falha = e => toast(e.message || String(e));
+const falha = e => { if (!(e instanceof Stale)) toast(e.message || String(e)); };
 
 // ----- janelas (não fecham ao clicar fora, para não perder o que foi digitado) -----
 function modal(html, onReady) {
@@ -37,21 +42,21 @@ function tabs() {
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => { S.aba = b.dataset.k; tabs(); render(); });
 }
 async function render() {
-  const app = $('#app');
+  gen.n++; const app = $('#app');
   if (S.eu.acesso === false) { app.innerHTML = '<div class="aviso erro">Seu departamento não tem acesso ao Registro de Visitas. Peça a um administrador.</div>'; return; }
   if (!S.eu.webhook && S.aba !== 'cfg') { app.innerHTML = `<div class="aviso erro">O Bitrix24 ainda não está conectado ao app. ${S.eu.config ? 'Abra <b>Configurações</b> e informe o webhook de entrada.' : 'Peça a um administrador para concluir a configuração.'}</div>`; return; }
-  try { await ({ fila: telaFila, alt: telaAlt, dash: telaDash, cfg: telaCfg }[S.aba])(); } catch (e) { app.innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; }
+  try { await ({ fila: telaFila, alt: telaAlt, dash: telaDash, cfg: telaCfg }[S.aba])(); } catch (e) { if (!(e instanceof Stale)) app.innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; }
 }
 
 // ----- Registro de Visitas -----
 async function telaFila() {
-  const app = $('#app');
+  gen.n++; const app = $('#app');
   if (!$('#fil')) {
     app.innerHTML = `<div class="kpis" id="kpis"></div><div class="filtros" id="fil"></div><div id="lista"><div class="grid">${'<div class="sk"></div>'.repeat(6)}</div></div>`;
   } else $('#lista').classList.add('busy');
   const f = S.f;
   const q = new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: S.page, pageSize: S.vista === 'kanban' ? 200 : S.size }).toString();
-  const r = await api('/api/visitas?' + q);
+  const r = await vapi('/api/visitas?' + q);
   S.itens = r.itens; S.total = r.total; S.pages = r.pages; S.page = r.page; S.porEtapa = r.porEtapa || {};
   S.segs = new Set([...(S.segs || []), ...S.itens.map(i => i.segmento).filter(Boolean)]); S.vends = new Map([...(S.vends || []), ...S.itens.map(i => [i.vendedorId, i.vendedor])]); S.hoje = r.hoje;
   const uniq = () => [...S.segs].sort();
@@ -182,7 +187,7 @@ async function verRegistro(id) {
 // ----- Visita Alterada -----
 let altPg = 1;
 async function telaAlt() {
-  const r = await api('/api/historico?page=' + altPg), h = r.itens;
+  gen.n++; const r = await vapi('/api/historico?page=' + altPg), h = r.itens;
   $('#app').innerHTML = h.length ? `<div class="scroll"><table><thead><tr><th>Quando</th><th>Empresa</th><th>Segmento</th><th>Vendedor</th><th>De</th><th>Para</th><th>Motivo</th><th>Quem alterou</th></tr></thead><tbody>${h.map(x => `<tr><td>${dthBR(x.at)}</td><td>${esc(x.titulo)}</td><td>${esc(x.segmento)}</td><td>${esc(x.vendedor)}</td><td>${dtBR(x.de)}</td><td>${dtBR(x.para)}</td><td>${esc(x.motivo)}</td><td>${esc(x.usuario)}</td></tr>`).join('')}</tbody></table></div><div class="filtros" style="justify-content:center;margin-top:12px"><button class="btn sm" id="h_a" ${r.page <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">Página ${r.page} de ${r.pages}</span><button class="btn sm" id="h_p" ${r.page >= r.pages ? 'disabled' : ''}>Próxima ›</button></div>` : `<div class="vazio">${ico('inbox')}Nenhuma data alterada ainda.</div>`;
   if ($('#h_a')) { $('#h_a').onclick = () => { altPg--; telaAlt(); }; $('#h_p').onclick = () => { altPg++; telaAlt(); }; }
 }
@@ -219,11 +224,11 @@ function filtrosAtivos(d) {
   return ch.length ? `<div class="chips">${ch.map(([k, t]) => `<span class="chip">${esc(t)}<button data-x="${k}" aria-label="Remover filtro">✕</button></span>`).join('')}<button class="btn sm" data-x="tudo">Limpar tudo</button></div>` : '';
 }
 async function telaDash() {
-  const app = $('#app'), hoje = S.eu.hoje;
+  gen.n++; const app = $('#app'), hoje = S.eu.hoje;
   if (!$('#dash')) { app.innerHTML = `<div id="dash"><div class="kpis">${'<div class="sk" style="height:76px"></div>'.repeat(6)}</div><div class="dash">${'<div class="sk" style="height:260px"></div>'.repeat(4)}</div></div>`; }
   else $('#dash').classList.add('busy');
   if (!D.mes) { D.f.de = periodo(D.preset, hoje); D.f.ate = ''; }
-  const qs = qsDash(), d = await api('/api/dashboard?' + qs), k = d.kpis;
+  const qs = qsDash(), d = await vapi('/api/dashboard?' + qs), k = d.kpis;
   const tile = (n, rot, e, extra = '') => `<button class="kpi-t ${D.f.etapa === e && e ? 'on' : ''}" ${e ? `data-e="${e}"` : ''} data-kpi="${e}" ${extra}><b>${n}</b><span>${rot}</span></button>`;
   const maxM = Math.max(1, ...d.serie.map(x => x.total));
   $('#dash').classList.remove('busy');
@@ -249,7 +254,7 @@ async function telaDash() {
   ligaDash(d); registrosDash();
 }
 async function registrosDash() {
-  const r = await api('/api/registros?' + new URLSearchParams({ ...Object.fromEntries(Object.entries(D.f).filter(([, v]) => v)), q: D.q, page: D.page }).toString()), C = $('#regs_corpo');
+  const r = await vapi('/api/registros?' + new URLSearchParams({ ...Object.fromEntries(Object.entries(D.f).filter(([, v]) => v)), q: D.q, page: D.page }).toString()), C = $('#regs_corpo');
   if (!C) return;
   if (!r.itens.length) { C.innerHTML = `<div class="vazio">${ico('inbox')}<b>Nenhum registro encontrado</b><div>Mude os filtros ou a busca.</div></div>`; return; }
   C.innerHTML = `<div class="scroll"><table><thead><tr><th>Data</th><th>Empresa</th><th>Segmento</th><th>Vendedor</th><th>Resumo</th><th>Supervisor</th><th></th></tr></thead><tbody>${r.itens.map(x => `<tr><td style="white-space:nowrap">${dthBR(x.dataHora)}</td><td><b>${esc(x.empresa)}</b> <span class="cls ${esc(x.classe)}">${esc(x.classe || '–')}</span>${x.contatos ? `<div class="mut">${x.contatos} contato(s)${x.anexos ? ` · ${x.anexos} anexo(s)` : ''}</div>` : ''}</td><td>${esc(x.segmento)}</td><td>${esc(x.vendedor)}</td><td class="resumo">${esc(x.resumo)}</td><td>${esc(x.supervisor || '—')}</td><td><div class="acoes" style="border:0;padding:0;margin:0"><button class="btn sm" data-ver="${x.idFila}">Ver</button>${x.podeEditar ? `<button class="btn sm" data-edit="${x.idFila}">${IC.edit ? ico('edit') : ''}Editar</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>
@@ -284,12 +289,11 @@ function ligaDash(d) {
 // ----- Configurações -----
 const lista = (id, ids, nomes) => `<div class="chips" id="${id}">${ids.map(i => `<span class="chip">${esc(nomes[i] || '#' + i)}<button data-rm="${i}" aria-label="Remover">✕</button></span>`).join('') || '<span class="mut">ninguém</span>'}</div>`;
 async function telaCfg() {
-  const { config: c, motivosPadrao } = await api('/api/config'), A = $('#app');
+  gen.n++;
+  const { config: c, motivosPadrao } = await vapi('/api/config'), A = $('#app');
   const ids = [...new Set([...c.verTudo, ...c.admins, ...c.podeExcluir, ...c.supervisoresExtras])];
-  const nomes = S.eu.webhook && ids.length ? await api('/api/nomes?ids=' + ids.join(',')).catch(() => ({})) : {};
-  const info = S.eu.webhook ? await api('/api/campos').catch(e => ({ erro: e.message })) : null;
-  const depts = S.eu.webhook ? await api('/api/departamentos').catch(() => []) : [];
-  const log = S.eu.webhook ? await api('/api/log').catch(() => []) : [];
+  const w = S.eu.webhook, ok = (url, vazio) => vapi(url).catch(e => { if (e instanceof Stale) throw e; return vazio === 'erro' ? { erro: e.message } : vazio; });
+  const [nomes, info, depts, log] = await Promise.all([w && ids.length ? ok('/api/nomes?ids=' + ids.join(','), {}) : {}, w ? ok('/api/campos', 'erro') : null, w ? ok('/api/departamentos', []) : [], w ? ok('/api/log', []) : []]);
   A.innerHTML = `
   <div class="sec"><h3>Conexão com o Bitrix24</h3>${S.eu.webhook ? '<div>✅ Webhook configurado.</div>' : '<div class="aviso">Informe o webhook de entrada (permissões: crm, task, user, department, entity, im).</div>'}
     <div class="row2"><input id="c_wh" type="password" placeholder="https://seu-portal.bitrix24.com.br/rest/1/CODIGO/" autocomplete="off"><button class="btn pri" id="c_whb">Salvar webhook</button></div></div>
