@@ -94,9 +94,25 @@ test('campos descobertos por rótulo, com duplicados e sem faltas', async () => 
   const { svc } = mundo(); const i = await svc.camposInfo();
   assert.deepEqual(i.faltando, []); assert.equal(i.segmentos[0].nome, 'Motores'); assert.equal(i.segmentos[0].duplicados, true); assert.equal(i.etapas.ENC, 'DT1036_19:UC_EFR0YE');
 });
-test('dashboard agrega por etapa', async () => {
-  const { svc } = mundo(); await svc.sync(); const d = await svc.dashboard(admin);
-  assert.equal(d.fila.porEtapa.NEW, 2); assert.equal(d.fila.porSegmento.Motores, 2);
+test('dashboard: indicadores, série mensal, por vendedor e filtros cruzados', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  const card = f.s.itens[1036].find(c => c.companyId == 100);
+  await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'Visita muito boa com o cliente', supervisor: '9' }, vendedor); svc.invalidar();
+  const d = await svc.dashboard(admin, { de: '2026-01-01' });
+  assert.equal(d.kpis.programadas, 3); assert.equal(d.kpis.realizadas, 1); assert.equal(d.kpis.abertas, 2); assert.equal(d.kpis.taxa, 100);
+  assert.ok(d.serie.length >= 1 && d.serie.every(x => /^\d{4}-\d{2}$/.test(x.mes))); assert.equal(d.porVendedor[0].nome, 'Vera Vendedora'); assert.equal(d.porSegmento[0].nome, 'Motores');
+  const so = await svc.dashboard(admin, { de: '2026-01-01', classe: 'A' }); assert.equal(so.kpis.programadas, 2);
+  assert.deepEqual(so.opcoes.classes, ['A', 'B', 'C', 'E']); assert.equal(so.opcoes.vendedores.length, 1);   // opções não encolhem com o filtro de classe
+});
+test('registros: lista, busca, paginação e permissão de edição', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  const card = f.s.itens[1036].find(c => c.companyId == 100);
+  await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'Cliente quer revisão de turbina' }, vendedor); svc.invalidar();
+  const r = await svc.registros(admin, { de: '2026-01-01' });
+  assert.equal(r.total, 1); assert.equal(r.itens[0].empresa, 'Alfa Motores'); assert.equal(r.itens[0].podeEditar, true); assert.match(r.itens[0].resumo, /turbina/);
+  assert.equal((await svc.registros(admin, { de: '2026-01-01', q: 'TURBINA' })).total, 1); assert.equal((await svc.registros(admin, { de: '2026-01-01', q: 'inexistente' })).total, 0);
+  assert.equal((await svc.registros(vendedor, {})).itens[0].podeEditar, true);
+  assert.equal((await svc.registros({ id: '8', papel: 'usuario' }, {})).total, 0);          // outro vendedor não vê
 });
 test('acesso por departamento (com subdepartamentos); admin sempre entra', async () => {
   const { f, svc, store } = mundo();

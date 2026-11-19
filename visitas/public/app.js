@@ -168,7 +168,7 @@ async function formRegistro(id, editar) {
       try {
         b.anexos = await Promise.all(files.slice(0, 10).map(arq64));
         if (editar) await api(`/api/registros/${reg.id}/editar`, 'POST', b); else await api(`/api/cards/${id}/registrar`, 'POST', b);
-        close(); toast(editar ? 'Registro atualizado' : 'Visita registrada. Próxima visita gerada.'); telaFila();
+        close(); toast(editar ? 'Registro atualizado' : 'Visita registrada. Próxima visita gerada.'); recarrega();
       } catch (e) { ev.target.disabled = false; falha(e); }
     });
 }
@@ -187,23 +187,99 @@ async function telaAlt() {
   if ($('#h_a')) { $('#h_a').onclick = () => { altPg--; telaAlt(); }; $('#h_p').onclick = () => { altPg++; telaAlt(); }; }
 }
 
-// ----- Dashboard -----
-const barras = (o, vazio = 'Sem dados') => { const e = Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, 15), mx = Math.max(1, ...e.map(x => x[1])); return e.length ? e.map(([k, v]) => `<div class="barra"><span title="${esc(k)}">${esc(ETAPAS[k] || k)}</span><i style="width:${(v / mx) * 100}%"></i><b>${v}</b></div>`).join('') : `<div class="mut">${vazio}</div>`; };
-async function telaDash() {
-  const d = await api('/api/dashboard'), P = S.dashPag;
-  const pag = [['fila', 'Fila'], ['encerradas', 'Encerradas'], ['registros', 'Registros'], ['reprogramacoes', 'Reprogramações'], ['supervisor', 'Supervisor'], ['naoRealizadas', 'Não realizadas']];
-  const box = (t, o) => `<div class="sec"><h3>${t}</h3>${barras(o)}</div>`, kpi = (t, n) => `<div class="sec"><div class="mut">${t}</div><div class="kpi">${n}</div></div>`;
-  const corpo = {
-    fila: () => kpi('Atrasadas', d.fila.atrasadas) + kpi('Dia da visita', d.fila.diaDaVisita) + box('Cards por etapa', d.fila.porEtapa) + box('Em aberto por vendedor', d.fila.porVendedor) + box('Em aberto por classe', d.fila.porClasse) + box('Em aberto por segmento', d.fila.porSegmento),
-    encerradas: () => kpi('Encerradas', d.encerradas.total) + box('Por mês', d.encerradas.porMes) + box('Por vendedor', d.encerradas.porVendedor) + box('Por classe', d.encerradas.porClasse) + box('Por segmento', d.encerradas.porSegmento),
-    registros: () => kpi('Visitas registradas', d.registros.total) + box('Por mês', d.registros.porMes) + box('Por vendedor', d.registros.porVendedor) + box('Por segmento', d.registros.porSegmento),
-    reprogramacoes: () => kpi('Reprogramações', d.reprogramacoes.total) + box('Motivos', d.reprogramacoes.porMotivo) + box('Vendedores que mais reprogramam', d.reprogramacoes.porVendedor),
-    supervisor: () => kpi('Visitas acompanhadas', d.supervisor.acompanhadas) + box('Por supervisor', d.supervisor.porSupervisor),
-    naoRealizadas: () => kpi('Não realizadas', d.naoRealizadas.total) + box('Motivos', d.naoRealizadas.porMotivo) + box('Vendedores', d.naoRealizadas.porVendedor) + box('Tendência por mês', d.naoRealizadas.porMes),
-  }[P]();
-  $('#app').innerHTML = `<div class="seg" style="margin-bottom:12px;flex-wrap:wrap">${pag.map(([k, n]) => `<button class="btn ${P === k ? 'on' : ''}" data-p="${k}">${n}</button>`).join('')}</div><div class="dash">${corpo}</div>`;
-  document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { S.dashPag = b.dataset.p; telaDash(); });
+// ----- Dashboard interativo -----
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const mesRot = m => `${MESES[+m.slice(5, 7) - 1]}/${m.slice(2, 4)}`;
+const recarrega = () => (S.aba === 'dash' ? telaDash() : telaFila());
+const GRUPOS = [['realizadas', 'Realizadas', 'var(--e-enc)'], ['abertas', 'Em aberto', 'var(--e-new)'], ['atrasadas', 'Atrasadas', 'var(--e-late)'], ['nao', 'Não realizadas', 'var(--e-nao)']];
+const D = { f: { de: '', ate: '', segmento: '', vendedor: '', classe: '', etapa: '', motivo: '' }, preset: '6m', mes: '', q: '', page: 1 };
+function periodo(preset, hoje) {
+  const [y, m] = hoje.split('-').map(Number), ini = n => { const t = y * 12 + (m - 1) - (n - 1); return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}-01`; };
+  return { '3m': ini(3), '6m': ini(6), '12m': ini(12), ano: `${y}-01-01`, tudo: '' }[preset] ?? '';
 }
+const qsDash = () => new URLSearchParams(Object.entries(D.f).filter(([, v]) => v)).toString();
+function tip(el, txt) { el.dataset.tip = txt; el.setAttribute('aria-label', txt); }
+function stack(o, max) {   // segmentos empilhados horizontais, com vão de 2px entre preenchimentos
+  return GRUPOS.map(([k, n, c]) => o[k] ? `<i style="width:${(o[k] / max) * 100}%;background:${c}" data-tip="${esc(n)}: ${o[k]}"></i>` : '').join('');
+}
+function linhas(arr, campo, sel, vazio) {
+  const max = Math.max(1, ...arr.map(x => x.total));
+  if (!arr.length || !arr.some(x => x.total)) return `<div class="mut">${vazio || 'Sem dados no período.'}</div>`;
+  return arr.map(x => { const val = campo === 'vendedor' ? x.id : x.nome, on = sel && String(sel) === String(val);
+    return `<button class="hb ${on ? 'on' : sel ? 'dim' : ''}" data-f="${campo}" data-v="${esc(val)}" data-tip="${esc(x.nome)} · ${x.total} no total · ${x.realizadas} realizadas · ${x.atrasadas} atrasadas · ${x.nao} não realizadas"><span class="hn">${esc(campo === 'classe' ? 'Classe ' + x.nome : x.nome)}</span><span class="ht">${stack(x, max)}</span><b>${x.total}</b></button>`; }).join('');
+}
+function filtrosAtivos(d) {
+  const f = D.f, ch = [];
+  if (D.mes) ch.push(['mes', `Mês: ${mesRot(D.mes)}`]);
+  if (f.segmento) ch.push(['segmento', `Segmento: ${f.segmento}`]);
+  if (f.vendedor) ch.push(['vendedor', `Vendedor: ${d.opcoes.vendedores.find(v => v.id === f.vendedor)?.nome || f.vendedor}`]);
+  if (f.classe) ch.push(['classe', `Classe ${f.classe}`]);
+  if (f.etapa) ch.push(['etapa', `Etapa: ${ETAPAS[f.etapa] || f.etapa}`]);
+  if (f.motivo) ch.push(['motivo', `Motivo: ${f.motivo}`]);
+  return ch.length ? `<div class="chips">${ch.map(([k, t]) => `<span class="chip">${esc(t)}<button data-x="${k}" aria-label="Remover filtro">✕</button></span>`).join('')}<button class="btn sm" data-x="tudo">Limpar tudo</button></div>` : '';
+}
+async function telaDash() {
+  const app = $('#app'), hoje = S.eu.hoje;
+  if (!$('#dash')) { app.innerHTML = `<div id="dash"><div class="kpis">${'<div class="sk" style="height:76px"></div>'.repeat(6)}</div><div class="dash">${'<div class="sk" style="height:260px"></div>'.repeat(4)}</div></div>`; }
+  else $('#dash').classList.add('busy');
+  if (!D.mes) { D.f.de = periodo(D.preset, hoje); D.f.ate = ''; }
+  const qs = qsDash(), d = await api('/api/dashboard?' + qs), k = d.kpis;
+  const tile = (n, rot, e, extra = '') => `<button class="kpi-t ${D.f.etapa === e && e ? 'on' : ''}" ${e ? `data-e="${e}"` : ''} data-kpi="${e}" ${extra}><b>${n}</b><span>${rot}</span></button>`;
+  const maxM = Math.max(1, ...d.serie.map(x => x.total));
+  $('#dash').classList.remove('busy');
+  $('#dash').innerHTML = `
+  <div class="filtros dfil"><div class="seg" role="group" aria-label="Período">${[['3m', '3 meses'], ['6m', '6 meses'], ['12m', '12 meses'], ['ano', 'Este ano'], ['tudo', 'Tudo']].map(([p, n]) => `<button class="btn ${!D.mes && D.preset === p ? 'on' : ''}" data-p="${p}">${n}</button>`).join('')}</div>
+    <label>Segmento<select id="d_segmento"><option value="">Todos</option>${d.opcoes.segmentos.map(x => `<option ${D.f.segmento === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+    <label>Vendedor<select id="d_vendedor"><option value="">Todos</option>${d.opcoes.vendedores.map(x => `<option value="${esc(x.id)}" ${D.f.vendedor === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
+    <label>Classe<select id="d_classe"><option value="">Todas</option>${d.opcoes.classes.map(x => `<option ${D.f.classe === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+    <div class="count">Período pela data programada · clique nos gráficos para filtrar</div></div>
+  ${filtrosAtivos(d)}
+  <div class="kpis">${tile(k.programadas, 'Programadas', '')}${tile(k.realizadas, 'Realizadas', 'ENC')}${tile(k.abertas, 'Em aberto', 'NEW')}${tile(k.atrasadas, 'Atrasadas', 'LATE')}${tile(k.naoRealizadas, 'Não realizadas', 'NAOREAL')}
+    <div class="kpi-t static" data-e="${k.taxa === null ? '' : k.taxa >= 80 ? 'ENC' : k.taxa >= 50 ? 'PREPARATION' : 'LATE'}"><b>${k.taxa === null ? '—' : k.taxa + '%'}</b><span>Taxa de realização</span><div class="meter"><i style="width:${k.taxa || 0}%"></i></div></div>
+    <div class="kpi-t static"><b>${k.reprogramacoes}</b><span>Reprogramações</span></div></div>
+  <div class="dash">
+    <section class="sec wide"><h3>Visitas por mês</h3><div class="leg">${GRUPOS.map(([, n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join('')}</div>
+      ${d.serie.length ? `<div class="mcols" role="group" aria-label="Visitas por mês">${d.serie.map(x => `<button class="mcol ${D.mes === x.mes ? 'on' : D.mes ? 'dim' : ''}" data-mes="${x.mes}" data-tip="${mesRot(x.mes)} · ${x.total} programadas · ${x.realizadas} realizadas · ${x.abertas} em aberto · ${x.atrasadas} atrasadas · ${x.nao} não realizadas"><b>${x.total}</b><span class="stk" style="height:${Math.max(4, (x.total / maxM) * 150)}px">${[...GRUPOS].map(([g, , c]) => x[g] ? `<i style="flex:${x[g]};background:${c}"></i>` : '').join('')}</span><em>${mesRot(x.mes)}</em></button>`).join('')}</div>
+      <details class="tb"><summary>Ver dados em tabela</summary><div class="scroll"><table><thead><tr><th>Mês</th>${GRUPOS.map(g => `<th>${g[1]}</th>`).join('')}<th>Total</th></tr></thead><tbody>${d.serie.map(x => `<tr><td>${mesRot(x.mes)}</td>${GRUPOS.map(([g]) => `<td>${x[g]}</td>`).join('')}<td>${x.total}</td></tr>`).join('')}</tbody></table></div></details>` : '<div class="mut">Sem visitas no período.</div>'}</section>
+    <section class="sec"><h3>Por vendedor</h3><div class="hbs">${linhas(d.porVendedor, 'vendedor', D.f.vendedor)}</div></section>
+    <section class="sec"><h3>Por segmento</h3><div class="hbs">${linhas(d.porSegmento, 'segmento', D.f.segmento)}</div><h3 style="margin-top:18px">Por classe</h3><div class="hbs">${linhas(d.porClasse, 'classe', D.f.classe)}</div></section>
+    <section class="sec"><h3>Motivos das não realizadas</h3>${d.motivos.length ? `<div class="hbs">${(() => { const mx = Math.max(...d.motivos.map(x => x.n)); return d.motivos.map(x => `<button class="hb mono ${D.f.motivo === x.nome ? 'on' : D.f.motivo ? 'dim' : ''}" data-f="motivo" data-v="${esc(x.nome)}" data-tip="${esc(x.nome)}: ${x.n}"><span class="hn">${esc(x.nome)}</span><span class="ht"><i style="width:${(x.n / mx) * 100}%;background:var(--pri)"></i></span><b>${x.n}</b></button>`).join(''); })()}</div>` : '<div class="mut">Nenhuma não realizada no período.</div>'}</section>
+  </div>
+  <section class="sec" id="regs"><div class="rh"><h3>Registros de visita</h3><input type="search" id="r_q" placeholder="Buscar empresa, vendedor ou texto…" value="${esc(D.q)}" aria-label="Buscar registros"></div><div id="regs_corpo"><div class="sk" style="height:120px"></div></div></section>`;
+  ligaDash(d); registrosDash();
+}
+async function registrosDash() {
+  const r = await api('/api/registros?' + new URLSearchParams({ ...Object.fromEntries(Object.entries(D.f).filter(([, v]) => v)), q: D.q, page: D.page }).toString()), C = $('#regs_corpo');
+  if (!C) return;
+  if (!r.itens.length) { C.innerHTML = `<div class="vazio">${ico('inbox')}<b>Nenhum registro encontrado</b><div>Mude os filtros ou a busca.</div></div>`; return; }
+  C.innerHTML = `<div class="scroll"><table><thead><tr><th>Data</th><th>Empresa</th><th>Segmento</th><th>Vendedor</th><th>Resumo</th><th>Supervisor</th><th></th></tr></thead><tbody>${r.itens.map(x => `<tr><td style="white-space:nowrap">${dthBR(x.dataHora)}</td><td><b>${esc(x.empresa)}</b> <span class="cls ${esc(x.classe)}">${esc(x.classe || '–')}</span>${x.contatos ? `<div class="mut">${x.contatos} contato(s)${x.anexos ? ` · ${x.anexos} anexo(s)` : ''}</div>` : ''}</td><td>${esc(x.segmento)}</td><td>${esc(x.vendedor)}</td><td class="resumo">${esc(x.resumo)}</td><td>${esc(x.supervisor || '—')}</td><td><div class="acoes" style="border:0;padding:0;margin:0"><button class="btn sm" data-ver="${x.idFila}">Ver</button>${x.podeEditar ? `<button class="btn sm" data-edit="${x.idFila}">${IC.edit ? ico('edit') : ''}Editar</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>
+    <div class="filtros" style="justify-content:center;margin:12px 0 0;border:0;box-shadow:none;background:none"><button class="btn sm" data-rp="-1" ${r.page <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">Página ${r.page} de ${r.pages} · ${r.total} registro(s)</span><button class="btn sm" data-rp="1" ${r.page >= r.pages ? 'disabled' : ''}>Próxima ›</button></div>`;
+  C.querySelectorAll('[data-rp]').forEach(b => b.onclick = () => { D.page += +b.dataset.rp; registrosDash(); });
+  C.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => verRegistro(+b.dataset.ver).catch(falha));
+  C.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => formRegistro(+b.dataset.edit, true).catch(falha));
+}
+function ligaDash(d) {
+  const F = D.f, muda = () => { D.page = 1; telaDash().catch(falha); };
+  document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { D.preset = b.dataset.p; D.mes = ''; muda(); });
+  [['segmento', 'd_segmento'], ['vendedor', 'd_vendedor'], ['classe', 'd_classe']].forEach(([k, id]) => $('#' + id).onchange = e => { F[k] = e.target.value; muda(); });
+  document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { F.etapa = b.dataset.kpi && F.etapa !== b.dataset.kpi ? b.dataset.kpi : ''; muda(); });
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { F[b.dataset.f] = F[b.dataset.f] === b.dataset.v ? '' : b.dataset.v; muda(); });
+  document.querySelectorAll('[data-mes]').forEach(b => b.onclick = () => {
+    if (D.mes === b.dataset.mes) { D.mes = ''; } else { D.mes = b.dataset.mes; const [y, m] = D.mes.split('-').map(Number); F.de = `${D.mes}-01`; F.ate = `${D.mes}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`; }
+    if (!D.mes) { F.de = periodo(D.preset, S.eu.hoje); F.ate = ''; }
+    D.page = 1; telaDash().catch(falha);
+  });
+  document.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { const k = b.dataset.x; if (k === 'tudo') { D.mes = ''; Object.keys(F).forEach(x => F[x] = ''); } else if (k === 'mes') D.mes = ''; else F[k] = ''; muda(); });
+  let t; $('#r_q').oninput = e => { clearTimeout(t); t = setTimeout(() => { D.q = e.target.value; D.page = 1; registrosDash().catch(falha); }, 300); };
+}
+// Dica ao passar o mouse (uma só, seguindo o cursor) para qualquer elemento com data-tip.
+(() => {
+  const t = document.createElement('div'); t.className = 'tipbox'; t.setAttribute('role', 'tooltip'); t.hidden = true; document.body.append(t);
+  const pos = e => { const el = e.target.closest?.('[data-tip]'); if (!el) { t.hidden = true; return; } t.textContent = el.dataset.tip; t.hidden = false; const w = t.offsetWidth; t.style.left = Math.max(8, Math.min(innerWidth - w - 8, e.clientX + 12)) + 'px'; t.style.top = (e.clientY + 18) + 'px'; };
+  document.addEventListener('mousemove', pos); document.addEventListener('mouseleave', () => t.hidden = true);
+  document.addEventListener('focusin', e => { const el = e.target.closest?.('[data-tip]'); if (el) { const r = el.getBoundingClientRect(); t.textContent = el.dataset.tip; t.hidden = false; t.style.left = Math.max(8, r.left) + 'px'; t.style.top = r.bottom + 6 + 'px'; } });
+  document.addEventListener('focusout', () => t.hidden = true);
+})();
 
 // ----- Configurações -----
 const lista = (id, ids, nomes) => `<div class="chips" id="${id}">${ids.map(i => `<span class="chip">${esc(nomes[i] || '#' + i)}<button data-rm="${i}" aria-label="Remover">✕</button></span>`).join('') || '<span class="mut">ninguém</span>'}</div>`;

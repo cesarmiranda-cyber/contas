@@ -473,26 +473,57 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
   async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i))); }
+  // Cards no escopo do usuário + filtros do painel (período na data programada). `sem` ignora um filtro (para as opções dos seletores).
+  async function filtrados(user, q = {}, sem = []) {
+    const m = await modelo();
+    let cards = (await visiveis(user, await cardsC(m))).filter(c => c.etapa !== 'FAIL');
+    if (!sem.includes('de') && q.de) cards = cards.filter(c => c.data && c.data >= q.de);
+    if (!sem.includes('ate') && q.ate) cards = cards.filter(c => c.data && c.data <= q.ate);
+    if (!sem.includes('segmento') && q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
+    if (!sem.includes('vendedor') && q.vendedor) cards = cards.filter(c => c.vendedorId === String(q.vendedor));
+    if (!sem.includes('classe') && q.classe) cards = cards.filter(c => c.classe === q.classe);
+    if (!sem.includes('etapa') && q.etapa) cards = cards.filter(c => c.etapa === q.etapa);
+    if (!sem.includes('motivo') && q.motivo) cards = cards.filter(c => c.motivo === q.motivo);
+    if (!sem.includes('supervisor') && q.supervisor) { const e = await escopoDe(q.supervisor); cards = cards.filter(c => e.has(c.vendedorId)); }
+    return { m, cards };
+  }
+  const grupoDe = e => (e === 'ENC' || e === 'SUCCESS' ? 'realizadas' : e === 'LATE' ? 'atrasadas' : e === 'NAOREAL' ? 'nao' : 'abertas');
   async function dashboard(user, q = {}) {
-    const m = await modelo(), h = hoje();
-    const cards = await visiveis(user, await cardsC(m));
-    const ids = new Set(cards.map(c => String(c.id)));
-    const regs = (await registrosC(m)).filter(r => ids.has(r.idFila));
-    const nm = await nomes([...cards.map(c => c.vendedorId), ...regs.map(r => r.supervisor)]);
-    const cnt = (arr, f) => { const o = {}; for (const x of arr) { const k = f(x) || '—'; o[k] = (o[k] || 0) + 1; } return o; };
-    const ativos = cards.filter(c => c.etapa !== 'FAIL'), enc = cards.filter(c => c.etapa === 'ENC'), nao = cards.filter(c => c.etapa === 'NAOREAL');
-    const hist = store.historico.filter(x => ids.has(String(x.card)));
-    const mes = x => (x || '').slice(0, 7);
+    const { cards } = await filtrados(user, q), base = (await filtrados(user, q, ['segmento', 'vendedor', 'classe', 'supervisor', 'etapa', 'motivo'])).cards;
+    const nm = await nomes(cards.map(c => c.vendedorId).concat(base.map(c => c.vendedorId)));
+    const novo = () => ({ realizadas: 0, abertas: 0, atrasadas: 0, nao: 0, total: 0 });
+    const soma = (mapa, k, extra, c) => { const o = (mapa[k] ||= { ...novo(), ...extra }); o[grupoDe(c.etapa)]++; o.total++; };
+    const mes = {}, vend = {}, seg = {}, cls = {}, mot = {};
+    for (const c of cards) {
+      soma(mes, (c.data || '').slice(0, 7) || '—', {}, c);
+      soma(vend, c.vendedorId, { id: c.vendedorId, nome: nm(c.vendedorId) }, c);
+      soma(seg, c.segmento || '—', { nome: c.segmento || '—' }, c);
+      soma(cls, c.classe || '—', { nome: c.classe || '—' }, c);
+      if (c.etapa === 'NAOREAL') mot[c.motivo || 'Sem motivo informado'] = (mot[c.motivo || 'Sem motivo informado'] || 0) + 1;
+    }
+    const tot = cards.reduce((a, c) => { a[grupoDe(c.etapa)]++; return a; }, novo()), ids = new Set(cards.map(c => String(c.id)));
+    const vencidas = tot.realizadas + tot.atrasadas + tot.nao, ord = o => Object.values(o).sort((a, b) => b.total - a.total);
     return {
-      hoje: h, carregando: false,
-      fila: { porEtapa: cnt(ativos, c => c.etapa), atrasadas: ativos.filter(c => c.etapa === 'LATE').length, diaDaVisita: ativos.filter(c => c.etapa === 'PREPARATION').length,
-        porVendedor: cnt(ativos.filter(c => ABERTAS.includes(c.etapa)), c => nm(c.vendedorId)), porClasse: cnt(ativos.filter(c => ABERTAS.includes(c.etapa)), c => c.classe), porSegmento: cnt(ativos.filter(c => ABERTAS.includes(c.etapa)), c => c.segmento) },
-      encerradas: { total: enc.length, porMes: cnt(enc, c => mes(c.data)), porVendedor: cnt(enc, c => nm(c.vendedorId)), porClasse: cnt(enc, c => c.classe), porSegmento: cnt(enc, c => c.segmento) },
-      registros: { total: regs.length, porMes: cnt(regs, r => mes(r.dataHora)), porSegmento: cnt(regs, r => r.segmento), porVendedor: cnt(regs, r => nm(cards.find(c => String(c.id) === r.idFila)?.vendedorId)) },
-      reprogramacoes: { total: hist.length, porMotivo: cnt(hist, x => x.motivo), porVendedor: cnt(hist, x => nm(x.vendedorId)) },
-      supervisor: { acompanhadas: regs.filter(r => r.supervisor).length, porSupervisor: cnt(regs.filter(r => r.supervisor), r => nm(r.supervisor)) },
-      naoRealizadas: { total: nao.length, porMotivo: cnt(nao, c => c.motivo || 'Sem motivo informado'), porVendedor: cnt(nao, c => nm(c.vendedorId)), porMes: cnt(nao, c => mes(c.data)) },
+      hoje: hoje(),
+      kpis: { programadas: cards.length, realizadas: tot.realizadas, abertas: tot.abertas, atrasadas: tot.atrasadas, naoRealizadas: tot.nao,
+        reprogramacoes: store.historico.filter(h => ids.has(String(h.card))).length, taxa: vencidas ? Math.round(tot.realizadas * 100 / vencidas) : null },
+      serie: Object.entries(mes).filter(([k]) => k !== '—').sort().map(([k, v]) => ({ mes: k, ...v })),
+      porVendedor: ord(vend).slice(0, 30), porSegmento: ord(seg), porClasse: ['A', 'B', 'C', 'E'].map(k => cls[k] || { nome: k, ...novo() }).concat(cls['—'] ? [cls['—']] : []),
+      motivos: Object.entries(mot).sort((a, b) => b[1] - a[1]).map(([nome, n]) => ({ nome, n })),
+      opcoes: { segmentos: [...new Set(base.map(c => c.segmento).filter(Boolean))].sort(), vendedores: [...new Map(base.map(c => [c.vendedorId, nm(c.vendedorId)]))].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)), classes: ['A', 'B', 'C', 'E'] },
     };
+  }
+  // Registros de visita (SPA 1032) dos cards filtrados: busca, paginação e permissão de edição.
+  async function registros(user, q = {}) {
+    const { m, cards } = await filtrados(user, q), porId = new Map(cards.map(c => [String(c.id), c]));
+    let regs = (await registrosC(m)).filter(r => porId.has(r.idFila));
+    const esc = await escopo(user), busca = R.norm(q.q || '');
+    const tit = await tituloEmpresas(regs.map(r => r.empresaId)), nm = await nomes(regs.map(r => porId.get(r.idFila).vendedorId).concat(regs.map(r => r.supervisor)));
+    let lista = regs.map(r => { const c = porId.get(r.idFila); return { id: r.id, idFila: +r.idFila, empresa: tit(r.empresaId), segmento: c.segmento, classe: c.classe, vendedor: nm(c.vendedorId), dataHora: r.dataHora, supervisor: r.supervisor ? nm(r.supervisor) : '', contatos: r.contatos.length, anexos: r.anexos.length, resumo: r.fatos.replace(/\s+/g, ' ').slice(0, 180), podeEditar: user.papel === 'admin' || esc === null || r.criadoPor === String(user.id) || !!esc?.has(r.criadoPor), _b: R.norm(`${tit(r.empresaId)} ${c.segmento} ${nm(c.vendedorId)} ${r.fatos}`) }; });
+    if (busca) lista = lista.filter(x => x._b.includes(busca));
+    lista.sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)) || b.id - a.id);
+    const size = 15, pages = Math.max(1, Math.ceil(lista.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));
+    return { total: lista.length, page, pages, itens: lista.slice((page - 1) * size, page * size).map(({ _b, ...x }) => x) };
   }
   async function historico(user, q = {}) {
     const m = await modelo(), ids = new Set((await visiveis(user, await cardsC(m))).map(c => String(c.id)));
@@ -533,7 +564,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       fila: Object.fromEntries(Object.keys(F.FILA_CAMPOS).map(k => [k, m.fila[k] || null])), visita: Object.fromEntries(Object.keys(F.VISITA_CAMPOS).map(k => [k, m.visita[k] || null])) };
   }
 
-  return { modelo, sync, varrer, listar, dashboard, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
+  return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
     preparar, camposInfo, supervisores, temAcesso, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };

@@ -124,6 +124,7 @@ const routes = {
   'GET /api/visitas': async (u, b, user) => { exigeBitrix(); return svc.listar(user, Object.fromEntries(u.searchParams)); },
   'GET /api/excluidos': async (u, b, user) => { exigeBitrix(); if (!svc.podeExcluir(user)) throw bad(403, 'Sem permissão.'); return svc.listar(user, { ...Object.fromEntries(u.searchParams), excluidos: '1' }); },
   'GET /api/dashboard': async (u, b, user) => { exigeBitrix(); return svc.dashboard(user, Object.fromEntries(u.searchParams)); },
+  'GET /api/registros': async (u, b, user) => { exigeBitrix(); return svc.registros(user, Object.fromEntries(u.searchParams)); },
   'GET /api/historico': async (u, b, user) => { exigeBitrix(); return svc.historico(user, Object.fromEntries(u.searchParams)); },
   'GET /api/log': async (u, b, user) => { exigeConfig(user); return store.logs.slice(0, 200); },
   'POST /api/preparar': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.preparar(); },
