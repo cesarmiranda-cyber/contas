@@ -70,15 +70,19 @@ async function descobrir(bx) {
   const categoryId = cat ? +cat.id : 19;
   let stages = [];
   try { stages = (await bx.call('crm.status.list', { filter: { ENTITY_ID: `DYNAMIC_${ETYPE.fila}_STAGE_${categoryId}` } })).result || []; } catch { /* sem escopo */ }
-  const etapas = {};
+  const etapas = {}, etapaNomes = {};
+  const SUFIXO = { NEW: 'NEW', PREPARATION: 'PREPARATION', LATE: 'LATE', UC_EFR0YE: 'ENC', NAOREAL: 'NAOREAL', SUCCESS: 'SUCCESS', FAIL: 'FAIL' };
   for (const s of stages) {
+    etapaNomes[s.STATUS_ID] = s.NAME;
+    const cod0 = SUFIXO[String(s.STATUS_ID).split(':').pop()];
+    if (cod0 && !etapas[cod0]) etapas[cod0] = s.STATUS_ID;
     const n = norm(s.NAME);
     for (const [cod, re] of STAGE_NOMES) if (re.test(n) && !etapas[cod]) etapas[cod] = s.STATUS_ID;
     if (s.SEMANTICS === 'S' && !etapas.SUCCESS) etapas.SUCCESS = s.STATUS_ID;
     if (s.SEMANTICS === 'F' && !etapas.FAIL) etapas.FAIL = s.STATUS_ID;
   }
   const m = {
-    empresa, categoryId, etapas,
+    empresa, categoryId, etapas, etapaNomes,
     fila: { ...mapear(ff, FILA_CAMPOS), motivoEnum: enumMap(ff[achar(ff, FILA_CAMPOS.motivo)[0]]) },
     visita: { ...mapear(vf, VISITA_CAMPOS), ...Object.fromEntries(['regime', 'oportunidades', 'antecipada', 'acompanhamento', 'alcada'].map(k => [`${k}Enum`, enumMap(vf[achar(vf, VISITA_CAMPOS[k])[0]])])) },
     filaFields: ff, visitaFields: vf,

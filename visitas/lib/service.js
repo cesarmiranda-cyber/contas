@@ -139,7 +139,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const f = m.fila, ff = m.filaFields;
     const lista = k => { const v = it[f[k]]; const items = itensDe(ff, f[k]); const x = val(v); return items.length ? (items.find(i => String(i.ID) === String(x))?.VALUE || '') : txt(x); };
     return {
-      id: +it.id, titulo: it.title, empresaId: +it.companyId || 0, etapa: etapaCod(m, it.stageId) || it.stageId, vendedorId: txt(it.assignedById),
+      id: +it.id, titulo: it.title, empresaId: +it.companyId || 0, etapa: etapaCod(m, it.stageId) || 'OUTRA', etapaNome: m.etapaNomes?.[it.stageId] || '', vendedorId: txt(it.assignedById),
       segmento: lista('segmento'), cargo: lista('cargo') || 'Vendedor', classe: R.classeLetra(lista('classe')), data: dia(it[f.data]),
       motivo: lista('motivo'), detalhe: txt(it[f.detalhe]), criado: it.createdTime || '',
     };
@@ -444,17 +444,17 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   async function listar(user, q = {}) {
     const m = await modelo(), h = hoje();
     let cards = await visiveis(user, await cardsC(m));
-    const de = q.de || `${R.monthOf(h)}-01`, ate = q.ate || R.monthEnd(h);
+    const de = q.de || '', ate = q.ate || '';   // sem período = tudo o que está no SPA (exceto removidos)
     const excl = q.excluidos === '1';
     cards = cards.filter(c => (excl ? c.etapa === 'FAIL' : c.etapa !== 'FAIL'));
-    cards = cards.filter(c => c.etapa === 'NAOREAL' || excl || (c.data >= de && c.data <= ate) || (c.etapa === 'LATE' && c.data < de && !q.de));
+    if (de || ate) cards = cards.filter(c => c.etapa === 'NAOREAL' || !c.data || ((!de || c.data >= de) && (!ate || c.data <= ate)) || (ABERTAS.includes(c.etapa) && c.data < de && !q.de));
     if (q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
     if (q.vendedor) cards = cards.filter(c => c.vendedorId === String(q.vendedor));
     if (q.classe) cards = cards.filter(c => c.classe === q.classe);
     if (q.etapa) cards = cards.filter(c => c.etapa === q.etapa);
     if (q.supervisor) { const s = await escopoDe(q.supervisor); cards = cards.filter(c => s.has(c.vendedorId)); }
     const tit = await tituloEmpresas(cards.map(c => c.empresaId)), nm = await nomes(cards.map(c => c.vendedorId));
-    return { hoje: h, de, ate, itens: cards.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: nm(c.vendedorId), podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
+    return { hoje: h, de, ate, total: cards.length, itens: cards.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: nm(c.vendedorId), podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
   async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i))); }

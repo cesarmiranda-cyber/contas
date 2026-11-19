@@ -107,3 +107,10 @@ test('acesso por departamento (com subdepartamentos); admin sempre entra', async
   assert.equal(await svc.temAcesso({ id: '8', papel: 'usuario' }), false);
   assert.equal(await svc.temAcesso({ id: '8', papel: 'admin' }), true);
 });
+test('lista mostra todos os cards do SPA, inclusive datas antigas e etapas fora do padrão', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  f.s.itens[1036].push({ id: 900, title: 'Antigo', companyId: 100, categoryId: 19, stageId: 'DT1036_19:SUCCESS', assignedById: '7', ufSeg: 'Motores', ufClasse: 'A', ufData: '2025-03-10' },
+    { id: 901, title: 'Estranho', companyId: 101, categoryId: 19, stageId: 'DT1036_19:XYZ', assignedById: '7', ufSeg: 'Motores', ufData: '2026-01-05' });
+  svc.invalidar(); const r = await svc.listar(admin, {});
+  assert.equal(r.total, 4); assert.ok(r.itens.some(i => i.etapa === 'SUCCESS')); assert.ok(r.itens.some(i => i.etapa === 'OUTRA'));
+});

@@ -58,8 +58,9 @@ th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left;vertica
 <script>
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const ETAPAS = { NEW: 'Aguardando', PREPARATION: 'Dia da visita', LATE: 'Atrasada', ENC: 'Encerrado', NAOREAL: 'Não realizada', FAIL: 'Removido' };
-const COLS = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'];
+const ETAPAS = { NEW: 'Aguardando', PREPARATION: 'Dia da visita', LATE: 'Atrasada', ENC: 'Encerrado', NAOREAL: 'Não realizada', SUCCESS: 'Finalizado', OUTRA: 'Outra etapa', FAIL: 'Removido' };
+const COLS = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL', 'SUCCESS', 'OUTRA'];
+const nomeEtapa = i => (i.etapa === 'OUTRA' && i.etapaNome) || ETAPAS[i.etapa] || i.etapa;
 const S = { eu: null, aba: 'fila', vista: 'cards', f: { de: '', ate: '', segmento: '', vendedor: '', classe: '', etapa: '', supervisor: '' }, itens: [], sel: new Set(), dashPag: 'fila', cfg: null };
 try { Object.assign(S.f, JSON.parse(localStorage.getItem('vis.f') || '{}')); S.vista = localStorage.getItem('vis.v') || 'cards'; } catch {}
 const dtBR = d => (d ? d.slice(0, 10).split('-').reverse().join('/') : '—');
@@ -104,7 +105,7 @@ async function telaFila() {
   const f = S.f;
   const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
   const r = await api('/api/visitas?' + q);
-  S.itens = r.itens; if (!f.de) { f.de = r.de; f.ate = r.ate; }
+  S.itens = r.itens; S.total = r.total;
   const uniq = k => [...new Set(S.itens.map(i => i[k]).filter(Boolean))];
   const op = (k, arr, lab = x => x) => `<option value="">Todos</option>` + arr.map(x => `<option value="${esc(x[0] ?? x)}" ${f[k] === String(x[0] ?? x) ? 'selected' : ''}>${esc(lab(x[1] ?? x))}</option>`).join('');
   const vend = [...new Map(S.itens.map(i => [i.vendedorId, i.vendedor])).entries()];
@@ -114,7 +115,7 @@ async function telaFila() {
     <label>Vendedor<select id="f_vendedor">${op('vendedor', vend)}</select></label>
     <label>Classe<select id="f_classe">${op('classe', ['A', 'B', 'C', 'E'])}</select></label>
     <label>Etapa<select id="f_etapa">${op('etapa', COLS.map(c => [c, ETAPAS[c]]))}</select></label>
-    <div style="margin-left:auto" class="seg">${[['cards', 'Cartões'], ['tabela', 'Tabela'], ['kanban', 'Kanban']].map(([k, n]) => `<button class="btn ${S.vista === k ? 'on' : ''}" data-v="${k}">${n}</button>`).join('')}</div>
+    <div class="mut" style="align-self:center">${S.total} visita(s)</div><div style="margin-left:auto" class="seg">${[['cards', 'Cartões'], ['tabela', 'Tabela'], ['kanban', 'Kanban']].map(([k, n]) => `<button class="btn ${S.vista === k ? 'on' : ''}" data-v="${k}">${n}</button>`).join('')}</div>
     ${S.eu.podeExcluir ? '<button class="btn" id="b_excl">Excluídos</button>' : ''}`;
   ['de', 'ate', 'segmento', 'vendedor', 'classe', 'etapa'].forEach(k => $('#f_' + k).onchange = e => { f[k] = e.target.value; localStorage.setItem('vis.f', JSON.stringify({ ...f, de: '', ate: '' })); telaFila(); });
   document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { S.vista = b.dataset.v; localStorage.setItem('vis.v', S.vista); telaFila(); });
@@ -130,7 +131,7 @@ function acoesCard(i) {
   return a.join('');
 }
 function cardHtml(i) {
-  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(i.empresa)}</h3><span class="tag ${i.etapa}">${esc(ETAPAS[i.etapa] || i.etapa)}</span></div>
+  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(i.empresa)}</h3><span class="tag ${i.etapa}">${esc(nomeEtapa(i))}</span></div>
     <div class="mut">${esc(i.segmento)} · Classe ${esc(i.classe || '—')} · ${esc(i.vendedor)}</div>
     <div>📅 <b>${dtBR(i.data)}</b>${i.atrasoDias ? ` <span class="tag LATE">${i.atrasoDias} dia(s) de atraso</span>` : ''}${i.reprogramado ? ' <span class="tag">data alterada</span>' : ''}</div>
     ${i.etapa === 'NAOREAL' && i.motivo ? `<div class="mut">Motivo: ${esc(i.motivo)}${i.detalhe ? ' — ' + esc(i.detalhe) : ''}</div>` : ''}
@@ -140,8 +141,8 @@ function desenhaLista() {
   const L = $('#lista'), it = S.itens;
   if (!it.length) { L.innerHTML = '<div class="vazio">Nenhuma visita neste filtro.</div>'; return; }
   if (S.vista === 'cards') L.innerHTML = `<div class="grid">${it.map(cardHtml).join('')}</div>`;
-  else if (S.vista === 'kanban') L.innerHTML = `<div class="kanban">${COLS.map(c => `<div class="col"><h4>${ETAPAS[c]} (${it.filter(i => i.etapa === c).length})</h4>${it.filter(i => i.etapa === c).map(cardHtml).join('')}</div>`).join('')}</div>`;
-  else L.innerHTML = `<div class="actions" style="margin-bottom:8px"><button class="btn" id="b_grupo" disabled>Alterar data dos selecionados</button></div><div class="scroll"><table><thead><tr><th></th><th>Empresa</th><th>Segmento</th><th>Classe</th><th>Vendedor</th><th>Data</th><th>Etapa</th><th></th></tr></thead><tbody>${it.map(i => `<tr><td>${['NEW', 'PREPARATION', 'LATE'].includes(i.etapa) ? `<input type="checkbox" data-sel="${i.id}" ${S.sel.has(i.id) ? 'checked' : ''}>` : ''}</td><td>${esc(i.empresa)}</td><td>${esc(i.segmento)}</td><td>${esc(i.classe)}</td><td>${esc(i.vendedor)}</td><td>${dtBR(i.data)}</td><td><span class="tag ${i.etapa}">${esc(ETAPAS[i.etapa] || i.etapa)}</span></td><td><div class="acoes">${acoesCard(i)}</div></td></tr>`).join('')}</tbody></table></div>`;
+  else if (S.vista === 'kanban') L.innerHTML = `<div class="kanban">${COLS.filter(c => c.length && (['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'].includes(c) || it.some(i => i.etapa === c))).map(c => `<div class="col"><h4>${ETAPAS[c]} (${it.filter(i => i.etapa === c).length})</h4>${it.filter(i => i.etapa === c).map(cardHtml).join('')}</div>`).join('')}</div>`;
+  else L.innerHTML = `<div class="actions" style="margin-bottom:8px"><button class="btn" id="b_grupo" disabled>Alterar data dos selecionados</button></div><div class="scroll"><table><thead><tr><th></th><th>Empresa</th><th>Segmento</th><th>Classe</th><th>Vendedor</th><th>Data</th><th>Etapa</th><th></th></tr></thead><tbody>${it.map(i => `<tr><td>${['NEW', 'PREPARATION', 'LATE'].includes(i.etapa) ? `<input type="checkbox" data-sel="${i.id}" ${S.sel.has(i.id) ? 'checked' : ''}>` : ''}</td><td>${esc(i.empresa)}</td><td>${esc(i.segmento)}</td><td>${esc(i.classe)}</td><td>${esc(i.vendedor)}</td><td>${dtBR(i.data)}</td><td><span class="tag ${i.etapa}">${esc(nomeEtapa(i))}</span></td><td><div class="acoes">${acoesCard(i)}</div></td></tr>`).join('')}</tbody></table></div>`;
   L.querySelectorAll('[data-a]').forEach(b => b.onclick = () => acao(b.dataset.a, +b.dataset.id));
   L.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { c.checked ? S.sel.add(+c.dataset.sel) : S.sel.delete(+c.dataset.sel); if ($('#b_grupo')) $('#b_grupo').disabled = !S.sel.size; });
   if ($('#b_grupo')) { $('#b_grupo').disabled = !S.sel.size; $('#b_grupo').onclick = () => modalAlterar([...S.sel]); }
