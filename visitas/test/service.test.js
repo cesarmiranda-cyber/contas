@@ -114,3 +114,21 @@ test('lista mostra todos os cards do SPA, inclusive datas antigas e etapas fora 
   svc.invalidar(); const r = await svc.listar(admin, {});
   assert.equal(r.total, 4); assert.ok(r.itens.some(i => i.etapa === 'SUCCESS')); assert.ok(r.itens.some(i => i.etapa === 'OUTRA'));
 });
+test('paginação: página, total, contagem por etapa e nomes só da página', async () => {
+  const { f, svc } = mundo();
+  for (let i = 0; i < 25; i++) f.s.empresas.push({ ID: String(200 + i), TITLE: `Emp ${i}`, UF_V: '7', UF_C: '3' });
+  await svc.sync(); svc.invalidar();
+  f.s.chamadas.length = 0;
+  const p1 = await svc.listar(admin, { pageSize: 10, page: 1 }), p3 = await svc.listar(admin, { pageSize: 10, page: 3 });
+  assert.equal(p1.total, 27); assert.equal(p1.pages, 3); assert.equal(p1.itens.length, 10); assert.equal(p3.itens.length, 7); assert.equal(p1.porEtapa.NEW, 27);
+  assert.equal((await svc.listar(admin, { pageSize: 10, page: 99 })).page, 3);            // página fora do intervalo é corrigida
+  assert.ok(new Set([...p1.itens, ...p3.itens].map(i => i.id)).size === 17);
+});
+test('validação: anexo inválido, motivo fora da lista e texto gigante são tratados', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  const card = f.s.itens[1036].find(c => c.companyId == 100);
+  await assert.rejects(svc.naoRealizada(card.id, { motivo: 'qualquer coisa' }, vendedor), /Motivo inválido/);
+  f.s.itens[1032];
+  await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'x'.repeat(50000), contatos: Array(80).fill(5) }, vendedor);
+  assert.equal(f.s.itens[1032][0].ufFatos.length, 20000); assert.equal(f.s.itens[1032][0].contactIds.length, 50);
+});

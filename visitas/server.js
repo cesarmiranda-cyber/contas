@@ -1,5 +1,7 @@
 'use strict';
 const http = require('http');
+const zlib = require('zlib');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { createBitrix } = require('./lib/bitrix');
@@ -20,9 +22,30 @@ const svc = createService({ bitrix, store });
 const bad = (code, msg) => { const e = new Error(msg); e.status = code; return e; };
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "frame-ancestors 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
+  'Strict-Transport-Security': 'max-age=31536000', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self' https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
 };
-const send = (res, code, obj) => { res.writeHead(code, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
+const send = (res, code, obj) => {
+  let body = Buffer.from(JSON.stringify(obj)); const h = { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', Vary: 'Accept-Encoding' };
+  if (body.length > 1024 && /\bgzip\b/.test(res.req?.headers['accept-encoding'] || '')) { body = zlib.gzipSync(body, { level: 4 }); h['Content-Encoding'] = 'gzip'; }
+  res.writeHead(code, h); res.end(body);
+};
+// Limite de requisições por usuário (janela de 1 min): leitura 300, escrita 60. Protege o Bitrix (limite de chamadas) e o app.
+const limites = new Map();
+function limite(user, escrita) {
+  const k = `${user.id}:${escrita ? 'w' : 'r'}`, agora = Date.now(), max = escrita ? 60 : 300;
+  let l = limites.get(k); if (!l || l.fim < agora) { l = { n: 0, fim: agora + 60000 }; limites.set(k, l); }
+  if (++l.n > max) { const e = bad(429, 'Muitas requisições. Aguarde um instante e tente de novo.'); e.retry = Math.ceil((l.fim - agora) / 1000); throw e; }
+}
+setInterval(() => { const t = Date.now(); for (const [k, v] of limites) if (v.fim < t) limites.delete(k); }, 60000).unref();
+// Arquivos estáticos: lidos uma vez, comprimidos em memória e servidos com ETag (304 quando não mudou).
+const estaticos = new Map();
+function estatico(f) {
+  const st = fs.statSync(f), c = estaticos.get(f);
+  if (c && c.mtime === st.mtimeMs) return c;
+  const raw = fs.readFileSync(f), n = { mtime: st.mtimeMs, raw, gz: zlib.gzipSync(raw, { level: 9 }), etag: `"${crypto.createHash('sha1').update(raw).digest('hex').slice(0, 20)}"` };
+  estaticos.set(f, n); return n;
+}
 const readBody = (req, max = 1e6) => new Promise((ok, no) => {
   if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return no(bad(415, 'Content-Type deve ser application/json.'));
   const chunks = []; let n = 0, dead = false;
@@ -44,7 +67,7 @@ const sameOrigin = req => {
 
 // Identidade: cabeçalhos injetados pelo gateway da Vibecode (o navegador não os forja).
 function usuario(headers) {
-  if (process.env.AUTH_DISABLED === '1') return { id: '0', nome: 'Desenvolvimento', portalAdmin: true, papel: 'admin', config: true };
+  if (process.env.AUTH_DISABLED === '1' && process.env.NODE_ENV !== 'production') return { id: '0', nome: 'Desenvolvimento', portalAdmin: true, papel: 'admin', config: true };
   const id = String(headers['x-vibe-user-id'] || '');
   if (!/^\d{1,12}$/.test(id)) return null;
   let nome = ''; try { nome = decodeURIComponent(String(headers['x-vibe-user-name-encoded'] || '')); } catch { /* sem nome */ }
@@ -91,17 +114,17 @@ const routes = {
   },
   'GET /api/campos': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.camposInfo(); },
   'GET /api/usuarios': async (u, b, user) => {
-    exigeBitrix(); const q = String(u.searchParams.get('q') || '').trim().slice(0, 60); if (q.length < 2) return [];
+    exigeConfig(user); exigeBitrix(); const q = String(u.searchParams.get('q') || '').trim().slice(0, 60); if (q.length < 2) return [];
     const r = await bitrix.call('user.get', { FILTER: { ACTIVE: true, NAME_SEARCH: q } }).catch(e => { throw bad(502, e.message); });
     return (r.result || []).slice(0, 20).map(x => ({ id: String(x.ID), nome: [x.NAME, x.LAST_NAME].filter(Boolean).join(' ') || x.EMAIL }));
   },
-  'GET /api/nomes': async (u) => { exigeBitrix(); const ids = String(u.searchParams.get('ids') || '').split(',').filter(x => /^\d+$/.test(x)).slice(0, 100); const n = await svc.nomes(ids); return Object.fromEntries(ids.map(i => [i, n(i)])); },
+  'GET /api/nomes': async (u, b, user) => { exigeConfig(user); exigeBitrix(); const ids = String(u.searchParams.get('ids') || '').split(',').filter(x => /^\d+$/.test(x)).slice(0, 100); const n = await svc.nomes(ids); return Object.fromEntries(ids.map(i => [i, n(i)])); },
   'GET /api/departamentos': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.departamentos(); },
   'GET /api/supervisores': async () => { exigeBitrix(); return svc.supervisores(); },
   'GET /api/visitas': async (u, b, user) => { exigeBitrix(); return svc.listar(user, Object.fromEntries(u.searchParams)); },
   'GET /api/excluidos': async (u, b, user) => { exigeBitrix(); if (!svc.podeExcluir(user)) throw bad(403, 'Sem permissão.'); return svc.listar(user, { ...Object.fromEntries(u.searchParams), excluidos: '1' }); },
   'GET /api/dashboard': async (u, b, user) => { exigeBitrix(); return svc.dashboard(user, Object.fromEntries(u.searchParams)); },
-  'GET /api/historico': async (u, b, user) => { exigeBitrix(); return svc.historico(user); },
+  'GET /api/historico': async (u, b, user) => { exigeBitrix(); return svc.historico(user, Object.fromEntries(u.searchParams)); },
   'GET /api/log': async (u, b, user) => { exigeConfig(user); return store.logs.slice(0, 200); },
   'POST /api/preparar': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.preparar(); },
   'POST /api/sincronizar': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.sync({ forcar: !!b.forcar, previa: !!b.previa }); },
@@ -127,7 +150,8 @@ const server = http.createServer(async (req, res) => {
       const user = usuario(req.headers);
       if (!user) throw bad(401, 'Não consegui identificar seu usuário. Abra o app pelo Bitrix24.');
       if (u.pathname !== '/api/eu' && !(await svc.temAcesso(user))) throw bad(403, 'Seu departamento não tem acesso a este app. Peça a um administrador.');
-      const w = ['POST', 'PUT'].includes(req.method);
+      const w = ['POST', 'PUT', 'DELETE'].includes(req.method);
+      limite(user, w);
       if (routes[key]) return send(res, 200, await routes[key](u, w ? await readBody(req) : {}, user));
       let m = u.pathname.match(/^\/api\/cards\/(\d+)\/([a-z-]+)$/);
       if (m && cardRoutes[m[2]]) {
@@ -143,14 +167,18 @@ const server = http.createServer(async (req, res) => {
       const pub = path.join(__dirname, 'public');
       const f = path.join(pub, u.pathname === '/' ? 'index.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
       if (f.startsWith(pub + path.sep) && fs.existsSync(f) && fs.statSync(f).isFile()) {
-        res.writeHead(200, { ...SEC, 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-        return fs.createReadStream(f).on('error', () => res.destroy()).pipe(res);
+        const e = estatico(f), h = { ...SEC, 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache', ETag: e.etag, Vary: 'Accept-Encoding' };
+        if (req.headers['if-none-match'] === e.etag) { res.writeHead(304, h); return res.end(); }
+        const gz = /\bgzip\b/.test(req.headers['accept-encoding'] || '') && /^\.(html|js|css|svg)$/.test(path.extname(f));
+        if (gz) h['Content-Encoding'] = 'gzip';
+        res.writeHead(200, h); return res.end(req.method === 'HEAD' ? undefined : gz ? e.gz : e.raw);
       }
     }
     send(res, 404, { error: 'não encontrado' });
   } catch (e) {
     const code = e.status >= 400 && e.status < 600 ? e.status : 500;
     if (code >= 500) store.log('erro', `${req.method} ${u.pathname}: ${String(e.message).replace(/[\r\n]+/g, ' ').slice(0, 300)}`);
+    if (e.retry) res.setHeader('Retry-After', e.retry);
     send(res, code, { error: String(e.message).slice(0, 300) });
   }
 });

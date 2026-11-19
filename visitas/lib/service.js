@@ -8,6 +8,8 @@ const fail = (code, msg) => { const e = new Error(msg); e.status = code; return 
 const dia = v => (v ? String(v).slice(0, 10) : '');
 const val = v => (Array.isArray(v) ? v[0] : v);
 const txt = v => (v === undefined || v === null ? '' : String(v));
+const MAXTXT = 20000;
+const limpa = (v, max = MAXTXT) => txt(v).slice(0, max);
 
 function createService({ bitrix: bx, store, now = () => new Date() }) {
   const hoje = () => R.todayBR(now());
@@ -278,14 +280,22 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const v = m.visita, vf = m.visitaFields, f = {};
     const set = (k, x) => { if (v[k] && x !== undefined) f[v[k]] = x; };
     const lista = (k, x) => { const items = itensDe(vf, v[k]); return items.length ? (x ? (items.find(i => R.norm(i.VALUE) === R.norm(x))?.ID ?? '') : '') : txt(x); };
-    set('fatos', txt(b.fatos)); set('interesses', txt(b.interesses)); set('sentimentos', txt(b.sentimentos)); set('valores', txt(b.valores));
-    set('populacao', txt(b.populacao)); set('resultado', txt(b.resultado));
+    set('fatos', limpa(b.fatos)); set('interesses', limpa(b.interesses)); set('sentimentos', limpa(b.sentimentos)); set('valores', limpa(b.valores));
+    set('populacao', limpa(b.populacao)); set('resultado', limpa(b.resultado));
     if (v.regime) f[v.regime] = lista('regime', b.regime);
     if (v.oportunidades) f[v.oportunidades] = lista('oportunidades', b.oportunidades);
     if (v.antecipada) f[v.antecipada] = lista('antecipada', b.antecipada);
     if (v.acompanhamento) f[v.acompanhamento] = lista('acompanhamento', b.acompanhamento);
-    if (v.supervisor && b.supervisor) f[v.supervisor] = txt(b.supervisor);
-    if (Array.isArray(b.anexos) && b.anexos.length && v.anexos) f[v.anexos] = b.anexos.slice(0, 10).map(a => [String(a.nome || 'anexo').slice(0, 120), String(a.base64 || '')]);
+    if (v.supervisor && /^\d{1,12}$/.test(txt(b.supervisor))) f[v.supervisor] = txt(b.supervisor);
+    if (Array.isArray(b.anexos) && b.anexos.length && v.anexos) {
+      let total = 0;
+      f[v.anexos] = b.anexos.slice(0, 10).map(a => {
+        const b64 = String(a?.base64 || '');
+        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) throw fail(400, 'Anexo inválido.');
+        total += b64.length; if (total > 27e6) throw fail(413, 'Anexos passam de 20 MB.');
+        return [String(a.nome || 'anexo').replace(/[\\/\r\n\0]/g, '_').slice(0, 120), b64];
+      });
+    }
     return f;
   }
   async function registrar(id, b, user) {
@@ -299,7 +309,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       if (dataHora.slice(0, 10) > h) throw fail(400, 'A visita não pode estar no futuro. Para mudar a data, use "Alterar visita".');
       if (!txt(b.fatos).trim()) throw fail(400, 'Preencha "Fatos e dados".');
       const f = camposVisita(m, b, card.vendedorId);
-      const contatos = A(b.contatos).map(Number).filter(Boolean);
+      const contatos = A(b.contatos).slice(0, 50).map(Number).filter(n => Number.isInteger(n) && n > 0);
       Object.assign(f, { title: `Visita · ${card.titulo}`.slice(0, 250), companyId: card.empresaId, assignedById: card.vendedorId, [m.visita.data]: dataHora.length > 10 ? dataHora : `${dataHora}T09:00:00`,
         [m.visita.idFila]: String(id), [m.visita.segmento]: escreverLista(itensDe(m.visitaFields, m.visita.segmento), card.segmento) });
       if (contatos.length) f.contactIds = contatos;
@@ -319,7 +329,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const { m, card } = await carregar(id, user);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) throw fail(400, 'Informe a nova data.');
     if (data < hoje()) throw fail(400, 'A nova data não pode ser no passado.');
-    motivo = txt(motivo).trim();
+    motivo = limpa(motivo, 500).trim();
     if (!motivo && card.classe !== 'E') throw fail(400, 'Informe o motivo da alteração (obrigatório, exceto classe E).');
     return comTrava(`c:${card.empresaId}`, async () => {
       if (!ABERTAS.includes(card.etapa)) throw fail(409, 'Só é possível alterar a data de cards abertos.');
@@ -345,8 +355,9 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
   async function naoRealizada(id, { motivo, detalhe }, user) {
     const { m, card } = await carregar(id, user);
-    motivo = txt(motivo).trim(); detalhe = txt(detalhe).trim();
+    motivo = txt(motivo).trim(); detalhe = limpa(detalhe, 2000).trim();
     if (!motivo) throw fail(400, 'Informe o motivo da não realização.');
+    if (!cfg().motivosNaoRealizada.includes(motivo)) throw fail(400, 'Motivo inválido: escolha um da lista.');
     return comTrava(`c:${card.empresaId}`, async () => {
       if (!ABERTAS.includes(card.etapa)) throw fail(409, 'Só é possível marcar cards abertos.');
       const extra = {};
@@ -387,7 +398,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
   async function participantes(id, ids, user) {
     const { card } = await carregar(id, user);
-    store.addTroca(id, { at: new Date().toISOString(), usuario: user.nome || String(user.id), contatos: A(ids).map(Number) });
+    store.addTroca(id, { at: new Date().toISOString(), usuario: user.nome || String(user.id), contatos: A(ids).slice(0, 50).map(Number).filter(n => Number.isInteger(n) && n > 0) });
     const m = await modelo(); void m; void card;
     return { ok: true };
   }
@@ -418,7 +429,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     if (!pode) throw fail(403, 'Você não pode editar este registro.');
     if (!txt(b.fatos).trim()) throw fail(400, 'Preencha "Fatos e dados".');
     const f = camposVisita(m, b);
-    if (A(b.contatos).length) f.contactIds = A(b.contatos).map(Number).filter(Boolean);
+    if (A(b.contatos).length) f.contactIds = A(b.contatos).slice(0, 50).map(Number).filter(n => Number.isInteger(n) && n > 0);
     if (b.dataHora && /^\d{4}-\d{2}-\d{2}/.test(b.dataHora)) f[m.visita.data] = b.dataHora;
     await bx.call('crm.item.update', { entityTypeId: ETYPE.visita, id: vid, fields: f });
     store.log('edicao', `Registro #${vid} editado por ${user.nome || user.id}`);
@@ -453,8 +464,12 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     if (q.classe) cards = cards.filter(c => c.classe === q.classe);
     if (q.etapa) cards = cards.filter(c => c.etapa === q.etapa);
     if (q.supervisor) { const s = await escopoDe(q.supervisor); cards = cards.filter(c => s.has(c.vendedorId)); }
-    const tit = await tituloEmpresas(cards.map(c => c.empresaId)), nm = await nomes(cards.map(c => c.vendedorId));
-    return { hoje: h, de, ate, total: cards.length, itens: cards.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: nm(c.vendedorId), podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
+    cards.sort((x, y) => (x.data || '9999').localeCompare(y.data || '9999') || x.id - y.id);
+    const porEtapa = {}; for (const c of cards) porEtapa[c.etapa] = (porEtapa[c.etapa] || 0) + 1;
+    const size = Math.min(200, Math.max(10, +q.pageSize || 50)), pages = Math.max(1, Math.ceil(cards.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));
+    const fatia = cards.slice((page - 1) * size, page * size);          // só a página corrente busca nomes no Bitrix
+    const tit = await tituloEmpresas(fatia.map(c => c.empresaId)), nm = await nomes(fatia.map(c => c.vendedorId));
+    return { hoje: h, de, ate, total: cards.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: nm(c.vendedorId), podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
   async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i))); }
@@ -479,10 +494,11 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       naoRealizadas: { total: nao.length, porMotivo: cnt(nao, c => c.motivo || 'Sem motivo informado'), porVendedor: cnt(nao, c => nm(c.vendedorId)), porMes: cnt(nao, c => mes(c.data)) },
     };
   }
-  async function historico(user) {
+  async function historico(user, q = {}) {
     const m = await modelo(), ids = new Set((await visiveis(user, await cardsC(m))).map(c => String(c.id)));
-    const nm = await nomes(store.historico.map(h => h.vendedorId));
-    return store.historico.filter(h => ids.has(String(h.card))).slice(0, 500).map(h => ({ ...h, vendedor: nm(h.vendedorId) }));
+    const todos = store.historico.filter(h => ids.has(String(h.card))), size = 30, pages = Math.max(1, Math.ceil(todos.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));
+    const fatia = todos.slice((page - 1) * size, page * size), nm = await nomes(fatia.map(h => h.vendedorId));
+    return { total: todos.length, page, pages, itens: fatia.map(h => ({ ...h, vendedor: nm(h.vendedorId) })) };
   }
 
   // ---------- preparar (cria etapas e campos que faltam) ----------
