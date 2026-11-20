@@ -68,6 +68,7 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
     'PATCH /api/curriculos/vagas/:id': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.editarVaga(user, p.id, body, bearer); },
     'POST /api/curriculos/vagas/:id/acao': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.acaoVaga(user, p.id, body, bearer); },
     'DELETE /api/curriculos/vagas/:id': async ({ user, p }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.excluirVaga(user, p.id); },
+    'DELETE /api/curriculos/exemplos': async ({ user }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.removerExemplos(user); },
     'GET /api/curriculos/config': async ({ user }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.config(); },
     'PUT /api/curriculos/config': async ({ user, body }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.salvarConfig(user, body); },
     'PUT /api/curriculos/config/area/:area': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.addResponsavel(user, bearer, p.area, body.userId); },
@@ -131,6 +132,7 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
       send(res, code, { error: code === 500 ? 'Erro interno.' : e.message, ...(e.erros ? { erros: e.erros } : {}) });
     }
   });
+  if (process.env.SEED_DEMO === '1') cur.semearExemplos().catch(e => console.error('exemplos', e.message));
   server.store = store; server.cur = cur;
   return server;
 }

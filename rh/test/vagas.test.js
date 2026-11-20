@@ -142,3 +142,20 @@ test('candidatura de vaga do RH tem prioridade: marca, ordem e metade do prazo',
   assert.deepEqual(p.map(i => i.viaVaga), [true]);
   srv.close();
 });
+
+test('dados de exemplo: criados uma vez, marcados e removíveis sem tocar nos reais', async () => {
+  const { srv, call, G, Q } = await boot();
+  assert.equal(await srv.cur.semearExemplos(), true);
+  assert.equal(await srv.cur.semearExemplos(), false, 'não repete');
+  await srv.cur.aguardarIa();
+  const l = (await call('GET', '/api/curriculos/candidatos', { as: G })).j;
+  assert.equal(l.total, 3); assert.equal(l.temExemplos, true); assert.equal(l.itens.filter(i => i.viaVaga).length, 2);
+  const v = (await call('GET', '/public/vagas', { h: EXT })).j.vagas; assert.equal(v.length, 2); assert.ok(v.find(x => x.titulo === 'Mecânico de Manutenção').faixaSalarial);
+  await call('POST', '/public/candidaturas', { h: EXT, body: ficha(50, undefined) });                 // candidatura real
+  assert.equal((await call('DELETE', '/api/curriculos/exemplos', { as: Q })).s, 403);
+  const r = (await call('DELETE', '/api/curriculos/exemplos', { as: G })).j; assert.deepEqual(r, { candidatos: 3, vagas: 2 });
+  const depois = (await call('GET', '/api/curriculos/candidatos', { as: G })).j; assert.equal(depois.total, 1); assert.equal(depois.temExemplos, false);
+  assert.equal((await call('GET', '/public/vagas', { h: EXT })).j.vagas.length, 0);
+  assert.equal(await srv.cur.semearExemplos(), false, 'não volta depois de removidos');
+  srv.close();
+});

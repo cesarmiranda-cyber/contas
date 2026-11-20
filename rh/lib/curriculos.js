@@ -131,7 +131,7 @@ function createCurriculos({ store, ia, usuarios, extrair = extrairTexto }) {
     if (ordem === 'aderencia') itens.sort((a, b) => (b.aderencia ?? -1) - (a.aderencia ?? -1));
     else itens.sort((a, b) => (b.viaVaga - a.viaVaga) || (a.criadoEm < b.criadoEm ? 1 : -1));   // vagas do RH primeiro, depois as mais recentes
     const porStatus = Object.fromEntries(STATUS.map(s => [s.id, 0])); for (const c of store.candidatos) porStatus[c.status] = (porStatus[c.status] || 0) + 1;
-    return { total: itens.length, porStatus, paradas: store.candidatos.filter(parada).length, semResponsavel: store.candidatos.filter(c => !c.responsavel && c.status === 'novo').length, viaVaga: store.candidatos.filter(c => c.viaVaga && c.status === 'novo').length, status: STATUS, slaDias: cfg().slaDias, itens: itens.slice(offset, offset + Math.min(limite, 500)) };
+    return { total: itens.length, porStatus, paradas: store.candidatos.filter(parada).length, semResponsavel: store.candidatos.filter(c => !c.responsavel && c.status === 'novo').length, temExemplos: store.candidatos.some(c => c.demo) || store.vagas.some(v => v.demo), viaVaga: store.candidatos.filter(c => c.viaVaga && c.status === 'novo').length, status: STATUS, slaDias: cfg().slaDias, itens: itens.slice(offset, offset + Math.min(limite, 500)) };
   }
   const detalhe = id => {
     const c = achar(id), v = vagaPor(c.dados.vaga);
@@ -290,6 +290,34 @@ function createCurriculos({ store, ia, usuarios, extrair = extrairTexto }) {
   const vagasPublicas = () => { atualizarVagas(); return { vagas: store.vagas.filter(v => v.status === 'aberta').map(v => ({ ...publica(v), descricao: v.descricao.slice(0, 400) })) }; };
   const vagaPublica = codigo => { atualizarVagas(); const v = vagaPor(codigo); if (!v || v.status !== 'aberta') throw fail(404, 'Vaga não encontrada ou já encerrada.'); return { vaga: { ...publica(v), descricao: v.descricao, requisitos: v.requisitos } }; };
 
+  // ---------- dados de exemplo (para demonstração; marcados e removíveis) ----------
+  async function semearExemplos() {
+    if (store.curConfig.exemplosSemeados || store.vagas.length || store.candidatos.length) return false;
+    const cvs = require('./demoCvs'), hoje = hojeBR();
+    const mk = async (dados, pub) => { const v = await criarVaga(SISTEMA, dados); await acaoVaga(SISTEMA, v.id, { acao: 'publicar', ...pub }); gravaVaga({ ...acharVaga(v.id), demo: true }); return v.codigo; };
+    const mec = await mk({ titulo: 'Mecânico de Manutenção', area: 'Manutenção e mecânica', cidade: 'Belo Horizonte', tipoContrato: 'CLT', modelo: 'Presencial', faixaSalarial: 'R$ 3.200 a R$ 4.000', mostrarSalario: true, posicoes: 2, limiteCandidatos: 30,
+      descricao: 'Manutenção preventiva e corretiva de geradores, compressores e equipamentos para construção civil, na oficina e em atendimentos nas obras dos clientes.',
+      requisitos: '3 anos ou mais em manutenção de equipamentos pesados; NR-12 e NR-10 vigentes; NR-35 desejável; CNH B; disponibilidade para atendimentos em obra.' }, { encerraEm: somaDias(hoje, 21) });
+    const adm = await mk({ titulo: 'Assistente Administrativo', area: 'Administrativo', cidade: 'Belo Horizonte', tipoContrato: 'CLT', modelo: 'Presencial', posicoes: 1, limiteCandidatos: 50,
+      descricao: 'Rotinas administrativas da filial: atendimento a clientes, emissão e conferência de documentos, apoio ao financeiro e ao comercial.',
+      requisitos: 'Experiência em rotinas administrativas e atendimento; Excel intermediário; ensino médio completo; vivência com contas a pagar e a receber é diferencial.' }, { encerraEm: somaDias(hoje, 14) });
+    const base = { cidade: 'Belo Horizonte', uf: 'MG', consentimento: true, escolaridade: 'Médio', origem: 'Site da Original' };
+    const fichas = [
+      { ...base, nome: 'João Pereira dos Santos', email: 'joao.pereira@exemplo.com.br', telefone: '31999990001', area: 'Manutenção e mecânica', vaga: mec, linkedin: 'linkedin.com/in/joao-pereira-exemplo', escolaridade: 'Técnico', experiencia: 'Mais de 10 anos', disponibilidade: 'Imediata', modelo: ['Presencial'], pretensao: 3800, sobre: 'Trabalho há 10 anos com manutenção de equipamentos pesados e quero crescer numa empresa do setor de locação.', curriculo: { nome: 'curriculo-joao-pereira.pdf', base64: cvs.joao } },
+      { ...base, nome: 'Mariana Costa Lima', email: 'mariana.lima@exemplo.com.br', telefone: '31999990002', cidade: 'Contagem', area: 'Administrativo', vaga: adm, escolaridade: 'Superior incompleto', experiencia: 'Até 1 ano', disponibilidade: 'Em até 15 dias', modelo: ['Presencial', 'Híbrido'], pretensao: 1900, curriculo: { nome: 'curriculo-mariana-lima.pdf', base64: cvs.mariana } },
+      { ...base, nome: 'Rafael Almeida Souza', email: 'rafael.souza@exemplo.com.br', telefone: '31999990003', cidade: 'Betim', area: 'Motorista e transporte', cargo: 'Motorista carreteiro (prancha)', experiencia: 'Mais de 10 anos', disponibilidade: 'Imediata', origem: 'Indicação', sobre: 'Candidatura espontânea: tenho CNH E e MOPP e experiência com transporte de máquinas pesadas.', curriculo: { nome: 'curriculo-rafael-souza.pdf', base64: cvs.rafael } },
+    ];
+    for (const f of fichas) { receber(f, 'exemplo'); const c = store.candidatos.find(x => x.dados.email === f.email); c.demo = true; c.tags = ['exemplo']; }
+    store.touch(); salvaCfg({ ...store.curConfig, exemplosSemeados: true }); store.audit(SISTEMA, 'exemplos.criar', '2 vagas e 3 candidaturas fictícias');
+    return true;
+  }
+  function removerExemplos(user) {
+    const cs = store.candidatos.filter(c => c.demo), vs = store.vagas.filter(v => v.demo);
+    for (const c of cs) store.removeCandidato(c.id);
+    store.setVagas(store.vagas.filter(v => !v.demo)); store.audit(user, 'exemplos.remover', `${cs.length} candidatura(s), ${vs.length} vaga(s)`);
+    return { candidatos: cs.length, vagas: vs.length };
+  }
+
   // ---------- configuração do módulo ----------
   const config = () => { const c = cfg(); return { slaDias: c.slaDias, iaAtiva: c.iaAtiva && !!ia?.ativa, iaDisponivel: !!ia?.ativa, areas: AREAS.map(a => ({ area: a, responsaveis: c.areas[a] || [] })), etapasComPrazo: Object.keys(SLA_PADRAO) }; };
   function salvarConfig(user, p) {
@@ -315,6 +343,6 @@ function createCurriculos({ store, ia, usuarios, extrair = extrairTexto }) {
     salvaCfg({ ...store.curConfig, areas: { ...c.areas, [area]: l.filter(x => x.userId !== String(userId)) }, rr: c.rr });
     store.audit(user, 'curriculos.responsavel-', `${area}: #${userId}`); return config();
   }
-  return { receber, listar, detalhe, atualizar, excluir, baixarCv, reanalisar, vagas, vagasPublicas, vagaPublica, criarVaga, editarVaga, acaoVaga, excluirVaga, atualizarVagas, config, salvarConfig, addResponsavel, removeResponsavel, retomar, aguardarIa, STATUS };
+  return { receber, listar, detalhe, atualizar, excluir, baixarCv, reanalisar, vagas, vagasPublicas, vagaPublica, criarVaga, editarVaga, acaoVaga, excluirVaga, atualizarVagas, config, salvarConfig, addResponsavel, removeResponsavel, retomar, aguardarIa, semearExemplos, removerExemplos, STATUS };
 }
 module.exports = { createCurriculos, STATUS };
