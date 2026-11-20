@@ -92,8 +92,8 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
   const server = http.createServer(async (req, res) => {
     const u = new URL(req.url, 'http://x'); const pathname = u.pathname;
     res.on('finish', () => {   // diagnóstico: método, rota, status e ID do usuário (nada de conteúdo)
-      if (pathname === '/health' || (res.statusCode < 400 && pathname !== '/api/me')) return;
-      console.log(JSON.stringify({ m: req.method, p: pathname.replace(/[0-9a-f]{24}/g, ':id'), s: res.statusCode, uid: String(req.headers['x-vibe-user-id'] || '-').slice(0, 40), role: req.headers['x-vibe-user-role'] || '-', bearer: !!req.headers['x-vibe-authorization'], ext: req.headers['x-vibe-caller-kind'] || '-' }));
+      if (pathname === '/health' || (res.statusCode < 400 && pathname !== '/api/me' && !pathname.startsWith('/public/'))) return;
+      console.log(JSON.stringify({ m: req.method, p: pathname.replace(/[0-9a-f]{24}/g, ':id'), s: res.statusCode, uid: String(req.headers['x-vibe-user-id'] || '-').slice(0, 40), role: req.headers['x-vibe-user-role'] || '-', ...(pathname.startsWith('/public/') ? { o: String(req.headers.origin || '-').slice(0, 80), nav: /Mobile|Android|iPhone/i.test(req.headers['user-agent'] || '') ? 'movel' : /Chrome|Safari|Firefox|Edg/i.test(req.headers['user-agent'] || '') ? 'desktop' : 'outro' } : {}), bearer: !!req.headers['x-vibe-authorization'], ext: req.headers['x-vibe-caller-kind'] || '-' }));
     });
     try {
       if (req.method === 'GET' && pathname === '/health') return send(res, 200, { ok: true });
@@ -114,6 +114,10 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
         } else if (!publico) throw bad(403, 'Acesso permitido apenas pelo site de carreiras.');
         else if (origem && !origemOk(origem)) throw bad(403, 'Origem não permitida.');
         if (estouro(`pub:${externo ? kid : 'site'}`, 240, 60_000)) throw bad(429, 'Muitas requisições. Tente em instantes.');
+        if (pathname === '/public/ping') {   // sinal de diagnóstico da página (sem dados pessoais): só vai para o registro do servidor
+          console.log(JSON.stringify({ ping: String(u.searchParams.get('e') || '').slice(0, 30), d: String(u.searchParams.get('d') || '').slice(0, 80), site: String(u.searchParams.get('o') || '').slice(0, 80), pag: String(u.searchParams.get('p') || '').slice(0, 80) }));
+          res.writeHead(204, { ...SEC, 'Cache-Control': 'no-store' }); return res.end();
+        }
         const mv = pathname.match(/^\/public\/vagas\/([a-z0-9-]{1,60})$/);
         if (mv) { if (req.method !== 'GET') throw bad(405, 'Use GET.'); return send(res, 200, { success: true, ...cur.vagaPublica(mv[1]) }); }
         if (pathname === '/public/vagas') { if (req.method !== 'GET') throw bad(405, 'Use GET.'); return send(res, 200, { success: true, ...cur.vagasPublicas() }); }

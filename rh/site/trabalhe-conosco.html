@@ -136,6 +136,7 @@
     API: "https://app-ef03a44d30e7.vibecode.bitrix24.com", /*API*/   // endereço do app de RH (não termina com /)
     POLITICA: "/politica-de-privacidade/",                            // link da Política de Privacidade do site
     CV_MAX_MB: 3,
+    PING: true,                                                       // envia ao app um sinal de diagnóstico (abriu / carregou / falhou), sem dados pessoais
     TIMEOUT_MS: 12000                                                  // tempo máximo de espera por resposta do app
   };
   /* ====================================================================== */
@@ -160,6 +161,7 @@
 
   /* ------------------------------- vagas -------------------------------- */
   var DEBUG = /[?&]debug=1/.test(location.search);
+  function ping(e, d) { if (!CFG.PING) return; try { new Image().src = CFG.API + "/public/ping?e=" + encodeURIComponent(e) + "&d=" + encodeURIComponent(String(d == null ? "" : d).slice(0, 80)) + "&o=" + encodeURIComponent(location.origin) + "&p=" + encodeURIComponent(location.pathname.slice(0, 60)); } catch (x) {} }
   function dbg(m) { try { console.log("[carreiras]", m); } catch (e) {} if (DEBUG) { var d = $("#ol-dbg"); if (d) { d.hidden = false; d.textContent += new Date().toLocaleTimeString() + "  " + m + "\n"; } } }
   function api(path, init) {
     var c = typeof AbortController === "function" ? new AbortController() : null, t;
@@ -179,9 +181,9 @@
     api("/public/vagas", { headers: { Accept: "application/json" } }).then(function (r) {
       dbg("resposta: HTTP " + r.status);
       if (!r.ok || !r.j.vagas) throw Object.assign(new Error("http"), { status: r.status });
-      vagas = r.j.vagas; desenhar(); abrirDaUrl();
+      vagas = r.j.vagas; desenhar(); abrirDaUrl(); ping("vagas-ok", vagas.length);
     }).catch(function (e) {
-      dbg("falha: " + (e && e.message) + (e && e.status ? " (HTTP " + e.status + ")" : ""));
+      dbg("falha: " + (e && e.message) + (e && e.status ? " (HTTP " + e.status + ")" : "")); ping("vagas-falha", codigoErro(e) + " t" + tentativa);
       if (tentativa < 2) return setTimeout(function () { carregar(2); }, 1500);   // o servidor pode estar acordando
       $("#ol-cnt").textContent = "";
       lista.removeAttribute("aria-busy");
@@ -341,7 +343,9 @@
     }
   });
   dbg("página iniciada · API = " + CFG.API);
+  ping("inicio", "ok");
   carregar();
+  window.addEventListener("error", function (ev) { ping("js-erro", (ev && ev.message) || "erro"); });
 })();
 </script>
 </div>

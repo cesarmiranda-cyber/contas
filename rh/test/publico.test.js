@@ -76,3 +76,14 @@ test('limite por e-mail no modo público e página /carreiras', async () => {
   assert.match(pg.r.headers.get('content-security-policy'), /frame-ancestors 'self' https:\/\/originallocadora\.com\.br/);
   srv.close();
 });
+
+test('diagnóstico: sinal da página chega ao servidor e não exige dados pessoais', async () => {
+  const { srv, call } = await boot();
+  const logs = []; const orig = console.log; console.log = (...a) => { logs.push(a.join(' ')); };
+  try {
+    assert.equal((await call('GET', '/public/ping?e=inicio&d=ok&o=https%3A%2F%2Foriginallocadora.com.br&p=%2Ftrabalhe-conosco%2F', { h: { 'x-vibe-public': 'true' } })).s, 204);
+    assert.equal((await call('GET', '/public/ping?e=x', {})).s, 403, 'só no modo público');
+  } finally { console.log = orig; }
+  const l = logs.find(x => x.includes('"ping"')); assert.ok(l && l.includes('originallocadora.com.br') && l.includes('/trabalhe-conosco/'), logs.join('\n'));
+  srv.close();
+});
