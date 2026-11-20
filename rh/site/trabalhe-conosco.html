@@ -342,6 +342,11 @@
       if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
     }
   });
+  // quando a página é exibida dentro de um iframe, avisa a página-mãe qual a altura (para o iframe se ajustar sozinho)
+  if (window.parent !== window) {
+    var alt = function () { try { parent.postMessage({ olh: Math.ceil(root.getBoundingClientRect().height) + 8 }, "*"); } catch (x) {} };
+    window.addEventListener("load", alt); if (window.ResizeObserver) new ResizeObserver(alt).observe(root); else setInterval(alt, 800);
+  }
   dbg("página iniciada · API = " + CFG.API);
   ping("inicio", "ok");
   carregar();

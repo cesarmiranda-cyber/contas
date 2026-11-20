@@ -1,0 +1,11 @@
+<!-- PLANO B · Trabalhe conosco por iframe (use só se o bloco principal não funcionar no seu site).
+     Cole no bloco "Código HTML". Não precisa de CORS. A altura se ajusta sozinha quando scripts são permitidos;
+     se não forem, o iframe usa a altura fixa abaixo (mude o "height" se quiser). -->
+<iframe id="ol-frame" src="https://app-ef03a44d30e7.vibecode.bitrix24.com/carreiras" title="Trabalhe conosco · Original Locações"
+        style="width:100%;height:1500px;border:0;display:block" loading="eager"></iframe>
+<script>
+window.addEventListener("message", function (e) {
+  if (e.origin !== "https://app-ef03a44d30e7.vibecode.bitrix24.com" || !e.data || typeof e.data.olh !== "number") return;
+  document.getElementById("ol-frame").style.height = Math.max(400, Math.min(e.data.olh, 6000)) + "px";
+});
+</script>

@@ -132,7 +132,7 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
       }
       if (externo) throw bad(403, 'Este canal só aceita o envio de candidaturas.');
       if (req.method === 'GET' && pathname === '/carreiras') {
-        const csp = SEC['Content-Security-Policy'].replace(/frame-ancestors [^;]*/, `frame-ancestors 'self' ${ORIGENS.join(' ')}`);
+        const csp = SEC['Content-Security-Policy'].replace(/frame-ancestors [^;]*/, `frame-ancestors 'self' ${ORIGENS.join(' ')} https://*.bitrix24.site`);
         res.writeHead(200, { ...SEC, 'Content-Security-Policy': csp, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
         return res.end(paginaCarreiras());
       }

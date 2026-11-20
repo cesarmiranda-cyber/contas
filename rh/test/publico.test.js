@@ -73,7 +73,7 @@ test('limite por e-mail no modo público e página /carreiras', async () => {
   assert.equal((await call('POST', '/public/candidaturas', { h: PUB, body: ficha(10) })).s, 201, 'outros e-mails seguem normais');
   const pg = await call('GET', '/carreiras', { h: { 'x-vibe-user-id': '1' } });
   assert.equal(pg.s, 200); assert.match(pg.j, /Trabalhe conosco/); assert.match(pg.j, /API: "", \/\*API\*\//);
-  assert.match(pg.r.headers.get('content-security-policy'), /frame-ancestors 'self' https:\/\/originallocadora\.com\.br/);
+  assert.match(pg.r.headers.get('content-security-policy'), /frame-ancestors 'self' https:\/\/originallocadora\.com\.br.*https:\/\/\*\.bitrix24\.site/);
   srv.close();
 });
 
