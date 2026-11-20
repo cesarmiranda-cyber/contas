@@ -7,7 +7,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 umask 077
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-tar czf "$T/app.tgz" server.js package.json lib public
+# pdf-parse usa só a versão v1.10.100 do pdf.js; as outras (~29 MB) ficam de fora do pacote
+mkdir "$T/pkg" && cp -r server.js package.json lib public node_modules "$T/pkg/"
+find "$T/pkg/node_modules/pdf-parse/lib/pdf.js" -mindepth 1 -maxdepth 1 -type d ! -name v1.10.100 -exec rm -rf {} +
+rm -rf "$T/pkg/node_modules/pdf-parse/test" "$T/pkg/node_modules/pdf-parse/.git"* 2>/dev/null || true
+tar czf "$T/app.tgz" -C "$T/pkg" .
 T="$T" python3 - <<'PY' > "$T/deploy.json"
 import base64, json, os
 env = {"VIBE_APP_KEY": os.environ["VIBE_APP_KEY"], "VIBE_APPLICATION_ID": os.environ["VIBE_APPLICATION_ID"], "DATA_DIR": "/opt/data/state"}

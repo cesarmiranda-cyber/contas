@@ -100,4 +100,4 @@ function validar(inp) {
   if (inp.utm && typeof inp.utm === 'object') d.utm = Object.fromEntries(['source', 'medium', 'campaign'].filter(k => inp.utm[k]).map(k => [k, limpa(inp.utm[k], 60)]));
   return { ok: Object.keys(erros).length === 0, erros, dados: d, cv };
 }
-module.exports = { validar, CAMPOS, CV_MAX, CONSENTIMENTO_VERSAO, linkedin, fone };
+module.exports = { AREAS, validar, CAMPOS, CV_MAX, CONSENTIMENTO_VERSAO, linkedin, fone };

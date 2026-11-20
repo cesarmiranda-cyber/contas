@@ -6,6 +6,7 @@ const { createStore } = require('./lib/store');
 const { createAcl } = require('./lib/acl');
 const { createBitrixUsers } = require('./lib/bitrixUsers');
 const { createCurriculos } = require('./lib/curriculos');
+const { createIa } = require('./lib/ia');
 const { MODULOS } = require('./lib/modules');
 const { CAMPOS, CV_MAX } = require('./lib/candidatura');
 
@@ -29,11 +30,12 @@ const sameOrigin = req => {
   try { return new URL(o).host === req.headers.host; } catch { return false; }
 };
 
-function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds } = {}) {
+function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, ia, extrair } = {}) {
   const store = createStore(dataDir);
   usuarios = usuarios || createBitrixUsers({ appKey });
   const acl = createAcl({ store, usuarios });
-  const cur = createCurriculos({ store });
+  const cur = createCurriculos({ store, ia: ia || createIa({ appKey }), usuarios, extrair });
+  cur.retomar();
   const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
   const janela = new Map(); // limite por chave do site: 60 fichas/min
   const limitado = k => { const t = Date.now(), l = (janela.get(k) || []).filter(x => t - x < 60_000); l.push(t); janela.set(k, l); return l.length > 60; };
@@ -55,11 +57,21 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds }
     // ---- Módulo: recepção de currículos
     'GET /api/curriculos/candidatos': async ({ user, u }) => {
       acl.exige(user, 'curriculos'); const q = u.searchParams;
-      return cur.listar({ status: q.get('status'), q: q.get('q'), vaga: q.get('vaga'), area: q.get('area'), limite: +q.get('limite') || 200, offset: +q.get('offset') || 0 });
+      return cur.listar({ status: q.get('status'), q: q.get('q'), vaga: q.get('vaga'), area: q.get('area'), responsavel: q.get('responsavel') === 'eu' ? user.id : q.get('responsavel'), parada: q.get('parada') === '1', ordem: q.get('ordem'), limite: +q.get('limite') || 200, offset: +q.get('offset') || 0 });
     },
     'GET /api/curriculos/candidatos/:id': async ({ user, p }) => { acl.exige(user, 'curriculos'); const d = cur.detalhe(p.id); store.audit(user, 'candidato.ver', `${p.id.slice(0, 8)} ${d.nome}`); return d; },
-    'PATCH /api/curriculos/candidatos/:id': async ({ user, p, body }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.atualizar(user, p.id, body); },
+    'PATCH /api/curriculos/candidatos/:id': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.atualizar(user, p.id, body, bearer); },
+    'POST /api/curriculos/candidatos/:id/reanalisar': async ({ user, p }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.reanalisar(user, p.id); },
     'DELETE /api/curriculos/candidatos/:id': async ({ user, p }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.excluir(user, p.id); },
+    'GET /api/curriculos/vagas': async ({ user }) => { acl.exige(user, 'curriculos'); return cur.vagas(); },
+    'POST /api/curriculos/vagas': async ({ user, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.criarVaga(user, body, bearer); },
+    'PATCH /api/curriculos/vagas/:id': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.editarVaga(user, p.id, body, bearer); },
+    'DELETE /api/curriculos/vagas/:id': async ({ user, p }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.excluirVaga(user, p.id); },
+    'GET /api/curriculos/config': async ({ user }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.config(); },
+    'PUT /api/curriculos/config': async ({ user, body }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.salvarConfig(user, body); },
+    'PUT /api/curriculos/config/area/:area': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.addResponsavel(user, bearer, p.area, body.userId); },
+    'DELETE /api/curriculos/config/area/:area/:id': async ({ user, p }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.removeResponsavel(user, p.area, p.id); },
+    'GET /api/curriculos/usuarios': async ({ user, u, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return { usuarios: await usuarios.buscar(bearer, u.searchParams.get('q')) }; },
     'GET /api/curriculos/integracao': async ({ user }) => {
       acl.exige(user, 'curriculos', 'gestor');
       return { campos: CAMPOS, cvMaxBytes: CV_MAX, applicationId: applicationId || '', endpoint: applicationId ? `https://vibecode.bitrix24.com/v1/applications/${applicationId}/api/public/candidaturas` : '' };
@@ -67,12 +79,17 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds }
   };
   const compiled = Object.entries(rotas).map(([k, fn]) => { const [m, pat] = k.split(' '); const names = []; const re = new RegExp('^' + pat.replace(/:(\w+)/g, (_, n) => { names.push(n); return '([^/]+)'; }) + '$'); return { m, re, names, fn }; });
 
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     const u = new URL(req.url, 'http://x'); const pathname = u.pathname;
     try {
       if (req.method === 'GET' && pathname === '/health') return send(res, 200, { ok: true });
       const externo = String(req.headers['x-vibe-caller-kind'] || '') === 'external-api';
       // Canal externo (site de carreiras): só a rota de entrada, com chave identificada; todas as demais ficam fechadas.
+      if (pathname === '/public/vagas') {
+        if (req.method !== 'GET') throw bad(405, 'Use GET.');
+        if (!externo || !req.headers['x-vibe-caller-key-id']) throw bad(403, 'Acesso permitido apenas pelo canal da API externa.');
+        return send(res, 200, { success: true, ...cur.vagasPublicas() });
+      }
       if (pathname === '/public/candidaturas') {
         if (req.method !== 'POST') throw bad(405, 'Use POST.');
         const kid = String(req.headers['x-vibe-caller-key-id'] || '');
@@ -107,6 +124,8 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds }
       send(res, code, { error: code === 500 ? 'Erro interno.' : e.message, ...(e.erros ? { erros: e.erros } : {}) });
     }
   });
+  server.store = store; server.cur = cur;
+  return server;
 }
 module.exports = { createServer };
 

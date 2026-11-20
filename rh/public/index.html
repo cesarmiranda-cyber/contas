@@ -44,6 +44,8 @@ table{width:100%;border-collapse:collapse}th,td{padding:11px 14px;text-align:lef
 tr.l{cursor:pointer}tr.l:hover{background:var(--verde-bg)}tr:last-child td{border-bottom:0}
 .av{width:34px;height:34px;border-radius:50%;background:var(--verde-bg);color:var(--verde);display:inline-grid;place-items:center;font-weight:700;margin-right:10px;vertical-align:middle;overflow:hidden}.av img{width:100%;height:100%;object-fit:cover}
 .tag{display:inline-block;background:var(--verde-bg);color:var(--verde);border-radius:6px;padding:1px 8px;font-size:12px;margin:0 4px 2px 0;font-weight:600}.tag.cinza{background:#eee;color:#555}
+.ader{display:inline-block;min-width:38px;text-align:center;font-weight:700;border-radius:8px;padding:2px 8px;background:#eef1ef;color:#555}.ader.ok{background:var(--verde);color:#fff}.ader.med{background:#ffe9b0;color:#7a5a00}.ader.baixa{background:#e6eae7;color:#5b6660}.ader.grande{font-size:26px;padding:8px 14px;border-radius:14px;min-width:70px}
+.tag.atraso{background:#fde6e6;color:var(--erro)}.ia{background:var(--verde-bg);margin:20px -24px 0;padding:16px 24px;border-top:0}label{display:block;font-size:13px;color:var(--mudo);font-weight:600}label input,label select,label textarea{margin-top:4px;font-weight:400}
 .mudo{color:var(--mudo)}.estr{color:#e0a800;letter-spacing:1px}
 .drawer{position:fixed;inset:0;background:rgba(10,25,16,.45);display:flex;justify-content:flex-end;z-index:20}
 .drawer .box{background:var(--card);width:min(560px,100%);height:100%;overflow:auto;padding:24px;box-shadow:-8px 0 30px rgba(0,0,0,.25)}
@@ -91,45 +93,112 @@ function home(){
 const voltar=t=>`<div class="bar"><button class="crumb" onclick="location.hash='#/'">← Início</button><span class="mudo">/</span><h2>${t}</h2></div>`;
 
 /* ---------------- Currículos ---------------- */
-let C={status:'',q:'',aba:'lista'};
+let C={status:'',q:'',aba:'lista',vaga:'',eu:false,parada:false,ordem:''};
+const aderCls=n=>n==null?'':n>=75?'ok':n>=50?'med':'baixa';
+const badge=n=>n==null?'<span class="mudo">—</span>':`<span class="ader ${aderCls(n)}">${n}</span>`;
 async function curriculos(){
  const gestor=ME.modulos.find(m=>m.id==='curriculos')?.nivel==='gestor';
- app.innerHTML=voltar('Recepção de currículos')+`<div class="tabs"><button class="tab ${C.aba==='lista'?'on':''}" data-a="lista">Candidatos</button>${gestor?`<button class="tab ${C.aba==='int'?'on':''}" data-a="int">Integração com o site</button>`:''}</div><div id="cv"></div>`;
+ const abas=[['lista','Candidatos'],['vagas','Vagas'],...(gestor?[['cfg','Responsáveis e prazos'],['int','Integração com o site']]:[])];
+ app.innerHTML=voltar('Recepção de currículos')+`<div class="tabs">${abas.map(([a,t])=>`<button class="tab ${C.aba===a?'on':''}" data-a="${a}">${t}</button>`).join('')}</div><div id="cv"></div>`;
  app.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{C.aba=b.dataset.a;curriculos()});
  if(C.aba==='int')return integracao();
+ if(C.aba==='vagas')return vagas(gestor);
+ if(C.aba==='cfg')return cfgCur();
  await lista(gestor)}
 async function lista(gestor){
- const el=$('#cv');let d;
- try{d=await api('GET','/api/curriculos/candidatos?status='+encodeURIComponent(C.status)+'&q='+encodeURIComponent(C.q))}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
+ const el=$('#cv');let d,vg;
+ const qs=new URLSearchParams({status:C.status,q:C.q,vaga:C.vaga,ordem:C.ordem});if(C.eu)qs.set('responsavel','eu');if(C.parada)qs.set('parada','1');
+ try{[d,vg]=await Promise.all([api('GET','/api/curriculos/candidatos?'+qs),api('GET','/api/curriculos/vagas')])}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
  const tot=Object.values(d.porStatus).reduce((a,b)=>a+b,0);
  el.innerHTML=`<div class="pipe"><button class="pill ${C.status===''?'on':''}" data-s="">Todos<b>${tot}</b></button>${d.status.map(s=>`<button class="pill ${C.status===s.id?'on':''}" data-s="${s.id}">${esc(s.nome)}<b>${d.porStatus[s.id]||0}</b></button>`).join('')}</div>
- <div class="bar"><input type="search" id="q" placeholder="Buscar por nome, e-mail, cargo, cidade ou etiqueta…" value="${esc(C.q)}" style="max-width:420px"></div>
- <div class="panel">${d.itens.length?`<table><thead><tr><th>Candidato</th><th>Área de interesse</th><th>Cidade</th><th>Recebido</th><th>Etapa</th></tr></thead><tbody>${d.itens.map(c=>`<tr class="l" data-id="${c.id}"><td><span class="av">${esc(ini(c.nome))}</span><b>${esc(c.nome)}</b><br><span class="mudo" style="margin-left:44px;font-size:12.5px">${esc(c.email)}</span></td><td>${esc(c.area)}${c.vaga?`<br><span class="tag cinza">${esc(c.vaga)}</span>`:''}</td><td>${esc(c.cidade)}/${esc(c.uf)}</td><td>${fdt(c.criadoEm)}</td><td><span class="tag">${esc(d.status.find(s=>s.id===c.status)?.nome||c.status)}</span>${c.avaliacao?`<br><span class="estr">${'★'.repeat(c.avaliacao)}</span>`:''}</td></tr>`).join('')}</tbody></table>`:`<div class="vazio">Nenhum candidato por aqui ainda.<br>As fichas enviadas pelo site de carreiras aparecem automaticamente.</div>`}</div>`;
- el.querySelectorAll('.pill').forEach(b=>b.onclick=()=>{C.status=b.dataset.s;lista(gestor)});
+ <div class="bar"><input type="search" id="q" placeholder="Buscar por nome, e-mail, cargo, cidade, habilidade ou certificação (NR-12…)" value="${esc(C.q)}" style="max-width:440px;flex:1">
+  <select id="fv" style="max-width:220px"><option value="">Todas as vagas</option>${vg.vagas.map(v=>`<option value="${esc(v.codigo)}" ${C.vaga===v.codigo?'selected':''}>${esc(v.titulo)}</option>`).join('')}</select>
+  <select id="fo" style="max-width:190px"><option value="">Mais recentes</option><option value="aderencia" ${C.ordem==='aderencia'?'selected':''}>Maior aderência (IA)</option></select>
+  <button class="pill ${C.eu?'on':''}" id="feu">Minhas fichas</button>
+  <button class="pill ${C.parada?'on':''}" id="fpa">Paradas<b>${d.paradas}</b></button></div>
+ ${d.semResponsavel?`<div class="aviso">${d.semResponsavel} ficha(s) nova(s) sem responsável — defina os responsáveis por área em “Responsáveis e prazos”.</div>`:''}
+ <div class="panel">${d.itens.length?`<table><thead><tr><th>Candidato</th><th>Vaga / área</th><th>Aderência</th><th>Responsável</th><th>Etapa</th></tr></thead><tbody>${d.itens.map(c=>`<tr class="l" data-id="${c.id}"><td><span class="av">${esc(ini(c.nome))}</span><b>${esc(c.nome)}</b><br><span class="mudo" style="margin-left:44px;font-size:12.5px">${esc(c.cidade)}/${esc(c.uf)} · ${fdt(c.criadoEm)}</span></td><td>${esc(c.vagaTitulo||c.area)}${c.vagaTitulo?`<br><span class="mudo" style="font-size:12.5px">${esc(c.area)}</span>`:''}</td><td>${c.iaStatus==='pendente'?'<span class="mudo">lendo…</span>':badge(c.aderencia)}</td><td>${c.responsavel?esc(c.responsavel.nome):'<span class="mudo">—</span>'}</td><td><span class="tag">${esc(d.status.find(s=>s.id===c.status)?.nome||c.status)}</span>${c.parada?`<br><span class="tag atraso">parada há ${c.diasNaEtapa} d</span>`:''}${c.avaliacao?`<br><span class="estr">${'★'.repeat(c.avaliacao)}</span>`:''}</td></tr>`).join('')}</tbody></table>`:`<div class="vazio">Nenhum candidato por aqui.<br>As fichas enviadas pelo site de carreiras aparecem automaticamente.</div>`}</div>`;
+ el.querySelectorAll('.pill[data-s]').forEach(b=>b.onclick=()=>{C.status=b.dataset.s;lista(gestor)});
+ $('#fv').onchange=e=>{C.vaga=e.target.value;lista(gestor)};$('#fo').onchange=e=>{C.ordem=e.target.value;lista(gestor)};
+ $('#feu').onclick=()=>{C.eu=!C.eu;lista(gestor)};$('#fpa').onclick=()=>{C.parada=!C.parada;lista(gestor)};
  let t;$('#q').oninput=e=>{clearTimeout(t);t=setTimeout(async()=>{C.q=e.target.value;const p=e.target.selectionStart;await lista(gestor);const q=$('#q');q.focus();q.setSelectionRange(p,p)},350)};
  el.querySelectorAll('tr.l').forEach(r=>r.onclick=()=>ficha(r.dataset.id,gestor,d.status))}
+const li=a=>a&&a.length?`<ul class="hist" style="color:inherit">${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'';
+const tags=a=>(a||[]).map(x=>`<span class="tag">${esc(x)}</span>`).join('');
+function blocoIa(c,gestor){
+ const i=c.ia,re=gestor?`<button class="btn ghost sm" id="rean">Ler de novo</button>`:'';
+ if(!i)return `<div class="sec2"><h4>Leitura da IA</h4><p class="mudo">Ainda não analisado. ${re}</p></div>`;
+ if(i.status==='pendente')return `<div class="sec2"><h4>Leitura da IA</h4><p class="mudo">⏳ Lendo o currículo…</p></div>`;
+ if(i.status!=='ok')return `<div class="sec2"><h4>Leitura da IA</h4><p class="mudo">${esc({'sem-texto':i.motivo,erro:'Não foi possível ler agora ('+(i.erro||'erro')+').',desligada:'A leitura por IA está desligada.'}[i.status]||'')} ${re}</p></div>`;
+ return `<div class="sec2 ia"><div class="row"><h4 style="margin:0;flex:1">✨ Leitura da IA <span class="mudo" style="font-weight:400;font-size:12.5px">— sugestão, confira o currículo antes de decidir</span></h4>${re}</div>
+ ${i.suspeitaInjecao?'<div class="aviso" style="margin-top:10px">Este currículo contém instruções dirigidas à IA/avaliador. A nota pode estar distorcida — leia o arquivo com atenção.</div>':''}
+ ${i.aderencia?.nota!=null?`<div class="row" style="margin:12px 0 4px;align-items:flex-start"><div class="ader grande ${aderCls(i.aderencia.nota)}">${i.aderencia.nota}</div><div style="flex:1"><b>Aderência ${c.vagaInfo?'à vaga '+esc(c.vagaInfo.titulo):'à área de interesse'}</b>${li(i.aderencia.motivos)}</div></div>`:''}
+ <p style="margin:8px 0">${esc(i.resumo)}</p>
+ <dl class="kv">${i.cargoAtual?`<dt>Cargo atual</dt><dd>${esc(i.cargoAtual)}${i.anosExperiencia?` · ~${i.anosExperiencia} anos de experiência`:''}</dd>`:''}${i.formacao.length?`<dt>Formação</dt><dd>${esc(i.formacao.join(' · '))}</dd>`:''}${i.certificacoes.length?`<dt>Certificações</dt><dd>${tags(i.certificacoes)}</dd>`:''}${i.habilidades.length?`<dt>Habilidades</dt><dd>${tags(i.habilidades)}</dd>`:''}${i.idiomas.length?`<dt>Idiomas</dt><dd>${esc(i.idiomas.join(', '))}</dd>`:''}</dl>
+ ${i.experiencias.length?`<b>Experiências</b>${li(i.experiencias.map(e=>[e.cargo,e.empresa,e.periodo].filter(Boolean).join(' — ')))}`:''}
+ ${i.pontosFortes.length?`<b>Pontos fortes</b>${li(i.pontosFortes)}`:''}${i.pontosAtencao.length?`<b>Pontos de atenção</b>${li(i.pontosAtencao)}`:''}${i.perguntasEntrevista.length?`<b>Perguntas sugeridas para a entrevista</b>${li(i.perguntasEntrevista)}`:''}
+ <p class="mudo" style="font-size:12px;margin:10px 0 0">Gerado por IA (${esc(i.modelo||'')}) em ${fdt(i.em)}. Contatos e documentos são removidos antes do envio; a IA não decide nem reprova ninguém.</p></div>`}
 async function ficha(id,gestor,status){
- let c;try{c=await api('GET','/api/curriculos/candidatos/'+id)}catch(e){return toast(e.message)}
- const dd=document.createElement('div');dd.className='drawer';document.body.append(dd);dd.onclick=e=>{if(e.target===dd)dd.remove()};
- const k=(a,b)=>b?`<dt>${a}</dt><dd>${b}</dd>`:'';const x=c.dados;
- const draw=c=>{dd.innerHTML=`<div class="box"><div class="row"><div style="flex:1"><h3>${esc(c.nome)}</h3><span class="mudo">Protocolo ${esc(c.protocolo)} · recebido em ${fdt(c.criadoEm)}</span></div><button class="btn ghost sm" id="fx">Fechar</button></div>
- <dl class="kv">${k('E-mail',`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`)}${k('Celular',`<a href="https://wa.me/55${esc(x.telefone.replace(/\D/g,''))}" target="_blank" rel="noopener">${esc(x.telefone)}</a>`)}${k('Cidade',esc(x.cidade+'/'+x.uf))}${k('Área',esc(x.area))}${k('Cargo/vaga',esc([x.cargo,x.vaga].filter(Boolean).join(' · ')))}${k('LinkedIn',x.linkedin?`<a href="${esc(x.linkedin)}" target="_blank" rel="noopener noreferrer">${esc(x.linkedin.replace('https://www.',''))}</a>`:'')}${k('Currículo',c.cv?`<a href="/api/curriculos/candidatos/${c.id}/cv">${esc(c.cv.nome)}</a> <span class="mudo">(${Math.round(c.cv.tamanho/1024)} KB)</span>`:'')}${k('Escolaridade',esc(x.escolaridade))}${k('Experiência',esc(x.experiencia))}${k('Disponibilidade',esc(x.disponibilidade))}${k('Modelo',esc((x.modelo||[]).join(', ')))}${k('Pretensão',x.pretensao!=null?'R$ '+x.pretensao.toLocaleString('pt-BR'):'')}${k('Portfólio',x.portfolio?`<a href="${esc(x.portfolio)}" target="_blank" rel="noopener noreferrer">${esc(x.portfolio)}</a>`:'')}${k('PcD',x.pcd?'Sim':'')}${k('Origem',esc(x.origem))}${k('Sobre',esc(x.sobre))}</dl>
- <div class="sec2"><h4>Etapa e avaliação</h4>${gestor?`<div class="row"><select id="st" style="max-width:220px">${status.map(s=>`<option value="${s.id}" ${s.id===c.status?'selected':''}>${esc(s.nome)}</option>`).join('')}</select><select id="av" style="max-width:150px">${[0,1,2,3,4,5].map(n=>`<option value="${n}" ${n===c.avaliacao?'selected':''}>${n?'★'.repeat(n):'Sem nota'}</option>`).join('')}</select></div><div class="row" style="margin-top:8px"><input type="text" id="tg" placeholder="Etiquetas separadas por vírgula" value="${esc(c.tags.join(', '))}"><button class="btn sec sm" id="sv">Salvar</button></div>`:`<span class="tag">${esc(status.find(s=>s.id===c.status)?.nome)}</span> <span class="estr">${'★'.repeat(c.avaliacao)}</span>`}</div>
+ let c;const dd=document.createElement('div');dd.className='drawer';document.body.append(dd);dd.onclick=e=>{if(e.target===dd)dd.remove()};
+ let tm;const load=async()=>{try{c=await api('GET','/api/curriculos/candidatos/'+id)}catch(e){dd.remove();return toast(e.message)}draw(c)};
+ const k=(a,b)=>b?`<dt>${a}</dt><dd>${b}</dd>`:'';
+ const draw=c=>{clearTimeout(tm);const x=c.dados;
+  dd.innerHTML=`<div class="box"><div class="row"><div style="flex:1"><h3>${esc(c.nome)}</h3><span class="mudo">Protocolo ${esc(c.protocolo)} · recebido em ${fdt(c.criadoEm)}</span></div><button class="btn ghost sm" id="fx">Fechar</button></div>
+ <dl class="kv">${k('E-mail',`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`)}${k('Celular',`<a href="https://wa.me/55${esc(x.telefone.replace(/\D/g,''))}" target="_blank" rel="noopener">${esc(x.telefone)}</a>`)}${k('Cidade',esc(x.cidade+'/'+x.uf))}${k('Área',esc(x.area))}${k('Vaga',esc(c.vagaInfo?c.vagaInfo.titulo:x.vaga))}${k('Cargo de interesse',esc(x.cargo))}${k('LinkedIn',x.linkedin?`<a href="${esc(x.linkedin)}" target="_blank" rel="noopener noreferrer">${esc(x.linkedin.replace('https://www.',''))}</a>`:'')}${k('Currículo',c.cv?`<a href="/api/curriculos/candidatos/${c.id}/cv">${esc(c.cv.nome)}</a> <span class="mudo">(${Math.round(c.cv.tamanho/1024)} KB)</span>`:'')}${k('Escolaridade',esc(x.escolaridade))}${k('Experiência',esc(x.experiencia))}${k('Disponibilidade',esc(x.disponibilidade))}${k('Modelo',esc((x.modelo||[]).join(', ')))}${k('Pretensão',x.pretensao!=null?'R$ '+x.pretensao.toLocaleString('pt-BR'):'')}${k('Portfólio',x.portfolio?`<a href="${esc(x.portfolio)}" target="_blank" rel="noopener noreferrer">${esc(x.portfolio)}</a>`:'')}${k('PcD',x.pcd?'Sim':'')}${k('Origem',esc(x.origem))}${k('Sobre',esc(x.sobre))}</dl>
+ ${blocoIa(c,gestor)}
+ <div class="sec2"><h4>Responsável, etapa e avaliação</h4>
+ <div class="row" style="margin-bottom:8px"><span class="mudo">Responsável:</span><b>${c.responsavel?esc(c.responsavel.nome):'ninguém'}</b>${gestor?`<button class="btn ghost sm" id="rsp">Alterar</button>`:''}</div><div id="rsb"></div>
+ ${gestor?`<div class="row"><select id="st" style="max-width:220px">${status.map(s=>`<option value="${s.id}" ${s.id===c.status?'selected':''}>${esc(s.nome)}</option>`).join('')}</select><select id="av" style="max-width:150px">${[0,1,2,3,4,5].map(n=>`<option value="${n}" ${n===c.avaliacao?'selected':''}>${n?'★'.repeat(n):'Sem nota'}</option>`).join('')}</select></div><div class="row" style="margin-top:8px"><input type="text" id="tg" placeholder="Etiquetas separadas por vírgula" value="${esc(c.tags.join(', '))}"><button class="btn sec sm" id="sv">Salvar</button></div>`:`<span class="tag">${esc(status.find(s=>s.id===c.status)?.nome)}</span> <span class="estr">${'★'.repeat(c.avaliacao)}</span>`}
+ ${c.parada?`<p><span class="tag atraso">Parada há ${c.diasNaEtapa} dias nesta etapa</span></p>`:''}</div>
  <div class="sec2"><h4>Anotações</h4>${gestor?`<div class="row"><input type="text" id="nt" placeholder="Escreva uma anotação interna…"><button class="btn sm" id="an">Adicionar</button></div>`:''}${c.notas.map(n=>`<p style="margin:10px 0 0"><span class="mudo" style="font-size:12.5px">${esc(n.porNome||'#'+n.por)} · ${fdt(n.em)}</span><br>${esc(n.texto)}</p>`).join('')||'<p class="mudo">Sem anotações.</p>'}</div>
  <div class="sec2"><h4>Histórico</h4><ul class="hist">${c.historico.map(h=>`<li>${fdt(h.em)} — ${esc(h.texto)}${h.porNome?' ('+esc(h.porNome)+')':''}</li>`).join('')}</ul></div>
  ${gestor?`<div class="sec2"><button class="btn red sm" id="ex">Excluir candidato (LGPD)</button></div>`:''}</div>`;
-  $('#fx').onclick=()=>dd.remove();
+  $('#fx').onclick=()=>{clearTimeout(tm);dd.remove()};
+  if(c.ia?.status==='pendente'||!c.ia)tm=setTimeout(()=>{if(document.body.contains(dd))load().then(()=>lista(gestor))},4000);
   if(!gestor)return;
-  const patch=async b=>{try{c=await api('PATCH','/api/curriculos/candidatos/'+id,b);draw(c);toast('Salvo');bg()}catch(e){toast(e.message)}};const bg=()=>lista(gestor);
+  const patch=async b=>{try{c=await api('PATCH','/api/curriculos/candidatos/'+id,b);draw(c);toast('Salvo');lista(gestor)}catch(e){toast(e.message)}};
   $('#sv').onclick=()=>patch({status:$('#st').value,avaliacao:+$('#av').value,tags:$('#tg').value.split(',').map(s=>s.trim()).filter(Boolean)});
   $('#an').onclick=()=>{const v=$('#nt').value.trim();if(v)patch({nota:v})};
-  $('#ex').onclick=async()=>{if(!confirm('Excluir definitivamente este candidato e o currículo? Não pode ser desfeito.'))return;try{await api('DELETE','/api/curriculos/candidatos/'+id);dd.remove();toast('Excluído');bg()}catch(e){toast(e.message)}}};
- draw(c)}
+  $('#rean')&&($('#rean').onclick=async()=>{try{await api('POST',`/api/curriculos/candidatos/${id}/reanalisar`,{});toast('Lendo de novo…');load()}catch(e){toast(e.message)}});
+  $('#rsp').onclick=()=>{$('#rsb').innerHTML=buscador('rsp');ligaBusca('rsp',u=>patch({responsavelId:u.id}),'/api/curriculos/usuarios')};
+  $('#ex').onclick=async()=>{if(!confirm('Excluir definitivamente este candidato e o currículo? Não pode ser desfeito.'))return;try{await api('DELETE','/api/curriculos/candidatos/'+id);dd.remove();toast('Excluído');lista(gestor)}catch(e){toast(e.message)}}};
+ await load()}
+async function vagas(gestor){
+ const el=$('#cv');let d;try{d=await api('GET','/api/curriculos/vagas')}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
+ el.innerHTML=`<div class="bar"><span class="mudo" style="flex:1">Vagas abertas aparecem no site de carreiras (o candidato escolhe a vaga; o código vai na ficha). Candidatura espontânea continua possível.</span>${gestor?'<button class="btn" id="nv">+ Nova vaga</button>':''}</div>
+ <div class="panel">${d.vagas.length?`<table><thead><tr><th>Vaga</th><th>Área</th><th>Código</th><th>Candidatos</th><th>Situação</th></tr></thead><tbody>${d.vagas.map(v=>`<tr class="l" data-id="${v.id}"><td><b>${esc(v.titulo)}</b><br><span class="mudo" style="font-size:12.5px">${esc(v.cidade)}</span></td><td>${esc(v.area)}</td><td><code>${esc(v.codigo)}</code></td><td>${v.candidatos}</td><td><span class="tag ${v.status==='aberta'?'':'cinza'}">${esc(v.status)}</span></td></tr>`).join('')}</tbody></table>`:'<div class="vazio">Nenhuma vaga cadastrada.</div>'}</div>`;
+ if(!gestor)return;
+ const form=v=>{const dd=document.createElement('div');dd.className='drawer';document.body.append(dd);dd.onclick=e=>{if(e.target===dd)dd.remove()};
+  dd.innerHTML=`<div class="box"><h3>${v?'Editar vaga':'Nova vaga'}</h3><div style="display:grid;gap:10px;margin-top:12px">
+  <label>Título<input type="text" id="vt" value="${esc(v?.titulo)}" maxlength="100"></label>
+  <label>Área<select id="va">${d.areas.map(a=>`<option ${v?.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></label>
+  <label>Cidade<input type="text" id="vc" value="${esc(v?.cidade)}"></label>
+  <label>Descrição (aparece no site)<textarea id="vd" rows="4">${esc(v?.descricao)}</textarea></label>
+  <label>Requisitos (a IA compara o currículo com isso)<textarea id="vr" rows="5" placeholder="Ex.: 3 anos em manutenção de equipamentos; NR-12 e NR-10; CNH B; disponibilidade para viagens">${esc(v?.requisitos)}</textarea></label>
+  ${v?`<label>Situação<select id="vs">${['aberta','pausada','encerrada'].map(s=>`<option ${v.status===s?'selected':''}>${s}</option>`).join('')}</select></label>`:''}
+  <div class="row"><button class="btn" id="vok">Salvar</button><button class="btn ghost" id="vno">Cancelar</button>${v&&!v.candidatos?'<button class="btn red sm" id="vdl" style="margin-left:auto">Excluir</button>':''}</div></div></div>`;
+  $('#vno').onclick=()=>dd.remove();
+  $('#vok').onclick=async()=>{const b={titulo:$('#vt').value,area:$('#va').value,cidade:$('#vc').value,descricao:$('#vd').value,requisitos:$('#vr').value};if(v)b.status=$('#vs').value;try{await api(v?'PATCH':'POST','/api/curriculos/vagas'+(v?'/'+v.id:''),b);dd.remove();toast('Vaga salva');vagas(gestor)}catch(e){toast(e.message)}};
+  $('#vdl')&&($('#vdl').onclick=async()=>{if(confirm('Excluir esta vaga?'))try{await api('DELETE','/api/curriculos/vagas/'+v.id);dd.remove();vagas(gestor)}catch(e){toast(e.message)}})};
+ $('#nv').onclick=()=>form(null);el.querySelectorAll('tr.l').forEach(r=>r.onclick=()=>form(d.vagas.find(v=>v.id===r.dataset.id)))}
+async function cfgCur(){
+ const el=$('#cv');let d;try{d=await api('GET','/api/curriculos/config')}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
+ const nomes={novo:'Novos',triagem:'Em triagem',entrevista:'Entrevista',proposta:'Proposta'};
+ el.innerHTML=`<div class="panel" style="padding:20px;margin-bottom:16px"><h3 style="margin:0 0 4px">Leitura por IA</h3><p class="mudo" style="margin:0 0 10px">A IA do Bitrix lê cada currículo que chega, resume e sugere a aderência à vaga. Ela só recomenda; quem decide é o RH.</p>
+ ${d.iaDisponivel?`<label class="row"><input type="checkbox" id="ia" ${d.iaAtiva?'checked':''}> Ler os currículos automaticamente</label>`:'<p class="aviso">A IA não está disponível neste servidor (chave do app não configurada).</p>'}</div>
+ <div class="panel" style="padding:20px;margin-bottom:16px"><h3 style="margin:0 0 4px">Prazo por etapa</h3><p class="mudo" style="margin:0 0 10px">Depois de quantos dias parada numa etapa a ficha é destacada como atrasada.</p><div class="row">${d.etapasComPrazo.map(e=>`<label>${nomes[e]}<br><input type="text" data-sla="${e}" value="${d.slaDias[e]}" style="width:90px"> dias</label>`).join('')}<button class="btn sec" id="ssla">Salvar prazos</button></div></div>
+ <div class="panel" style="padding:20px"><h3 style="margin:0 0 4px">Responsável por área de interesse</h3><p class="mudo" style="margin:0 0 10px">A ficha nova vai para um responsável da área (em rodízio, se houver mais de um) ou para o responsável da vaga. Área sem responsável fica sem dono, visível a todos do módulo.</p>
+ ${d.areas.map((a,n)=>`<div style="padding:10px 0;border-top:1px solid var(--borda)"><div class="row"><b style="min-width:210px">${esc(a.area)}</b>${a.responsaveis.map(r=>`<span class="tag">${esc(r.nome)} <a href="#" data-rm="${n}|${r.userId}" style="text-decoration:none" title="Remover">✕</a></span>`).join('')||'<span class="mudo">sem responsável</span>'}<button class="btn ghost sm" data-add="${n}">+ Adicionar</button></div><div id="ab-${n}"></div></div>`).join('')}</div>`;
+ $('#ia')&&($('#ia').onchange=async e=>{try{await api('PUT','/api/curriculos/config',{iaAtiva:e.target.checked});toast(e.target.checked?'Leitura por IA ligada':'Leitura por IA desligada')}catch(x){toast(x.message)}});
+ $('#ssla').onclick=async()=>{const s={};el.querySelectorAll('[data-sla]').forEach(i=>s[i.dataset.sla]=+i.value);try{await api('PUT','/api/curriculos/config',{slaDias:s});toast('Prazos salvos')}catch(e){toast(e.message)}};
+ el.querySelectorAll('[data-rm]').forEach(a=>a.onclick=async ev=>{ev.preventDefault();const [n,u]=a.dataset.rm.split('|');try{await api('DELETE',`/api/curriculos/config/area/${encodeURIComponent(d.areas[+n].area)}/${u}`);cfgCur()}catch(e){toast(e.message)}});
+ el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const n=+b.dataset.add;$('#ab-'+n).innerHTML=buscador('ar'+n);ligaBusca('ar'+n,async u=>{try{await api('PUT','/api/curriculos/config/area/'+encodeURIComponent(d.areas[n].area),{userId:u.id});cfgCur()}catch(e){toast(e.message)}},'/api/curriculos/usuarios')})}
 async function integracao(){
  const el=$('#cv');let d;try{d=await api('GET','/api/curriculos/integracao')}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
  el.innerHTML=`<div class="panel" style="padding:20px"><h3 style="margin-top:0">Ficha de cadastro do site de carreiras</h3>
  <p>O site (página do Bitrix24) envia a ficha para este endereço, com a <b>chave de API externa</b> do aplicativo. O cadastro é curto: contato + área + <b>currículo ou LinkedIn</b> + aceite da LGPD; o resto é opcional.</p>
- <p><b>POST</b> <code>${esc(d.endpoint||'(configure VIBE_APPLICATION_ID no servidor)')}</code><br><span class="mudo">Cabeçalhos: <code>X-Api-Key: &lt;chave externa&gt;</code> e <code>Content-Type: application/json</code>. Resposta: <code>201 {"success":true,"protocolo":"…"}</code> ou <code>422 {"erros":{campo:mensagem}}</code>.</span></p></div>
+ <p><b>POST</b> <code>${esc(d.endpoint||'(configure VIBE_APPLICATION_ID no servidor)')}</code><br><span class="mudo">Cabeçalhos: <code>X-Api-Key: &lt;chave externa&gt;</code> e <code>Content-Type: application/json</code>. Resposta: <code>201 {"success":true,"protocolo":"…"}</code> ou <code>422 {"erros":{campo:mensagem}}</code>.</span></p>
+ <p><b>GET</b> <code>${esc((d.endpoint||'').replace('/public/candidaturas','/public/vagas'))}</code><br><span class="mudo">Lista as vagas abertas (<code>codigo</code>, <code>titulo</code>, <code>area</code>, <code>cidade</code>, <code>descricao</code>) para o site montar a página de vagas. Envie o <code>codigo</code> no campo <code>vaga</code> da ficha.</span></p></div>
  <div class="panel" style="margin-top:16px"><table><thead><tr><th>Campo (JSON)</th><th>Rótulo no formulário</th><th>Obrigatório</th><th>Formato / opções</th></tr></thead><tbody>${d.campos.map(f=>`<tr><td><code>${esc(f.campo)}</code></td><td>${esc(f.rotulo)}</td><td>${f.obrigatorio===true?'<b>Sim</b>':f.obrigatorio?esc(f.obrigatorio):'não'}</td><td class="mudo">${esc(f.opcoes?f.opcoes.join(' · '):(f.regra||f.tipo))}</td></tr>`).join('')}</tbody></table></div>`}
 
 /* ---------------- Configurações de acesso ---------------- */
@@ -152,7 +221,7 @@ async function config(){
  el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{const [m,u]=b.dataset.rm.split('|');if(confirm('Remover o acesso deste usuário?')){try{await api('DELETE',`/api/acessos/modulo/${m}/${u}`);config()}catch(e){toast(e.message)}}});
  A.modulos.forEach(m=>ligaBusca(m.id,async u=>{try{await api('PUT','/api/acessos/modulo/'+m.id,{userId:u.id,nivel:$('#nv-'+m.id).value});toast('Acesso liberado para '+u.nome);config()}catch(e){toast(e.message)}}))}
 const buscador=id=>`<input type="search" id="bs-${id}" placeholder="Buscar usuário do Bitrix24 por nome ou e-mail…" autocomplete="off"><div id="rs-${id}"></div>`;
-function ligaBusca(id,onPick){let t;const i=$('#bs-'+id),r=$('#rs-'+id);i.oninput=()=>{clearTimeout(t);const q=i.value.trim();if(q.length<2){r.innerHTML='';return}t=setTimeout(async()=>{try{const d=await api('GET','/api/usuarios?q='+encodeURIComponent(q));r.innerHTML=d.usuarios.length?`<div class="res">${d.usuarios.map((u,k)=>`<button data-k="${k}"><span class="av">${u.foto?`<img src="${esc(u.foto)}" alt="" referrerpolicy="no-referrer">`:esc(ini(u.nome))}</span><span><b>${esc(u.nome)}</b><br><span class="mudo" style="font-size:12.5px">${esc([u.cargo,u.email].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>`:'<p class="mudo">Ninguém encontrado.</p>';r.querySelectorAll('button').forEach(b=>b.onclick=()=>onPick(d.usuarios[+b.dataset.k]))}catch(e){r.innerHTML=`<p class="mudo">${esc(e.message)}</p>`}},300)}}
+function ligaBusca(id,onPick,url='/api/usuarios'){let t;const i=$('#bs-'+id),r=$('#rs-'+id);i.oninput=()=>{clearTimeout(t);const q=i.value.trim();if(q.length<2){r.innerHTML='';return}t=setTimeout(async()=>{try{const d=await api('GET',url+'?q='+encodeURIComponent(q));r.innerHTML=d.usuarios.length?`<div class="res">${d.usuarios.map((u,k)=>`<button data-k="${k}"><span class="av">${u.foto?`<img src="${esc(u.foto)}" alt="" referrerpolicy="no-referrer">`:esc(ini(u.nome))}</span><span><b>${esc(u.nome)}</b><br><span class="mudo" style="font-size:12.5px">${esc([u.cargo,u.email].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>`:'<p class="mudo">Ninguém encontrado.</p>';r.querySelectorAll('button').forEach(b=>b.onclick=()=>onPick(d.usuarios[+b.dataset.k]))}catch(e){r.innerHTML=`<p class="mudo">${esc(e.message)}</p>`}},300)}}
 boot();
 </script>
 </body>

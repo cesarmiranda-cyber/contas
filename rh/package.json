@@ -4,6 +4,14 @@
   "description": "RH: tela inicial por módulos, controle de acesso por usuário do Bitrix24 e recepção de currículos",
   "private": true,
   "main": "server.js",
-  "scripts": { "start": "node server.js", "test": "node --test" },
-  "engines": { "node": ">=20" }
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pdf-parse": "1.1.1"
+  }
 }

@@ -7,7 +7,7 @@ const crypto = require('crypto');
 function createStore(dir) {
   fs.mkdirSync(path.join(dir, 'cv'), { recursive: true, mode: 0o700 });
   const file = path.join(dir, 'state.json');
-  let data = { admins: [], modulos: {}, candidatos: [], audit: [] };
+  let data = { admins: [], modulos: {}, candidatos: [], audit: [], vagas: [], curConfig: {} };
   try { data = { ...data, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; }
   catch (e) {
     if (e.code !== 'ENOENT') { try { fs.renameSync(file, `${file}.corrompido-${Date.now()}`); console.error('state.json ilegível: cópia guardada'); } catch { /* sem permissão */ } }
@@ -19,6 +19,10 @@ function createStore(dir) {
     setAdmins(a) { data.admins = a; save(); },
     get modulos() { return data.modulos; },
     setModulo(id, lista) { data.modulos[id] = lista; save(); },
+    get vagas() { return data.vagas; },
+    setVagas(v) { data.vagas = v; save(); },
+    get curConfig() { return data.curConfig; },
+    setCurConfig(c) { data.curConfig = c; save(); },
     get candidatos() { return data.candidatos; },
     addCandidato(c) { data.candidatos.unshift(c); save(); return c; },
     touch() { save(); },
