@@ -17,3 +17,9 @@ Isso exige que o endereço do app esteja em modo **PÚBLICO** (política de aces
 ## Testar antes de publicar
 `https://<endereço-do-app>/carreiras` mostra a mesma página servida pelo próprio app (também pode ser usada em iframe no site).
 Parâmetros úteis: `?vaga=<codigo>` abre direto a candidatura daquela vaga; `utm_source/medium/campaign` são gravados na ficha.
+
+## Cuidado ao editar o bloco (aprendido na prática)
+O editor do Bitrix24 Sites **decodifica entidades HTML dentro do `<script>` ao salvar** (`&amp;`→`&`, `&quot;`→`"`, `&lt;`→`<`…).
+Uma entidade escrita dentro de uma string de JavaScript vira aspas soltas e **quebra o script inteiro** (a página fica em "Carregando…").
+Por isso o script usa `\uXXXX` no lugar de entidades; há um teste automático (`test/publico.test.js`) que falha se alguma entidade voltar.
+Depois de colar o bloco: **Publicar** e abrir o endereço publicado (scripts não rodam no editor). Abra com `?debug=1` para ver o que a página está fazendo.

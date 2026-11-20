@@ -87,3 +87,15 @@ test('diagnóstico: sinal da página chega ao servidor e não exige dados pessoa
   const l = logs.find(x => x.includes('"ping"')); assert.ok(l && l.includes('originallocadora.com.br') && l.includes('/trabalhe-conosco/'), logs.join('\n'));
   srv.close();
 });
+
+test('bloco do site sobrevive ao editor do Bitrix24 (que decodifica entidades HTML ao salvar)', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'site', 'trabalhe-conosco.html'), 'utf8');
+  const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
+  const decodifica = t => t.replace(/&(amp|lt|gt|quot|apos|nbsp);?/g, (_, n) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' })[n]).replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
+  assert.equal(decodifica(script), script, 'o script não pode conter entidades HTML (use escapes \\uXXXX)');
+  assert.doesNotThrow(() => new Function(decodifica(script)), 'o script decodificado precisa continuar válido');
+  assert.equal((html.match(/&(amp|lt|gt|quot|apos|nbsp|#\d+|#x[0-9a-f]+);/gi) || []).length, 0, 'nem o HTML/CSS pode ter entidades literais');
+  // o escape de texto da página continua escapando de verdade
+  const esc = new Function(`${script.match(/var ESCMAP[^\n]*\n\s*var esc = [^\n]*/)[0]}; return esc;`)();
+  assert.equal(esc(`<b a="x" b='y'>&`), '&lt;b a=&quot;x&quot; b=&#39;y&#39;&gt;&amp;');
+});

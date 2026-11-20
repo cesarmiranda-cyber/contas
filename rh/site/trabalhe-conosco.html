@@ -154,14 +154,16 @@
     up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>',
     ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
   };
-  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  // OBS: sem entidades HTML literais aqui — o editor do Bitrix24 as decodifica ao salvar e quebraria o script. Usamos escapes \uXXXX.
+  var ESCMAP = { "\u0026": "\u0026amp;", "\u003c": "\u0026lt;", "\u003e": "\u0026gt;", "\u0022": "\u0026quot;", "\u0027": "\u0026#39;" };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[\u0026\u003c\u003e\u0022\u0027]/g, function (c) { return ESCMAP[c]; }); };
   var fdata = function (d) { var p = String(d || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] : ""; };
   var opts = function (l, sel) { return l.map(function (x) { return "<option" + (x === sel ? " selected" : "") + ">" + esc(x) + "</option>"; }).join(""); };
   var vagas = [], filtro = "", focoAnterior = null;
 
   /* ------------------------------- vagas -------------------------------- */
-  var DEBUG = /[?&]debug=1/.test(location.search);
-  function ping(e, d) { if (!CFG.PING) return; try { new Image().src = CFG.API + "/public/ping?e=" + encodeURIComponent(e) + "&d=" + encodeURIComponent(String(d == null ? "" : d).slice(0, 80)) + "&o=" + encodeURIComponent(location.origin) + "&p=" + encodeURIComponent(location.pathname.slice(0, 60)); } catch (x) {} }
+  var DEBUG = /[?\u0026]debug=1/.test(location.search);
+  function ping(e, d) { if (!CFG.PING) return; try { new Image().src = CFG.API + "/public/ping?e=" + encodeURIComponent(e) + "\u0026d=" + encodeURIComponent(String(d == null ? "" : d).slice(0, 80)) + "\u0026o=" + encodeURIComponent(location.origin) + "\u0026p=" + encodeURIComponent(location.pathname.slice(0, 60)); } catch (x) {} }
   function dbg(m) { try { console.log("[carreiras]", m); } catch (e) {} if (DEBUG) { var d = $("#ol-dbg"); if (d) { d.hidden = false; d.textContent += new Date().toLocaleTimeString() + "  " + m + "\n"; } } }
   function api(path, init) {
     var c = typeof AbortController === "function" ? new AbortController() : null, t;
