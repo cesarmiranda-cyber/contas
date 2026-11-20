@@ -83,6 +83,10 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
 
   const server = http.createServer(async (req, res) => {
     const u = new URL(req.url, 'http://x'); const pathname = u.pathname;
+    res.on('finish', () => {   // diagnóstico: método, rota, status e ID do usuário (nada de conteúdo)
+      if (pathname === '/health' || (res.statusCode < 400 && pathname !== '/api/me')) return;
+      console.log(JSON.stringify({ m: req.method, p: pathname.replace(/[0-9a-f]{24}/g, ':id'), s: res.statusCode, uid: String(req.headers['x-vibe-user-id'] || '-').slice(0, 40), role: req.headers['x-vibe-user-role'] || '-', bearer: !!req.headers['x-vibe-authorization'], ext: req.headers['x-vibe-caller-kind'] || '-' }));
+    });
     try {
       if (req.method === 'GET' && pathname === '/health') return send(res, 200, { ok: true });
       const externo = String(req.headers['x-vibe-caller-kind'] || '') === 'external-api';
@@ -109,8 +113,8 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
       if (externo) throw bad(403, 'Este canal só aceita o envio de candidaturas.');
       if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) { res.writeHead(200, { ...SEC, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end(html); }
       if (!pathname.startsWith('/api/')) throw bad(404, 'Não encontrado.');
-      const user = acl.resolve(req.headers);
-      if (!user) throw bad(401, 'Abra o app pelo Bitrix24 para se identificar.');
+      const user = await acl.resolve(req.headers, bearerDe(req.headers));
+      if (!user) throw bad(401, 'Não consegui identificar o seu usuário do Bitrix24. Abra o app pelo menu do Bitrix24 (não pelo endereço direto) e tente de novo.');
       if (req.method !== 'GET' && !sameOrigin(req)) throw bad(403, 'Origem não permitida.');
       // download do currículo (GET autenticado, sem JSON)
       let m = pathname.match(/^\/api\/curriculos\/candidatos\/([0-9a-f]{24})\/cv$/);

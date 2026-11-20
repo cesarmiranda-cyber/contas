@@ -15,9 +15,15 @@ function createAcl({ store, usuarios }) {
     let nome = ''; try { nome = decodeURIComponent(String(h['x-vibe-user-name-encoded'] || '')); } catch { /* sem nome */ }
     return { id, nome: nome.slice(0, 120), portalAdmin: String(h['x-vibe-user-role'] || '').toUpperCase() === 'ADMIN' };
   }
-  function resolve(h) {
-    const i = ident(h); if (!i) return null;
-    const bootstrap = store.admins.length === 0 && i.portalAdmin;
+  // bearer: token de sessão injetado pelo gateway (X-Vibe-Authorization). Serve para (1) descobrir o ID quando o cabeçalho
+  // vem com prefixo (vibe:/net_) e (2) saber se é administrador do portal, já que o cabeçalho de papel nem sempre é confiável.
+  async function resolve(h, bearer) {
+    let i = ident(h), eu = null;
+    if (!i && h['x-vibe-user-id'] && bearer) { eu = await usuarios.eu?.(bearer); if (eu) i = { id: eu.id, nome: eu.nome, portalAdmin: false }; }
+    if (!i) return null;
+    const semAdmin = store.admins.length === 0;
+    if (semAdmin && !i.portalAdmin && bearer) { eu = eu || await usuarios.eu?.(bearer); if (eu?.isAdmin === true && eu.id === i.id) i = { ...i, portalAdmin: true }; }
+    const bootstrap = semAdmin && i.portalAdmin;
     const admin = bootstrap || store.admins.some(a => a.id === i.id);
     const niveis = {};
     for (const m of MODULOS.filter(x => x.status === 'ativo')) {

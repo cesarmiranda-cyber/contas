@@ -88,3 +88,26 @@ test('lista de chaves autorizadas para o site (INTAKE_KEY_IDS)', async () => {
   assert.equal((await post('outra')).status, 403); assert.equal((await post('ok')).status, 201);
   srv.close();
 });
+
+test('identidade: papel do cabeçalho errado e ID com prefixo são resolvidos pelo Bitrix24', async () => {
+  const eu = async b => ({ 'tok-admin': { id: '10', nome: 'Admin Um', isAdmin: true }, 'tok-membro': { id: '20', nome: 'Maria', isAdmin: false }, 'tok-prefixo': { id: '10', nome: 'Admin Um', isAdmin: true } })[b] || null;
+  const srv = createServer({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'rh-')), usuarios: { ...fake, eu }, applicationId: 'app-1' });
+  await new Promise(r => srv.listen(0, r)); const base = `http://127.0.0.1:${srv.address().port}`;
+  const me = async h => { const r = await fetch(base + '/api/me', { headers: h }); return { s: r.status, j: await r.json() }; };
+  // cabeçalho diz MEMBER, mas o Bitrix24 diz que é administrador do portal → configuração inicial liberada
+  let r = await me({ 'x-vibe-user-id': '10', 'x-vibe-user-role': 'MEMBER', 'x-vibe-authorization': 'Bearer tok-admin' });
+  assert.equal(r.s, 200); assert.equal(r.j.usuario.papel, 'admin'); assert.equal(r.j.usuario.bootstrap, true);
+  // membro de verdade continua sem acesso
+  r = await me({ 'x-vibe-user-id': '20', 'x-vibe-user-role': 'MEMBER', 'x-vibe-authorization': 'Bearer tok-membro' });
+  assert.equal(r.j.usuario.papel, 'usuario'); assert.ok(r.j.modulos.every(m => !m.acesso));
+  // o token de outra pessoa não eleva o usuário do cabeçalho (IDs diferentes)
+  r = await me({ 'x-vibe-user-id': '20', 'x-vibe-user-role': 'MEMBER', 'x-vibe-authorization': 'Bearer tok-admin' });
+  assert.equal(r.j.usuario.papel, 'usuario');
+  // ID com prefixo: o Bitrix24 informa o número
+  r = await me({ 'x-vibe-user-id': 'vibe:abc123', 'x-vibe-authorization': 'Bearer tok-prefixo' });
+  assert.equal(r.s, 200); assert.equal(r.j.usuario.id, '10');
+  // sem token e com prefixo → não dá para identificar
+  assert.equal((await me({ 'x-vibe-user-id': 'vibe:abc123' })).s, 401);
+  assert.equal((await me({})).s, 401);
+  srv.close();
+});
