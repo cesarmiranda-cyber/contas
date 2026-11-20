@@ -1,5 +1,7 @@
 # Ficha de cadastro do candidato — dados de entrada para o site de carreiras
 
+> **A página pronta está em `site/trabalhe-conosco.html` (ver `site/LEIA-ME.md`).** Este documento descreve o contrato para quem quiser montar outra página. O navegador fala direto com o endereço do app (`/public/...`, modo público + CORS); o canal de API externa com chave só serve para integrações servidor-a-servidor, não para navegadores.
+
 Modelo inspirado nos grandes players (Gupy, Vagas.com, LinkedIn "candidatura simplificada"): **uma tela, ~1 minuto**.
 Obrigatório = contato + área + **currículo OU LinkedIn** + aceite da LGPD. O resto é opcional e fica sob "Quer contar mais?".
 Propositalmente **não** coletamos idade, sexo, raça, estado civil nem foto (evita viés/discriminação e reduz risco de LGPD).

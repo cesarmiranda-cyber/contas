@@ -16,8 +16,8 @@ const SEC = {
   'Content-Security-Policy': "frame-ancestors 'self' https://vibecode.bitrix24.com https://*.bitrix24.com.br https://*.bitrix24.com https://*.bitrix24.com.ar https://*.bitrix24.es https://*.bitrix24.eu https://*.bitrix24.net https://*.bitrix24.ru",
 };
 const send = (res, code, obj) => { res.writeHead(code, { ...SEC, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
-const readBody = req => new Promise((ok, no) => {
-  if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) return no(bad(415, 'Content-Type deve ser application/json.'));
+const readBody = (req, aceitaTexto = false) => new Promise((ok, no) => {
+  if (!/^application\/json\b/i.test(req.headers['content-type'] || '') && !(aceitaTexto && /^text\/plain\b/i.test(req.headers['content-type'] || ''))) return no(bad(415, 'Content-Type deve ser application/json.'));
   const chunks = []; let n = 0, dead = false;
   req.on('data', c => { n += c.length; if (n > 4.2e6) { dead = true; chunks.length = 0; no(bad(413, 'Corpo grande demais.')); req.resume(); } else if (!dead) chunks.push(c); });
   req.on('end', () => { if (dead) return; const t = Buffer.concat(chunks).toString('utf8'); let v; try { v = t.trim() ? JSON.parse(t) : {}; } catch { return no(bad(400, 'JSON inválido.')); } if (!v || typeof v !== 'object' || Array.isArray(v)) return no(bad(400, 'O corpo deve ser um objeto JSON.')); ok(v); });
@@ -30,13 +30,21 @@ const sameOrigin = req => {
   try { return new URL(o).host === req.headers.host; } catch { return false; }
 };
 
-function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, ia, extrair } = {}) {
+const ORIGENS_PADRAO = 'https://originallocadora.com.br,https://www.originallocadora.com.br';
+function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, ia, extrair, siteOrigins } = {}) {
+  const ORIGENS = (siteOrigins || process.env.SITE_ORIGINS || ORIGENS_PADRAO).split(',').map(x => x.trim()).filter(Boolean);
+  // site da Original (e a pré-visualização do Bitrix24 Sites) — somente estes navegadores podem ler/enviar pelo CORS
+  const origemOk = o => !!o && (ORIGENS.includes(o) || /^https:\/\/[a-z0-9-]+\.bitrix24\.site$/i.test(o));
   const store = createStore(dataDir);
   usuarios = usuarios || createBitrixUsers({ appKey });
   const acl = createAcl({ store, usuarios });
   const cur = createCurriculos({ store, ia: ia || createIa({ appKey }), usuarios, extrair });
   cur.retomar();
   const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'));
+  // a mesma página do bloco HTML do site, apontando para o próprio app (mesma origem)
+  const paginaCarreiras = () => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Trabalhe conosco · Original Locações</title></head><body style="margin:0">${fs.readFileSync(path.join(__dirname, 'site', 'trabalhe-conosco.html'), 'utf8').replace(/API: "[^"]*", \/\*API\*\//, 'API: "", /*API*/')}</body></html>`;
+  const taxa = new Map();   // limitador genérico: chave -> instantes
+  const estouro = (k, max, ms) => { const t = Date.now(), l = (taxa.get(k) || []).filter(x => t - x < ms); l.push(t); taxa.set(k, l); if (taxa.size > 5000) for (const [kk, v] of taxa) if (!v.length || t - v[v.length - 1] > 3.6e6) taxa.delete(kk); return l.length > max; };
   const janela = new Map(); // limite por chave do site: 60 fichas/min
   const limitado = k => { const t = Date.now(), l = (janela.get(k) || []).filter(x => t - x < 60_000); l.push(t); janela.set(k, l); return l.length > 60; };
   const bearerDe = h => String(h['x-vibe-authorization'] || '').replace(/^Bearer /, '');
@@ -91,26 +99,39 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
       if (req.method === 'GET' && pathname === '/health') return send(res, 200, { ok: true });
       const externo = String(req.headers['x-vibe-caller-kind'] || '') === 'external-api';
       // Canal externo (site de carreiras): só a rota de entrada, com chave identificada; todas as demais ficam fechadas.
-      const mv = pathname.match(/^\/public\/vagas\/([a-z0-9-]{1,60})$/);
-      if (mv) {
-        if (req.method !== 'GET') throw bad(405, 'Use GET.');
-        if (!externo || !req.headers['x-vibe-caller-key-id']) throw bad(403, 'Acesso permitido apenas pelo canal da API externa.');
-        return send(res, 200, { success: true, ...cur.vagaPublica(mv[1]) });
-      }
-      if (pathname === '/public/vagas') {
-        if (req.method !== 'GET') throw bad(405, 'Use GET.');
-        if (!externo || !req.headers['x-vibe-caller-key-id']) throw bad(403, 'Acesso permitido apenas pelo canal da API externa.');
-        return send(res, 200, { success: true, ...cur.vagasPublicas() });
-      }
-      if (pathname === '/public/candidaturas') {
-        if (req.method !== 'POST') throw bad(405, 'Use POST.');
-        const kid = String(req.headers['x-vibe-caller-key-id'] || '');
-        if (!externo || !kid) throw bad(403, 'Acesso permitido apenas pelo canal da API externa.');
-        if (intakeKeyIds?.length && !intakeKeyIds.includes(kid)) throw bad(403, 'Chave não autorizada para enviar candidaturas.');
-        if (limitado(kid)) throw bad(429, 'Muitas candidaturas em pouco tempo. Tente em instantes.');
-        return send(res, 201, { success: true, ...cur.receber(await readBody(req), kid) });
+      const publico = req.headers['x-vibe-public'] === 'true' && !externo;   // visitante anônimo do site (servidor em modo público)
+      if (pathname.startsWith('/public/')) {
+        const origem = req.headers.origin;
+        if (origem && origemOk(origem)) {   // CORS só para o site da Original
+          res.setHeader('Access-Control-Allow-Origin', origem); res.setHeader('Vary', 'Origin');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept'); res.setHeader('Access-Control-Max-Age', '86400');
+        }
+        if (req.method === 'OPTIONS') { if (!origemOk(origem)) throw bad(403, 'Origem não permitida.'); res.writeHead(204, { ...SEC }); return res.end(); }
+        const kid = String(req.headers['x-vibe-caller-kind'] === 'external-api' ? req.headers['x-vibe-caller-key-id'] || '' : '');
+        if (externo) {
+          if (!kid) throw bad(403, 'Acesso permitido apenas pelo canal da API externa.');
+          if (intakeKeyIds?.length && !intakeKeyIds.includes(kid)) throw bad(403, 'Chave não autorizada para enviar candidaturas.');
+        } else if (!publico) throw bad(403, 'Acesso permitido apenas pelo site de carreiras.');
+        else if (origem && !origemOk(origem)) throw bad(403, 'Origem não permitida.');
+        if (estouro(`pub:${externo ? kid : 'site'}`, 240, 60_000)) throw bad(429, 'Muitas requisições. Tente em instantes.');
+        const mv = pathname.match(/^\/public\/vagas\/([a-z0-9-]{1,60})$/);
+        if (mv) { if (req.method !== 'GET') throw bad(405, 'Use GET.'); return send(res, 200, { success: true, ...cur.vagaPublica(mv[1]) }); }
+        if (pathname === '/public/vagas') { if (req.method !== 'GET') throw bad(405, 'Use GET.'); return send(res, 200, { success: true, ...cur.vagasPublicas() }); }
+        if (pathname === '/public/candidaturas') {
+          if (req.method !== 'POST') throw bad(405, 'Use POST.');
+          if (estouro(`cand:${externo ? kid : 'site'}`, 60, 60_000)) throw bad(429, 'Muitas candidaturas em pouco tempo. Tente em instantes.');
+          const body = await readBody(req, true);
+          if (publico && estouro(`email:${String(body.email || '').toLowerCase().slice(0, 120)}`, 5, 3_600_000)) throw bad(429, 'Você já enviou várias candidaturas. Tente novamente mais tarde.');
+          return send(res, 201, { success: true, ...cur.receber(body, externo ? kid : 'site') });
+        }
+        throw bad(404, 'Não encontrado.');
       }
       if (externo) throw bad(403, 'Este canal só aceita o envio de candidaturas.');
+      if (req.method === 'GET' && pathname === '/carreiras') {
+        const csp = SEC['Content-Security-Policy'].replace(/frame-ancestors [^;]*/, `frame-ancestors 'self' ${ORIGENS.join(' ')}`);
+        res.writeHead(200, { ...SEC, 'Content-Security-Policy': csp, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+        return res.end(paginaCarreiras());
+      }
       if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) { res.writeHead(200, { ...SEC, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end(html); }
       if (!pathname.startsWith('/api/')) throw bad(404, 'Não encontrado.');
       const user = await acl.resolve(req.headers, bearerDe(req.headers));

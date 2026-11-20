@@ -1,0 +1,331 @@
+<!-- =====================================================================================
+  TRABALHE CONOSCO · Original Locações — bloco HTML para o Bitrix24 Sites
+  Cole TODO este conteúdo em um bloco "Código HTML" da página. Não precisa de mais nada.
+  Só 3 coisas para ajustar (logo abaixo, em CFG): API, POLITICA e (opcional) o texto do topo.
+===================================================================================== -->
+<div id="ol-carreiras">
+<style>
+#ol-carreiras{--v:#118042;--ve:#0d6636;--vc:#5ecb71;--vb:#eef7f1;--vbd:#cfe8d8;--tx:#1b2420;--mu:#68746d;--bd:#e4e9e5;--bg:#fff;--soft:#f6f9f7;--er:#c0392b;
+ font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,system-ui,sans-serif;font-size:16px;line-height:1.55;color:var(--tx);background:var(--bg);letter-spacing:-.006em;-webkit-font-smoothing:antialiased;text-align:left}
+#ol-carreiras *,#ol-carreiras *::before,#ol-carreiras *::after{box-sizing:border-box}
+#ol-carreiras h1,#ol-carreiras h2,#ol-carreiras h3,#ol-carreiras p,#ol-carreiras ul{margin:0;padding:0;font-family:inherit;color:inherit;text-transform:none;letter-spacing:inherit;font-size:inherit;line-height:inherit;font-weight:inherit}
+#ol-carreiras p{font-size:inherit}
+#ol-carreiras button,#ol-carreiras input,#ol-carreiras select,#ol-carreiras textarea{font:inherit;color:inherit;letter-spacing:inherit}
+#ol-carreiras a{color:var(--v)}
+#ol-carreiras .w{max-width:1080px;margin:0 auto;padding:0 24px}
+/* topo */
+#ol-carreiras .hero{padding:clamp(56px,9vw,112px) 0 clamp(40px,6vw,72px);position:relative;overflow:hidden}
+#ol-carreiras .hero::after{content:"";position:absolute;right:-120px;top:-60px;width:460px;height:460px;border-radius:50%;border:68px solid var(--vb);opacity:.9;pointer-events:none}
+#ol-carreiras .hero::before{content:"";position:absolute;right:20px;top:120px;width:120px;height:120px;border-radius:50%;background:var(--vc);opacity:.18;pointer-events:none}
+#ol-carreiras .hero .w{position:relative;z-index:1}
+#ol-carreiras .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--v)}
+#ol-carreiras .eyebrow::before{content:"";width:22px;height:2px;background:var(--v);border-radius:2px}
+#ol-carreiras h1{font-size:clamp(34px,5.6vw,58px);line-height:1.06;font-weight:700;letter-spacing:-.035em;margin:18px 0 18px;max-width:14ch}
+#ol-carreiras h1 em{font-style:normal;color:var(--v)}
+#ol-carreiras .lead{font-size:clamp(16px,1.6vw,19px);color:var(--mu);max-width:560px}
+#ol-carreiras .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:32px;position:relative;z-index:1}
+#ol-carreiras .b{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--v);background:var(--v);color:#fff!important;text-decoration:none;border-radius:11px;padding:12px 22px;font-weight:600;font-size:15px;cursor:pointer;transition:background .15s,transform .15s,border-color .15s}
+#ol-carreiras .b:hover{background:var(--ve);border-color:var(--ve)}#ol-carreiras .b:active{transform:scale(.98)}
+#ol-carreiras .b.g{background:transparent;color:var(--tx)!important;border-color:var(--bd)}#ol-carreiras .b.g:hover{background:var(--soft);border-color:#c9d3cc}
+#ol-carreiras .b.s{padding:9px 16px;font-size:14px;border-radius:9px}
+#ol-carreiras .b[disabled]{opacity:.55;cursor:default}
+#ol-carreiras :focus-visible{outline:3px solid color-mix(in srgb,var(--vc) 60%,transparent);outline-offset:2px}
+/* vagas */
+#ol-carreiras .sec{padding:clamp(24px,4vw,48px) 0}
+#ol-carreiras .sh{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+#ol-carreiras h2{font-size:clamp(24px,3vw,32px);font-weight:700;letter-spacing:-.03em;line-height:1.15}
+#ol-carreiras .cnt{color:var(--mu);font-size:14px;line-height:1.5;margin-top:4px}
+#ol-carreiras .chips{display:flex;gap:6px;flex-wrap:wrap}
+#ol-carreiras .chip{border:1px solid var(--bd);background:transparent;border-radius:99px;padding:5px 14px;font-size:13.5px;font-weight:550;color:var(--mu);cursor:pointer;transition:all .15s}
+#ol-carreiras .chip:hover{color:var(--tx);border-color:#b8c4bc}#ol-carreiras .chip.on{background:var(--vb);color:var(--v);border-color:var(--vbd)}
+#ol-carreiras .gr{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+#ol-carreiras .cd{border:1px solid var(--bd);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:10px;background:var(--bg);transition:border-color .15s,box-shadow .15s}
+#ol-carreiras .cd:hover{border-color:var(--vbd);box-shadow:0 8px 28px rgba(17,128,66,.07)}
+#ol-carreiras .ar{font-size:12px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--v)}
+#ol-carreiras .cd h3{font-size:20px;line-height:1.25;font-weight:650;letter-spacing:-.02em}
+#ol-carreiras .mt{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;color:var(--mu)}
+#ol-carreiras .mt span{display:inline-flex;align-items:center;gap:6px}
+#ol-carreiras .mt svg{width:14px;height:14px;flex:none;opacity:.8}
+#ol-carreiras .ds{color:var(--mu);font-size:14.5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#ol-carreiras .det{border-top:1px dashed var(--bd);padding-top:14px;font-size:14.5px;display:none;gap:12px;flex-direction:column}
+#ol-carreiras .det h4{margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-weight:650}
+#ol-carreiras .det p{white-space:pre-line}
+#ol-carreiras .cd.open .det{display:flex}#ol-carreiras .cd.open .ds{display:none}
+#ol-carreiras .ft{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:auto;padding-top:8px}
+#ol-carreiras .pz{font-size:13px;color:var(--mu)}
+#ol-carreiras .ok p{font-size:16px;line-height:1.55}#ol-carreiras .ev{font-size:15px;line-height:1.5}
+#ol-carreiras .lk{background:none;border:0;padding:0;color:var(--v);font-weight:600;font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--vbd)}
+#ol-carreiras .acts{display:flex;align-items:center;gap:14px}
+#ol-carreiras .sk{height:178px;border-radius:16px;background:linear-gradient(90deg,var(--soft),#edf2ee,var(--soft));background-size:200% 100%;animation:olsk 1.3s infinite}
+@keyframes olsk{to{background-position:-200% 0}}
+#ol-carreiras .ev{border:1px dashed var(--bd);border-radius:16px;padding:44px 24px;text-align:center;color:var(--mu);grid-column:1/-1}
+#ol-carreiras .ev strong{display:block;color:var(--tx);font-size:17px;margin-bottom:6px}
+#ol-carreiras .ev .b{margin-top:16px}
+/* faixa currículo */
+#ol-carreiras .band{margin:clamp(20px,4vw,40px) 0 clamp(48px,7vw,88px);background:#0d3b22;border-radius:22px;color:#fff;padding:clamp(28px,5vw,52px);display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;position:relative;overflow:hidden}
+#ol-carreiras .band::after{content:"";position:absolute;right:-70px;bottom:-110px;width:300px;height:300px;border-radius:50%;border:46px solid rgba(94,203,113,.16);pointer-events:none}
+#ol-carreiras .band h2{color:#fff;max-width:18ch}#ol-carreiras .band p{color:#b8d6c4;margin-top:8px;max-width:46ch;font-size:16px;line-height:1.55}
+#ol-carreiras .band .b{background:var(--vc);border-color:var(--vc);color:#0b2a19!important;position:relative;z-index:1}#ol-carreiras .band .b:hover{background:#7ad78a;border-color:#7ad78a}
+/* janela */
+#ol-carreiras .ov{position:fixed;inset:0;z-index:99999;background:rgba(14,26,19,.5);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;padding:16px}
+#ol-carreiras .ov.on{display:flex}
+#ol-carreiras .md{background:var(--bg);border-radius:20px;width:min(560px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:28px;box-shadow:0 24px 70px rgba(0,0,0,.28);animation:olin .2s ease-out}
+@keyframes olin{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+#ol-carreiras .mh{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+#ol-carreiras .md h2{font-size:23px}
+#ol-carreiras .x{border:0;background:var(--soft);width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;color:var(--mu);flex:none}#ol-carreiras .x:hover{background:var(--bd)}
+#ol-carreiras .sub{color:var(--mu);font-size:14.5px;line-height:1.5;margin-bottom:18px}
+#ol-carreiras .vg{display:inline-flex;gap:8px;align-items:center;background:var(--vb);color:var(--v);font-weight:600;font-size:13.5px;border-radius:99px;padding:4px 12px;margin-bottom:16px}
+#ol-carreiras form{display:grid;gap:14px}
+#ol-carreiras .f2{display:grid;grid-template-columns:1fr 1fr;gap:12px}#ol-carreiras .f3{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+#ol-carreiras label{display:block;font-size:13px;font-weight:600;color:var(--mu)}
+#ol-carreiras label .o{font-weight:400;opacity:.8}
+#ol-carreiras input[type=text],#ol-carreiras input[type=email],#ol-carreiras input[type=tel],#ol-carreiras select,#ol-carreiras textarea{width:100%;margin-top:5px;background:#fff;border:1px solid var(--bd);border-radius:10px;padding:10px 12px;font-size:15px;font-weight:400;color:var(--tx);transition:border-color .15s,box-shadow .15s;-webkit-appearance:none;appearance:none}
+#ol-carreiras input[type=text],#ol-carreiras input[type=email],#ol-carreiras input[type=tel],#ol-carreiras select,#ol-carreiras textarea{height:auto;min-height:0;line-height:1.4;box-shadow:none;margin-bottom:0}
+#ol-carreiras textarea{resize:vertical}
+#ol-carreiras select{padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2368746d' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+#ol-carreiras input:focus,#ol-carreiras select:focus,#ol-carreiras textarea:focus{outline:0;border-color:var(--v);box-shadow:0 0 0 3px color-mix(in srgb,var(--vc) 30%,transparent)}
+#ol-carreiras .bad input,#ol-carreiras .bad select,#ol-carreiras .bad .dz{border-color:var(--er)}
+#ol-carreiras .em{color:var(--er);font-size:12.5px;font-weight:500;margin-top:4px;display:none}#ol-carreiras .bad>.em,#ol-carreiras .bad .em{display:block}
+#ol-carreiras .dz{margin-top:5px;border:1.5px dashed #bfd0c5;border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;background:var(--soft);transition:border-color .15s,background .15s}
+#ol-carreiras .dz:hover,#ol-carreiras .dz.dr{border-color:var(--v);background:var(--vb)}
+#ol-carreiras .dz svg{width:26px;height:26px;color:var(--v);flex:none}#ol-carreiras .dz b{display:block;font-size:14.5px;color:var(--tx)}#ol-carreiras .dz small{color:var(--mu);font-size:12.5px}
+#ol-carreiras .dz input{position:absolute;opacity:0;width:0;height:0}
+#ol-carreiras .fn{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:13.5px;color:var(--v);font-weight:600}#ol-carreiras .fn button{border:0;background:none;color:var(--mu);cursor:pointer;font-size:13px;text-decoration:underline}
+#ol-carreiras details{border:1px solid var(--bd);border-radius:12px;padding:0 14px}#ol-carreiras details summary{cursor:pointer;padding:12px 0;font-weight:600;font-size:14px;color:var(--mu);list-style:none}
+#ol-carreiras details summary::-webkit-details-marker{display:none}#ol-carreiras details summary::after{content:"+";float:right;font-size:18px;line-height:1}#ol-carreiras details[open] summary::after{content:"–"}
+#ol-carreiras details[open]{padding-bottom:14px}#ol-carreiras details .in{display:grid;gap:12px}
+#ol-carreiras .ck{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:13px;line-height:1.5}#ol-carreiras .ck input{margin-top:3px;width:17px;height:17px;accent-color:var(--v);flex:none}
+#ol-carreiras .iso{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+#ol-carreiras .al{background:#fdecea;color:#8c2a20;border-radius:11px;padding:10px 14px;font-size:14px;display:none}#ol-carreiras .al.on{display:block}
+#ol-carreiras .ok{text-align:center;padding:14px 4px 4px}#ol-carreiras .ok .ic{width:60px;height:60px;border-radius:50%;background:var(--vb);color:var(--v);display:grid;place-items:center;margin:0 auto 16px}
+#ol-carreiras .ok .ic svg{width:30px;height:30px}#ol-carreiras .ok h2{margin-bottom:8px}#ol-carreiras .ok p{color:var(--mu)}#ol-carreiras .ok .pr{display:inline-block;margin:14px 0 20px;background:var(--soft);border-radius:10px;padding:6px 14px;font-weight:650;letter-spacing:.06em;color:var(--tx)}
+#ol-carreiras .sp{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:olsp .7s linear infinite}@keyframes olsp{to{transform:rotate(360deg)}}
+@media(max-width:720px){#ol-carreiras .gr{grid-template-columns:1fr}#ol-carreiras .hero::after{right:-230px;top:-150px;opacity:.7}#ol-carreiras .hero::before{display:none}#ol-carreiras .f2,#ol-carreiras .f3{grid-template-columns:1fr}#ol-carreiras .md{padding:22px;border-radius:18px}#ol-carreiras .band{border-radius:18px}}
+@media(prefers-reduced-motion:reduce){#ol-carreiras *{animation:none!important;transition:none!important}}
+</style>
+
+<!-- ===== Conteúdo ===== -->
+<header class="hero"><div class="w">
+  <span class="eyebrow">Trabalhe conosco</span>
+  <h1>Venha ser <em>parceiro</em> na obra.</h1>
+  <p class="lead">A Original aluga equipamentos para construção civil, mineração e indústrias, com agilidade e qualidade. Buscamos pessoas que gostam de resolver — e de crescer junto com os clientes.</p>
+  <div class="cta"><a class="b" href="#ol-vagas">Ver vagas abertas</a><button class="b g" type="button" data-cv>Enviar currículo</button></div>
+</div></header>
+
+<section class="sec" id="ol-vagas"><div class="w">
+  <div class="sh"><div><h2>Vagas abertas</h2><p class="cnt" id="ol-cnt" aria-live="polite">Carregando…</p></div><div class="chips" id="ol-chips" role="group" aria-label="Filtrar por área"></div></div>
+  <div class="gr" id="ol-lista" aria-busy="true"><div class="sk"></div><div class="sk"></div></div>
+</div></section>
+
+<div class="w"><aside class="band">
+  <div><h2>Não achou a vaga ideal?</h2><p>Envie seu currículo e entre para o nosso banco de talentos. Quando surgir uma oportunidade com o seu perfil, a gente chama.</p></div>
+  <button class="b" type="button" data-cv>Enviar currículo</button>
+</aside></div>
+
+<!-- ===== Janela de candidatura ===== -->
+<div class="ov" id="ol-ov" role="dialog" aria-modal="true" aria-labelledby="ol-t"><div class="md" id="ol-md"></div></div>
+
+<script>
+(function () {
+  "use strict";
+  /* ============================ CONFIGURAÇÃO ============================ */
+  var CFG = {
+    API: "https://app-ef03a44d30e7.vibecode.bitrix24.com", /*API*/   // endereço do app de RH (não termina com /)
+    POLITICA: "/politica-de-privacidade/",                            // link da Política de Privacidade do site
+    CV_MAX_MB: 3
+  };
+  /* ====================================================================== */
+  var root = document.getElementById("ol-carreiras");
+  var $ = function (s, r) { return (r || root).querySelector(s); };
+  var AREAS = ["Operações e logística", "Manutenção e mecânica", "Comercial e vendas", "Atendimento ao cliente", "Administrativo", "Financeiro e contábil", "Recursos humanos", "Tecnologia", "Segurança do trabalho", "Motorista e transporte", "Outra"];
+  var UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
+  var ESC = ["Fundamental", "Médio", "Técnico", "Superior incompleto", "Superior completo", "Pós-graduação"];
+  var EXP = ["Sem experiência", "Até 1 ano", "1 a 3 anos", "3 a 5 anos", "5 a 10 anos", "Mais de 10 anos"];
+  var DISP = ["Imediata", "Em até 15 dias", "Em até 30 dias", "Mais de 30 dias"];
+  var ICO = {
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>',
+    ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
+  };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fdata = function (d) { var p = String(d || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] : ""; };
+  var opts = function (l, sel) { return l.map(function (x) { return "<option" + (x === sel ? " selected" : "") + ">" + esc(x) + "</option>"; }).join(""); };
+  var vagas = [], filtro = "", focoAnterior = null;
+
+  /* ------------------------------- vagas -------------------------------- */
+  function api(path, init) {
+    return fetch(CFG.API + path, init).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
+    });
+  }
+  function carregar() {
+    var lista = $("#ol-lista"); lista.setAttribute("aria-busy", "true");
+    lista.innerHTML = '<div class="sk"></div><div class="sk"></div>';
+    api("/public/vagas", { headers: { Accept: "application/json" } }).then(function (r) {
+      if (!r.ok || !r.j.vagas) throw new Error("falha");
+      vagas = r.j.vagas; desenhar(); abrirDaUrl();
+    }).catch(function () {
+      $("#ol-cnt").textContent = "";
+      lista.removeAttribute("aria-busy");
+      lista.innerHTML = '<div class="ev"><strong>Não foi possível carregar as vagas agora.</strong>Você ainda pode enviar seu currículo para o nosso banco de talentos.<br><button class="b g s" type="button" id="ol-retry">Tentar de novo</button> <button class="b s" type="button" data-cv>Enviar currículo</button></div>';
+      $("#ol-retry").onclick = carregar;
+    });
+  }
+  function desenhar() {
+    var areas = []; vagas.forEach(function (v) { if (areas.indexOf(v.area) < 0) areas.push(v.area); });
+    if (filtro && areas.indexOf(filtro) < 0) filtro = "";
+    var vis = vagas.filter(function (v) { return !filtro || v.area === filtro; });
+    $("#ol-cnt").textContent = vagas.length ? vagas.length + (vagas.length === 1 ? " oportunidade" : " oportunidades") + " no momento" : "";
+    $("#ol-chips").innerHTML = areas.length > 1 ? ['<button type="button" class="chip' + (filtro ? "" : " on") + '" data-a="">Todas</button>'].concat(areas.map(function (a) { return '<button type="button" class="chip' + (filtro === a ? " on" : "") + '" data-a="' + esc(a) + '">' + esc(a) + "</button>"; })).join("") : "";
+    var lista = $("#ol-lista"); lista.removeAttribute("aria-busy");
+    if (!vis.length) { lista.innerHTML = '<div class="ev"><strong>Nenhuma vaga aberta no momento.</strong>Envie seu currículo e entre para o nosso banco de talentos.<br><button class="b" type="button" data-cv>Enviar currículo</button></div>'; return; }
+    lista.innerHTML = vis.map(function (v) {
+      var meta = [];
+      if (v.cidade) meta.push("<span>" + ICO.pin + esc(v.cidade) + "</span>");
+      if (v.tipoContrato) meta.push("<span>" + ICO.doc + esc(v.tipoContrato) + "</span>");
+      if (v.modelo) meta.push("<span>" + ICO.clock + esc(v.modelo) + "</span>");
+      return '<article class="cd" data-c="' + esc(v.codigo) + '"><span class="ar">' + esc(v.area) + "</span><h3>" + esc(v.titulo) + "</h3>" +
+        (meta.length ? '<div class="mt">' + meta.join("") + "</div>" : "") + (v.faixaSalarial ? '<div class="mt"><span>' + esc(v.faixaSalarial) + "</span></div>" : "") +
+        '<p class="ds">' + esc(v.descricao) + '</p><div class="det" data-det></div>' +
+        '<div class="ft"><span class="pz">' + (v.encerraEm ? "Inscrições até " + fdata(v.encerraEm) : "") + '</span><span class="acts"><button class="lk" type="button" data-more>Ver detalhes</button><button class="b s" type="button" data-ap="' + esc(v.codigo) + '">Candidatar-me</button></span></div></article>';
+    }).join("");
+  }
+  function detalhes(card) {
+    var abre = !card.classList.contains("open"), det = $("[data-det]", card), btn = $("[data-more]", card);
+    card.classList.toggle("open", abre); btn.textContent = abre ? "Ocultar detalhes" : "Ver detalhes";
+    if (!abre || det.getAttribute("data-ok")) return;
+    det.innerHTML = '<p class="cnt">Carregando…</p>';
+    api("/public/vagas/" + encodeURIComponent(card.getAttribute("data-c")), { headers: { Accept: "application/json" } }).then(function (r) {
+      if (r.status === 404) { det.innerHTML = "<p>Esta vaga acabou de ser encerrada.</p>"; carregar(); return; }
+      var v = (r.j && r.j.vaga) || {};
+      det.innerHTML = "<div><h4>Sobre a vaga</h4><p>" + esc(v.descricao) + "</p></div>" + (v.requisitos ? "<div><h4>Requisitos</h4><p>" + esc(v.requisitos) + "</p></div>" : ""); det.setAttribute("data-ok", "1");
+    }).catch(function () { det.innerHTML = "<p>Não foi possível carregar os detalhes agora.</p>"; });
+  }
+  function abrirDaUrl() {
+    var c = new URLSearchParams(location.search).get("vaga"); if (!c || abrirDaUrl.feito) return; abrirDaUrl.feito = true;
+    var v = vagas.filter(function (x) { return x.codigo === c; })[0]; if (v) candidatura(v);
+  }
+
+  /* ---------------------------- candidatura ----------------------------- */
+  var arquivo = null, vagaSel = null, aberto = false;
+  function candidatura(vaga) {
+    vagaSel = vaga || null; arquivo = null; aberto = true; focoAnterior = document.activeElement;
+    var md = $("#ol-md");
+    md.innerHTML =
+      '<div class="mh"><h2 id="ol-t">' + (vaga ? "Candidatar-me" : "Enviar currículo") + '</h2><button class="x" type="button" data-x aria-label="Fechar">×</button></div>' +
+      '<p class="sub">' + (vaga ? "Leva menos de um minuto." : "Entre para o banco de talentos da Original. Leva menos de um minuto.") + "</p>" +
+      (vaga ? '<div class="vg">' + esc(vaga.titulo) + (vaga.cidade ? " · " + esc(vaga.cidade) : "") + "</div>" : "") +
+      '<form id="ol-f" novalidate><div class="al" id="ol-al" role="alert"></div>' +
+      '<div data-k="nome"><label>Nome completo<input type="text" name="nome" autocomplete="name" maxlength="120" required></label><div class="em"></div></div>' +
+      '<div class="f2"><div data-k="email"><label>E-mail<input type="email" name="email" autocomplete="email" maxlength="200" required></label><div class="em"></div></div>' +
+      '<div data-k="telefone"><label>Celular (WhatsApp)<input type="tel" name="telefone" autocomplete="tel" inputmode="tel" placeholder="(31) 99999-9999" required></label><div class="em"></div></div></div>' +
+      '<div class="f3"><div data-k="cidade"><label>Cidade<input type="text" name="cidade" autocomplete="address-level2" maxlength="80" required></label><div class="em"></div></div>' +
+      '<div data-k="uf"><label>Estado<select name="uf" required><option value="">UF</option>' + opts(UFS, "MG") + '</select></label><div class="em"></div></div></div>' +
+      (vaga ? "" : '<div data-k="area"><label>Área de interesse<select name="area" required><option value="">Selecione…</option>' + opts(AREAS) + '</select></label><div class="em"></div></div>') +
+      '<div data-k="curriculo"><label>Currículo</label><label class="dz" id="ol-dz" for="ol-cv">' + ICO.up + '<span><b>Anexar currículo</b><small>PDF, DOC ou DOCX · até ' + CFG.CV_MAX_MB + ' MB</small></span><input id="ol-cv" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label><div class="fn" id="ol-fn" hidden></div><div class="em"></div></div>' +
+      '<div data-k="linkedin"><label>ou perfil do LinkedIn <span class="o">(se preferir)</span><input type="text" name="linkedin" placeholder="linkedin.com/in/seu-perfil" autocomplete="off" inputmode="url"></label><div class="em"></div></div>' +
+      '<details><summary>Quer contar mais? (opcional)</summary><div class="in"><div class="f2"><label>Escolaridade<select name="escolaridade"><option value="">—</option>' + opts(ESC) + '</select></label><label>Experiência<select name="experiencia"><option value="">—</option>' + opts(EXP) + '</select></label></div>' +
+      '<div class="f2"><label>Disponibilidade<select name="disponibilidade"><option value="">—</option>' + opts(DISP) + '</select></label><label>Pretensão salarial (R$)<input type="text" name="pretensao" inputmode="numeric" placeholder="Ex.: 3000"></label></div>' +
+      '<label>Fale um pouco sobre você<textarea name="sobre" rows="3" maxlength="600"></textarea></label></div></details>' +
+      '<div data-k="consentimento"><label class="ck"><input type="checkbox" name="consentimento"><span>Li e aceito a <a href="' + esc(CFG.POLITICA) + '" target="_blank" rel="noopener">Política de Privacidade</a>. Meus dados serão usados apenas em processos seletivos da Original. A leitura do currículo pode ser apoiada por inteligência artificial; a decisão é sempre de uma pessoa do RH.</span></label><div class="em"></div></div>' +
+      '<div class="iso" aria-hidden="true"><label>Não preencha<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>' +
+      '<button class="b" type="submit" id="ol-go">Enviar candidatura</button></form>';
+    $("#ol-ov").classList.add("on"); document.documentElement.style.overflow = "hidden";
+    var f = $("#ol-f"); setTimeout(function () { f.nome.focus(); }, 30);
+    f.telefone.addEventListener("input", mascara); f.onsubmit = enviar;
+    var ok1 = function (e) { var k = e.target.closest && e.target.closest("[data-k]"); if (k) k.classList.remove("bad"); };
+    f.addEventListener("input", ok1); f.addEventListener("change", ok1);
+    var inp = $("#ol-cv"); inp.onchange = function () { escolher(inp.files && inp.files[0]); };
+    var dz = $("#ol-dz");
+    ["dragenter", "dragover"].forEach(function (e) { dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.classList.add("dr"); }); });
+    ["dragleave", "drop"].forEach(function (e) { dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.classList.remove("dr"); }); });
+    dz.addEventListener("drop", function (ev) { escolher(ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]); });
+  }
+  function fechar() { if (!aberto) return; aberto = false; $("#ol-ov").classList.remove("on"); document.documentElement.style.overflow = ""; if (focoAnterior && focoAnterior.focus) focoAnterior.focus(); }
+  function mascara(e) { var d = e.target.value.replace(/\D/g, "").slice(0, 11), o = d; if (d.length > 6) o = "(" + d.slice(0, 2) + ") " + d.slice(2, d.length > 10 ? 7 : 6) + "-" + d.slice(d.length > 10 ? 7 : 6); else if (d.length > 2) o = "(" + d.slice(0, 2) + ") " + d.slice(2); e.target.value = o; }
+  function erro(campo, msg) { var k = $('#ol-f [data-k="' + campo + '"]'); if (!k) return false; k.classList.add("bad"); $(".em", k).textContent = msg; return true; }
+  function limpar() { root.querySelectorAll("#ol-f .bad").forEach(function (k) { k.classList.remove("bad"); }); var a = $("#ol-al"); a.classList.remove("on"); a.textContent = ""; }
+  function escolher(file) {
+    var k = $('#ol-f [data-k="curriculo"]'); k.classList.remove("bad");
+    if (!file) return;
+    var ok = /\.(pdf|docx?)$/i.test(file.name);
+    if (!ok) { arquivo = null; atualizarArquivo(); return erro("curriculo", "Envie o currículo em PDF, DOC ou DOCX."); }
+    if (file.size > CFG.CV_MAX_MB * 1024 * 1024) { arquivo = null; atualizarArquivo(); return erro("curriculo", "O arquivo passa de " + CFG.CV_MAX_MB + " MB."); }
+    arquivo = file; atualizarArquivo();
+  }
+  function atualizarArquivo() {
+    var fn = $("#ol-fn"); if (!arquivo) { fn.hidden = true; fn.innerHTML = ""; $("#ol-cv").value = ""; return; }
+    fn.hidden = false; fn.innerHTML = "✓ " + esc(arquivo.name) + ' <button type="button" id="ol-rm">remover</button>';
+    $("#ol-rm").onclick = function () { arquivo = null; atualizarArquivo(); };
+  }
+  function lerBase64(file) { return new Promise(function (ok, no) { var r = new FileReader(); r.onload = function () { ok(String(r.result).split(",")[1] || ""); }; r.onerror = no; r.readAsDataURL(file); }); }
+  function validar(f) {
+    var ruim = false, v = function (c, m) { erro(c, m); ruim = true; };
+    if (f.nome.value.trim().length < 3) v("nome", "Informe seu nome completo.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.value.trim())) v("email", "Informe um e-mail válido.");
+    var d = f.telefone.value.replace(/\D/g, ""); if (d.length < 10 || d.length > 11) v("telefone", "Informe o celular com DDD.");
+    if (!f.cidade.value.trim()) v("cidade", "Informe a cidade.");
+    if (!f.uf.value) v("uf", "Escolha o estado.");
+    if (!vagaSel && !f.area.value) v("area", "Escolha a área de interesse.");
+    if (!arquivo && !f.linkedin.value.trim()) v("curriculo", "Anexe o currículo ou informe o LinkedIn abaixo.");
+    if (!f.consentimento.checked) v("consentimento", "É preciso aceitar a Política de Privacidade.");
+    return !ruim;
+  }
+  function enviar(e) {
+    e.preventDefault(); var f = e.target, go = $("#ol-go"); limpar();
+    if (!validar(f)) { var p = $("#ol-f .bad"); if (p) p.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+    go.disabled = true; go.innerHTML = '<span class="sp"></span> Enviando…';
+    var utm = {}, q = new URLSearchParams(location.search);
+    ["source", "medium", "campaign"].forEach(function (k) { var x = q.get("utm_" + k); if (x) utm[k] = x; });
+    var corpo = {
+      nome: f.nome.value.trim(), email: f.email.value.trim(), telefone: f.telefone.value, cidade: f.cidade.value.trim(), uf: f.uf.value,
+      area: vagaSel ? vagaSel.area : f.area.value, vaga: vagaSel ? vagaSel.codigo : undefined, consentimento: true, website: f.website.value,
+      linkedin: f.linkedin.value.trim() || undefined, escolaridade: f.escolaridade.value || undefined, experiencia: f.experiencia.value || undefined,
+      disponibilidade: f.disponibilidade.value || undefined, pretensao: f.pretensao.value.trim() || undefined, sobre: f.sobre.value.trim() || undefined,
+      origem: "Site da Original", utm: Object.keys(utm).length ? utm : undefined
+    };
+    (arquivo ? lerBase64(arquivo).then(function (b) { corpo.curriculo = { nome: arquivo.name, base64: b }; }) : Promise.resolve()).then(function () {
+      // text/plain evita a "pré-checagem" (preflight) do navegador; o servidor lê o JSON do mesmo jeito
+      return api("/public/candidaturas", { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8", Accept: "application/json" }, body: JSON.stringify(corpo) });
+    }).then(function (r) {
+      if (r.ok && r.j.success) return sucesso(r.j.protocolo);
+      var m = r.j && r.j.erros, qualquer = false;
+      if (m) Object.keys(m).forEach(function (c) { if (erro(c, m[c])) qualquer = true; else { aviso(m[c]); qualquer = true; } });
+      if (m && m.vaga) { aviso(m.vaga); carregar(); }
+      if (!qualquer) aviso(r.status === 429 ? ((r.j.error) || "Muitas tentativas. Tente de novo mais tarde.") : "Não foi possível enviar agora. Tente novamente em instantes.");
+      go.disabled = false; go.textContent = "Enviar candidatura";
+    }).catch(function () { aviso("Não foi possível enviar agora. Verifique sua conexão e tente de novo."); go.disabled = false; go.textContent = "Enviar candidatura"; });
+  }
+  function aviso(t) { var a = $("#ol-al"); a.textContent = t; a.classList.add("on"); a.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  function sucesso(prot) {
+    $("#ol-md").innerHTML = '<div class="ok"><div class="ic">' + ICO.ok + '</div><h2 id="ol-t">Recebemos sua candidatura!</h2><p>' + (vagaSel ? "Você concorre à vaga <b>" + esc(vagaSel.titulo) + "</b>. " : "Seu currículo já está no nosso banco de talentos. ") + 'Nosso time de RH vai analisar e entrar em contato se o seu perfil combinar com uma oportunidade.</p><div class="pr">Protocolo ' + esc(prot) + '</div><br><button class="b" type="button" data-x>Fechar</button></div>';
+  }
+
+  /* ------------------------------ eventos ------------------------------- */
+  root.addEventListener("click", function (e) {
+    var t = e.target.closest ? e.target.closest("[data-cv],[data-ap],[data-more],[data-x],.chip") : null;
+    if (e.target.id === "ol-ov") return fechar();
+    if (!t) return;
+    if (t.hasAttribute("data-x")) return fechar();
+    if (t.hasAttribute("data-cv")) return candidatura(null);
+    if (t.hasAttribute("data-ap")) { var c = t.getAttribute("data-ap"); return candidatura(vagas.filter(function (v) { return v.codigo === c; })[0]); }
+    if (t.hasAttribute("data-more")) return detalhes(t.closest(".cd"));
+    if (t.classList.contains("chip")) { filtro = t.getAttribute("data-a") || ""; desenhar(); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!aberto) return;
+    if (e.key === "Escape") return fechar();
+    if (e.key === "Tab") { // mantém o foco dentro da janela
+      var fs = root.querySelectorAll("#ol-md button,#ol-md input:not([type=file]),#ol-md select,#ol-md textarea,#ol-md a[href],#ol-md summary,#ol-md label.dz");
+      fs = Array.prototype.filter.call(fs, function (x) { return x.offsetParent !== null && !x.closest(".iso"); });
+      if (!fs.length) return; var a = fs[0], z = fs[fs.length - 1];
+      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+    }
+  });
+  carregar();
+})();
+</script>
+</div>
