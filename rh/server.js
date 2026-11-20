@@ -57,7 +57,7 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
     // ---- Módulo: recepção de currículos
     'GET /api/curriculos/candidatos': async ({ user, u }) => {
       acl.exige(user, 'curriculos'); const q = u.searchParams;
-      return cur.listar({ status: q.get('status'), q: q.get('q'), vaga: q.get('vaga'), area: q.get('area'), responsavel: q.get('responsavel') === 'eu' ? user.id : q.get('responsavel'), parada: q.get('parada') === '1', ordem: q.get('ordem'), limite: +q.get('limite') || 200, offset: +q.get('offset') || 0 });
+      return cur.listar({ status: q.get('status'), q: q.get('q'), vaga: q.get('vaga'), area: q.get('area'), responsavel: q.get('responsavel') === 'eu' ? user.id : q.get('responsavel'), origem: q.get('origem'), parada: q.get('parada') === '1', ordem: q.get('ordem'), limite: +q.get('limite') || 200, offset: +q.get('offset') || 0 });
     },
     'GET /api/curriculos/candidatos/:id': async ({ user, p }) => { acl.exige(user, 'curriculos'); const d = cur.detalhe(p.id); store.audit(user, 'candidato.ver', `${p.id.slice(0, 8)} ${d.nome}`); return d; },
     'PATCH /api/curriculos/candidatos/:id': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.atualizar(user, p.id, body, bearer); },
@@ -66,6 +66,7 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
     'GET /api/curriculos/vagas': async ({ user }) => { acl.exige(user, 'curriculos'); return cur.vagas(); },
     'POST /api/curriculos/vagas': async ({ user, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.criarVaga(user, body, bearer); },
     'PATCH /api/curriculos/vagas/:id': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.editarVaga(user, p.id, body, bearer); },
+    'POST /api/curriculos/vagas/:id/acao': async ({ user, p, body, bearer }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.acaoVaga(user, p.id, body, bearer); },
     'DELETE /api/curriculos/vagas/:id': async ({ user, p }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.excluirVaga(user, p.id); },
     'GET /api/curriculos/config': async ({ user }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.config(); },
     'PUT /api/curriculos/config': async ({ user, body }) => { acl.exige(user, 'curriculos', 'gestor'); return cur.salvarConfig(user, body); },
@@ -85,6 +86,12 @@ function createServer({ dataDir, appKey, applicationId, usuarios, intakeKeyIds, 
       if (req.method === 'GET' && pathname === '/health') return send(res, 200, { ok: true });
       const externo = String(req.headers['x-vibe-caller-kind'] || '') === 'external-api';
       // Canal externo (site de carreiras): só a rota de entrada, com chave identificada; todas as demais ficam fechadas.
+      const mv = pathname.match(/^\/public\/vagas\/([a-z0-9-]{1,60})$/);
+      if (mv) {
+        if (req.method !== 'GET') throw bad(405, 'Use GET.');
+        if (!externo || !req.headers['x-vibe-caller-key-id']) throw bad(403, 'Acesso permitido apenas pelo canal da API externa.');
+        return send(res, 200, { success: true, ...cur.vagaPublica(mv[1]) });
+      }
       if (pathname === '/public/vagas') {
         if (req.method !== 'GET') throw bad(405, 'Use GET.');
         if (!externo || !req.headers['x-vibe-caller-key-id']) throw bad(403, 'Acesso permitido apenas pelo canal da API externa.');

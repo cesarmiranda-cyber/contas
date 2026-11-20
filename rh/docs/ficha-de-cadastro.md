@@ -12,6 +12,16 @@ Corpo máximo 4 MiB (currículo até **3 MB**, enviado em base64). Limite: 120 c
 Respostas: `201 {"success":true,"protocolo":"A1B2C3D4"}` · `422 {"error":"…","erros":{"email":"Informe um e-mail válido."}}` (mostre cada mensagem junto ao campo) · `429` muitas tentativas.
 Reenviar o mesmo e-mail para a mesma vaga **atualiza** a ficha (não duplica).
 
+## Vagas do site (RH cadastra, site exibe)
+O RH cadastra e publica as vagas no app (aba **Vagas**). O site só **lê** as vagas abertas e envia a candidatura com o código da vaga.
+
+- `GET https://vibecode.bitrix24.com/v1/applications/cmwotbdkc00814bo6g4nsvnh1/api/public/vagas` — lista só as **vagas abertas**: `codigo`, `titulo`, `area`, `cidade`, `tipoContrato`, `modelo`, `faixaSalarial` (vazia, a menos que o RH marque "mostrar no site"), `encerraEm` (AAAA-MM-DD), `descricao` (resumo).
+- `GET …/api/public/vagas/{codigo}` — detalhe com `descricao` e `requisitos` completos. `404` se a vaga já fechou (mostre "vaga encerrada" e a lista de outras vagas).
+- `POST …/api/public/candidaturas` com `"vaga": "<codigo>"` — a ficha segue o fluxo normal e o RH a enxerga como **"Vaga do RH"**, com prioridade na triagem (aparece primeiro e o prazo de cada etapa é metade).
+- Se a vaga fechar entre o candidato abrir a página e enviar, volta `422` com `erros.vaga` (texto pronto para exibir). Sem o campo `vaga`, a candidatura é espontânea.
+
+**A vaga sai do site sozinha** quando acontecer o que vier primeiro: o **prazo** termina (obrigatório para publicar, máx. 120 dias), o **limite de candidaturas** é atingido, ou as **posições** são preenchidas (candidatos marcados como *Contratado*). Também pode ser **agendada** para abrir numa data. O site nunca precisa "tirar" vaga: basta listar o que o endpoint devolve a cada visita (não faça cache longo).
+
 ## Campos
 | Campo (JSON) | Rótulo | Obrigatório | Formato |
 |---|---|---|---|
@@ -34,7 +44,7 @@ Reenviar o mesmo e-mail para a mesma vaga **atualiza** a ficha (não duplica).
 | `portfolio` | Portfólio / site | não | URL |
 | `pcd` | Pessoa com deficiência | não | `true/false`, voluntário |
 | `origem` | Como conheceu a Original | não | Site da Original · LinkedIn · Indicação · Instagram · Outro |
-| `vaga` | (oculto) código da vaga | não | vem da URL `?vaga=…` |
+| `vaga` | (oculto) código da vaga | não | vem da URL `?vaga=…` / da página da vaga; deve estar aberta |
 | `utm` | (oculto) campanha | não | `{source, medium, campaign}` |
 | `website` | (oculto) campo isca anti-robô | — | **deve ir vazio** |
 

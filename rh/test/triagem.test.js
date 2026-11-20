@@ -66,7 +66,9 @@ test('vagas, rodízio por área, leitura pela IA, ordenação e reatribuição',
   assert.equal((await call('PUT', `/api/curriculos/config/area/${area}`, { as: gestor, body: { userId: '999' } })).s, 404);
   // vaga + lista pública
   const v = (await call('POST', '/api/curriculos/vagas', { as: gestor, body: { titulo: 'Mecânico de Manutenção', area: 'Manutenção e mecânica', cidade: 'Belo Horizonte', requisitos: 'NR-12; 3 anos' } })).j;
-  assert.match(v.codigo, /^mecanico-de-manutencao/);
+  assert.match(v.codigo, /^mecanico-de-manutencao/); assert.equal(v.status, 'rascunho');
+  const amanha = new Date(Date.now() + 10 * 864e5).toISOString().slice(0, 10);
+  assert.equal((await call('POST', `/api/curriculos/vagas/${v.id}/acao`, { as: gestor, body: { acao: 'publicar', encerraEm: amanha, descricao: 'Manutenção preventiva e corretiva de equipamentos.' } })).j.status, 'aberta');
   assert.equal((await call('GET', '/public/vagas', { as: gestor })).s, 403, 'lista pública só no canal externo');
   assert.equal((await call('GET', '/public/vagas', { h: EXT })).j.vagas.length, 1);
   // 3 candidaturas
@@ -97,7 +99,7 @@ test('vagas, rodízio por área, leitura pela IA, ordenação e reatribuição',
   assert.equal((await call('GET', '/api/curriculos/candidatos?q=nr-12', { as: gestor })).j.itens.length, 1);
   // vaga com candidatos não se exclui
   assert.equal((await call('DELETE', `/api/curriculos/vagas/${v.id}`, { as: gestor })).s, 409);
-  assert.equal((await call('PATCH', `/api/curriculos/vagas/${v.id}`, { as: gestor, body: { status: 'encerrada' } })).j.status, 'encerrada');
+  assert.equal((await call('POST', `/api/curriculos/vagas/${v.id}/acao`, { as: gestor, body: { acao: 'encerrar' } })).j.status, 'encerrada');
   assert.equal((await call('GET', '/public/vagas', { h: EXT })).j.vagas.length, 0);
   srv.close();
 });
