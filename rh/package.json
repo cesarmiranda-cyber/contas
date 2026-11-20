@@ -1,0 +1,9 @@
+{
+  "name": "rh-bitrix24",
+  "version": "1.0.0",
+  "description": "RH: tela inicial por módulos, controle de acesso por usuário do Bitrix24 e recepção de currículos",
+  "private": true,
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node --test" },
+  "engines": { "node": ">=20" }
+}

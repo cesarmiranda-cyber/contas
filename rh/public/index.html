@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RH · Original Locações</title>
+<link rel="icon" href="/_gw/icon">
+<style>
+:root{--verde:#118042;--verde-esc:#0b5e32;--verde-cl:#5ecb71;--verde-bg:#e9f6ee;--grafite:#34383b;--mudo:#6b7378;--bg:#f4f7f5;--card:#fff;--borda:#e1e8e3;--sombra:0 1px 2px rgba(16,40,26,.06),0 8px 24px rgba(16,40,26,.06);--erro:#c62f2f;--aviso:#b7791f}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--grafite:#e8eeea;--mudo:#9aa6a0;--bg:#0f1713;--card:#16211b;--borda:#243229;--verde-bg:#15291d;--sombra:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35)}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--grafite);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}a{color:var(--verde)}
+.top{background:var(--verde);color:#fff;position:sticky;top:0;z-index:5}
+.top .in{max-width:1180px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;cursor:pointer;letter-spacing:.2px}
+.brand svg{width:30px;height:30px}.brand small{font-weight:500;opacity:.85;display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;margin-top:-3px}
+.sp{flex:1}.who{font-size:13px;opacity:.95;text-align:right}.who b{display:block}
+main{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+.hero{background:linear-gradient(135deg,var(--verde-esc),var(--verde) 55%,#2f9a58);color:#fff;border-radius:22px;padding:34px 34px 30px;position:relative;overflow:hidden;box-shadow:var(--sombra)}
+.hero:after{content:"";position:absolute;right:-60px;top:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(94,203,113,.55),transparent 65%)}
+.hero h1{margin:0 0 6px;font-size:30px;line-height:1.15}.hero p{margin:0;opacity:.92;max-width:560px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;margin-top:26px}
+.mod{background:var(--card);border:1px solid var(--borda);border-radius:20px;padding:22px;box-shadow:var(--sombra);text-align:left;cursor:pointer;transition:transform .15s,box-shadow .15s,border-color .15s;display:flex;flex-direction:column;gap:10px;min-height:190px;position:relative}
+.mod:hover:not(.off){transform:translateY(-3px);border-color:var(--verde-cl)}
+.mod.off{cursor:default;opacity:.62}.mod h3{margin:6px 0 0;font-size:17px}.mod p{margin:0;color:var(--mudo);font-size:13.5px;flex:1}
+.ico{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--verde-cl),var(--verde))}
+.ico.lime{background:linear-gradient(135deg,#b6e36a,#5aa83a)}.ico.slate{background:linear-gradient(135deg,#8a9a93,#4d5a54)}.ico.forest{background:linear-gradient(135deg,#2f9a58,#0b5e32)}
+.ico svg{width:24px;height:24px}
+.chip{position:absolute;top:18px;right:18px;font-size:11px;padding:3px 9px;border-radius:99px;background:var(--verde-bg);color:var(--verde);font-weight:600}
+.chip.lock{background:#f1f1f1;color:#777}@media (prefers-color-scheme:dark){.chip.lock{background:#242b27;color:#9aa6a0}}
+.btn{border:0;background:var(--verde);color:#fff;border-radius:10px;padding:9px 16px;cursor:pointer;font-weight:600}.btn:hover{background:var(--verde-esc)}
+.btn.sec{background:var(--verde-bg);color:var(--verde)}.btn.ghost{background:transparent;color:inherit;border:1px solid var(--borda)}.btn.red{background:var(--erro)}.btn.sm{padding:5px 11px;font-size:13px}.btn:disabled{opacity:.5;cursor:default}
+.top .btn.ghost{color:#fff;border-color:rgba(255,255,255,.4)}
+.bar{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}.bar h2{margin:0;font-size:22px}
+.crumb{color:var(--verde);cursor:pointer;font-weight:600;background:none;border:0;padding:0}
+input[type=text],input[type=search],select,textarea{width:100%;background:var(--card);border:1px solid var(--borda);border-radius:10px;padding:9px 12px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--verde-cl);border-color:transparent}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--borda);margin-bottom:18px;flex-wrap:wrap}
+.tab{background:none;border:0;padding:10px 14px;cursor:pointer;color:var(--mudo);font-weight:600;border-bottom:3px solid transparent}.tab.on{color:var(--verde);border-color:var(--verde)}
+.pipe{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pill{border:1px solid var(--borda);background:var(--card);border-radius:99px;padding:6px 13px;cursor:pointer;font-size:13px;font-weight:600}.pill.on{background:var(--verde);color:#fff;border-color:var(--verde)}.pill b{margin-left:6px;opacity:.75}
+.panel{background:var(--card);border:1px solid var(--borda);border-radius:16px;box-shadow:var(--sombra);overflow:hidden}
+table{width:100%;border-collapse:collapse}th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--borda);font-size:14px}th{color:var(--mudo);font-size:12px;text-transform:uppercase;letter-spacing:.6px}
+tr.l{cursor:pointer}tr.l:hover{background:var(--verde-bg)}tr:last-child td{border-bottom:0}
+.av{width:34px;height:34px;border-radius:50%;background:var(--verde-bg);color:var(--verde);display:inline-grid;place-items:center;font-weight:700;margin-right:10px;vertical-align:middle;overflow:hidden}.av img{width:100%;height:100%;object-fit:cover}
+.tag{display:inline-block;background:var(--verde-bg);color:var(--verde);border-radius:6px;padding:1px 8px;font-size:12px;margin:0 4px 2px 0;font-weight:600}.tag.cinza{background:#eee;color:#555}
+.mudo{color:var(--mudo)}.estr{color:#e0a800;letter-spacing:1px}
+.drawer{position:fixed;inset:0;background:rgba(10,25,16,.45);display:flex;justify-content:flex-end;z-index:20}
+.drawer .box{background:var(--card);width:min(560px,100%);height:100%;overflow:auto;padding:24px;box-shadow:-8px 0 30px rgba(0,0,0,.25)}
+.drawer h3{margin:0 0 2px;font-size:22px}.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;margin:14px 0;font-size:14px}.kv dt{color:var(--mudo)}.kv dd{margin:0;word-break:break-word}
+.sec2{margin-top:20px;padding-top:16px;border-top:1px solid var(--borda)}.sec2 h4{margin:0 0 8px}
+.hist{font-size:13px;color:var(--mudo);margin:0;padding-left:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.res{border:1px solid var(--borda);border-radius:12px;margin-top:6px;max-height:260px;overflow:auto}.res button{display:flex;width:100%;gap:10px;align-items:center;background:none;border:0;border-bottom:1px solid var(--borda);padding:8px 12px;cursor:pointer;text-align:left}.res button:hover{background:var(--verde-bg)}
+.aviso{background:#fff7e0;color:#7a5a00;border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:14px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--grafite);color:var(--card);padding:10px 18px;border-radius:12px;z-index:50;box-shadow:var(--sombra)}
+pre{background:#10231a;color:#d4f5de;padding:14px;border-radius:12px;overflow:auto;font-size:12.5px}code{font-family:ui-monospace,Menlo,Consolas,monospace}
+.vazio{padding:40px;text-align:center;color:var(--mudo)}
+@media(max-width:640px){.hero{padding:24px}.hero h1{font-size:24px}th:nth-child(n+4),td:nth-child(n+4){display:none}.kv{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <div class="brand" onclick="location.hash='#/'"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="none" stroke="#fff" stroke-width="9"/><circle cx="32" cy="32" r="9" fill="#5ecb71"/></svg><div>Original Locações<small>Recursos Humanos</small></div></div>
+  <div class="sp"></div><div class="who" id="who"></div>
+</div></header>
+<main id="app"><div class="vazio">Carregando…</div></main>
+<script>
+const $=s=>document.querySelector(s),app=$('#app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=async(m,u,b)=>{const r=await fetch(u,{method:m,headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Erro '+r.status));return j};
+const toast=t=>{const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3200)};
+const fdt=s=>s?new Date(s).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';
+const ini=n=>String(n||'?').split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
+const ICON={curriculos:'<path d="M6 3h8l5 5v13H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M8.5 18c.6-2 2-3 3.5-3s2.9 1 3.5 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',admissao:'<path d="M4 7h16v12H4zM9 7V5h6v2M4 12h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',ferias:'<rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 10h16M9 3v4M15 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',desempenho:'<path d="M4 19V9M10 19V5M16 19v-7M22 19H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',cfg:'<circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'};
+const svg=k=>`<svg viewBox="0 0 24 24">${ICON[k]||''}</svg>`;
+let ME=null;
+async function boot(){try{ME=await api('GET','/api/me')}catch(e){app.innerHTML=`<div class="vazio"><h2>Acesso não identificado</h2><p>${esc(e.message)}</p></div>`;return}
+ $('#who').innerHTML=`<b>${esc(ME.usuario.nome||'Usuário #'+ME.usuario.id)}</b>${ME.usuario.papel==='admin'?'Administrador':'Colaborador'}`;route()}
+addEventListener('hashchange',route);
+function route(){const h=location.hash.replace(/^#\/?/,'').split('/')[0];if(!ME)return;if(h==='curriculos')return curriculos();if(h==='config')return config();home()}
+function home(){
+ const adm=ME.usuario.papel==='admin',h=new Date().getHours(),sd=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
+ const nome=(ME.usuario.nome||'').split(' ')[0];
+ app.innerHTML=`<section class="hero"><h1>${sd}${nome?', '+esc(nome):''}!</h1><p>Seu espaço de Recursos Humanos. Cada módulo liberado para você aparece abaixo.</p></section>
+ ${ME.usuario.bootstrap?'<div class="aviso" style="margin-top:18px">Nenhum administrador foi definido ainda — você está agindo como administrador do portal. Defina os administradores em <b>Configurações de acesso</b>.</div>':''}
+ <div class="grid">${ME.modulos.map(m=>{const on=m.status==='ativo'&&m.acesso;return `<button class="mod ${on?'':'off'}" ${on?`onclick="location.hash='#/${m.id}'"`:'disabled'}>
+  <span class="chip ${m.status==='ativo'&&!m.acesso?'lock':''}">${m.status!=='ativo'?'Em breve':m.acesso?(m.nivel==='gestor'?'Gestor':'Consulta'):'Sem acesso'}</span>
+  <div class="ico ${m.cor}">${svg(m.icone)}</div><h3>${esc(m.nome)}</h3><p>${esc(m.desc)}</p></button>`}).join('')}
+  ${adm?`<button class="mod" onclick="location.hash='#/config'"><span class="chip">Admin</span><div class="ico slate">${svg('cfg')}</div><h3>Configurações de acesso</h3><p>Defina quem pode acessar cada módulo, buscando os usuários do Bitrix24.</p></button>`:''}</div>`}
+const voltar=t=>`<div class="bar"><button class="crumb" onclick="location.hash='#/'">← Início</button><span class="mudo">/</span><h2>${t}</h2></div>`;
+
+/* ---------------- Currículos ---------------- */
+let C={status:'',q:'',aba:'lista'};
+async function curriculos(){
+ const gestor=ME.modulos.find(m=>m.id==='curriculos')?.nivel==='gestor';
+ app.innerHTML=voltar('Recepção de currículos')+`<div class="tabs"><button class="tab ${C.aba==='lista'?'on':''}" data-a="lista">Candidatos</button>${gestor?`<button class="tab ${C.aba==='int'?'on':''}" data-a="int">Integração com o site</button>`:''}</div><div id="cv"></div>`;
+ app.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{C.aba=b.dataset.a;curriculos()});
+ if(C.aba==='int')return integracao();
+ await lista(gestor)}
+async function lista(gestor){
+ const el=$('#cv');let d;
+ try{d=await api('GET','/api/curriculos/candidatos?status='+encodeURIComponent(C.status)+'&q='+encodeURIComponent(C.q))}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
+ const tot=Object.values(d.porStatus).reduce((a,b)=>a+b,0);
+ el.innerHTML=`<div class="pipe"><button class="pill ${C.status===''?'on':''}" data-s="">Todos<b>${tot}</b></button>${d.status.map(s=>`<button class="pill ${C.status===s.id?'on':''}" data-s="${s.id}">${esc(s.nome)}<b>${d.porStatus[s.id]||0}</b></button>`).join('')}</div>
+ <div class="bar"><input type="search" id="q" placeholder="Buscar por nome, e-mail, cargo, cidade ou etiqueta…" value="${esc(C.q)}" style="max-width:420px"></div>
+ <div class="panel">${d.itens.length?`<table><thead><tr><th>Candidato</th><th>Área de interesse</th><th>Cidade</th><th>Recebido</th><th>Etapa</th></tr></thead><tbody>${d.itens.map(c=>`<tr class="l" data-id="${c.id}"><td><span class="av">${esc(ini(c.nome))}</span><b>${esc(c.nome)}</b><br><span class="mudo" style="margin-left:44px;font-size:12.5px">${esc(c.email)}</span></td><td>${esc(c.area)}${c.vaga?`<br><span class="tag cinza">${esc(c.vaga)}</span>`:''}</td><td>${esc(c.cidade)}/${esc(c.uf)}</td><td>${fdt(c.criadoEm)}</td><td><span class="tag">${esc(d.status.find(s=>s.id===c.status)?.nome||c.status)}</span>${c.avaliacao?`<br><span class="estr">${'★'.repeat(c.avaliacao)}</span>`:''}</td></tr>`).join('')}</tbody></table>`:`<div class="vazio">Nenhum candidato por aqui ainda.<br>As fichas enviadas pelo site de carreiras aparecem automaticamente.</div>`}</div>`;
+ el.querySelectorAll('.pill').forEach(b=>b.onclick=()=>{C.status=b.dataset.s;lista(gestor)});
+ let t;$('#q').oninput=e=>{clearTimeout(t);t=setTimeout(async()=>{C.q=e.target.value;const p=e.target.selectionStart;await lista(gestor);const q=$('#q');q.focus();q.setSelectionRange(p,p)},350)};
+ el.querySelectorAll('tr.l').forEach(r=>r.onclick=()=>ficha(r.dataset.id,gestor,d.status))}
+async function ficha(id,gestor,status){
+ let c;try{c=await api('GET','/api/curriculos/candidatos/'+id)}catch(e){return toast(e.message)}
+ const dd=document.createElement('div');dd.className='drawer';document.body.append(dd);dd.onclick=e=>{if(e.target===dd)dd.remove()};
+ const k=(a,b)=>b?`<dt>${a}</dt><dd>${b}</dd>`:'';const x=c.dados;
+ const draw=c=>{dd.innerHTML=`<div class="box"><div class="row"><div style="flex:1"><h3>${esc(c.nome)}</h3><span class="mudo">Protocolo ${esc(c.protocolo)} · recebido em ${fdt(c.criadoEm)}</span></div><button class="btn ghost sm" id="fx">Fechar</button></div>
+ <dl class="kv">${k('E-mail',`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`)}${k('Celular',`<a href="https://wa.me/55${esc(x.telefone.replace(/\D/g,''))}" target="_blank" rel="noopener">${esc(x.telefone)}</a>`)}${k('Cidade',esc(x.cidade+'/'+x.uf))}${k('Área',esc(x.area))}${k('Cargo/vaga',esc([x.cargo,x.vaga].filter(Boolean).join(' · ')))}${k('LinkedIn',x.linkedin?`<a href="${esc(x.linkedin)}" target="_blank" rel="noopener noreferrer">${esc(x.linkedin.replace('https://www.',''))}</a>`:'')}${k('Currículo',c.cv?`<a href="/api/curriculos/candidatos/${c.id}/cv">${esc(c.cv.nome)}</a> <span class="mudo">(${Math.round(c.cv.tamanho/1024)} KB)</span>`:'')}${k('Escolaridade',esc(x.escolaridade))}${k('Experiência',esc(x.experiencia))}${k('Disponibilidade',esc(x.disponibilidade))}${k('Modelo',esc((x.modelo||[]).join(', ')))}${k('Pretensão',x.pretensao!=null?'R$ '+x.pretensao.toLocaleString('pt-BR'):'')}${k('Portfólio',x.portfolio?`<a href="${esc(x.portfolio)}" target="_blank" rel="noopener noreferrer">${esc(x.portfolio)}</a>`:'')}${k('PcD',x.pcd?'Sim':'')}${k('Origem',esc(x.origem))}${k('Sobre',esc(x.sobre))}</dl>
+ <div class="sec2"><h4>Etapa e avaliação</h4>${gestor?`<div class="row"><select id="st" style="max-width:220px">${status.map(s=>`<option value="${s.id}" ${s.id===c.status?'selected':''}>${esc(s.nome)}</option>`).join('')}</select><select id="av" style="max-width:150px">${[0,1,2,3,4,5].map(n=>`<option value="${n}" ${n===c.avaliacao?'selected':''}>${n?'★'.repeat(n):'Sem nota'}</option>`).join('')}</select></div><div class="row" style="margin-top:8px"><input type="text" id="tg" placeholder="Etiquetas separadas por vírgula" value="${esc(c.tags.join(', '))}"><button class="btn sec sm" id="sv">Salvar</button></div>`:`<span class="tag">${esc(status.find(s=>s.id===c.status)?.nome)}</span> <span class="estr">${'★'.repeat(c.avaliacao)}</span>`}</div>
+ <div class="sec2"><h4>Anotações</h4>${gestor?`<div class="row"><input type="text" id="nt" placeholder="Escreva uma anotação interna…"><button class="btn sm" id="an">Adicionar</button></div>`:''}${c.notas.map(n=>`<p style="margin:10px 0 0"><span class="mudo" style="font-size:12.5px">${esc(n.porNome||'#'+n.por)} · ${fdt(n.em)}</span><br>${esc(n.texto)}</p>`).join('')||'<p class="mudo">Sem anotações.</p>'}</div>
+ <div class="sec2"><h4>Histórico</h4><ul class="hist">${c.historico.map(h=>`<li>${fdt(h.em)} — ${esc(h.texto)}${h.porNome?' ('+esc(h.porNome)+')':''}</li>`).join('')}</ul></div>
+ ${gestor?`<div class="sec2"><button class="btn red sm" id="ex">Excluir candidato (LGPD)</button></div>`:''}</div>`;
+  $('#fx').onclick=()=>dd.remove();
+  if(!gestor)return;
+  const patch=async b=>{try{c=await api('PATCH','/api/curriculos/candidatos/'+id,b);draw(c);toast('Salvo');bg()}catch(e){toast(e.message)}};const bg=()=>lista(gestor);
+  $('#sv').onclick=()=>patch({status:$('#st').value,avaliacao:+$('#av').value,tags:$('#tg').value.split(',').map(s=>s.trim()).filter(Boolean)});
+  $('#an').onclick=()=>{const v=$('#nt').value.trim();if(v)patch({nota:v})};
+  $('#ex').onclick=async()=>{if(!confirm('Excluir definitivamente este candidato e o currículo? Não pode ser desfeito.'))return;try{await api('DELETE','/api/curriculos/candidatos/'+id);dd.remove();toast('Excluído');bg()}catch(e){toast(e.message)}}};
+ draw(c)}
+async function integracao(){
+ const el=$('#cv');let d;try{d=await api('GET','/api/curriculos/integracao')}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
+ el.innerHTML=`<div class="panel" style="padding:20px"><h3 style="margin-top:0">Ficha de cadastro do site de carreiras</h3>
+ <p>O site (página do Bitrix24) envia a ficha para este endereço, com a <b>chave de API externa</b> do aplicativo. O cadastro é curto: contato + área + <b>currículo ou LinkedIn</b> + aceite da LGPD; o resto é opcional.</p>
+ <p><b>POST</b> <code>${esc(d.endpoint||'(configure VIBE_APPLICATION_ID no servidor)')}</code><br><span class="mudo">Cabeçalhos: <code>X-Api-Key: &lt;chave externa&gt;</code> e <code>Content-Type: application/json</code>. Resposta: <code>201 {"success":true,"protocolo":"…"}</code> ou <code>422 {"erros":{campo:mensagem}}</code>.</span></p></div>
+ <div class="panel" style="margin-top:16px"><table><thead><tr><th>Campo (JSON)</th><th>Rótulo no formulário</th><th>Obrigatório</th><th>Formato / opções</th></tr></thead><tbody>${d.campos.map(f=>`<tr><td><code>${esc(f.campo)}</code></td><td>${esc(f.rotulo)}</td><td>${f.obrigatorio===true?'<b>Sim</b>':f.obrigatorio?esc(f.obrigatorio):'não'}</td><td class="mudo">${esc(f.opcoes?f.opcoes.join(' · '):(f.regra||f.tipo))}</td></tr>`).join('')}</tbody></table></div>`}
+
+/* ---------------- Configurações de acesso ---------------- */
+let CF={aba:'modulos'};
+async function config(){
+ if(ME.usuario.papel!=='admin'){app.innerHTML=voltar('Configurações')+'<div class="vazio">Somente administradores.</div>';return}
+ app.innerHTML=voltar('Configurações de acesso')+`<div class="tabs">${[['modulos','Acesso por módulo'],['admins','Administradores'],['audit','Auditoria']].map(([a,t])=>`<button class="tab ${CF.aba===a?'on':''}" data-a="${a}">${t}</button>`).join('')}</div><div id="cf"></div>`;
+ app.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{CF.aba=b.dataset.a;config()});
+ const el=$('#cf');
+ if(CF.aba==='audit'){const d=await api('GET','/api/auditoria').catch(e=>({itens:[],e}));el.innerHTML=`<div class="panel"><table><thead><tr><th>Quando</th><th>Quem</th><th>Ação</th><th>Detalhe</th></tr></thead><tbody>${d.itens.map(a=>`<tr><td>${fdt(a.em)}</td><td>${esc(a.nome||'#'+a.por)}</td><td><code>${esc(a.acao)}</code></td><td class="mudo">${esc(a.detalhe)}</td></tr>`).join('')||'<tr><td colspan="4" class="vazio">Sem registros.</td></tr>'}</tbody></table></div>`;return}
+ let A;try{A=await api('GET','/api/acessos')}catch(e){el.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;return}
+ if(CF.aba==='admins'){
+  el.innerHTML=`<div class="panel" style="padding:20px"><p class="mudo" style="margin-top:0">Administradores configuram os acessos e acessam todos os módulos. ${A.admins.length?'':'<b>Nenhum definido:</b> por enquanto os administradores do portal Bitrix24 fazem esse papel.'}</p>${A.admins.map(a=>`<div class="row" style="padding:8px 0;border-bottom:1px solid var(--borda)"><span class="av">${esc(ini(a.nome))}</span><b style="flex:1">${esc(a.nome)} <span class="mudo">#${a.id}</span></b><button class="btn ghost sm" data-rm="${a.id}">Remover</button></div>`).join('')}<div style="margin-top:16px">${buscador('adm')}</div></div>`;
+  el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{if(confirm('Remover este administrador?')){try{await api('DELETE','/api/acessos/admin/'+b.dataset.rm);config()}catch(e){toast(e.message)}}});
+  ligaBusca('adm',async u=>{try{await api('POST','/api/acessos/admin',{userId:u.id});toast('Administrador adicionado');config()}catch(e){toast(e.message)}});return}
+ el.innerHTML=A.modulos.map(m=>`<div class="panel" style="padding:20px;margin-bottom:16px"><h3 style="margin:0 0 4px">${esc(m.nome)}</h3><p class="mudo" style="margin:0 0 10px">Quem não estiver na lista não vê o módulo. <b>Consulta</b> só visualiza; <b>Gestor</b> também altera e exclui.</p>
+  ${m.usuarios.map(u=>`<div class="row" style="padding:8px 0;border-bottom:1px solid var(--borda)"><span class="av">${esc(ini(u.nome))}</span><b style="flex:1">${esc(u.nome)} <span class="mudo">#${u.userId}</span></b><select data-m="${m.id}" data-u="${u.userId}" style="width:130px"><option value="consulta" ${u.nivel==='consulta'?'selected':''}>Consulta</option><option value="gestor" ${u.nivel==='gestor'?'selected':''}>Gestor</option></select><button class="btn ghost sm" data-rm="${m.id}|${u.userId}">Remover</button></div>`).join('')||'<p class="mudo">Ninguém liberado ainda (além dos administradores).</p>'}
+  <div style="margin-top:14px"><div class="row"><select id="nv-${m.id}" style="width:130px"><option value="consulta">Consulta</option><option value="gestor">Gestor</option></select><div style="flex:1;min-width:220px">${buscador(m.id)}</div></div></div></div>`).join('');
+ el.querySelectorAll('select[data-m]').forEach(s=>s.onchange=async()=>{try{await api('PUT','/api/acessos/modulo/'+s.dataset.m,{userId:s.dataset.u,nivel:s.value});toast('Nível atualizado')}catch(e){toast(e.message)}});
+ el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{const [m,u]=b.dataset.rm.split('|');if(confirm('Remover o acesso deste usuário?')){try{await api('DELETE',`/api/acessos/modulo/${m}/${u}`);config()}catch(e){toast(e.message)}}});
+ A.modulos.forEach(m=>ligaBusca(m.id,async u=>{try{await api('PUT','/api/acessos/modulo/'+m.id,{userId:u.id,nivel:$('#nv-'+m.id).value});toast('Acesso liberado para '+u.nome);config()}catch(e){toast(e.message)}}))}
+const buscador=id=>`<input type="search" id="bs-${id}" placeholder="Buscar usuário do Bitrix24 por nome ou e-mail…" autocomplete="off"><div id="rs-${id}"></div>`;
+function ligaBusca(id,onPick){let t;const i=$('#bs-'+id),r=$('#rs-'+id);i.oninput=()=>{clearTimeout(t);const q=i.value.trim();if(q.length<2){r.innerHTML='';return}t=setTimeout(async()=>{try{const d=await api('GET','/api/usuarios?q='+encodeURIComponent(q));r.innerHTML=d.usuarios.length?`<div class="res">${d.usuarios.map((u,k)=>`<button data-k="${k}"><span class="av">${u.foto?`<img src="${esc(u.foto)}" alt="" referrerpolicy="no-referrer">`:esc(ini(u.nome))}</span><span><b>${esc(u.nome)}</b><br><span class="mudo" style="font-size:12.5px">${esc([u.cargo,u.email].filter(Boolean).join(' · '))}</span></span></button>`).join('')}</div>`:'<p class="mudo">Ninguém encontrado.</p>';r.querySelectorAll('button').forEach(b=>b.onclick=()=>onPick(d.usuarios[+b.dataset.k]))}catch(e){r.innerHTML=`<p class="mudo">${esc(e.message)}</p>`}},300)}}
+boot();
+</script>
+</body>
+</html>
