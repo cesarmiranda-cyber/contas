@@ -123,6 +123,8 @@
   <button class="b" type="button" data-cv>Enviar currículo</button>
 </aside></div>
 
+<pre id="ol-dbg" hidden style="max-width:1032px;margin:0 auto 24px;padding:14px;background:#10231a;color:#d4f5de;border-radius:12px;font-size:12px;white-space:pre-wrap"></pre>
+
 <!-- ===== Janela de candidatura ===== -->
 <div class="ov" id="ol-ov" role="dialog" aria-modal="true" aria-labelledby="ol-t"><div class="md" id="ol-md"></div></div>
 
@@ -133,7 +135,8 @@
   var CFG = {
     API: "https://app-ef03a44d30e7.vibecode.bitrix24.com", /*API*/   // endereço do app de RH (não termina com /)
     POLITICA: "/politica-de-privacidade/",                            // link da Política de Privacidade do site
-    CV_MAX_MB: 3
+    CV_MAX_MB: 3,
+    TIMEOUT_MS: 12000                                                  // tempo máximo de espera por resposta do app
   };
   /* ====================================================================== */
   var root = document.getElementById("ol-carreiras");
@@ -156,22 +159,34 @@
   var vagas = [], filtro = "", focoAnterior = null;
 
   /* ------------------------------- vagas -------------------------------- */
+  var DEBUG = /[?&]debug=1/.test(location.search);
+  function dbg(m) { try { console.log("[carreiras]", m); } catch (e) {} if (DEBUG) { var d = $("#ol-dbg"); if (d) { d.hidden = false; d.textContent += new Date().toLocaleTimeString() + "  " + m + "\n"; } } }
   function api(path, init) {
-    return fetch(CFG.API + path, init).then(function (r) {
+    var c = typeof AbortController === "function" ? new AbortController() : null, t;
+    var req = Object.assign({}, init || {}); if (c) req.signal = c.signal;
+    var limite = new Promise(function (_, no) { t = setTimeout(function () { if (c) c.abort(); no(new Error("timeout")); }, CFG.TIMEOUT_MS); });
+    var chamada = fetch(CFG.API + path, req).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
     });
+    return Promise.race([chamada, limite]).then(function (r) { clearTimeout(t); return r; }, function (e) { clearTimeout(t); throw e; });
   }
-  function carregar() {
+  function codigoErro(e) { return e && e.message === "timeout" ? "tempo-esgotado" : e && e.status ? "http-" + e.status : "sem-conexao-ou-bloqueio"; }
+  function carregar(tentativa) {
+    tentativa = tentativa || 1;
     var lista = $("#ol-lista"); lista.setAttribute("aria-busy", "true");
-    lista.innerHTML = '<div class="sk"></div><div class="sk"></div>';
+    if (tentativa === 1) lista.innerHTML = '<div class="sk"></div><div class="sk"></div>';
+    dbg("buscando vagas em " + CFG.API + "/public/vagas (tentativa " + tentativa + ")");
     api("/public/vagas", { headers: { Accept: "application/json" } }).then(function (r) {
-      if (!r.ok || !r.j.vagas) throw new Error("falha");
+      dbg("resposta: HTTP " + r.status);
+      if (!r.ok || !r.j.vagas) throw Object.assign(new Error("http"), { status: r.status });
       vagas = r.j.vagas; desenhar(); abrirDaUrl();
-    }).catch(function () {
+    }).catch(function (e) {
+      dbg("falha: " + (e && e.message) + (e && e.status ? " (HTTP " + e.status + ")" : ""));
+      if (tentativa < 2) return setTimeout(function () { carregar(2); }, 1500);   // o servidor pode estar acordando
       $("#ol-cnt").textContent = "";
       lista.removeAttribute("aria-busy");
-      lista.innerHTML = '<div class="ev"><strong>Não foi possível carregar as vagas agora.</strong>Você ainda pode enviar seu currículo para o nosso banco de talentos.<br><button class="b g s" type="button" id="ol-retry">Tentar de novo</button> <button class="b s" type="button" data-cv>Enviar currículo</button></div>';
-      $("#ol-retry").onclick = carregar;
+      lista.innerHTML = '<div class="ev"><strong>Não foi possível carregar as vagas agora.</strong>Você ainda pode enviar seu currículo para o nosso banco de talentos.<br><button class="b g s" type="button" id="ol-retry">Tentar de novo</button> <button class="b s" type="button" data-cv>Enviar currículo</button><br><small class="cnt" style="display:block;margin-top:14px;opacity:.7">Código: ' + codigoErro(e) + "</small></div>";
+      $("#ol-retry").onclick = function () { carregar(1); };
     });
   }
   function desenhar() {
@@ -325,6 +340,7 @@
       if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
     }
   });
+  dbg("página iniciada · API = " + CFG.API);
   carregar();
 })();
 </script>
