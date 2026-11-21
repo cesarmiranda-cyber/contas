@@ -637,3 +637,13 @@ test('criar a etapa "Não realizada" a pedido: antes não existe, depois o botã
   assert.equal(f.s.itens[1036].find(c => c.id === 70).stageId, 'DT1036_19:NAOREAL'); assert.ok(n.proximoCard);   // agora funciona e gera o próximo card
   assert.equal((await svc.listar(adm, { etapa: 'NAOREAL' })).itens.length, 1);
 });
+test('regra da Última visita filtra só a fila pendente: card finalizado aparece mesmo sem Última visita no cadastro', async () => {
+  const { f, svc, store, card, adm } = mundoReal({ exigirUltimaVisita: true, cargosFila: ['Vendedor'] });
+  card(80, 100, 'Vendedor', 49, '20/11/2026 08:00:00');                           // aberto, empresa sem Última visita: oculto
+  card(81, 100, 'Supervisor', 15, '05/10/2026 08:00:00', 'SUCCESS');              // finalizado: visível
+  card(82, 101, 'Vendedor', 49, '10/09/2026 08:00:00', 'SUCCESS');
+  svc.invalidar(); void f; void store;
+  const l = await svc.listar(adm, { finalizados: '1' }); assert.deepEqual(l.itens.map(i => i.id).sort(), [81, 82]); assert.equal(l.ocultos, 1);
+  assert.equal((await svc.listar(adm, {})).itens.length, 0);                        // sem pedir finalizados, continuam fora da lista comum
+  const d = await svc.dashboard(adm, {}); assert.equal(d.kpis.fila.abertas, 0); assert.equal(d.kpis.programadas, 2);
+});

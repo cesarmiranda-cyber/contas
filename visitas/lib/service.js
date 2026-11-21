@@ -112,7 +112,8 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     await carregaUltimas(m, cards.map(c => c.empresaId));
     const ok = [], h = hoje(); let agendados = 0;
     for (const c of cards) {
-      if (ultDados.get(chaveUlt(c))?.ultima || store.admitido(c.id)) ok.push(c);
+      // A regra filtra a FILA PENDENTE. Card já finalizado/encerrado (visita que aconteceu) não some por falta de Última visita.
+      if (ultDados.get(chaveUlt(c))?.ultima || store.admitido(c.id) || !ABERTAS.includes(c.etapa)) ok.push(c);
       else if (ABERTAS.includes(c.etapa) && c.data && c.data > h) agendados++;       // oculto, mas já agendado para o futuro: candidato a "incluir no app"
     }
     return { cards: ok, ocultos: cards.length - ok.length, agendados };
