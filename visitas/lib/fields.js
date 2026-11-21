@@ -35,7 +35,7 @@ function achar(fields, re) {
   return Object.entries(fields || {}).filter(([, f]) => re.test(norm(label(f)))).map(([k]) => k);
 }
 const FILA_CAMPOS = {
-  segmento: /^segmento$/, cargo: /^cargo$/, classe: /^classe$/, data: /^data programada$/,
+  segmento: /^segmento$/, cargo: /^(cargo|alcada)$/, classe: /^classe$/, usuario: /^usuario$/, idEmpresa: /^id (da )?empresa$/, data: /^data programada$/,
   motivo: /^motivo da nao realizacao$/, detalhe: /^detalhe do motivo$/, vendedor: /^vendedor$/, alcada: /^alcada$/,
 };
 const VISITA_CAMPOS = {
@@ -79,7 +79,7 @@ function acharData(ff) {
     || c.find(([k, , t]) => uf(k) && /^date/.test(t))?.[0]
     || ['begindate', 'closedate'].find(k => ff[k]) || null;
 }
-const CAMPOS_AJUSTAVEIS = ['data', 'vendedor', 'segmento', 'classe', 'cargo', 'motivo', 'detalhe', 'alcada'];
+const CAMPOS_AJUSTAVEIS = ['data', 'vendedor', 'segmento', 'classe', 'cargo', 'motivo', 'detalhe', 'alcada', 'usuario', 'idEmpresa'];
 
 async function descobrir(bx, mapa = {}) {
   const [emp, fila, visita, cats] = await Promise.all([
@@ -104,6 +104,10 @@ async function descobrir(bx, mapa = {}) {
     if (s.SEMANTICS === 'S' && !etapas.SUCCESS) etapas.SUCCESS = s.STATUS_ID;
     if (s.SEMANTICS === 'F' && !etapas.FAIL) etapas.FAIL = s.STATUS_ID;
   }
+  // O SPA pode ter só 4 etapas (Aguardando, Dia da Visita, Finalizado, Removido): Finalizado é a etapa de conclusão;
+  // sem etapa "Atrasada", o atraso fica em "Dia da Visita" (o app mostra como atrasada pela data); sem "Não realizada", o app não marca nem gera nada sozinho.
+  if (!etapas.ENC && etapas.SUCCESS) etapas.ENC = etapas.SUCCESS;
+  if (!etapas.LATE && etapas.PREPARATION) etapas.LATE = etapas.PREPARATION;
   const filaMap = mapear(ff, FILA_CAMPOS);
   if (!filaMap.data) filaMap.data = acharData(ff);
   for (const k of CAMPOS_AJUSTAVEIS) if (mapa?.fila?.[k] && ff[mapa.fila[k]]) filaMap[k] = mapa.fila[k];   // ajuste manual do administrador
@@ -114,10 +118,11 @@ async function descobrir(bx, mapa = {}) {
     visita: (() => { const v = mapearVisita(vf, mapa); return { ...v, ...Object.fromEntries(['regime', 'oportunidades', 'antecipada', 'acompanhamento', 'alcada'].map(k => [`${k}Enum`, enumMap(vf[v[k]])])) }; })(),
     filaFields: ff, visitaFields: vf,
   };
+  m.etapaReal = { LATE: etapas.LATE !== etapas.PREPARATION, NAOREAL: !!etapas.NAOREAL, ENC: etapas.ENC !== etapas.SUCCESS };   // false = a etapa não existe de fato no SPA
   m.faltando = [
     ...Object.keys(empresa.segmentos).length ? [] : ['Empresa: nenhum segmento encontrado (campos "[Motores] Vendedor Responsável", "Classe Motores"...)'],
     ...FILA_OBRIG.filter(k => !m.fila[k]).map(k => `Fila (SPA ${ETYPE.fila}): campo "${k}"`),
-    ...['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL', 'FAIL'].filter(c => !etapas[c]).map(c => `Fila: etapa ${c}`),
+    ...['NEW', 'PREPARATION', 'ENC', 'FAIL'].filter(c => !etapas[c]).map(c => `Fila: etapa ${c}`),
     ...VISITA_OBRIG.filter(k => !m.visita[k]).map(k => `Registro (SPA ${ETYPE.visita}): campo "${k}"`),
   ];
   return m;

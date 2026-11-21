@@ -1,6 +1,6 @@
 'use strict';
 // Bitrix simulado em memória (só o que o app usa).
-function criarFake() {
+function criarFake(op = {}) {
   const s = { empresas: [], contatos: [], itens: { 1036: [], 1032: [] }, prox: 1, chamadas: [], tarefas: [] };
   const lab = (title, extra = {}) => ({ title, formLabel: title, ...extra });
   const empresaFields = {
@@ -8,12 +8,15 @@ function criarFake() {
     UF_C: lab('Classe Motores', { items: [{ ID: '1', VALUE: 'A' }, { ID: '2', VALUE: 'B' }, { ID: '3', VALUE: 'C' }, { ID: '4', VALUE: 'Clientes Estratégicos' }] }),
     UF_P: lab('[Motores] Data Próxima Visita'), UF_U: lab('[Motores] Última Visita'), UF_P2: lab('[Motores] Data Próxima Visita'),
   };
-  const filaFields = {
-    ufSeg: lab('Segmento'), ufCargo: lab('Cargo'), ufClasse: lab('Classe'), ufData: lab('Data programada'),
+  const real = !!op.real;       // modelo real do portal: 4 etapas, Data como texto "dd/mm/aaaa hh:mm:ss", Alçada = cargo, Usuário e ID Empresa
+  if (real) empresaFields.UF_S = lab('[Motores] Supervisor Responsável');
+  const filaReal = { ufClasse: lab('Classe', { type: 'string' }), ufAlc: lab('Alçada', { type: 'string' }), ufData: lab('Data da visita', { type: 'string' }), ufUsr: lab('Usuário', { type: 'employee' }), ufSeg: lab('Segmento', { type: 'string' }), ufIdEmp: lab('ID Empresa', { type: 'string' }) };
+  const filaFields = real ? filaReal : {
+    ufSeg: lab('Segmento'), ufCargo: lab('Cargo'), ufClasse: lab('Classe'), ufData: lab('Data programada', { type: 'date' }),
     ufMotivo: lab('Motivo da não realização', { items: [{ ID: '10', VALUE: 'Cliente pediu para remarcar' }, { ID: '11', VALUE: 'Outro motivo' }] }), ufDet: lab('Detalhe do motivo'),
   };
   const visitaFields = { ufData: lab('Data/Hora da Visita'), ufFatos: lab('Fatos e dados'), ufInt: lab('Interesses'), ufIdFila: lab('ID Fila'), ufSeg: lab('Segmento'), ufSup: lab('Supervisor que acompanhou') };
-  const status = [['NEW', 'Aguardando'], ['PREPARATION', 'Dia da visita'], ['LATE', 'Atrasada'], ['UC_EFR0YE', 'Encerrado'], ['NAOREAL', 'Não realizada'], ['SUCCESS', 'Finalizado', 'S'], ['FAIL', 'Removido', 'F']]
+  const status = (real ? [['NEW', 'Aguardando Visita'], ['PREPARATION', 'Dia da Visita'], ['SUCCESS', 'Finalizado', 'S'], ['FAIL', 'Removido', 'F']] : [['NEW', 'Aguardando'], ['PREPARATION', 'Dia da visita'], ['LATE', 'Atrasada'], ['UC_EFR0YE', 'Encerrado'], ['NAOREAL', 'Não realizada'], ['SUCCESS', 'Finalizado', 'S'], ['FAIL', 'Removido', 'F']])
     .map(([id, NAME, SEMANTICS]) => ({ STATUS_ID: `DT1036_19:${id}`, NAME, SEMANTICS: SEMANTICS || '' }));
   const casa = (it, filter = {}) => Object.entries(filter).every(([k, v]) => v === undefined || (Array.isArray(v) ? v.map(String).includes(String(it[k])) : String(it[k]) === String(v)));
   const handlers = {
@@ -32,6 +35,7 @@ function criarFake() {
     'department.get': () => ({ result: [{ ID: '1', NAME: 'Comercial', PARENT: '', UF_HEAD: '9' }] }),
     'tasks.task.add': p => { s.tarefas.push(p.fields); return { result: { task: { id: 500 + s.tarefas.length } } }; },
     'tasks.task.complete': () => ({ result: true }),
+    'profile': () => ({ result: { ID: '188' } }),
     'crm.status.add': () => ({ result: 1 }), 'userfieldconfig.add': () => ({ result: 1 }),
   };
   const bx = {

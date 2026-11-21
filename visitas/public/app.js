@@ -4,7 +4,7 @@ const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d=
 const ini = n => String(n || '').split(/\s+/).map(x => x.replace(/[^\p{L}]/gu, '')).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?';
 const rel = (d, hoje) => { d = String(d || '').slice(0, 10); hoje = String(hoje || '').slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !/^\d{4}-\d{2}-\d{2}$/.test(hoje)) return ''; const n = Math.round((new Date(d + 'T00:00:00Z') - new Date(hoje + 'T00:00:00Z')) / 864e5); if (Number.isNaN(n)) return ''; return n === 0 ? 'hoje' : n === 1 ? 'amanhã' : n > 1 ? `em ${n} dias` : n === -1 ? 'ontem' : `há ${-n} dias`; };
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const ETAPAS = { NEW: 'Aguardando', PREPARATION: 'Dia da visita', LATE: 'Atrasada', ENC: 'Encerrado', NAOREAL: 'Não realizada', SUCCESS: 'Finalizado', OUTRA: 'Outra etapa', FAIL: 'Removido' };
+const ETAPAS = { NEW: 'Aguardando', PREPARATION: 'Dia da visita', LATE: 'Atrasada', ENC: 'Finalizado', NAOREAL: 'Não realizada', SUCCESS: 'Finalizado', OUTRA: 'Outra etapa', FAIL: 'Removido' };
 const COLS = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL', 'SUCCESS', 'OUTRA'];
 const nomeEtapa = i => (i.etapa === 'OUTRA' && i.etapaNome) || ETAPAS[i.etapa] || i.etapa;
 const S = { page: 1, size: 30, total: 0, pages: 1, eu: null, aba: 'fila', vista: 'cards', f: { de: '', ate: '', segmento: '', vendedor: '', classe: '', etapa: '', supervisor: '' }, itens: [], sel: new Set(), dashPag: 'fila', cfg: null };
@@ -113,10 +113,10 @@ function acoesLinha(i) {
   const abre = ABERTA.includes(i.etapa), b = (a, t, c = '') => `<button class="btn sm ${c}" data-a="${a}" data-id="${i.id}">${t}</button>`;
   const sec = [];
   if (abre) sec.push(b('alt', 'Alterar data'), b('nao', 'Não realizada'));
-  if (i.etapa === 'ENC') sec.push(b('edit', '✎ Editar registro'));
+  if (i.etapa === 'ENC' || i.etapa === 'SUCCESS') sec.push(b('edit', '✎ Editar registro'));
   if (i.reprogramado && abre) sec.push(b('rev', 'Reverter data'));
   if (i.podeExcluir && i.etapa !== 'FAIL') sec.push(b('del', 'Excluir', 'bad'));
-  const prim = abre ? b('reg', 'Registrar', 'pri') : i.etapa === 'ENC' ? b('ver', 'Ver registro') : '';
+  const prim = abre ? b('reg', 'Registrar', 'pri') : (i.etapa === 'ENC' || i.etapa === 'SUCCESS') ? b('ver', 'Ver registro') : '';
   return `${prim}${sec.length ? `<details class="menu"><summary class="btn sm" aria-label="Mais ações">⋯</summary><div class="menu-p">${sec.join('')}</div></details>` : ''}`;
 }
 function linhaHtml(i, kan) {
@@ -458,22 +458,22 @@ async function telaCfg() {
     <li>Visitar a cada: <b>A ${c.intervalos.A} dias · B ${c.intervalos.B} dias · C ${c.intervalos.C} dias · E ${c.intervalos.E} meses</b>.</li>
     <li>${c.atualizarProxima ? 'Ao registrar uma visita, grava a Última e a Próxima visita no cadastro da empresa.' : 'Não grava datas no cadastro da empresa.'}</li>
     <li>${c.tarefaAtiva ? 'Cria uma tarefa para o vendedor quando a visita não é realizada.' : 'Não cria tarefas.'}</li>
-    ${c.removerSemClasse ? '<li>Clientes sem classe saem da fila.</li>' : ''}</ul></div>
+    <li>O app <b>nunca remove cards sozinho</b>: ele só cria, muda a etapa pela data e finaliza quando a visita é registrada.</li></ul></div>
 
   <div class="sec"><h3>1. Fila automática</h3>
     <label class="opt"><input type="checkbox" id="c_ativo" ${c.ativo ? 'checked' : ''}><span><b>Ligar a fila automática</b><small>Ligada: o app confere as datas sozinho, cria os cards que faltam e muda a etapa conforme o prazo. Desligada: ele só mostra o que já existe. Registrar, alterar data e "não realizada" funcionam nos dois casos.</small></span></label>
     <details class="avanc" style="margin:4px 0 8px"><summary style="color:var(--pri);font-weight:600">Ver exatamente o que a fila automática faz (e o que não faz)</summary>
       <div class="oque"><b>O que ela faz, por conta própria:</b><ol>
         <li><b>Cria cards.</b> Para cada cliente e segmento que tem vendedor e classe e ainda não tem visita aberta, cria um card com a data da próxima visita (a da empresa, ou "Última visita + prazo da classe"). Isso roda a cada hora e uma vez por dia.</li>
-        <li><b>Muda a etapa pela data</b> (a cada ~30 segundos): data de hoje vira <i>Dia da visita</i>; data futura fica <i>Aguardando</i>; data que passou no mesmo mês vira <i>Atrasada</i>.</li>
-        <li><b>Fecha o mês:</b> visita que passou de mês sem registro vira <i>Não realizada</i> e o app já cria o card da próxima visita.</li>
-        <li><b>Mantém o cadastro em ordem:</b> corrige vendedor e classe do card se mudaram na empresa, remove card duplicado e tira da fila quem ficou sem classe (se a opção estiver marcada).</li></ol>
+        <li><b>Muda a etapa pela data</b> (a cada ~30 segundos): data de hoje vira <i>Dia da visita</i>; data futura fica <i>Aguardando</i>. Data que passou aparece como <i>Atrasada</i> no app (se o seu SPA não tiver a etapa Atrasada, o card continua em Dia da visita).</li>
+        <li><b>Fecha o mês:</b> se o SPA tiver a etapa <i>Não realizada</i>, a visita que passou de mês sem registro vira <i>Não realizada</i> e o app já cria o card da próxima visita. Sem essa etapa, o app não mexe nesses cards.</li>
+        <li><b>Mantém o cadastro em ordem:</b> preenche responsável vazio, corrige a classe do card se mudou na empresa e cria o card de quem ainda não tem. <b>Nunca remove cards.</b></li></ol>
       <b>O que ela NÃO faz:</b><ul>
         <li>Não marca visita como realizada nem cria o registro da visita: isso só acontece quando o vendedor clica em <b>Registrar</b>.</li>
-        <li>Não apaga nada de vez: "Removido" é uma etapa, e dá para restaurar.</li>
+        <li>Não remove nem apaga nada sozinho. Só o botão <b>Excluir</b> (de quem tem permissão) move um card para Removido, e dá para restaurar.</li>
         <li>Não mexe em empresa sem vendedor ou sem classe, nem (com a regra da Última visita ligada) em cliente sem essa data.</li>
         <li>Não envia mensagens. Só cria tarefa se a opção "Criar tarefa…" estiver marcada.</li></ul>
-      <div class="aviso" style="margin:8px 0 0"><div><b>Cuidado:</b> cards com data de meses passados viram <i>Não realizada</i> de uma vez, e cada um gera um card novo. Use a <b>Prévia</b> antes de ligar.</div></div></div></details>
+      <div class="aviso" style="margin:8px 0 0"><div><b>Cuidado:</b> se o SPA tiver a etapa <i>Não realizada</i>, cards de meses passados viram <i>Não realizada</i> de uma vez e cada um gera um card novo. Use a <b>Prévia</b> antes de ligar.</div></div></div></details>
     <div class="botoes-ajuda">
       <div><button class="btn" id="c_prev">Prévia</button><small>Mostra quantos cards seriam criados, movidos ou removidos. <b>Não altera nada.</b></small></div>
       <div><button class="btn" id="c_sync">Sincronizar agora</button><small>Cria e atualiza os cards agora, sem esperar a rotina automática.</small></div>
@@ -487,8 +487,7 @@ async function telaCfg() {
   <div class="sec"><h3>3. Quais clientes aparecem no app</h3>
     <div class="mut" style="margin-bottom:6px"><b>Gerar visitas para o cargo</b> (normalmente só Vendedor): cada cliente recebe um card para o responsável deste cargo.</div>
     <div style="margin-bottom:10px">${['Diretor', 'Gerente', 'Coordenador', 'Supervisor', 'Vendedor'].map(k => `<label style="margin-right:14px"><input type="checkbox" name="c_cargo" value="${k}" ${c.cargosFila.includes(k) ? 'checked' : ''}> ${k}</label>`).join('')}</div>
-    <label class="opt"><input type="checkbox" id="c_ult" ${c.exigirUltimaVisita ? 'checked' : ''}><span><b>Mostrar só clientes que já têm "Última visita" no cadastro</b><small>Cliente sem esta data no cadastro da empresa não aparece e não ganha card. Dá para preencher a data pela lista "Preencher Última visita".</small></span></label>
-    <label class="opt"><input type="checkbox" id="c_sem" ${c.removerSemClasse ? 'checked' : ''}><span><b>Tirar da fila clientes sem classe</b><small>Se o cadastro da empresa não tiver classe (A, B, C ou E), o card sai da fila automaticamente.</small></span></label></div>
+    <label class="opt"><input type="checkbox" id="c_ult" ${c.exigirUltimaVisita ? 'checked' : ''}><span><b>Mostrar só clientes que já têm "Última visita" no cadastro</b><small>Cliente sem esta data no cadastro da empresa não aparece e não ganha card. Dá para preencher a data pela lista "Preencher Última visita".</small></span></label></div>
 
   <div class="sec"><h3>4. O que o app grava e avisa</h3>
     <label class="opt"><input type="checkbox" id="c_atu" ${c.atualizarProxima ? 'checked' : ''}><span><b>Gravar as datas no cadastro da empresa</b><small>Ao registrar ou reprogramar uma visita, atualiza "Última visita" e "Próxima visita" na própria empresa no Bitrix.</small></span></label>
@@ -519,6 +518,9 @@ async function telaCfg() {
       <li><b>Tela:</b> lista e dashboard atualizam na hora. Se alguém criar o registro direto no Bitrix, a <b>reconciliação</b> (a cada 5 minutos, com a fila ligada) encerra o card e gera a próxima visita.</li></ol>
     <div class="mut">A auditoria confere se cada passo está íntegro e é somente leitura. As correções só rodam quando você clica em <b>Corrigir</b> e nunca apagam nada de vez.</div>
     <div class="acoes" style="border:0;padding:0;margin:10px 0"><button class="btn pri" id="c_aud">Rodar auditoria</button></div><div id="aud_out"></div></div>` : ''}
+  ${S.eu.webhook ? `<div class="sec" id="sec_rest"><h3>Desfazer remoções feitas pelo app</h3>
+    <div class="mut">Procura os cards que o <b>próprio app</b> moveu para <b>Removido</b> (o Bitrix registra quem moveu: o usuário do webhook). Mostra a prévia e só restaura depois que você confirmar, devolvendo cada card à etapa em que estava. O que foi apagado de propósito pelo botão Excluir do app não é restaurado.</div>
+    <div class="acoes" style="border:0;padding:0;margin:10px 0;align-items:end"><label class="f" style="margin:0"><span>Movidos desde</span><input type="date" id="r_desde" value="${new Date(Date.parse(S.eu.hoje) - 864e5).toISOString().slice(0, 10)}"></label><button class="btn pri" id="r_ver">Ver o que o app removeu</button></div><div id="rest_out"></div></div>` : ''}
   <div class="sec"><h3>Log</h3><div class="scroll" style="max-height:260px;overflow:auto"><table><tbody>${log.map(l => `<tr><td>${dthBR(l.at)}</td><td>${esc(l.type)}</td><td>${esc(l.msg)}</td></tr>`).join('') || '<tr><td class="mut">Sem registros.</td></tr>'}</tbody></table></div></div>
   <div class="foot"><button class="btn pri" id="c_save">Salvar configurações</button></div>`;
   const addDias = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
@@ -537,7 +539,7 @@ async function telaCfg() {
   const salvar = async extra => {
     const n = id => +$('#' + id).value;
     return api('/api/config', 'PUT', { ...draft, ...extra, intervalos: { A: n('c_iA'), B: n('c_iB'), C: n('c_iC'), E: n('c_iE') }, periodos: { A: n('c_pA'), B: n('c_pB'), C: n('c_pC') }, mesClasseE: n('c_mE'), horaJob: n('c_hora'), sweepSegundos: n('c_sw'),
-      cargosFila: [...document.querySelectorAll('[name=c_cargo]:checked')].map(x => x.value), tarefaAtiva: $('#c_tarefa').checked, atualizarProxima: $('#c_atu').checked, removerSemClasse: $('#c_sem').checked, exigirUltimaVisita: $('#c_ult').checked, ativo: $('#c_ativo').checked, ...(depts.length ? { deptsAcesso: [...document.querySelectorAll('[name=c_dept]:checked')].map(x => x.value) } : {}),
+      cargosFila: [...document.querySelectorAll('[name=c_cargo]:checked')].map(x => x.value), tarefaAtiva: $('#c_tarefa').checked, atualizarProxima: $('#c_atu').checked, exigirUltimaVisita: $('#c_ult').checked, ativo: $('#c_ativo').checked, ...(depts.length ? { deptsAcesso: [...document.querySelectorAll('[name=c_dept]:checked')].map(x => x.value) } : {}),
       motivosNaoRealizada: $('#c_mot').value.split('\n') });
   };
   $('#c_save').onclick = async () => { try { await salvar(); S.eu = await api('/api/eu'); toast('Configurações salvas'); } catch (e) { falha(e); } };
@@ -612,6 +614,24 @@ async function telaCfg() {
     };
     b.onclick = () => rodar(false);
     api('/api/jobs/auditoria').then(j => { if (!vivo()) return; if (j.status === 'concluido') mostra(j.resultado, j.fim); else if (j.status === 'rodando') rodar(true); }).catch(() => {});
+  }
+  if ($('#r_ver')) {
+    const o = $('#rest_out'), b = $('#r_ver'), vivo = () => document.body.contains(o);
+    const roda = async corpo => {
+      b.disabled = true; o.innerHTML = '<div class="aviso">Consultando o Bitrix24…</div>';
+      try {
+        await api('/api/jobs/restaurar', 'POST', corpo);
+        const j = await acompanhaJob('restaurar', x => { if (x.status === 'rodando') o.innerHTML = `<div class="aviso"><div><b>Executando há ${x.segundos}s</b> — ${esc(x.passo || '')}</div></div>`; }, vivo);
+        if (!j) return;
+        if (j.status !== 'concluido') { o.innerHTML = `<div class="aviso erro">${esc(j.erro || 'Falhou.')}</div>`; return; }
+        const r = j.resultado, volta = Object.entries(r.voltamPara || {}).map(([k, v]) => `${v} para "${k}"`).join(' · ');
+        if (r.confirmado) { o.innerHTML = `<div class="aviso ok"><div><b>${r.restaurados} card(s) restaurado(s)</b>${r.erros ? ` · ${r.erros} com erro (veja o Log)` : ''}${volta ? ` · voltaram: ${esc(volta)}` : ''}</div></div>`; toast(`${r.restaurados} card(s) restaurado(s)`); return; }
+        o.innerHTML = r.aRestaurar ? `<div class="aviso"><div><b>${r.aRestaurar} card(s)</b> foram movidos para Removido pelo app desde ${dtBR(r.desde)} (de ${r.totalRemovidos} em Removido no total). Voltariam: ${esc(volta)}.${r.exemplos.length ? `<ul class="ex">${r.exemplos.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}<button class="btn pri" id="r_ok" style="margin-top:8px">Restaurar ${r.aRestaurar} card(s)</button></div></div>` : `<div class="aviso ok"><div>Nenhum card removido pelo app desde ${dtBR(r.desde)} (há ${r.totalRemovidos} em Removido no total).</div></div>`;
+        if ($('#r_ok')) $('#r_ok').onclick = () => { if (confirm(`Restaurar ${r.aRestaurar} card(s) para a etapa em que estavam?`)) roda({ confirmar: true, desde: $('#r_desde').value }); };
+      } catch (e) { if (vivo()) o.innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; }
+      finally { if (vivo()) b.disabled = false; }
+    };
+    b.onclick = () => roda({ desde: $('#r_desde').value });
   }
   $('#c_whb').onclick = async () => { try { await api('/api/webhook', 'PUT', { webhook: $('#c_wh').value }); S.eu = await api('/api/eu'); toast('Webhook salvo e testado'); telaCfg(); } catch (e) { falha(e); } };
   const rodar = (id, nome, body) => $(id).onclick = async ev => {

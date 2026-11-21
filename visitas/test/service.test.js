@@ -33,10 +33,12 @@ test('sem a fila ativa só mostra a prévia, sem gravar', async () => {
   const { f, store, svc } = mundo(); store.setConfig({ ativo: false });
   const r = await svc.sync(); assert.equal(r.previa, true); assert.equal(r.criados, 2); assert.equal(fila(f).length, 0);
 });
-test('empresa que perde a classe tem o card removido', async () => {
+test('empresa que perde a classe NÃO tem o card removido: o app nunca remove cards sozinho', async () => {
   const { f, svc } = mundo(); await svc.sync();
   f.s.empresas[1].UF_C = ''; svc.invalidar(); const r = await svc.sync();
-  assert.equal(r.removidos, 1); assert.equal(fila(f).find(c => c.companyId == 101).stageId, 'DT1036_19:FAIL');
+  assert.equal(r.removidos, 0); assert.ok(r.semClasse >= 1);
+  assert.equal(f.s.itens[1036].find(c => c.companyId == 101).stageId, 'DT1036_19:NEW');         // continua aberto
+  assert.ok(!f.s.itens[1036].some(c => c.stageId === 'DT1036_19:FAIL'));
 });
 test('registrar encerra o card, atualiza o cadastro e gera o próximo', async () => {
   const { f, svc } = mundo(); await svc.sync();
@@ -469,4 +471,104 @@ test('exceção pontual: cards já agendados para o futuro entram no app sem Úl
 test('cards admitidos persistem após reiniciar o servidor', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vis-')); const a = createStore(dir); assert.equal(a.admitir([1, 2, 2]), 2); a.flush();
   const b = createStore(dir); assert.equal(b.admitido(1), true); assert.equal(b.admitido(3), false); assert.equal(b.totalAdmitidos, 2);
+});
+// ===== Modelo REAL do portal: 4 etapas, Data como texto, Alçada = cargo, vários cards por cliente (um por responsável) =====
+function mundoReal(cfg = {}) {
+  const f = criarFake({ real: true }), store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'vis-')));
+  store.setConfig({ ativo: true, exigirUltimaVisita: false, cargosFila: ['Vendedor', 'Supervisor'], ...cfg });
+  f.s.empresas.push({ ID: '100', TITLE: 'Alfa Servicos', UF_V: '49', UF_S: '15', UF_C: '1' }, { ID: '101', TITLE: 'Beta Diesel', UF_V: '49', UF_S: '15', UF_C: '2' });
+  const svc = createService({ bitrix: f.bx, store, now: () => new Date('2026-11-18T15:00:00Z') });
+  const card = (id, emp, cargo, resp, data, stage = 'NEW', extra = {}) => f.s.itens[1036].push({ id, title: emp === 100 ? 'Alfa Servicos' : 'Beta Diesel', companyId: emp, categoryId: 19, stageId: `DT1036_19:${stage}`, assignedById: String(resp), ufAlc: cargo, ufUsr: String(resp), ufSeg: 'Motores', ufClasse: emp === 100 ? 'A' : 'B', ufData: data, ufIdEmp: String(emp), ...extra });
+  return { f, store, svc, card, u49: { id: '49', nome: 'Vendedor 49', papel: 'usuario' }, u15: { id: '15', nome: 'Supervisor 15', papel: 'usuario' }, adm: { id: '1', nome: 'Admin', papel: 'admin', config: true } };
+}
+test('modelo real: Alçada é o cargo, data em texto é lida e o sync NUNCA remove cards de outros responsáveis', async () => {
+  const { f, svc, card, adm } = mundoReal();
+  card(10, 100, 'Vendedor', 49, '10/12/2026 17:53:50'); card(11, 100, 'Supervisor', 15, '10/12/2026 17:53:50'); card(12, 100, 'Gerente', 0, '', 'NEW');
+  card(13, 101, 'Vendedor', 49, '09/01/2027 08:00:00'); card(14, 101, 'Supervisor', 15, '09/01/2027 08:00:00');
+  const info = await svc.camposInfo(); assert.equal(info.fila.cargo, 'ufAlc'); assert.equal(info.fila.data, 'ufData'); assert.equal(info.fila.usuario, 'ufUsr'); assert.equal(info.fila.idEmpresa, 'ufIdEmp');
+  assert.deepEqual(info.faltando, []);                                                                   // 4 etapas bastam: Atrasada e Não realizada são opcionais
+  const r = await svc.sync(); assert.equal(r.removidos, 0); assert.equal(r.criados, 0);                  // nenhum card removido nem criado em duplicidade
+  assert.ok(f.s.itens[1036].every(c => c.stageId === 'DT1036_19:NEW'));                                  // nada foi movido
+  const l = await svc.listar(adm, {});
+  assert.equal(l.total, 5); assert.deepEqual(l.itens.filter(i => i.empresaId === 100).map(i => i.cargo).sort(), ['Gerente', 'Supervisor', 'Vendedor']);
+  assert.equal(l.itens.find(i => i.id === 10).data, '2026-12-10'); assert.equal(l.itens.find(i => i.id === 10).alcada, 'Vendedor');
+  assert.equal(l.itens.find(i => i.id === 12).vendedor, 'Sem vendedor');
+});
+test('modelo real: cada responsável vê só o seu card do mesmo cliente', async () => {
+  const { svc, card, u49, u15 } = mundoReal();
+  card(10, 100, 'Vendedor', 49, '10/12/2026 17:53:50'); card(11, 100, 'Supervisor', 15, '10/12/2026 17:53:50');
+  assert.deepEqual((await svc.listar(u49, {})).itens.map(i => i.id), [10]); assert.deepEqual((await svc.listar(u15, {})).itens.map(i => i.id), [11]);
+  await assert.rejects(svc.formCard(11, u49), /não é seu/);
+});
+test('modelo real: registrar finaliza o card (etapa Finalizado), grava o registro e gera o próximo no formato do SPA', async () => {
+  const { f, svc, card, u49 } = mundoReal();
+  card(10, 100, 'Vendedor', 49, '10/12/2026 17:53:50'); card(11, 100, 'Supervisor', 15, '10/12/2026 17:53:50');
+  const r = await svc.registrar(10, { dataHora: '2026-11-18T10:00', fatos: 'visita feita' }, u49);
+  assert.equal(f.s.itens[1036].find(c => c.id === 10).stageId, 'DT1036_19:SUCCESS');                    // avançou para a etapa final que existe no SPA
+  assert.equal(f.s.itens[1036].find(c => c.id === 11).stageId, 'DT1036_19:NEW');                         // card do supervisor não é tocado
+  assert.equal(f.s.itens[1032].length, 1); assert.equal(f.s.itens[1032][0].ufIdFila, '10');
+  const prox = f.s.itens[1036].find(c => c.id === r.proximoCard);
+  assert.equal(prox.title, 'Alfa Servicos'); assert.equal(prox.ufAlc, 'Vendedor'); assert.equal(prox.ufUsr, '49'); assert.equal(prox.ufIdEmp, '100'); assert.equal(prox.assignedById, '49');
+  assert.equal(prox.ufData, '18/12/2026 00:00:00');                                                         // 18/11 + 30 dias (classe A), no mesmo formato texto do SPA
+  assert.equal(f.s.empresas[0].UF_U, '2026-11-18');
+  svc.invalidar(); assert.ok(!(await svc.listar(u49, {})).itens.some(i => i.id === 10));                  // Finalizado fica oculto por padrão
+  assert.ok((await svc.listar(u49, { finalizados: '1' })).itens.some(i => i.id === 10 && i.etapa === 'SUCCESS'));
+});
+test('modelo real: sem etapa "Atrasada" o atraso é calculado pela data; sem "Não realizada" nada é gravado nem gerado', async () => {
+  const { f, svc, card, adm } = mundoReal({ cargosFila: ['Vendedor'] });
+  card(20, 100, 'Vendedor', 49, '10/11/2026 08:00:00'); card(21, 101, 'Vendedor', 49, '05/10/2026 08:00:00', 'PREPARATION');
+  svc.invalidar(); const l = await svc.listar(adm, {});
+  assert.equal(l.itens.find(i => i.id === 20).etapa, 'LATE'); assert.equal(l.itens.find(i => i.id === 21).etapa, 'LATE');   // atrasadas pela data
+  assert.ok(l.itens.find(i => i.id === 20).atrasoDias > 0);
+  const antes = f.s.chamadas.filter(m => m === 'crm.item.update' || m === 'crm.item.add').length;
+  const v = await svc.varrer(); assert.equal(v.ajustados, 0);                                             // nada a mover: sem loop de atualizações inúteis
+  const s = await svc.sync(); assert.equal(s.naoRealizadas, 0); assert.equal(s.semEtapaNaoRealizada, 1);
+  assert.equal(f.s.chamadas.filter(m => m === 'crm.item.update' || m === 'crm.item.add').length, antes);  // nenhuma gravação
+  assert.equal(f.s.itens[1036].length, 2);                                                                  // nenhum card novo
+  await assert.rejects(svc.naoRealizada(20, { motivo: 'Outro motivo' }, adm), /Não realizada.*não existe no SPA/);
+});
+test('desfazer remoções do app: restaura só o que o webhook moveu, na etapa anterior, e poupa o que foi apagado de propósito', async () => {
+  const { f, svc, store, card, adm } = mundoReal();
+  const rem = (id, mov, prev, quando = '2026-11-21T19:42:00+03:00') => card(id, 100, 'Vendedor', 49, '09/01/2027 08:00:00', 'FAIL', { movedBy: mov, previousStageId: prev, movedTime: quando });
+  rem(30, '188', 'DT1036_19:NEW'); rem(31, '188', 'DT1036_19:PREPARATION'); rem(32, '5', 'DT1036_19:NEW');             // 32: removido por uma pessoa
+  rem(33, '188', 'DT1036_19:NEW'); store.log('exclusao', 'Card excluído de propósito', { card: 33 });                  // 33: botão Excluir do app
+  rem(34, '188', 'DT1036_19:NEW', '2026-10-01T10:00:00+03:00');                                                         // 34: removido muito antes
+  const prev = await svc.restaurarRemovidos({ desde: '2026-11-20' });
+  assert.equal(prev.confirmado, false); assert.equal(prev.aRestaurar, 2); assert.deepEqual(prev.voltamPara, { Aguardando: 1, 'Dia da Visita': 1 });
+  assert.ok(f.s.itens[1036].filter(c => [30, 31, 32, 33, 34].includes(c.id)).every(c => c.stageId === 'DT1036_19:FAIL'));   // prévia não altera nada
+  const r = await svc.restaurarRemovidos({ confirmar: true, desde: '2026-11-20' }); assert.equal(r.restaurados, 2);
+  const st = id => f.s.itens[1036].find(c => c.id === id).stageId;
+  assert.equal(st(30), 'DT1036_19:NEW'); assert.equal(st(31), 'DT1036_19:PREPARATION'); assert.equal(st(32), 'DT1036_19:FAIL'); assert.equal(st(33), 'DT1036_19:FAIL'); assert.equal(st(34), 'DT1036_19:FAIL');
+  assert.equal((await svc.restaurarRemovidos({ confirmar: true, desde: '2026-11-20' })).restaurados, 0);                     // repetir não faz nada
+  void adm;
+});
+test('criação de card: se o Bitrix recusa o cadastro completo, cria o essencial e grava os campos um a um, apontando o recusado', async () => {
+  const { f, svc, store } = mundoReal({ exigirUltimaVisita: true, cargosFila: ['Vendedor'] });
+  f.s.empresas[0].UF_U = '2026-10-20';
+  const orig = f.bx.call;
+  f.bx.call = async (m, p = {}) => {
+    if (m === 'crm.item.add' && +p.entityTypeId === 1036 && p.fields.ufData) { const e = new Error('Bitrix crm.item.add: Internal server error.'); e.code = 'INTERNAL_SERVER_ERROR'; throw e; }
+    if (m === 'crm.item.update' && +p.entityTypeId === 1036 && p.fields.ufIdEmp) throw new Error('Bitrix crm.item.update: campo recusado');
+    return orig(m, p);
+  };
+  const r = await svc.sync(); assert.equal(r.criados, 1);
+  const c = f.s.itens[1036][0]; assert.ok(c); assert.equal(c.title, 'Alfa Servicos'); assert.equal(c.ufAlc, 'Vendedor'); assert.equal(c.ufUsr, '49'); assert.equal(c.ufSeg, 'Motores'); assert.equal(c.ufClasse, 'A');
+  assert.equal(c.ufData, R.proximaVisita('A', '2026-10-20').split('-').reverse().join('/') + ' 00:00:00'); assert.equal(c.ufIdEmp, undefined);   // só o campo recusado ficou sem valor
+  assert.ok(store.logs.some(l => /recusou o campo ufIdEmp/.test(l.msg)));                                                          // diagnóstico: qual campo o Bitrix recusou
+});
+test('modelo real: registro VAZIO pré-criado na data não encerra o card; registro preenchido encerra; registrar atualiza o pré-criado sem duplicar', async () => {
+  const { f, svc, card, u49 } = mundoReal();
+  card(10, 100, 'Vendedor', 49, '10/11/2026 08:00:00', 'PREPARATION'); card(11, 101, 'Vendedor', 49, '10/11/2026 08:00:00', 'PREPARATION');
+  f.s.itens[1032].push({ id: 900, createdBy: '1', companyId: '100', ufIdFila: '10', ufData: '2026-11-10T00:00:00' });                       // casca criada pela automação: sem "Fatos e dados"
+  f.s.itens[1032].push({ id: 901, createdBy: '49', companyId: '101', ufIdFila: '11', ufData: '2026-11-12T10:00:00', ufFatos: 'Visita feita e preenchida no Bitrix' });
+  svc.invalidar();
+  const a = await svc.auditoria(), por = Object.fromEntries(a.checks.map(c => [c.id, c]));
+  assert.equal(por.registro_card_aberto.contagem, 1); assert.match(por.registro_card_aberto.exemplos[0], /Beta Diesel/);                      // só o preenchido conta
+  const r = await svc.reconciliar(); assert.equal(r.movidos, 1);
+  const st = id => f.s.itens[1036].find(c => c.id === id).stageId;
+  assert.equal(st(10), 'DT1036_19:PREPARATION'); assert.equal(st(11), 'DT1036_19:SUCCESS');                                                     // o card da casca vazia continua aberto
+  assert.equal(f.s.empresas[0].UF_U, undefined); assert.equal(f.s.empresas[1].UF_U, '2026-11-12');                                             // Última visita só vem de registro preenchido
+  await svc.registrar(10, { dataHora: '2026-11-18T10:00', fatos: 'preenchido pelo app' }, u49);
+  assert.equal(f.s.itens[1032].filter(x => x.ufIdFila === '10').length, 1); assert.equal(f.s.itens[1032].find(x => x.id === 900).ufFatos, 'preenchido pelo app');   // atualizou a casca, sem duplicar
+  assert.equal(st(10), 'DT1036_19:SUCCESS');
 });

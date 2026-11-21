@@ -20,7 +20,7 @@ const lerWebhook = () => process.env.BITRIX_WEBHOOK || (() => { try { return fs.
 bitrix.configure(lerWebhook());
 const svc = createService({ bitrix, store });
 
-const jobs = createJobs({ diagnostico: (b, passo) => svc.diagnosticoDatas(passo), sincronizar: b => svc.sync({ forcar: !!b.forcar, previa: !!b.previa }), preparar: () => svc.preparar(), reconciliar: () => svc.reconciliar(), auditoria: (b, passo) => svc.auditoria(passo), corrigir: (b, passo) => svc.corrigirAuditoria(String(b.id || ''), passo) });
+const jobs = createJobs({ diagnostico: (b, passo) => svc.diagnosticoDatas(passo), sincronizar: b => svc.sync({ forcar: !!b.forcar, previa: !!b.previa }), preparar: () => svc.preparar(), reconciliar: () => svc.reconciliar(), auditoria: (b, passo) => svc.auditoria(passo), corrigir: (b, passo) => svc.corrigirAuditoria(String(b.id || ''), passo), restaurar: (b, passo) => svc.restaurarRemovidos({ confirmar: b.confirmar === true, desde: b.desde }, passo) });
 const bad = (code, msg) => { const e = new Error(msg); e.status = code; return e; };
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
@@ -161,7 +161,7 @@ const server = http.createServer(async (req, res) => {
       const w = ['POST', 'PUT', 'DELETE'].includes(req.method);
       limite(user, w);
       if (routes[key]) return send(res, 200, await routes[key](u, w ? await readBody(req) : {}, user));
-      const mj = u.pathname.match(/^\/api\/jobs\/(diagnostico|sincronizar|preparar|reconciliar|auditoria|corrigir)$/);
+      const mj = u.pathname.match(/^\/api\/jobs\/(diagnostico|sincronizar|preparar|reconciliar|auditoria|corrigir|restaurar)$/);
       if (mj) { exigeConfig(user); exigeBitrix(); return send(res, 200, req.method === 'POST' ? jobs.iniciar(mj[1], await readBody(req)) : jobs.estado(mj[1])); }
       let m = u.pathname.match(/^\/api\/cards\/(\d+)\/([a-z-]+)$/);
       if (m && cardRoutes[m[2]]) {
