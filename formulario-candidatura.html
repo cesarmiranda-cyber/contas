@@ -1,59 +1,57 @@
 <div id="nx">
 <style>
-  #nx{--cor:#ff7a00;--cor2:#ffa02e;--bg:#000;--card:#0e0e10;--campo:#17171a;--borda:rgba(255,255,255,.10);--txt:#fff;--mut:#9a9aa3;
-    font-family:'Inter','Segoe UI',Arial,sans-serif;color:var(--txt);padding:56px 16px;min-height:100vh;
-    background:radial-gradient(900px 500px at 50% -10%,rgba(255,122,0,.22),transparent 60%),var(--bg);box-sizing:border-box}
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+  #nx{--navy:#0b2559;--roxo:#7a2fb8;--roxo2:#b14fd6;--verde:#4cd620;--verde2:#86d41f;--azul:#3b82c4;--bg:#f5f7fb;--campo:#f3f5fa;--borda:#dfe4ee;--mut:#6b7794;
+    font-family:'Outfit','Segoe UI',Arial,sans-serif;color:var(--navy);background:var(--bg);box-sizing:border-box;border-top:19px solid var(--verde2);padding:48px 16px 64px}
   #nx *{box-sizing:border-box}
-  #nx .logo{text-align:center;margin-bottom:36px}
-  #nx .logo img{width:260px;max-width:70%;height:auto}
-  #nx .card{max-width:640px;margin:0 auto;background:var(--card);border:1px solid var(--borda);border-radius:24px;
-    padding:40px;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,122,0,.05)}
-  #nx h2{margin:0 0 8px;font-size:30px;font-weight:800;letter-spacing:-.5px}
-  #nx h2 span{background:linear-gradient(90deg,var(--cor),var(--cor2));-webkit-background-clip:text;background-clip:text;color:transparent}
-  #nx .sub{margin:0 0 28px;color:var(--mut);font-size:15px;line-height:1.5}
+  #nx .logo{text-align:center;margin-bottom:34px}
+  #nx .logo img{width:170px;max-width:60%;height:auto;filter:brightness(0)}
+  #nx .card{max-width:640px;margin:0 auto;background:#fff;border-radius:24px;padding:40px;box-shadow:0 20px 60px rgba(11,37,89,.10)}
+  #nx h2{margin:0 0 10px;font-size:36px;line-height:1.1;font-weight:600;letter-spacing:-1px;text-align:center}
+  #nx h2 span{background:linear-gradient(90deg,var(--roxo),var(--roxo2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #nx .sub{margin:0 0 30px;color:var(--mut);font-size:16px;line-height:1.5;text-align:center}
   #nx .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   #nx .f{position:relative;margin-bottom:14px}
   #nx .f input[type=text],#nx .f input[type=tel],#nx .f input[type=email],#nx .f select{
-    width:100%;height:58px;padding:22px 16px 6px;font-size:16px;color:var(--txt);background:var(--campo);
+    width:100%;height:58px;padding:22px 16px 6px;font-size:16px;color:var(--navy);background:var(--campo);
     border:1.5px solid var(--borda);border-radius:14px;outline:none;font-family:inherit;transition:.2s}
   #nx .f label.fl{position:absolute;left:16px;top:19px;font-size:16px;color:var(--mut);pointer-events:none;transition:.18s;transform-origin:left top}
   #nx .f input:focus+label.fl,#nx .f input:not(:placeholder-shown)+label.fl,
-  #nx .f select:focus+label.fl,#nx .f select.has+label.fl{transform:translateY(-13px) scale(.75);color:var(--cor2)}
-  #nx .f input:focus,#nx .f select:focus{border-color:var(--cor);box-shadow:0 0 0 4px rgba(255,122,0,.15)}
+  #nx .f select:focus+label.fl,#nx .f select.has+label.fl{transform:translateY(-13px) scale(.75);color:var(--roxo)}
+  #nx .f input:focus,#nx .f select:focus{border-color:var(--roxo);background:#fff;box-shadow:0 0 0 4px rgba(122,47,184,.12)}
   #nx select{appearance:none;-webkit-appearance:none;cursor:pointer;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%23ff7a00' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%237a2fb8' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 18px center}
-  #nx select option{background:#17171a;color:#fff}
-  #nx .q{margin:22px 0 10px;font-size:14px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.8px}
+  #nx .q{margin:24px 0 10px;font-size:13px;font-weight:600;color:var(--navy);text-transform:uppercase;letter-spacing:1px}
   #nx .chips{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}
   #nx .chips label{position:relative;cursor:pointer}
   #nx .chips input{position:absolute;opacity:0;inset:0;width:100%;height:100%;cursor:pointer;margin:0}
   #nx .chips span{display:block;padding:12px 20px;border-radius:999px;background:var(--campo);border:1.5px solid var(--borda);font-size:15px;transition:.18s}
-  #nx .chips label:hover span{border-color:rgba(255,122,0,.6)}
-  #nx .chips input:checked+span{background:linear-gradient(135deg,var(--cor),var(--cor2));border-color:transparent;color:#000;font-weight:700;box-shadow:0 6px 20px rgba(255,122,0,.35)}
-  #nx .chips input:focus-visible+span{box-shadow:0 0 0 4px rgba(255,122,0,.3)}
-  #nx .drop{display:block;margin-top:6px;border:2px dashed rgba(255,255,255,.18);border-radius:16px;padding:26px 16px;text-align:center;cursor:pointer;transition:.2s;background:var(--campo)}
-  #nx .drop:hover,#nx .drop.over{border-color:var(--cor);background:rgba(255,122,0,.07)}
-  #nx .drop b{display:block;font-size:16px;margin-bottom:4px}
+  #nx .chips label:hover span{border-color:var(--roxo2)}
+  #nx .chips input:checked+span{background:linear-gradient(135deg,var(--roxo),var(--roxo2));border-color:transparent;color:#fff;font-weight:600;box-shadow:0 6px 18px rgba(122,47,184,.30)}
+  #nx .chips input:focus-visible+span{box-shadow:0 0 0 4px rgba(122,47,184,.25)}
+  #nx .drop{display:block;margin-top:6px;border:2px dashed #c9d1e3;border-radius:16px;padding:26px 16px;text-align:center;cursor:pointer;transition:.2s;background:var(--campo)}
+  #nx .drop:hover,#nx .drop.over{border-color:var(--roxo);background:rgba(122,47,184,.05)}
+  #nx .drop b{display:block;font-size:16px;font-weight:600;margin-bottom:4px}
   #nx .drop small{color:var(--mut);font-size:13px}
-  #nx .drop .ico{font-size:28px;color:var(--cor);line-height:1;margin-bottom:6px}
-  #nx .drop.ok{border-style:solid;border-color:var(--cor)}
+  #nx .drop .ico{font-size:28px;color:var(--roxo);line-height:1;margin-bottom:6px}
+  #nx .drop.ok{border-style:solid;border-color:var(--verde)}
   #nx .drop input{display:none}
-  #nx .err{display:none;color:#ff6b6b;font-size:13px;margin:6px 4px 0}
+  #nx .err{display:none;color:#d6334b;font-size:13px;margin:6px 4px 0}
   #nx .f.invalid .err,#nx .g.invalid .err{display:block}
-  #nx .f.invalid input,#nx .f.invalid select{border-color:#ff6b6b}
-  #nx .g.invalid .drop{border-color:#ff6b6b}
-  #nx button.send{margin-top:26px;width:100%;height:60px;border:0;border-radius:16px;font-size:17px;font-weight:800;letter-spacing:.3px;color:#000;cursor:pointer;
-    background:linear-gradient(135deg,var(--cor),var(--cor2));box-shadow:0 10px 30px rgba(255,122,0,.35);transition:.2s;font-family:inherit}
-  #nx button.send:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(255,122,0,.5)}
+  #nx .f.invalid input,#nx .f.invalid select{border-color:#d6334b}
+  #nx .g.invalid .drop{border-color:#d6334b}
+  #nx button.send{margin-top:28px;width:100%;height:58px;border:0;border-radius:999px;font-size:14px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#fff;cursor:pointer;
+    background:linear-gradient(90deg,var(--verde),var(--azul));box-shadow:0 10px 26px rgba(59,130,196,.30);transition:.2s;font-family:inherit}
+  #nx button.send:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(59,130,196,.42)}
   #nx button.send:disabled{opacity:.6;cursor:wait;transform:none}
-  #nx .fail{display:none;margin-top:14px;padding:12px;border-radius:12px;background:rgba(255,80,80,.12);color:#ff8a8a;text-align:center;font-size:14px}
+  #nx .fail{display:none;margin-top:14px;padding:12px;border-radius:12px;background:#fdecef;color:#b3243a;text-align:center;font-size:14px}
   #nx .done{display:none;text-align:center;padding:30px 0}
-  #nx .done .ck{width:76px;height:76px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;color:#000;
-    background:linear-gradient(135deg,var(--cor),var(--cor2));box-shadow:0 10px 30px rgba(255,122,0,.4)}
-  #nx .done h3{margin:0 0 8px;font-size:24px}
+  #nx .done .ck{width:76px;height:76px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;
+    background:linear-gradient(135deg,var(--verde),var(--azul));box-shadow:0 10px 26px rgba(59,130,196,.35)}
+  #nx .done h3{margin:0 0 8px;font-size:26px;font-weight:600}
   #nx .done p{margin:0;color:var(--mut)}
-  @media(max-width:560px){#nx .card{padding:26px 18px}#nx .row{grid-template-columns:1fr}#nx h2{font-size:25px}}
+  @media(max-width:560px){#nx .card{padding:26px 18px}#nx .row{grid-template-columns:1fr}#nx h2{font-size:28px}}
 </style>
 
 <div class="logo"><img src="https://nextevoce.com.br/wp-content/uploads/2024/08/NEXT_LOGO.png" alt="Next Internet"></div>
