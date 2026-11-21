@@ -203,3 +203,11 @@ body.arrastando .kdel{opacity:.92;pointer-events:auto;transform:none}.kdel.over{
 .resumo-cfg{background:var(--pri-s);border-color:transparent}.rs{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px}.rs b.ok{color:var(--e-enc)}.rs b.bad{color:var(--e-late)}
 details.avanc>summary{cursor:pointer;list-style:none}details.avanc>summary::-webkit-details-marker{display:none}details.avanc[open]>summary{margin-bottom:6px}
 .oque{padding:6px 2px 2px;font-size:13.5px;line-height:1.5}.oque ol,.oque ul{margin:6px 0 12px;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+
+/* auditoria do processo */
+.fluxo{margin:8px 0 12px;padding-left:22px;display:flex;flex-direction:column;gap:5px;font-size:13.5px}
+.aviso.ok{background:color-mix(in srgb,var(--e-enc) 12%,var(--surf));border-color:color-mix(in srgb,var(--e-enc) 40%,transparent)}
+.chk{display:flex;gap:12px;padding:10px 4px;border-top:1px solid var(--bd)}.chk-i{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;background:var(--mut)}
+.chk.ok .chk-i{background:var(--e-enc)}.chk.warn .chk-i{background:var(--e-prep)}.chk.bad .chk-i{background:var(--e-late)}
+.chk-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.chk-t{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ex{margin:0;padding-left:18px;font-size:12.5px;color:var(--mut);display:flex;flex-direction:column;gap:2px}

@@ -322,3 +322,73 @@ test('cadastrar Última visita sem abrir a empresa: lista ocultos, grava no cada
   f.s.empresas.find(e => e.ID === '101').UF_P = '2027-03-01'; await svc.salvarUltimas(admin, [{ empresaId: 101, segmento: 'Motores', data: '2026-10-25' }]);
   assert.equal(f.s.empresas.find(e => e.ID === '101').UF_P, '2027-03-01');                              // Próxima já preenchida não é sobrescrita
 });
+// ===== Auditoria do processo: card da fila -> registro (SPA 1032) -> próxima etapa -> próxima visita -> app atualizado =====
+function mundoAtivo() {
+  const w = mundo(); w.store.setConfig({ exigirUltimaVisita: true });
+  Object.assign(w.f.s.empresas[0], { UF_U: '2026-10-20' }); Object.assign(w.f.s.empresas[1], { UF_U: '2026-10-10' });   // Alfa (A) e Beta (B) aptas; as demais ficam fora
+  return w;
+}
+test('processo completo: cria a fila, registra, encerra o card, grava o registro, gera a próxima visita e a lista reflete', async () => {
+  const { f, svc } = mundoAtivo();
+  const s1 = await svc.sync(); assert.equal(s1.criados, 2);
+  const [alfa, beta] = ['100', '101'].map(id => f.s.itens[1036].find(c => String(c.companyId) === id));
+  assert.equal(alfa.ufData, R.proximaVisita('A', '2026-10-20')); assert.equal(beta.ufData, R.proximaVisita('B', '2026-10-10'));   // 1º card = última visita + prazo da classe
+  assert.equal(f.s.empresas[0].UF_P, alfa.ufData);                                                                                  // cadastro recebe a próxima
+  const r = await svc.registrar(alfa.id, { dataHora: '2026-11-18T10:00', fatos: 'Visita realizada', contatos: [5] }, vendedor);
+  assert.deepEqual(r.avisos, []);
+  assert.equal(f.s.itens[1032].length, 1); assert.equal(f.s.itens[1032][0].ufIdFila, String(alfa.id));                             // registro criado e ligado ao card
+  assert.equal(alfa.stageId, 'DT1036_19:UC_EFR0YE');                                                                                  // card avançou para Encerrado
+  assert.equal(f.s.empresas[0].UF_U, '2026-11-18'); const prox = f.s.itens[1036].find(c => c.id === r.proximoCard);
+  assert.equal(prox.ufData, R.proximaVisita('A', '2026-11-18')); assert.equal(f.s.empresas[0].UF_P, prox.ufData);                    // próxima visita = cópia do card para o próximo ciclo
+  assert.equal(prox.ufSeg, alfa.ufSeg); assert.equal(prox.assignedById, alfa.assignedById);
+  svc.invalidar(); const l = await svc.listar(admin, { finalizados: '1' });
+  assert.equal(l.itens.find(i => i.id === alfa.id).etapa, 'ENC'); assert.ok(l.itens.some(i => i.id === prox.id && i.etapa === 'NEW'));      // app atualizado
+  const s2 = await svc.sync(); assert.equal(s2.criados, 0); assert.equal(f.s.itens[1036].length, 3);                                  // 2ª sincronização não duplica nada
+});
+test('falha ao encerrar o card NÃO duplica o registro na nova tentativa', async () => {
+  const { f, svc } = mundoAtivo(); await svc.sync();
+  const alfa = f.s.itens[1036].find(c => String(c.companyId) === '100'); const orig = f.bx.call; let falhou = false;
+  f.bx.call = async (m, p = {}) => { if (m === 'crm.item.update' && +p.entityTypeId === 1036 && p.fields?.stageId && !falhou) { falhou = true; throw new Error('Bitrix indisponível'); } return orig(m, p); };
+  await assert.rejects(svc.registrar(alfa.id, { dataHora: '2026-11-18T10:00', fatos: 'primeira tentativa' }, vendedor), /indisponível/);
+  assert.equal(f.s.itens[1032].length, 1); assert.equal(alfa.stageId, 'DT1036_19:NEW');                                                 // registro existe, card ainda aberto
+  const r = await svc.registrar(alfa.id, { dataHora: '2026-11-18T10:00', fatos: 'segunda tentativa' }, vendedor);
+  assert.equal(f.s.itens[1032].length, 1); assert.equal(f.s.itens[1032][0].ufFatos, 'segunda tentativa');                              // atualizou o mesmo, sem duplicar
+  assert.equal(alfa.stageId, 'DT1036_19:UC_EFR0YE'); assert.ok(r.proximoCard);
+  assert.equal(f.s.itens[1036].filter(c => String(c.companyId) === '100').length, 2);                                                   // um único próximo card
+});
+test('falha depois de registrar vira aviso: a visita conta e o card encerra', async () => {
+  const { f, svc } = mundoAtivo(); await svc.sync(); const alfa = f.s.itens[1036].find(c => String(c.companyId) === '100'); const orig = f.bx.call;
+  f.bx.call = async (m, p = {}) => { if (m === 'crm.company.update') throw new Error('sem permissão na empresa'); return orig(m, p); };
+  const r = await svc.registrar(alfa.id, { dataHora: '2026-11-18T10:00', fatos: 'ok' }, vendedor);
+  assert.equal(r.ok, true); assert.ok(r.avisos.length >= 1 && /empresa/.test(r.avisos[0])); assert.equal(alfa.stageId, 'DT1036_19:UC_EFR0YE'); assert.equal(f.s.itens[1032].length, 1);
+});
+test('reconciliação: registro criado direto no Bitrix encerra o card e gera a próxima visita (idempotente)', async () => {
+  const { f, svc } = mundoAtivo(); await svc.sync();
+  const [alfa, beta] = ['100', '101'].map(id => f.s.itens[1036].find(c => String(c.companyId) === id));
+  f.s.itens[1032].push({ id: 777, createdBy: '7', companyId: '100', ufIdFila: String(alfa.id), ufData: '2026-11-17T09:00:00', ufFatos: 'lançado à mão no Bitrix' }); svc.invalidar();
+  const r = await svc.reconciliar(); assert.equal(r.movidos, 1); assert.equal(r.erros, 0);
+  assert.equal(alfa.stageId, 'DT1036_19:UC_EFR0YE'); assert.equal(beta.stageId, 'DT1036_19:NEW');                                       // só o card com registro mudou
+  assert.equal(f.s.empresas[0].UF_U, '2026-11-17'); assert.equal(f.s.itens[1036].filter(c => String(c.companyId) === '100').length, 2);
+  svc.invalidar(); const r2 = await svc.reconciliar(); assert.equal(r2.movidos, 0); assert.equal(f.s.itens[1036].filter(c => String(c.companyId) === '100').length, 2);   // 2ª rodada: nada muda
+  assert.equal(f.s.itens[1032].length, 1);                                                                                              // não cria registro novo
+});
+test('auditoria detecta cada tipo de problema e as correções seguras funcionam', async () => {
+  const { f, svc } = mundoAtivo(); await svc.sync(); const it = f.s.itens[1036];
+  const [alfa, beta] = ['100', '101'].map(id => it.find(c => String(c.companyId) === id));
+  f.s.itens[1032].push({ id: 801, createdBy: '7', companyId: '100', ufIdFila: String(alfa.id), ufData: '2026-11-17T09:00:00', ufFatos: 'x' },   // registro com card aberto
+    { id: 802, createdBy: '7', companyId: '100', ufIdFila: '99999', ufData: '2026-11-01T09:00:00', ufFatos: 'órfão' });                       // registro órfão
+  it.push({ id: 850, title: 'dup', companyId: 101, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '7', ufSeg: 'Motores', ufClasse: 'B', ufData: '2027-01-10' });   // 2º aberto para Beta
+  it.push({ id: 851, title: 'enc', companyId: 200, categoryId: 19, stageId: 'DT1036_19:UC_EFR0YE', assignedById: '7', ufSeg: 'Motores', ufClasse: 'B', ufData: '2026-09-01' });   // encerrado sem registro
+  svc.invalidar(); const a = await svc.auditoria(), por = Object.fromEntries(a.checks.map(c => [c.id, c]));
+  assert.equal(por.registro_card_aberto.contagem, 1); assert.equal(por.registro_card_aberto.severidade, 'erro'); assert.equal(por.registro_card_aberto.corrigivel, true);
+  assert.equal(por.registro_orfao.contagem, 1); assert.equal(por.abertos_duplicados.contagem, 1); assert.equal(por.encerrado_sem_registro.contagem, 1);
+  assert.equal(a.resumo.registros, 2); assert.equal(a.resumo.cards, 4);
+  await svc.corrigirAuditoria('abertos_duplicados'); assert.equal(it.find(c => c.id === 850).stageId, 'DT1036_19:FAIL'); assert.equal(beta.stageId, 'DT1036_19:NEW');   // mantém o mais antigo
+  await svc.corrigirAuditoria('registro_card_aberto'); assert.equal(alfa.stageId, 'DT1036_19:UC_EFR0YE');
+  svc.invalidar(); const b = Object.fromEntries((await svc.auditoria()).checks.map(c => [c.id, c]));
+  assert.equal(b.registro_card_aberto.severidade, 'ok'); assert.equal(b.abertos_duplicados.severidade, 'ok'); assert.equal(b.sem_proximo.severidade, 'ok');         // corrigido, e a próxima visita foi gerada
+  await assert.rejects(svc.corrigirAuditoria('encerrado_sem_registro'), /não tem correção/);
+  const quebra = it.find(c => String(c.companyId) === '101' && c.id === beta.id); quebra.stageId = 'DT1036_19:UC_EFR0YE'; svc.invalidar();      // ciclo quebrado: encerrado e sem aberto
+  assert.equal(Object.fromEntries((await svc.auditoria()).checks.map(c => [c.id, c])).sem_proximo.contagem, 1);
+  await svc.corrigirAuditoria('sem_proximo'); svc.invalidar(); assert.equal(Object.fromEntries((await svc.auditoria()).checks.map(c => [c.id, c])).sem_proximo.contagem, 0);
+});

@@ -20,7 +20,7 @@ const lerWebhook = () => process.env.BITRIX_WEBHOOK || (() => { try { return fs.
 bitrix.configure(lerWebhook());
 const svc = createService({ bitrix, store });
 
-const jobs = createJobs({ diagnostico: (b, passo) => svc.diagnosticoDatas(passo), sincronizar: b => svc.sync({ forcar: !!b.forcar, previa: !!b.previa }), preparar: () => svc.preparar() });
+const jobs = createJobs({ diagnostico: (b, passo) => svc.diagnosticoDatas(passo), sincronizar: b => svc.sync({ forcar: !!b.forcar, previa: !!b.previa }), preparar: () => svc.preparar(), reconciliar: () => svc.reconciliar(), auditoria: (b, passo) => svc.auditoria(passo), corrigir: (b, passo) => svc.corrigirAuditoria(String(b.id || ''), passo) });
 const bad = (code, msg) => { const e = new Error(msg); e.status = code; return e; };
 const SEC = {
   'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
@@ -160,7 +160,7 @@ const server = http.createServer(async (req, res) => {
       const w = ['POST', 'PUT', 'DELETE'].includes(req.method);
       limite(user, w);
       if (routes[key]) return send(res, 200, await routes[key](u, w ? await readBody(req) : {}, user));
-      const mj = u.pathname.match(/^\/api\/jobs\/(diagnostico|sincronizar|preparar)$/);
+      const mj = u.pathname.match(/^\/api\/jobs\/(diagnostico|sincronizar|preparar|reconciliar|auditoria|corrigir)$/);
       if (mj) { exigeConfig(user); exigeBitrix(); return send(res, 200, req.method === 'POST' ? jobs.iniciar(mj[1], await readBody(req)) : jobs.estado(mj[1])); }
       let m = u.pathname.match(/^\/api\/cards\/(\d+)\/([a-z-]+)$/);
       if (m && cardRoutes[m[2]]) {
@@ -201,7 +201,7 @@ if (require.main === module) server.listen(PORT, () => {
   if (process.env.PREPARAR === '1' && bitrix.enabled) setTimeout(() => svc.preparar().then(r => console.log('preparar', JSON.stringify(r))).catch(e => console.error('preparar', e.message)), 3000);
   // Varredura leve a cada sweepSegundos; sincronização completa a cada hora e no job diário (a partir de horaJob, Brasília).
   let ultimoJob = '', ultimaHora = 0;
-  let ultimoAquec = 0;
+  let ultimoAquec = 0, ultimaReconc = 0;
   const aquece = () => { ultimoAquec = Date.now(); return svc.aquecer().catch(e => store.log('erro', `aquecer: ${e.message}`.slice(0, 200))); };
   setTimeout(aquece, 1500);
   const tique = async () => {
@@ -209,6 +209,7 @@ if (require.main === module) server.listen(PORT, () => {
     if (!bitrix.enabled || !store.ativo) return;
     try {
       await svc.varrer();
+      if (Date.now() - ultimaReconc > 300000) { ultimaReconc = Date.now(); const r = await svc.reconciliar(); if (r.movidos) store.log('reconcilia', `Reconciliação: ${r.movidos} card(s) encerrado(s) por já terem registro`); }
       const h = svc.hoje(), horaBR = +new Intl.DateTimeFormat('en-GB', { timeZone: R.TZ, hour: '2-digit', hour12: false }).format(new Date());
       if (Date.now() - ultimaHora > 3600e3) { ultimaHora = Date.now(); await svc.sync(); }
       if (ultimoJob !== h && horaBR >= store.config.horaJob) { ultimoJob = h; await svc.sync(); store.log('job', 'Job diário concluído'); }

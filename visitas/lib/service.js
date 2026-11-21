@@ -399,16 +399,22 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       Object.assign(f, { title: `Visita · ${card.titulo}`.slice(0, 250), companyId: card.empresaId, assignedById: card.vendedorId, [m.visita.data]: dataHora.length > 10 ? dataHora : `${dataHora}T09:00:00`,
         [m.visita.idFila]: String(id), [m.visita.segmento]: escreverLista(itensDe(m.visitaFields, m.visita.segmento), card.segmento) });
       if (contatos.length) f.contactIds = contatos;
-      const r = await bx.call('crm.item.add', { entityTypeId: ETYPE.visita, fields: f });
-      const vid = +(r.result?.item?.id || r.result?.id);
-      await mover(m, id, 'ENC');
-      await atualizarEmpresa(m, card.empresaId, card.segmento, { ultima: dataHora.slice(0, 10) });
-      const prox = await gerarProximo(m, { ...card, etapa: 'ENC' }, dataHora.slice(0, 10));
+      // Idempotente: se já existe registro deste card (tentativa anterior que parou no meio), atualiza o mesmo em vez de criar outro.
+      const ja = await bx.call('crm.item.list', { entityTypeId: ETYPE.visita, select: ['id'], filter: { [m.visita.idFila]: String(id) }, order: { id: 'ASC' } });
+      let vid = +((ja.result?.items || [])[0]?.id || 0);
+      if (vid) { await bx.call('crm.item.update', { entityTypeId: ETYPE.visita, id: vid, fields: f }); store.log('visita', `Registro #${vid} já existia para o card ${id}: atualizado, sem duplicar`, { card: id }); }
+      else { const r = await bx.call('crm.item.add', { entityTypeId: ETYPE.visita, fields: f }); vid = +(r.result?.item?.id || r.result?.id); }
+      await mover(m, id, 'ENC');                                  // etapa do card: a única que precisa dar certo para a visita contar como feita
+      // Daqui em diante a visita já está registrada e o card encerrado: falhas viram aviso (a reconciliação/sincronização corrige depois).
+      const avisos = [], tenta = async (rot, fn) => { try { return await fn(); } catch (e) { avisos.push(`${rot}: ${e.message}`.slice(0, 200)); store.log('erro', `registrar ${id}: ${rot}: ${e.message}`.slice(0, 300), { card: id }); return null; } };
+      const dia0 = dataHora.slice(0, 10), cadastro = ultDados.get(chaveUlt(card))?.ultima || '';
+      await tenta('atualizar a empresa', () => atualizarEmpresa(m, card.empresaId, card.segmento, { ultima: !cadastro || dia0 > cadastro ? dia0 : undefined, proxima: undefined }));
+      const prox = await tenta('criar a próxima visita', () => gerarProximo(m, { ...card, etapa: 'ENC' }, dia0));
       const tk = store.tarefa(id);
       if (tk) { await bx.call('tasks.task.complete', { taskId: tk }).catch(() => {}); store.setTarefa(id, null); }
       store.log('visita', `Visita registrada (#${vid}) em ${card.titulo} por ${user.nome || user.id}`, { card: id });
       invalidar('cards', 'dash', 'regs');
-      return { ok: true, registro: vid, proximoCard: prox };
+      return { ok: true, registro: vid, proximoCard: prox, avisos };
     });
   }
   async function reprogramar(id, { data, motivo }, user) {
@@ -680,6 +686,100 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     });
     return { hoje: h, exigirUltimaVisita: cfg().exigirUltimaVisita, empresas: emps.length, intervalosDoApp: cfg().intervalos, segmentos };
   }
+  // ---- Reconciliação e auditoria do processo (card da fila x registro de visita x cadastro da empresa) ----
+  // Registros do SPA 1032 ligados (campo "ID Fila") a estes cards, em lotes de 50.
+  async function registrosPorCards(m, ids) {
+    const out = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      out.push(...await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: ['id', 'companyId', 'createdTime', m.visita.idFila, m.visita.data].filter(Boolean), filter: { [m.visita.idFila]: ids.slice(i, i + 50).map(String) }, order: { id: 'ASC' } }));
+    }
+    return out.map(r => ({ id: +r.id, empresaId: +r.companyId, idFila: txt(r[m.visita.idFila]), data: dia(r[m.visita.data]) || dia(r.createdTime) }));
+  }
+  // Se existe registro de visita para um card ainda aberto (criado direto no Bitrix, ou uma tentativa que parou no meio),
+  // move o card para Encerrado, atualiza a Última visita da empresa e gera a próxima visita. Idempotente.
+  async function reconciliar() {
+    const m = await modelo();
+    if (!m.visita.idFila) return { ok: false, motivo: 'Campo "ID Fila" do registro não encontrado.' };
+    const abertos = (await comUltima(m, (await cardsTodos(m)).filter(c => ABERTAS.includes(c.etapa)))).cards;
+    if (!abertos.length) return { ok: true, verificados: 0, movidos: 0, erros: 0 };
+    const regs = await registrosPorCards(m, abertos.map(c => c.id)), porCard = new Map();
+    for (const r of regs) (porCard.get(r.idFila) || porCard.set(r.idFila, []).get(r.idFila)).push(r);
+    let movidos = 0, erros = 0;
+    for (const c of abertos) {
+      const l = porCard.get(String(c.id)); if (!l) continue;
+      await comTrava(`c:${c.empresaId}`, async () => {
+        try {
+          if (!ABERTAS.includes((await umCard(m, c.id)).etapa)) return;           // outro processo já tratou
+          const data = l.map(r => r.data).filter(Boolean).sort().pop() || hoje(), cadastro = ultDados.get(chaveUlt(c))?.ultima || '';
+          await mover(m, c.id, 'ENC');
+          await atualizarEmpresa(m, c.empresaId, c.segmento, { ultima: !cadastro || data > cadastro ? data : undefined });
+          await gerarProximo(m, { ...c, etapa: 'ENC' }, data);
+          movidos++; store.log('reconcilia', `Card ${c.id} (${c.titulo}) encerrado: já havia registro de visita (#${l[0].id})`, { card: c.id });
+        } catch (e) { erros++; store.log('erro', `reconciliar ${c.id}: ${e.message}`.slice(0, 300), { card: c.id }); }
+      });
+    }
+    invalidar('cards', 'dash', 'regs');
+    return { ok: true, verificados: abertos.length, movidos, erros };
+  }
+  // Auditoria (somente leitura): confere se o ciclo está íntegro. Devolve cada verificação com contagem e exemplos.
+  async function calcAuditoria(passo = () => {}) {
+    passo('Lendo o mapeamento de campos…');
+    const m = await modelo(true), h = hoje(), exigir = cfg().exigirUltimaVisita;
+    passo('Lendo cards, registros de visita e empresas (pode levar alguns minutos)…');
+    const [cards, regsRaw, emps] = await Promise.all([cardsTodos(m), bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: ['id', 'companyId', 'createdTime', m.visita.idFila, m.visita.data].filter(Boolean), order: { id: 'ASC' } }), empresasSync(m)]);
+    passo(`Analisando ${cards.length} cards, ${regsRaw.length} registros e ${emps.length} empresas…`);
+    const regs = regsRaw.map(r => ({ id: +r.id, empresaId: +r.companyId, idFila: txt(r[m.visita.idFila]), data: dia(r[m.visita.data]) || dia(r.createdTime) }));
+    const nomeEmp = new Map(emps.map(e => [String(e.ID), e.TITLE])), emp = id => nomeEmp.get(String(id)) || `Empresa #${id}`;
+    const cardPorId = new Map(cards.map(c => [String(c.id), c])), regsPorCard = new Map(), abertos = cards.filter(c => ABERTAS.includes(c.etapa));
+    for (const r of regs) if (r.idFila) (regsPorCard.get(r.idFila) || regsPorCard.set(r.idFila, []).get(r.idFila)).push(r);
+    const fmt = (c, x = '') => `${emp(c.empresaId)} · ${c.segmento} (card ${c.id}${x ? ', ' + x : ''})`;
+    const porChave = new Map(); for (const c of cards) if (c.etapa !== 'FAIL') (porChave.get(R.chaveCard(c.empresaId, c.segmento, c.cargo)) || porChave.set(R.chaveCard(c.empresaId, c.segmento, c.cargo), []).get(R.chaveCard(c.empresaId, c.segmento, c.cargo))).push(c);
+    const raw = { registroCardAberto: abertos.filter(c => regsPorCard.has(String(c.id))), duplicados: [], semProximo: [] };
+    const lista = { semCard: [], ultimaDesatualizada: [], proximaDiferente: [], virariamNaoRealizada: [] };
+    for (const [k, l] of porChave) { const ab = l.filter(c => ABERTAS.includes(c.etapa)); if (ab.length > 1) raw.duplicados.push(ab.sort((x, y) => x.id - y.id)); }
+    for (const comp of emps) for (const [segKey, seg] of Object.entries(m.empresa.segmentos)) for (const cargo of cfg().cargosFila) {
+      if (!seg.cargos[cargo]) continue;
+      const l = leituraEmpresa(m, comp, segKey, cargo); if (!l.vendedor || !l.classe || (exigir && !l.ultima)) continue;      // fora da fila por regra
+      const k = R.chaveCard(comp.ID, seg.nome, cargo), cs = (porChave.get(k) || []).sort((x, y) => x.id - y.id), ab = cs.filter(c => ABERTAS.includes(c.etapa));
+      if (!cs.length) lista.semCard.push(`${comp.TITLE} · ${seg.nome}`);
+      else if (!ab.length) { const ult = cs[cs.length - 1]; if (['ENC', 'NAOREAL'].includes(ult.etapa)) raw.semProximo.push(ult); }
+      for (const c of ab) if (c.data && l.proxima && c.data !== l.proxima) lista.proximaDiferente.push(`${fmt(c, `card ${dtBRs(c.data)} × cadastro ${dtBRs(l.proxima)}`)}`);
+      const datas = cs.flatMap(c => (regsPorCard.get(String(c.id)) || []).map(r => r.data)).filter(Boolean).sort(), ultReg = datas[datas.length - 1];
+      if (ultReg && (!l.ultima || ultReg > l.ultima)) lista.ultimaDesatualizada.push(`${comp.TITLE} · ${seg.nome} (registro ${dtBRs(ultReg)} × cadastro ${l.ultima ? dtBRs(l.ultima) : 'vazio'})`);
+    }
+    for (const c of abertos) if (c.data && R.etapaPorData(c.data, h) === 'NAOREAL') lista.virariamNaoRealizada.push(c);
+    const hidden = exigir ? (await comUltima(m, lista.virariamNaoRealizada)) : { cards: lista.virariamNaoRealizada };
+    const checks = [], add = (id, titulo, sev, itens, desc, corrigivel = false) => checks.push({ id, titulo, severidade: itens.length ? sev : 'ok', contagem: itens.length, descricao: desc, exemplos: itens.slice(0, 8).map(x => (typeof x === 'string' ? x : fmt(x))), corrigivel: corrigivel && itens.length > 0 });
+    add('registro_card_aberto', 'Visita registrada, mas o card continua aberto', 'erro', raw.registroCardAberto, 'Existe registro no SPA de registros ligado ao card, mas o card não foi encerrado (registro criado direto no Bitrix ou tentativa que parou no meio). A correção encerra o card, atualiza a Última visita da empresa e gera a próxima visita.', true);
+    add('encerrado_sem_registro', 'Card Encerrado sem registro de visita', 'aviso', cards.filter(c => c.etapa === 'ENC' && !regsPorCard.has(String(c.id))), 'Cards movidos para Encerrado fora do app (ou pela automação antiga) que não têm registro no SPA de registros. Não dá para criar o registro automaticamente: faltam os dados da visita.');
+    add('registro_duplicado', 'Mais de um registro para o mesmo card', 'aviso', [...regsPorCard].filter(([, l]) => l.length > 1).map(([id, l]) => `${cardPorId.get(id) ? fmt(cardPorId.get(id)) : 'card ' + id}: registros ${l.map(r => '#' + r.id).join(', ')}`), 'Pode ser visita lançada em duplicidade. Confira no Bitrix e apague a repetida.');
+    add('registro_orfao', 'Registro sem card correspondente na fila', 'aviso', regs.filter(r => !r.idFila || !cardPorId.has(r.idFila)).map(r => `registro #${r.id} · ${emp(r.empresaId)}${r.idFila ? ` (ID Fila ${r.idFila} não existe)` : ' (sem ID Fila)'}`), 'Registros criados à mão ou ligados a card que não existe mais. Não afetam a fila.');
+    add('abertos_duplicados', 'Mais de um card aberto para o mesmo cliente e segmento', 'erro', raw.duplicados.map(l => l[0]), 'Deveria haver só um card aberto por cliente e segmento. A correção mantém o mais antigo e move os outros para Removido (dá para restaurar).', true);
+    add('sem_proximo', 'Ciclo quebrado: último card encerrado e nenhum card aberto', 'erro', raw.semProximo, 'Cliente apto (vendedor, classe e Última visita) cuja visita foi encerrada ou não realizada e que ficou sem a próxima visita. A correção gera o próximo card.', true);
+    add('sem_card', 'Clientes aptos sem nenhum card', 'aviso', lista.semCard, 'Têm vendedor, classe e (se a regra estiver ligada) Última visita, mas nenhum card. A sincronização (fila ligada) cria esses cards.');
+    add('ultima_desatualizada', 'Última visita do cadastro mais antiga que o último registro', 'aviso', lista.ultimaDesatualizada, 'O cadastro da empresa não reflete a última visita registrada. Edite a empresa ou registre pelo app, que grava a data.');
+    add('proxima_diferente', 'Data do card aberta diferente da Próxima visita do cadastro', 'aviso', lista.proximaDiferente, 'O card e o cadastro da empresa mostram datas diferentes. A data do card é a que vale no app; ao reprogramar pelo app as duas ficam iguais.');
+    add('viram_nao_realizada', 'Cards abertos de meses passados (virarão Não realizada ao ligar a fila)', 'aviso', hidden.cards, 'Com a fila ligada, a varredura marca estes como Não realizada e cria o próximo card de cada um. Considere regularizar antes.');
+    const porEtapa = {}; for (const c of cards) porEtapa[c.etapa] = (porEtapa[c.etapa] || 0) + 1;
+    return { raw, resumo: { hoje: h, filaLigada: !!cfg().ativo, regraUltimaVisita: exigir, empresas: emps.length, cards: cards.length, registros: regs.length, cardsPorEtapa: porEtapa }, checks };
+  }
+  const dtBRs = d => (d ? d.split('-').reverse().join('/') : '—');
+  async function auditoria(passo) { const { raw, ...r } = await calcAuditoria(passo); return r; }
+  // Correções seguras e reversíveis: nunca apagam nada de vez.
+  async function corrigirAuditoria(id, passo = () => {}) {
+    if (id === 'registro_card_aberto') { passo('Encerrando os cards que já têm registro…'); return { id, ...(await reconciliar()) }; }
+    const { raw } = await calcAuditoria(passo), m = await modelo(); let n = 0, erros = 0;
+    if (id === 'abertos_duplicados') {
+      passo('Removendo cards abertos duplicados (mantém o mais antigo)…');
+      for (const grupo of raw.duplicados) for (const c of grupo.slice(1)) { try { await mover(m, c.id, 'FAIL'); n++; store.log('auditoria', `Card duplicado ${c.id} (${c.titulo}) movido para Removido`, { card: c.id }); } catch (e) { erros++; } }
+    } else if (id === 'sem_proximo') {
+      passo('Gerando as próximas visitas que faltam…');
+      for (const c of raw.semProximo) { try { const base = c.etapa === 'NAOREAL' ? (c.data > hoje() ? c.data : hoje()) : (c.data || hoje()); if (await gerarProximo(m, c, base)) n++; } catch (e) { erros++; store.log('erro', `auditoria sem_proximo ${c.id}: ${e.message}`.slice(0, 300)); } }
+    } else throw fail(400, 'Esta verificação não tem correção automática.');
+    invalidar('cards', 'dash');
+    return { id, ok: true, corrigidos: n, erros };
+  }
+
   // ---- Cadastrar "Última visita" sem abrir a empresa ----
   // Lista os cards abertos ocultos (empresa+segmento sem Última visita no cadastro), agrupados, dentro do escopo do usuário.
   async function semUltima(user, q = {}) {
@@ -792,6 +892,6 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    preparar, camposInfo, diagnosticoDatas, semUltima, salvarUltimas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    preparar, camposInfo, diagnosticoDatas, reconciliar, auditoria, corrigirAuditoria, semUltima, salvarUltimas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };

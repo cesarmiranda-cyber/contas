@@ -509,6 +509,14 @@ async function telaCfg() {
     <div class="foot" style="margin:12px 0 0;padding:0;background:none;border:0;position:static"><button class="btn pri" id="c_mapa">Salvar mapeamento</button></div></div>` : ''}
   ${S.eu.webhook ? `<div class="sec" id="sec_diag"><h3>Diagnóstico das datas de visita (cadastro das empresas)</h3><div class="mut">Somente leitura. Mostra, por segmento, quantas empresas têm vendedor, classe, última e próxima visita, e qual intervalo existe de fato entre as duas datas (a regra que a automação atual aplica).</div>
     <div class="acoes" style="border:0;padding:0;margin:10px 0"><button class="btn" id="c_diag">Rodar diagnóstico</button><button class="btn pri" id="c_ultima">Cadastrar Última visita (lista)</button></div><div id="diag_out"></div></div>` : ''}
+  ${S.eu.webhook ? `<div class="sec" id="sec_aud"><h3>Auditoria do processo (fila → registro → próxima visita)</h3>
+    <ol class="fluxo"><li><b>Fila:</b> o app cria o card no SPA da fila para cada cliente apto (vendedor, classe e Última visita).</li>
+      <li><b>Visita:</b> o vendedor clica em <b>Registrar</b>; o app cria o registro no SPA de registros, ligado ao card pelo campo "ID Fila".</li>
+      <li><b>Etapa:</b> o card vai para <b>Encerrado</b>.</li>
+      <li><b>Próximo ciclo:</b> o app cria o próximo card (cópia para a data seguinte) e grava Última e Próxima visita na empresa.</li>
+      <li><b>Tela:</b> lista e dashboard atualizam na hora. Se alguém criar o registro direto no Bitrix, a <b>reconciliação</b> (a cada 5 minutos, com a fila ligada) encerra o card e gera a próxima visita.</li></ol>
+    <div class="mut">A auditoria confere se cada passo está íntegro e é somente leitura. As correções só rodam quando você clica em <b>Corrigir</b> e nunca apagam nada de vez.</div>
+    <div class="acoes" style="border:0;padding:0;margin:10px 0"><button class="btn pri" id="c_aud">Rodar auditoria</button></div><div id="aud_out"></div></div>` : ''}
   <div class="sec"><h3>Log</h3><div class="scroll" style="max-height:260px;overflow:auto"><table><tbody>${log.map(l => `<tr><td>${dthBR(l.at)}</td><td>${esc(l.type)}</td><td>${esc(l.msg)}</td></tr>`).join('') || '<tr><td class="mut">Sem registros.</td></tr>'}</tbody></table></div></div>
   <div class="foot"><button class="btn pri" id="c_save">Salvar configurações</button></div>`;
   const addDias = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
@@ -566,6 +574,42 @@ async function telaCfg() {
     $('#c_ultima').onclick = abrirUltimas;
     api('/api/jobs/diagnostico').then(j => { if (!vivo() || S.irDiag) return; if (j.status === 'concluido') mostra(j.resultado, j.fim); else if (j.status === 'rodando') rodarDiag(true); }).catch(() => {});
     if (S.irDiag) { S.irDiag = false; $('#sec_diag').scrollIntoView(); rodarDiag(false); }
+  }
+  if ($('#c_aud')) {
+    const o = $('#aud_out'), b = $('#c_aud'), vivo = () => document.body.contains(o);
+    const ICO = { ok: ['✓', 'ok'], aviso: ['!', 'warn'], erro: ['✕', 'bad'] };
+    const prog = j => `<div class="aviso">${ico('inbox')}<div><b>Executando há ${j.segundos}s</b> — ${esc(j.passo || 'trabalhando…')}<div class="mut">Roda em segundo plano; esta tela acompanha sozinha.</div></div></div>`;
+    const mostra = (r, fim) => {
+      const n = x => Number(x).toLocaleString('pt-BR'), rs = r.resumo, pend = r.checks.filter(c => c.severidade !== 'ok');
+      o.innerHTML = `<div class="mut" style="margin-bottom:8px">${n(rs.empresas)} empresas · ${n(rs.cards)} cards · ${n(rs.registros)} registros · fila <b>${rs.filaLigada ? 'ligada' : 'desligada'}</b> · cards por etapa: ${Object.entries(rs.cardsPorEtapa).map(([k, v]) => `${ETAPAS[k] || k} ${n(v)}`).join(', ') || '—'}</div>
+        <div class="${pend.some(c => c.severidade === 'erro') ? 'aviso erro' : pend.length ? 'aviso' : 'aviso ok'}" style="margin-bottom:10px"><div><b>${pend.length ? `${pend.length} ponto(s) para conferir` : 'Tudo certo: o ciclo está íntegro'}</b>${pend.filter(c => c.severidade === 'erro').length ? ` · ${pend.filter(c => c.severidade === 'erro').length} com erro` : ''}</div></div>` +
+        r.checks.map(c => `<div class="chk ${ICO[c.severidade][1]}"><span class="chk-i">${ICO[c.severidade][0]}</span><div class="chk-b"><div class="chk-t"><b>${esc(c.titulo)}</b> <span class="tag ${ICO[c.severidade][1] === 'ok' ? 'ok' : ICO[c.severidade][1]}">${c.contagem}</span></div>
+          ${c.contagem ? `<div class="mut">${esc(c.descricao)}</div>${c.exemplos.length ? `<ul class="ex">${c.exemplos.map(x => `<li>${esc(x)}</li>`).join('')}${c.contagem > c.exemplos.length ? `<li class="mut">… e mais ${c.contagem - c.exemplos.length}</li>` : ''}</ul>` : ''}${c.corrigivel ? `<button class="btn sm pri" data-corrige="${esc(c.id)}">Corrigir</button>` : ''}` : ''}</div></div>`).join('') +
+        `<div class="mut" style="margin-top:8px">Gerada às ${new Date(fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.</div>`;
+      o.querySelectorAll('[data-corrige]').forEach(btn => btn.onclick = async () => {
+        if (!confirm('Aplicar esta correção agora?\n\nEla só encerra cards, gera próximas visitas ou move duplicados para "Removido" (dá para restaurar). Nada é apagado de vez.')) return;
+        btn.disabled = true; o.insertAdjacentHTML('afterbegin', '<div id="aud_cor" class="aviso">Aplicando a correção…</div>');
+        try {
+          await api('/api/jobs/corrigir', 'POST', { id: btn.dataset.corrige });
+          const j = await acompanhaJob('corrigir', x => { const e = $('#aud_cor'); if (e && x.status === 'rodando') e.textContent = `Aplicando a correção há ${x.segundos}s… ${x.passo || ''}`; }, vivo);
+          if (!j) return;
+          toast(j.status === 'concluido' ? `Correção aplicada (${j.resultado.movidos ?? j.resultado.corrigidos ?? 0} item(ns))` : (j.erro || 'A correção falhou.'));
+          rodar(false);
+        } catch (e) { falha(e); btn.disabled = false; }
+      });
+    };
+    const rodar = async retomar => {
+      b.disabled = true; o.innerHTML = prog({ segundos: 0, passo: 'Iniciando…' });
+      try {
+        if (!retomar) await api('/api/jobs/auditoria', 'POST', {});
+        const j = await acompanhaJob('auditoria', x => { if (x.status === 'rodando') o.innerHTML = prog(x); }, vivo);
+        if (!j) return;
+        if (j.status === 'concluido') mostra(j.resultado, j.fim); else o.innerHTML = `<div class="aviso erro">${esc(j.erro || 'A auditoria não terminou.')}</div>`;
+      } catch (e) { if (vivo()) o.innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; }
+      finally { if (vivo()) b.disabled = false; }
+    };
+    b.onclick = () => rodar(false);
+    api('/api/jobs/auditoria').then(j => { if (!vivo()) return; if (j.status === 'concluido') mostra(j.resultado, j.fim); else if (j.status === 'rodando') rodar(true); }).catch(() => {});
   }
   $('#c_whb').onclick = async () => { try { await api('/api/webhook', 'PUT', { webhook: $('#c_wh').value }); S.eu = await api('/api/eu'); toast('Webhook salvo e testado'); telaCfg(); } catch (e) { falha(e); } };
   const rodar = (id, nome, body) => $(id).onclick = async ev => {
