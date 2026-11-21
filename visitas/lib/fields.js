@@ -8,11 +8,11 @@ const A = v => (Array.isArray(v) ? v : v === undefined || v === null || v === ''
 
 // Campos da empresa -> { segmentos: { chave: { nome, cargos:{Vendedor:[campos]}, classe:[campos], proxima:[campos], ultima:[campos] } }, enums }
 function mapearEmpresa(fields) {
-  const segs = {}, enums = {};
+  const segs = {}, enums = {}, rotulos = {};
   const seg = nome => (segs[norm(nome)] ||= { nome: nome.trim(), cargos: {}, classe: [], proxima: [], ultima: [] });
   for (const [campo, f] of Object.entries(fields || {})) {
     if (!/^UF_/.test(campo)) continue;
-    const l = label(f), n = norm(l);
+    const l = label(f), n = norm(l); rotulos[campo] = l;
     if (f.items) enums[campo] = Object.fromEntries(f.items.map(i => [String(i.ID), i.VALUE]));
     let m;
     if ((m = l.match(/^\[(.+?)\]\s*(.+)$/))) {
@@ -27,7 +27,7 @@ function mapearEmpresa(fields) {
     }
   }
   for (const k of Object.keys(segs)) if (!segs[k].classe.length && !Object.keys(segs[k].cargos).length) delete segs[k];
-  return { segmentos: segs, enums };
+  return { segmentos: segs, enums, rotulos };
 }
 
 // Procura campo de SPA por rótulo (regex sobre o texto normalizado). Devolve a chave (camelCase do crm.item).

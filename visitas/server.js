@@ -82,7 +82,7 @@ const CFG_CAMPOS = {
   intervalos: v => Object.fromEntries(['A', 'B', 'C', 'E'].map(k => [k, Math.max(1, Math.min(400, +v?.[k] || R.DEFAULT_CONFIG.intervalos[k]))])),
   periodos: v => Object.fromEntries(['A', 'B', 'C'].map(k => [k, Math.max(1, Math.min(400, +v?.[k] || R.DEFAULT_CONFIG.periodos[k]))])),
   mesClasseE: v => Math.max(1, Math.min(12, +v || 3)), horaJob: v => Math.max(0, Math.min(23, +v || 7)), sweepSegundos: v => Math.max(10, Math.min(3600, +v || 30)),
-  tarefaAtiva: Boolean, atualizarProxima: Boolean, removerSemClasse: Boolean, hierarquiaAuto: Boolean, ativo: Boolean,
+  tarefaAtiva: Boolean, atualizarProxima: Boolean, removerSemClasse: Boolean, exigirUltimaVisita: Boolean, hierarquiaAuto: Boolean, ativo: Boolean,
   cargosFila: v => (Array.isArray(v) ? v.filter(x => R.CARGOS.includes(x)) : []),
   supervisoresDepts: v => ids(v), supervisoresExtras: v => ids(v), verTudo: v => ids(v), admins: v => ids(v), podeExcluir: v => ids(v),
   motivosNaoRealizada: v => (Array.isArray(v) ? v.map(x => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 30) : []),
@@ -113,6 +113,7 @@ const routes = {
     await bitrix.call('profile').catch(e => { throw bad(502, `Webhook salvo, mas o teste falhou: ${e.message}`); });
     return { ok: true };
   },
+  'GET /api/diagnostico-datas': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.diagnosticoDatas(); },
   'GET /api/campos': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.camposInfo(); },
   'GET /api/usuarios': async (u, b, user) => {
     exigeConfig(user); exigeBitrix(); const q = String(u.searchParams.get('q') || '').trim().slice(0, 60); if (q.length < 2) return [];

@@ -1,13 +1,14 @@
 'use strict';
 const test = require('node:test'); const assert = require('node:assert/strict');
 const fs = require('fs'); const os = require('os'); const path = require('path');
+const R = require('../lib/rules');
 const { createStore } = require('../lib/store'); const { createService } = require('../lib/service'); const { criarFake } = require('./fake');
 
 const vendedor = { id: '7', nome: 'Vera', papel: 'usuario', config: false };
 const admin = { id: '1', nome: 'Admin', papel: 'admin', config: true };
 function mundo() {
   const f = criarFake(), store = createStore(fs.mkdtempSync(path.join(os.tmpdir(), 'vis-')));
-  store.setConfig({ ativo: true });
+  store.setConfig({ ativo: true, exigirUltimaVisita: false });
   f.s.empresas.push(
     { ID: '100', TITLE: 'Alfa Motores', UF_V: '7', UF_C: '1', UF_P: '', UF_U: '' },
     { ID: '101', TITLE: 'Beta Diesel', UF_V: '7', UF_C: '2' },
@@ -229,4 +230,33 @@ test('registros mostram todos os campos do SPA com rótulo e valor; rótulo pare
   assert.equal(item.valores[rot['Supervisor que acompanhou']], 'Sérgio Supervisor'); assert.equal(item.valores[rot['Contatos']], 'João Silva'); assert.equal(item.valores[rot['Visita antecipada']], 'Sim');
   const um = await svc.registroDoCard(card.id, admin); assert.ok(um.campos.some(c => c.label === 'Observação interna' && c.valor === 'nota interna')); assert.equal(um.raw, undefined);
   store.setConfig({ mapa: { visita: { fatos: 'ufExtra' } } }); svc.resetModelo(); assert.equal((await svc.camposInfo()).visitaDetectada.fatos, 'ufExtra');   // ajuste manual
+});
+test('regra: sem "Última visita" no cadastro a empresa não entra na fila nem aparece no app', async () => {
+  const { f, svc, store } = mundo(); store.setConfig({ exigirUltimaVisita: true });
+  f.s.empresas[0].UF_U = '2026-10-20';                                  // só a Alfa (classe A) tem última visita
+  const r = await svc.sync();
+  assert.equal(r.criados, 1); assert.equal(r.semUltima, 1);              // Beta tem vendedor+classe mas não tem última: não gera card
+  const cards = f.s.itens[1036]; assert.equal(cards.length, 1); assert.equal(+cards[0].companyId, 100);
+  assert.equal(cards[0].ufData, R.proximaVisita('A', '2026-10-20'));        // última visita + 30 dias (classe A), em dia útil
+  // card antigo de empresa sem última visita fica no Bitrix, mas oculto no app
+  f.s.itens[1036].push({ id: 900, title: 'Beta', companyId: 101, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '7', ufSeg: 'Motores', ufClasse: 'B', ufData: '2026-12-10' }); svc.invalidar();
+  const l = await svc.listar(admin, {}); assert.deepEqual(l.itens.map(i => i.empresaId), [100]); assert.equal(l.ocultos, 1); assert.equal(l.itens[0].ultimaVisita, '2026-10-20');
+  assert.equal((await svc.dashboard(admin, {})).kpis.programadas, 1);
+  store.setConfig({ exigirUltimaVisita: false }); assert.equal((await svc.listar(admin, {})).itens.length, 2);       // desligando a regra, volta a aparecer
+});
+test('registrar mantém o cache da última visita: o card seguinte continua visível', async () => {
+  const { f, svc, store } = mundo(); store.setConfig({ exigirUltimaVisita: true }); f.s.empresas[0].UF_U = '2026-10-20'; await svc.sync();
+  const card = f.s.itens[1036].find(c => c.companyId == 100); await svc.listar(admin, {});          // aquece o cache
+  await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'ok' }, vendedor);
+  const l = await svc.listar(admin, { finalizados: '1' }); assert.equal(l.itens.filter(i => i.empresaId === 100).length, 2); assert.equal(l.itens[0].ultimaVisita, '2026-11-18');
+});
+test('diagnóstico das datas: contagens, intervalos observados e exemplos', async () => {
+  const { f, svc } = mundo();
+  Object.assign(f.s.empresas[0], { UF_U: '2026-10-01', UF_P: '2026-10-31' }); Object.assign(f.s.empresas[1], { UF_U: '2026-10-01', UF_P: '2026-12-01' });
+  f.s.empresas.push({ ID: '110', TITLE: 'Invertida', UF_V: '7', UF_C: '1', UF_U: '2026-11-01', UF_P: '2026-10-01' });
+  const d = await svc.diagnosticoDatas(), s = d.segmentos[0];
+  assert.equal(d.empresas, 5); assert.equal(s.nome, 'Motores'); assert.equal(s.comUltima, 3); assert.equal(s.aptas, 3); assert.equal(s.semUltima, 0);
+  assert.equal(s.proximaAntesDaUltima, 1); assert.match(s.exemplos.inconsistentes[0], /Invertida/);
+  assert.deepEqual(s.intervalosObservados.A, [{ dias: 30, empresas: 1 }]); assert.deepEqual(s.intervalosObservados.B, [{ dias: 61, empresas: 1 }]);
+  assert.ok(s.campos.ultima.includes('[Motores] Última Visita'));
 });

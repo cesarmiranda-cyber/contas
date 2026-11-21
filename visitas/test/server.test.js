@@ -29,3 +29,4 @@ test('segurança: busca de usuários e nomes só para quem configura; limite de 
   let last; for (let i = 0; i < 310; i++) last = (await fetch(base + '/api/eu', { headers: h })).status;
   assert.equal(last, 429);
 });
+test('a regra "só com Última visita" vem ligada por padrão', () => { assert.equal(require('../lib/rules').DEFAULT_CONFIG.exigirUltimaVisita, true); });

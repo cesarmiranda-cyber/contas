@@ -76,7 +76,29 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const fields = {};
     if (ultima && s.ultima[0]) fields[s.ultima[0]] = ultima;
     if (proxima && s.proxima[0]) fields[s.proxima[0]] = proxima;
-    if (Object.keys(fields).length) await bx.call('crm.company.update', { id: empresaId, fields });
+    if (Object.keys(fields).length) {
+      await bx.call('crm.company.update', { id: empresaId, fields });
+      const mapa = memo.get('ult')?.v;        // mantém o cache de datas do cadastro em dia sem reler todas as empresas
+      if (mapa) { const k = `${empresaId}|${R.norm(segNome)}`, cur = mapa.get(k) || {}; mapa.set(k, { ultima: ultima || cur.ultima || '', proxima: proxima || cur.proxima || '' }); }
+    }
+  }
+  // Datas "Última/Próxima visita" do cadastro da empresa, por empresa+segmento (cache longo, atualizado nas gravações).
+  const chaveUlt = c => `${c.empresaId}|${R.norm(c.segmento)}`;
+  async function ultimasC(m) {
+    return cached('ult', 600000, async () => {
+      const mapa = new Map();
+      for (const comp of await empresasSync(m)) for (const [k, s] of Object.entries(m.empresa.segmentos)) {
+        const ultima = dia(primeiro(comp, s.ultima)), proxima = dia(primeiro(comp, s.proxima));
+        if (ultima || proxima) mapa.set(`${comp.ID}|${k}`, { ultima, proxima });
+      }
+      return mapa;
+    }, 3600000);
+  }
+  // Regra: sem "Última visita" no cadastro da empresa (naquele segmento), o card não aparece no app.
+  async function comUltima(m, cards) {
+    if (!cfg().exigirUltimaVisita) return { cards, ocultos: 0 };
+    const u = await ultimasC(m), ok = cards.filter(c => u.get(chaveUlt(c))?.ultima);
+    return { cards: ok, ocultos: cards.length - ok.length };
   }
   async function tituloEmpresas(ids) {
     const falta = [...new Set(ids)].filter(i => !memo.get(`emp:${i}`));
@@ -217,7 +239,8 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
           const seg = m.empresa.segmentos[segKey];
           for (const cargo of cfg().cargosFila) {
             if (!seg.cargos[cargo]) continue;
-            const { vendedor, classe, proxima } = leituraEmpresa(m, comp, segKey, cargo);
+            const { vendedor, classe, proxima, ultima } = leituraEmpresa(m, comp, segKey, cargo);
+            const semUlt = cfg().exigirUltimaVisita && !ultima;
             const k = R.chaveCard(comp.ID, seg.nome, cargo), ex = porChave.get(k) || [], abertos = ex.filter(c => ABERTAS.includes(c.etapa));
             if (!vendedor || !classe) {
               r.semClasse++;
@@ -227,12 +250,17 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
             if (!abertos.length) {
               const ult = ex.filter(c => c.etapa !== 'FAIL').sort((a, b) => b.id - a.id)[0];
               const base = { empresaId: +comp.ID, empresa: comp.TITLE, segmento: seg.nome, cargo, classe, vendedorId: vendedor };
-              if (!ex.length) {
+              if (semUlt) { r.semUltima = (r.semUltima || 0) + 1; continue; }              // sem última visita no cadastro: não entra na fila
+              if (!ex.length && cfg().exigirUltimaVisita && !(proxima && proxima >= h)) {   // 1º card nasce da última visita + intervalo da classe
+                let data = R.proximaVisita(classe, ultima, cfg()); if (R.etapaPorData(data, h) === 'NAOREAL') data = R.nextBusinessDay(h);
+                r.criados++; acoes.push(async () => { await criarCard(m, { ...base, data }); await atualizarEmpresa(m, base.empresaId, base.segmento, { proxima: data }); });
+              } else if (!ex.length) {
                 if (proxima && proxima >= h) { r.criados++; acoes.push(() => criarCard(m, { ...base, data: proxima })); }
                 else primeiras[classe].push(base);
               } else if (ult) { r.criados++; acoes.push(() => criarCard(m, { ...base, data: R.proximaVisita(classe, ult.etapa === 'NAOREAL' ? (ult.data > h ? ult.data : h) : (ult.data || h), cfg()) })); }
               continue;
             }
+            if (semUlt) continue;                                                       // card existente sem última visita: fica como está (oculto no app)
             abertos.slice(1).forEach(c => { r.removidos++; acoes.push(() => mover(m, c.id, 'FAIL')); });
             const c = abertos[0], upd = {};
             if (c.vendedorId !== vendedor) upd.assignedById = vendedor;
@@ -268,7 +296,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     varrendo = true;
     try {
       const m = await modelo(), h = hoje();
-      const abertos = (await cardsC(m)).filter(c => ABERTAS.includes(c.etapa) && c.data);     // usa o cache: não refaz a leitura inteira a cada 30 s
+      const abertos = (await comUltima(m, (await cardsC(m)).filter(c => ABERTAS.includes(c.etapa) && c.data))).cards;     // usa o cache: não refaz a leitura inteira a cada 30 s
       let n = 0;
       for (const c of abertos) {
         const alvo = R.etapaPorData(c.data, h);
@@ -510,6 +538,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const excl = q.excluidos === '1';
     cards = cards.filter(c => (excl ? c.etapa === 'FAIL' : c.etapa !== 'FAIL'));
     if (!excl && !q.etapa && q.finalizados !== '1') cards = cards.filter(c => c.etapa !== 'SUCCESS');   // Finalizado só aparece a pedido
+    const ult = await ultimasC(m), cu = await comUltima(m, cards); cards = cu.cards;
     if (de || ate) cards = cards.filter(c => c.etapa === 'NAOREAL' || !c.data || ((!de || c.data >= de) && (!ate || c.data <= ate)) || (ABERTAS.includes(c.etapa) && c.data < de && !q.de));
     if (q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
     if (q.vendedor) cards = cards.filter(c => c.vendedorId === (q.vendedor === 'sem' ? '' : String(q.vendedor)));
@@ -525,14 +554,14 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const size = Math.min(todos ? 5000 : 200, Math.max(10, +q.pageSize || 50)), pages = todos ? 1 : Math.max(1, Math.ceil(unidades.length / size)), page = todos ? 1 : Math.min(pages, Math.max(1, +q.page || 1));
     const fatia = (todos ? unidades : unidades.slice((page - 1) * size, page * size)).flat();   // só a página corrente busca nomes no Bitrix
     const tit = await tituloEmpresas(fatia.map(c => c.empresaId)), nm = await nomes(fatia.map(c => c.vendedorId));
-    return { hoje: h, de, ate, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
+    return { hoje: h, de, ate, ocultos: cu.ocultos, exigirUltima: cfg().exigirUltimaVisita, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), ultimaVisita: ult.get(chaveUlt(c))?.ultima || '', reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
   async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i)), 600000); }
   // Cards no escopo do usuário + filtros do painel (período na data programada). `sem` ignora um filtro (para as opções dos seletores).
   async function filtrados(user, q = {}, sem = []) {
     const m = await modelo();
-    let cards = (await visiveis(user, await cardsC(m))).filter(c => c.etapa !== 'FAIL');
+    let cards = (await comUltima(m, (await visiveis(user, await cardsC(m))).filter(c => c.etapa !== 'FAIL'))).cards;
     if (!sem.includes('de') && q.de) cards = cards.filter(c => c.data && c.data >= q.de);
     if (!sem.includes('ate') && q.ate) cards = cards.filter(c => c.data && c.data <= q.ate);
     if (!sem.includes('segmento') && q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
@@ -568,6 +597,37 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       motivos: Object.entries(mot).sort((a, b) => b[1] - a[1]).map(([nome, n]) => ({ nome, n })),
       opcoes: { segmentos: [...new Set(base.map(c => c.segmento).filter(Boolean))].sort(), vendedores: [...new Map(base.map(c => [c.vendedorId || 'sem', nm(c.vendedorId)]))].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)), classes: ['A', 'B', 'C', 'E'] },
     };
+  }
+  // Diagnóstico (somente leitura) de como as datas de visita estão no cadastro das empresas.
+  async function diagnosticoDatas() {
+    const m = await modelo(true), h = hoje(), [emps, cards] = await Promise.all([empresasSync(m), cardsTodos(m)]);
+    const porChave = new Map(); for (const c of cards) { const k = `${c.empresaId}|${R.norm(c.segmento)}`; (porChave.get(k) || porChave.set(k, []).get(k)).push(c); }
+    const nome = id => m.empresa.rotulos?.[id] || id, ex = (l, t) => { if (l.length < 6) l.push(t); };
+    const segmentos = Object.entries(m.empresa.segmentos).map(([k, s]) => {
+      const st = { nome: s.nome, campos: { vendedor: (s.cargos.Vendedor || []).map(nome), classe: s.classe.map(nome), ultima: s.ultima.map(nome), proxima: s.proxima.map(nome) },
+        comVendedor: 0, comClasse: 0, comUltima: 0, comProxima: 0, aptas: 0, semUltima: 0, ultimaFutura: 0, proximaAntesDaUltima: 0, proximaIgualEsperada: 0, proximaDiferente: 0,
+        cardsAbertos: 0, cardsAbertosSemUltima: 0, cardsDataDiferenteDoCadastro: 0, exemplos: { semUltima: [], inconsistentes: [] } };
+      const delta = {};
+      for (const comp of emps) {
+        const { vendedor, classe, proxima, ultima } = leituraEmpresa(m, comp, k, 'Vendedor');
+        if (vendedor) st.comVendedor++; if (classe) st.comClasse++; if (ultima) st.comUltima++; if (proxima) st.comProxima++;
+        const apta = vendedor && classe;
+        if (apta && ultima) st.aptas++;
+        if (apta && !ultima) { st.semUltima++; ex(st.exemplos.semUltima, comp.TITLE); }
+        if (ultima && ultima > h) st.ultimaFutura++;
+        if (ultima && proxima) {
+          if (proxima < ultima) { st.proximaAntesDaUltima++; ex(st.exemplos.inconsistentes, `${comp.TITLE} (última ${ultima}, próxima ${proxima})`); }
+          else { const d = R.dayDiff(ultima, proxima); (delta[classe || '—'] ||= {})[d] = (delta[classe || '—'][d] || 0) + 1; }
+          if (classe && proxima === R.proximaVisita(classe, ultima, cfg())) st.proximaIgualEsperada++; else st.proximaDiferente++;
+        }
+        for (const c of (porChave.get(`${comp.ID}|${k}`) || []).filter(x => ABERTAS.includes(x.etapa))) {
+          st.cardsAbertos++; if (!ultima) st.cardsAbertosSemUltima++; if (proxima && c.data && c.data !== proxima) st.cardsDataDiferenteDoCadastro++;
+        }
+      }
+      st.intervalosObservados = Object.fromEntries(Object.entries(delta).map(([cl, o]) => [cl, Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([dias, n]) => ({ dias: +dias, empresas: n }))]));
+      return st;
+    });
+    return { hoje: h, exigirUltimaVisita: cfg().exigirUltimaVisita, empresas: emps.length, intervalosDoApp: cfg().intervalos, segmentos };
   }
   // Registros de visita (SPA 1032) dos cards filtrados: busca, paginação e permissão de edição.
   async function registros(user, q = {}) {
@@ -622,6 +682,6 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    preparar, camposInfo, supervisores, temAcesso, resetModelo: () => { modeloC = null; invalidar(); }, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    preparar, camposInfo, diagnosticoDatas, supervisores, temAcesso, resetModelo: () => { modeloC = null; invalidar(); }, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };

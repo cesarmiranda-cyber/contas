@@ -13,6 +13,7 @@ const DEFAULT_CONFIG = {
   mesClasseE: 3,
   horaJob: 7, sweepSegundos: 30,
   tarefaAtiva: false, atualizarProxima: true, removerSemClasse: true,
+  exigirUltimaVisita: true,    // só entra no app quem tem "Última visita" no cadastro da empresa (por segmento)
   cargosFila: ['Vendedor'],
   supervisoresDepts: [], supervisoresExtras: [],
   motivosNaoRealizada: MOTIVOS,

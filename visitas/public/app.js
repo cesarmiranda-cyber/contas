@@ -55,7 +55,7 @@ S.agrupar = localStorage.getItem('vis.g') !== '0'; S.fin = localStorage.getItem(
 async function telaFila() {
   gen.n++; const app = $('#app');
   if (!$('#fil')) {
-    app.innerHTML = `<div class="kpis" id="kpis"></div><div class="filtros" id="fil"></div><div id="lista"><div class="grid">${'<div class="sk"></div>'.repeat(6)}</div></div>`;
+    app.innerHTML = `<div class="kpis" id="kpis"></div><div class="filtros" id="fil"></div><div id="aoc"></div><div id="lista"><div class="grid">${'<div class="sk"></div>'.repeat(6)}</div></div>`;
   } else $('#lista').classList.add('busy');
   const f = S.f, kan = S.vista === 'kanban';
   const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', finalizados: S.fin ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
@@ -87,6 +87,8 @@ async function telaFila() {
   if ($('#b_excl')) $('#b_excl').onclick = telaExcluidos;
   $('#kpis').innerHTML = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'].map(c => `<button class="kpi-t ${f.etapa === c ? 'on' : ''}" data-e="${c}" data-kpi="${c}"><b>${S.porEtapa[c] || 0}</b><span>${ETAPAS[c]}</span></button>`).join('');
   document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { f.etapa = f.etapa === b.dataset.kpi ? '' : b.dataset.kpi; S.page = 1; telaFila(); });
+  $('#aoc').innerHTML = r.ocultos > 0 ? `<div class="aviso">${ico('inbox')}<div><b>${r.ocultos} visita(s) oculta(s)</b>: a empresa não tem <b>Última visita</b> preenchida no cadastro para aquele segmento.${S.eu.config ? ' <a href="#" id="a_diag">Ver diagnóstico das datas</a>' : ''}</div></div>` : '';
+  if ($('#a_diag')) $('#a_diag').onclick = e => { e.preventDefault(); S.aba = 'cfg'; S.irDiag = true; tabs(); render(); };
   $('#lista').classList.remove('busy');
   desenhaLista();
 }
@@ -105,7 +107,7 @@ function linhaHtml(i, kan) {
   const r = rel(i.data, S.hoje), abre = ABERTA.includes(i.etapa);
   return `<div class="srow" data-e="${i.etapa}" data-id="${i.id}" ${abre && kan ? 'draggable="true"' : ''}>
     <div class="srow-t"><span class="segn">${esc(i.segmento || '—')}</span><span class="cls ${esc(i.classe)}" title="Classe ${esc(i.classe || '—')}">${esc(i.classe || '–')}</span>${kan ? '' : `<span class="tag" data-e="${i.etapa}">${esc(nomeEtapa(i))}</span>`}</div>
-    <div class="srow-s"><span class="who"><span class="av">${esc(ini(i.vendedor))}</span>${esc(i.vendedor)}</span><span class="dt">${ico('cal')}${dtBR(i.data)}${r ? ` <span class="mut">${r}</span>` : ''}</span>${i.atrasoDias ? `<span class="tag bad">${i.atrasoDias}d de atraso</span>` : ''}${i.reprogramado ? '<span class="tag warn">data alterada</span>' : ''}</div>
+    <div class="srow-s"><span class="who"><span class="av">${esc(ini(i.vendedor))}</span>${esc(i.vendedor)}</span><span class="dt">${ico('cal')}${dtBR(i.data)}${r ? ` <span class="mut">${r}</span>` : ''}</span>${i.ultimaVisita ? `<span title="Última visita no cadastro da empresa">última: ${dtBR(i.ultimaVisita)}</span>` : ''}${i.atrasoDias ? `<span class="tag bad">${i.atrasoDias}d de atraso</span>` : ''}${i.reprogramado ? '<span class="tag warn">data alterada</span>' : ''}</div>
     ${i.etapa === 'NAOREAL' && i.motivo ? `<div class="mut">Motivo: ${esc(i.motivo)}${i.detalhe ? ' — ' + esc(i.detalhe) : ''}</div>` : ''}
     <div class="srow-a">${acoesLinha(i)}</div></div>`;
 }
@@ -372,6 +374,7 @@ async function telaCfg() {
     <div style="margin-top:6px"><label><input type="checkbox" id="c_tarefa" ${c.tarefaAtiva ? 'checked' : ''}> Criar tarefa para o vendedor nas não realizadas</label></div>
     <div><label><input type="checkbox" id="c_atu" ${c.atualizarProxima ? 'checked' : ''}> Atualizar "Última/Próxima visita" no cadastro da empresa</label></div>
     <div><label><input type="checkbox" id="c_sem" ${c.removerSemClasse ? 'checked' : ''}> Remover cards de empresas sem classe</label></div>
+    <div><label><input type="checkbox" id="c_ult" ${c.exigirUltimaVisita ? 'checked' : ''}> <b>Só mostrar empresas com "Última visita" preenchida no cadastro</b> (por segmento; sem ela o card não aparece nem é gerado)</label></div>
     <div class="row2" style="margin-top:6px"><label class="f"><span>Hora do job diário (Brasília)</span><input type="number" min="0" max="23" id="c_hora" value="${c.horaJob}"></label><label class="f"><span>Varredura (segundos)</span><input type="number" min="10" id="c_sw" value="${c.sweepSegundos}"></label></div></div>
   <div class="sec"><h3>Motivos da não realização</h3><textarea id="c_mot" rows="6">${esc(c.motivosNaoRealizada.join('\n'))}</textarea><div class="mut">Um por linha. Padrão: ${esc(motivosPadrao.length)} motivos.</div></div>
   <div class="sec"><h3>Departamentos com acesso ao app</h3><div class="mut">Marque os departamentos que podem usar o app (subdepartamentos incluídos). Nenhum marcado = todos do portal. Administradores sempre têm acesso.</div>
@@ -382,6 +385,8 @@ async function telaCfg() {
     <h4 style="margin:14px 0 4px">Fila (SPA de cards)</h4><div class="row2">${[['data', 'Data programada'], ['vendedor', 'Vendedor (vazio = responsável do card)'], ['segmento', 'Segmento'], ['classe', 'Classe'], ['cargo', 'Cargo']].map(([k, t]) => `<label class="f"><span>${t} · detectado: <b>${esc(info.fila[k] || 'não encontrado')}</b></span><select data-mapa="${k}"><option value="">(automático)</option>${info.disponiveis.map(d => `<option value="${esc(d.key)}" ${info.mapa[k] === d.key ? 'selected' : ''}>${esc(d.label)} · ${esc(d.key)}${d.type ? ' (' + esc(d.type) + ')' : ''}</option>`).join('')}</select></label>`).join('')}</div>
     <h4 style="margin:14px 0 4px">Registro de visita (SPA de registros)</h4><div class="row2">${[['data', 'Data/hora da visita'], ['fatos', 'Fatos e dados'], ['interesses', 'Interesses'], ['sentimentos', 'Sentimentos'], ['valores', 'Valores'], ['populacao', 'População de motores'], ['regime', 'Regime de trabalho'], ['oportunidades', 'Oportunidades futuras'], ['antecipada', 'Reunião antecipada'], ['resultado', 'Resultado / observações'], ['acompanhamento', 'Acompanhamento'], ['anexos', 'Anexos'], ['supervisor', 'Supervisor que acompanhou'], ['idFila', 'ID Fila (liga ao card)'], ['segmento', 'Segmento']].map(([k, t]) => `<label class="f"><span>${t} · detectado: <b>${esc(info.visitaDetectada[k] || 'não encontrado')}</b></span><select data-mapav="${k}"><option value="">(automático)</option>${info.disponiveisVisita.map(d => `<option value="${esc(d.key)}" ${info.mapaVisita[k] === d.key ? 'selected' : ''}>${esc(d.label)} · ${esc(d.key)}${d.type ? ' (' + esc(d.type) + ')' : ''}</option>`).join('')}</select></label>`).join('')}</div>
     <div class="foot" style="margin:12px 0 0;padding:0;background:none;border:0;position:static"><button class="btn pri" id="c_mapa">Salvar mapeamento</button></div></div>` : ''}
+  ${S.eu.webhook ? `<div class="sec" id="sec_diag"><h3>Diagnóstico das datas de visita (cadastro das empresas)</h3><div class="mut">Somente leitura. Mostra, por segmento, quantas empresas têm vendedor, classe, última e próxima visita, e qual intervalo existe de fato entre as duas datas (a regra que a automação atual aplica).</div>
+    <div class="acoes" style="border:0;padding:0;margin:10px 0"><button class="btn" id="c_diag">Rodar diagnóstico</button></div><div id="diag_out"></div></div>` : ''}
   <div class="sec"><h3>Log</h3><div class="scroll" style="max-height:260px;overflow:auto"><table><tbody>${log.map(l => `<tr><td>${dthBR(l.at)}</td><td>${esc(l.type)}</td><td>${esc(l.msg)}</td></tr>`).join('') || '<tr><td class="mut">Sem registros.</td></tr>'}</tbody></table></div></div>
   <div class="foot"><button class="btn pri" id="c_save">Salvar configurações</button></div>`;
   const draft = { verTudo: [...c.verTudo], podeExcluir: [...c.podeExcluir], admins: [...c.admins], supervisoresExtras: [...c.supervisoresExtras] };
@@ -395,11 +400,35 @@ async function telaCfg() {
   const salvar = async extra => {
     const n = id => +$('#' + id).value;
     return api('/api/config', 'PUT', { ...draft, ...extra, intervalos: { A: n('c_iA'), B: n('c_iB'), C: n('c_iC'), E: n('c_iE') }, periodos: { A: n('c_pA'), B: n('c_pB'), C: n('c_pC') }, mesClasseE: n('c_mE'), horaJob: n('c_hora'), sweepSegundos: n('c_sw'),
-      cargosFila: [...document.querySelectorAll('[name=c_cargo]:checked')].map(x => x.value), tarefaAtiva: $('#c_tarefa').checked, atualizarProxima: $('#c_atu').checked, removerSemClasse: $('#c_sem').checked, ativo: $('#c_ativo').checked, ...(depts.length ? { deptsAcesso: [...document.querySelectorAll('[name=c_dept]:checked')].map(x => x.value) } : {}),
+      cargosFila: [...document.querySelectorAll('[name=c_cargo]:checked')].map(x => x.value), tarefaAtiva: $('#c_tarefa').checked, atualizarProxima: $('#c_atu').checked, removerSemClasse: $('#c_sem').checked, exigirUltimaVisita: $('#c_ult').checked, ativo: $('#c_ativo').checked, ...(depts.length ? { deptsAcesso: [...document.querySelectorAll('[name=c_dept]:checked')].map(x => x.value) } : {}),
       motivosNaoRealizada: $('#c_mot').value.split('\n') });
   };
   $('#c_save').onclick = async () => { try { await salvar(); S.eu = await api('/api/eu'); toast('Configurações salvas'); } catch (e) { falha(e); } };
   if ($('#c_mapa')) $('#c_mapa').onclick = async () => { try { const fila = {}, visita = {}; document.querySelectorAll('[data-mapa]').forEach(x => { if (x.value) fila[x.dataset.mapa] = x.value; }); document.querySelectorAll('[data-mapav]').forEach(x => { if (x.value) visita[x.dataset.mapav] = x.value; }); await api('/api/config', 'PUT', { mapa: { fila, visita } }); toast('Mapeamento salvo'); telaCfg(); } catch (e) { falha(e); } };
+  if ($('#c_diag')) {
+    const rodarDiag = async () => {
+      const o = $('#diag_out'), b = $('#c_diag'); b.disabled = true; o.innerHTML = '<div class="sk" style="height:90px"></div>';
+      try {
+        const d = await api('/api/diagnostico-datas'), n = x => Number(x).toLocaleString('pt-BR');
+        o.innerHTML = `<div class="mut" style="margin-bottom:8px">${n(d.empresas)} empresas lidas · regra "só com Última visita": <b>${d.exigirUltimaVisita ? 'ligada' : 'desligada'}</b> · intervalos do app: A ${d.intervalosDoApp.A}d, B ${d.intervalosDoApp.B}d, C ${d.intervalosDoApp.C}d, E ${d.intervalosDoApp.E} meses</div>` + d.segmentos.map(s => `<div class="sec" style="box-shadow:none;margin:0 0 10px"><h3>${esc(s.nome)}</h3>
+          <div class="mut">Campos lidos — vendedor: ${esc(s.campos.vendedor.join(' | ') || 'nenhum')} · classe: ${esc(s.campos.classe.join(' | ') || 'nenhum')} · última: ${esc(s.campos.ultima.join(' | ') || 'nenhum')} · próxima: ${esc(s.campos.proxima.join(' | ') || 'nenhum')}</div>
+          <div class="scroll" style="margin:8px 0"><table><tbody>
+            <tr><td>Com vendedor</td><td><b>${n(s.comVendedor)}</b></td><td>Com classe</td><td><b>${n(s.comClasse)}</b></td></tr>
+            <tr><td>Com Última visita</td><td><b>${n(s.comUltima)}</b></td><td>Com Próxima visita</td><td><b>${n(s.comProxima)}</b></td></tr>
+            <tr><td>Aptas (vendedor + classe + última)</td><td><b style="color:var(--e-enc)">${n(s.aptas)}</b></td><td>Ficam de fora (têm vendedor e classe, sem última)</td><td><b style="color:var(--e-late)">${n(s.semUltima)}</b></td></tr>
+            <tr><td>Próxima = última + intervalo do app</td><td><b>${n(s.proximaIgualEsperada)}</b></td><td>Próxima diferente do esperado</td><td><b>${n(s.proximaDiferente)}</b></td></tr>
+            <tr><td>Próxima anterior à última (inconsistente)</td><td><b>${n(s.proximaAntesDaUltima)}</b></td><td>Última visita no futuro</td><td><b>${n(s.ultimaFutura)}</b></td></tr>
+            <tr><td>Cards abertos na fila</td><td><b>${n(s.cardsAbertos)}</b></td><td>…desses, sem última visita (ocultos)</td><td><b>${n(s.cardsAbertosSemUltima)}</b></td></tr>
+            <tr><td>Cards com data ≠ próxima do cadastro</td><td colspan="3"><b>${n(s.cardsDataDiferenteDoCadastro)}</b></td></tr></tbody></table></div>
+          <div class="mut"><b>Intervalo mais comum entre última e próxima (dias), por classe:</b> ${Object.entries(s.intervalosObservados).map(([c, l]) => `Classe ${esc(c)}: ${l.map(x => `${x.dias}d (${n(x.empresas)})`).join(', ')}`).join(' · ') || 'sem dados'}</div>
+          ${s.exemplos.semUltima.length ? `<div class="mut" style="margin-top:6px"><b>Exemplos sem última visita:</b> ${s.exemplos.semUltima.map(esc).join('; ')}</div>` : ''}
+          ${s.exemplos.inconsistentes.length ? `<div class="mut" style="margin-top:6px"><b>Exemplos de datas inconsistentes:</b> ${s.exemplos.inconsistentes.map(esc).join('; ')}</div>` : ''}</div>`).join('');
+      } catch (e) { o.innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; }
+      b.disabled = false;
+    };
+    $('#c_diag').onclick = rodarDiag;
+    if (S.irDiag) { S.irDiag = false; $('#sec_diag').scrollIntoView(); rodarDiag(); }
+  }
   $('#c_whb').onclick = async () => { try { await api('/api/webhook', 'PUT', { webhook: $('#c_wh').value }); S.eu = await api('/api/eu'); toast('Webhook salvo e testado'); telaCfg(); } catch (e) { falha(e); } };
   const rodar = (id, url, body) => $(id).onclick = async ev => { ev.target.disabled = true; $('#c_out').textContent = 'Executando…'; try { await salvar(); $('#c_out').textContent = JSON.stringify(await api(url, 'POST', body), null, 2); } catch (e) { $('#c_out').textContent = e.message; } ev.target.disabled = false; };
   rodar('#c_prev', '/api/sincronizar', { previa: true }); rodar('#c_sync', '/api/sincronizar', { forcar: true }); rodar('#c_prep', '/api/preparar', {});
