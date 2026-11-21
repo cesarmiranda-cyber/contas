@@ -72,10 +72,10 @@ async function telaFila() {
     setTimeout(() => { const d = $('#dica'); if (d) d.hidden = false; }, 3500);
   } else $('#lista').classList.add('busy');
   const f = S.f, kan = S.vista === 'kanban';
-  const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', finalizados: S.fin ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
+  const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', finalizados: S.fin || kan ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
   const r = await vapi('/api/visitas?' + q);
   S.itens = r.itens; S.total = r.total; S.grupos = r.totalGrupos; S.pages = r.pages; S.page = r.page; S.porEtapa = r.porEtapa || {};
-  S.hoje = r.hoje; S.opcoes = r.opcoes || { segmentos: [], vendedores: [] };
+  S.hoje = r.hoje; S.opcoes = r.opcoes || { segmentos: [], vendedores: [] }; S.etapasReais = r.etapasReais || { LATE: false, NAOREAL: false };
   // Itens são texto simples ou pares [valor, rótulo]; (cuidado: indexar um texto pegaria letras soltas)
   const op = (k, arr) => `<option value="">Todos</option>` + arr.map(x => { const [v, l] = Array.isArray(x) ? x : [x, x]; return `<option value="${esc(v)}" ${f[k] === String(v) ? 'selected' : ''}>${esc(l)}</option>`; }).join('');
   const vend = S.opcoes.vendedores.map(v => [v.id, v.nome]);
@@ -144,10 +144,17 @@ function ligaPager(L) {
   if ($('#pg_size')) $('#pg_size').onchange = e => { S.size = +e.target.value; S.page = 1; telaFila(); };
 }
 function kanbanHtml(it) {
-  const cols = COLS.filter(c => ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'].includes(c) || it.some(i => i.etapa === c));
-  return `<div class="kdica">${ico('pin')} Arraste um item para outra coluna: <b>Encerrado</b> abre o registro, <b>Não realizada</b> pede o motivo, <b>Aguardando / Dia da visita</b> altera a data${S.eu.podeExcluir ? ' e a faixa inferior exclui' : ''}.</div>
-  <div class="kanban">${cols.map(c => { const gs = agrupaItens(it.filter(i => i.etapa === c)), lim = S.kan[c] || 20;
-    return `<div class="col" data-e="${c}" data-col="${c}"><h4>${ETAPAS[c]} <b>${gs.reduce((n, g) => n + g.length, 0)}</b></h4><div class="colb">${gs.slice(0, lim).map(g => grupoHtml(g, true)).join('') || '<div class="mut" style="padding:10px">Vazio</div>'}${gs.length > lim ? `<button class="btn sm" data-mais="${c}">Ver mais (${gs.length - lim})</button>` : ''}</div></div>`; }).join('')}</div>`;
+  const col = i => (i.etapa === 'SUCCESS' ? 'ENC' : i.etapa);                      // Finalizado e Encerrado são a mesma fase no quadro
+  const base = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'], extras = [...new Set(it.map(col))].filter(c => !base.includes(c) && c !== 'FAIL');
+  const semNaoReal = `<div class="ecria"><div class="mut">A etapa <b>Não realizada</b> ainda não existe no seu Bitrix, por isso nenhum card pode ficar aqui.</div>${S.eu.config ? '<button class="btn sm" data-criaetapa="NAOREAL">Criar a etapa “Não realizada”</button>' : '<div class="mut">Peça a um administrador para criá-la.</div>'}</div>`;
+  return `<div class="kdica">${ico('pin')} Arraste um item para outra coluna: <b>Finalizado</b> abre o registro, <b>Não realizada</b> pede o motivo, <b>Aguardando / Dia da visita</b> altera a data${S.eu.podeExcluir ? ' e a faixa inferior exclui' : ''}. Em <b>Finalizado</b> aparecem os mais recentes primeiro.</div>
+  <div class="kanban">${[...base, ...extras].map(c => {
+    let l = it.filter(i => col(i) === c); if (c === 'ENC') l = [...l].sort((x, y) => (y.data || '').localeCompare(x.data || '') || y.id - x.id);
+    const gs = agrupaItens(l); if (c === 'ENC') gs.forEach(g => g.sort((x, y) => (y.data || '').localeCompare(x.data || '') || y.id - x.id));
+    const lim = S.kan[c] || 20;
+    const vazio = c === 'NAOREAL' && !(S.etapasReais && S.etapasReais.NAOREAL) ? semNaoReal : '<div class="mut" style="padding:10px">Vazio</div>';
+    return `<div class="col" data-e="${c}" data-col="${c}"><h4>${ETAPAS[c] || c} <b>${l.length}</b></h4><div class="colb">${gs.slice(0, lim).map(g => grupoHtml(g, true)).join('') || vazio}${gs.length > lim ? `<button class="btn sm" data-mais="${c}">Ver mais (${gs.length - lim})</button>` : ''}</div></div>`;
+  }).join('')}</div>`;
 }
 function tabelaHtml(it) {
   const linha = (i, mostraEmpresa) => `<tr data-e="${i.etapa}"><td>${ABERTA.includes(i.etapa) ? `<input type="checkbox" data-sel="${i.id}" ${S.sel.has(i.id) ? 'checked' : ''} aria-label="Selecionar">` : ''}</td><td>${mostraEmpresa ? `<b>${esc(i.empresa)}</b> <span class="mut">${esc(i.segmento)}</span>` : `<span class="segn">${esc(i.segmento || '—')}</span>`}</td><td><span class="cls ${esc(i.classe)}">${esc(i.classe || '–')}</span></td><td>${esc(i.vendedor)}</td><td style="white-space:nowrap">${dtBR(i.data)} <span class="mut">${rel(i.data, S.hoje)}</span></td><td><span class="tag" data-e="${i.etapa}">${esc(nomeEtapa(i))}</span></td><td><div class="srow-a" style="justify-content:flex-end">${acoesLinha(i)}</div></td></tr>`;
@@ -165,6 +172,10 @@ function desenhaLista() {
   L.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { c.checked ? S.sel.add(+c.dataset.sel) : S.sel.delete(+c.dataset.sel); if ($('#b_grupo')) $('#b_grupo').disabled = !S.sel.size; });
   if ($('#b_grupo')) { $('#b_grupo').disabled = !S.sel.size; $('#b_grupo').onclick = () => modalAlterar([...S.sel]); }
   L.querySelectorAll('[data-mais]').forEach(b => b.onclick = () => { S.kan[b.dataset.mais] = (S.kan[b.dataset.mais] || 20) + 25; desenhaLista(); });
+  L.querySelectorAll('[data-criaetapa]').forEach(b => b.onclick = async () => {
+    if (!confirm('Criar a etapa "Não realizada" no SPA da fila?\n\nDepois disso:\n• o botão "Não realizada" dos cards passa a funcionar;\n• com a fila ligada, o app marca como Não realizada as visitas de meses passados sem registro e já gera a próxima visita (só para cards visíveis no app).')) return;
+    b.disabled = true; try { await api('/api/criar-etapa', 'POST', { codigo: b.dataset.criaetapa }); toast('Etapa criada no Bitrix'); telaFila(); } catch (e) { falha(e); b.disabled = false; }
+  });
   if (S.vista === 'kanban') ligaKanban(L);
 }
 // Arrastar e soltar no Kanban: a coluna de destino decide a ação (mesmas regras dos botões).

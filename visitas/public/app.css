@@ -233,3 +233,5 @@ details.avanc>summary{cursor:pointer;list-style:none}details.avanc>summary::-web
 .ordb{border:0;background:none;cursor:pointer;font:inherit;font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--mut);padding:0;white-space:nowrap}.ordb.on,.ordb:hover{color:var(--pri)}
 @media(max-width:760px){.agenda{grid-template-columns:repeat(15,1fr);height:auto}.agenda .ag:nth-child(n+16){display:none}.cgs{grid-template-columns:1fr 1fr}.dh h1{font-size:20px}}
 .sec.w2{grid-column:span 2}@media(max-width:760px){.sec.w2{grid-column:auto}}
+.ecria{padding:10px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.kanban{grid-auto-columns:minmax(272px,1fr)}

@@ -36,7 +36,7 @@ function criarFake(op = {}) {
     'tasks.task.add': p => { s.tarefas.push(p.fields); return { result: { task: { id: 500 + s.tarefas.length } } }; },
     'tasks.task.complete': () => ({ result: true }),
     'profile': () => ({ result: { ID: '188' } }),
-    'crm.status.add': () => ({ result: 1 }), 'userfieldconfig.add': () => ({ result: 1 }),
+    'crm.status.add': p => { status.push({ STATUS_ID: p.fields.STATUS_ID, NAME: p.fields.NAME, SORT: p.fields.SORT, SEMANTICS: '' }); return { result: 1 }; }, 'userfieldconfig.add': () => ({ result: 1 }),
   };
   const bx = {
     enabled: true,

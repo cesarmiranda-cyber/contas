@@ -624,3 +624,16 @@ test('card-modelo sem responsável: a reconciliação o ignora (o Bitrix não pe
   const por = Object.fromEntries((await svc.auditoria()).checks.map(c => [c.id, c]));
   assert.equal(por.sem_responsavel.contagem, 1); assert.equal(por.sem_responsavel.severidade, 'aviso'); assert.equal(por.registro_card_aberto.severidade, 'ok');
 });
+test('criar a etapa "Não realizada" a pedido: antes não existe, depois o botão e o fechamento do mês funcionam', async () => {
+  const { f, svc, card, u49, adm } = mundoReal({ cargosFila: ['Vendedor'] });
+  card(70, 100, 'Vendedor', 49, '25/11/2026 08:00:00');
+  assert.deepEqual((await svc.listar(adm, {})).etapasReais, { LATE: false, NAOREAL: false });
+  await assert.rejects(svc.naoRealizada(70, { motivo: 'Outro motivo' }, u49), /Não realizada.*não existe/);
+  await assert.rejects(svc.criarEtapa('QUALQUER'), /inválida/);
+  const r = await svc.criarEtapa('NAOREAL'); assert.equal(r.criada, 'Não realizada');
+  assert.deepEqual((await svc.listar(adm, {})).etapasReais, { LATE: false, NAOREAL: true });
+  assert.equal((await svc.criarEtapa('NAOREAL')).jaExistia, true);                                       // repetir não cria de novo
+  const n = await svc.naoRealizada(70, { motivo: 'Outro motivo', detalhe: 'cliente viajando' }, u49);
+  assert.equal(f.s.itens[1036].find(c => c.id === 70).stageId, 'DT1036_19:NAOREAL'); assert.ok(n.proximoCard);   // agora funciona e gera o próximo card
+  assert.equal((await svc.listar(adm, { etapa: 'NAOREAL' })).itens.length, 1);
+});
