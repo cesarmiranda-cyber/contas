@@ -44,6 +44,18 @@ const VISITA_CAMPOS = {
   segmento: /^segmento$/, idFila: /^id fila$/, resultado: /^resultado/, acompanhamento: /^acompanhamento$/, anexos: /^anexos$/, supervisor: /^supervisor que acompanhou$/,
   alcada: /^alcada$/, lead: /^lead$/,
 };
+// Segunda tentativa (só campos personalizados ainda não usados): rótulos parecidos com o esperado.
+const VISITA_LOOSE = { data: /data.*(hora|visita)|^data$/, fatos: /fatos/, interesses: /interess/, sentimentos: /sentiment/, valores: /valores?/, populacao: /popula/, regime: /regime/, oportunidades: /oportunidade/,
+  antecipada: /antecipad/, segmento: /segmento/, idFila: /id.*fila|fila.*id|^fila$/, resultado: /resultado|observac/, acompanhamento: /acompanhament/, anexos: /anexo|arquivo/, supervisor: /supervisor/, alcada: /alcad/, lead: /^lead/ };
+const VISITA_AJUSTAVEIS = Object.keys(VISITA_CAMPOS);
+function mapearVisita(vf, mapa) {
+  const out = {}, usados = new Set();
+  for (const [k, re] of Object.entries(VISITA_CAMPOS)) { const c = achar(vf, re)[0]; if (c) { out[k] = c; usados.add(c); } }
+  for (const [k, re] of Object.entries(VISITA_LOOSE)) if (!out[k]) { const c = achar(vf, re).find(x => !usados.has(x) && /^uf/i.test(x)); if (c) { out[k] = c; usados.add(c); } }
+  for (const k of VISITA_AJUSTAVEIS) if (mapa?.visita?.[k] && vf[mapa.visita[k]]) out[k] = mapa.visita[k];     // ajuste manual do administrador
+  for (const k of VISITA_AJUSTAVEIS) { out[k] ||= null; out[`${k}_todos`] = out[k] ? [out[k]] : []; }
+  return out;
+}
 const FILA_OBRIG = ['segmento', 'cargo', 'classe', 'data'];
 const VISITA_OBRIG = ['data', 'fatos', 'idFila', 'segmento'];
 
@@ -98,8 +110,8 @@ async function descobrir(bx, mapa = {}) {
   const m = {
     empresa, categoryId, etapas, etapaNomes,
     fila: { ...filaMap, motivoEnum: enumMap(ff[filaMap.motivo]) },
-    disponiveis: { fila: Object.entries(ff).map(([key, f]) => ({ key, label: label(f) || key, type: String(f.type || '') })).sort((a, b) => a.label.localeCompare(b.label)) },
-    visita: { ...mapear(vf, VISITA_CAMPOS), ...Object.fromEntries(['regime', 'oportunidades', 'antecipada', 'acompanhamento', 'alcada'].map(k => [`${k}Enum`, enumMap(vf[achar(vf, VISITA_CAMPOS[k])[0]])])) },
+    disponiveis: { visita: Object.entries(vf).filter(([k]) => /^uf/i.test(k)).map(([key, f]) => ({ key, label: label(f) || key, type: String(f.type || '') })).sort((a, b) => a.label.localeCompare(b.label)), fila: Object.entries(ff).map(([key, f]) => ({ key, label: label(f) || key, type: String(f.type || '') })).sort((a, b) => a.label.localeCompare(b.label)) },
+    visita: (() => { const v = mapearVisita(vf, mapa); return { ...v, ...Object.fromEntries(['regime', 'oportunidades', 'antecipada', 'acompanhamento', 'alcada'].map(k => [`${k}Enum`, enumMap(vf[v[k]])])) }; })(),
     filaFields: ff, visitaFields: vf,
   };
   m.faltando = [
@@ -110,4 +122,4 @@ async function descobrir(bx, mapa = {}) {
   ];
   return m;
 }
-module.exports = { CAMPOS_AJUSTAVEIS, ETYPE, descobrir, mapearEmpresa, achar, label, A, enumMap, FILA_CAMPOS, VISITA_CAMPOS, STAGE_NOMES };
+module.exports = { VISITA_AJUSTAVEIS, CAMPOS_AJUSTAVEIS, ETYPE, descobrir, mapearEmpresa, achar, label, A, enumMap, FILA_CAMPOS, VISITA_CAMPOS, STAGE_NOMES };

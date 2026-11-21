@@ -184,3 +184,12 @@ tr.gh td{background:var(--surf2);padding:8px 12px;border-bottom:1px solid var(--
 body.arrastando .kdel{opacity:.92;pointer-events:auto;transform:none}.kdel.over{opacity:1;filter:brightness(1.1)}
 .filtros.pg{justify-content:center;margin-top:14px;align-items:center}
 @media(max-width:760px){.grid{grid-template-columns:1fr}.filtros .fim{margin-left:0;width:100%;grid-column:1/-1}.filtros .busca{grid-column:1/-1}.kanban{grid-auto-columns:88%}.colb{max-height:none}}
+
+/* tabela de registros com todos os campos */
+.rtab table{min-width:900px}
+.rtab th{white-space:nowrap}.rtab td.cel{min-width:150px;max-width:300px;vertical-align:top}
+.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.rtab .acol{position:sticky;right:0;background:var(--surf);box-shadow:-8px 0 8px -8px rgba(16,24,40,.18);text-align:right}
+.rtab tbody tr:hover .acol{background:var(--surf2)}
+.modal h4{font-size:13px}
+.rtab td{vertical-align:top}

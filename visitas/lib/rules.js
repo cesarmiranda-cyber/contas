@@ -19,7 +19,7 @@ const DEFAULT_CONFIG = {
   verTudo: [],                 // usuários que veem tudo
   admins: [],                  // acesso às configurações (vazio = administradores do portal)
   deptsAcesso: [],
-  mapa: { fila: {} },          // ajuste manual de campos da Fila (quando o rótulo difere do esperado)             // departamentos com acesso ao app (vazio = todos do portal); inclui subdepartamentos
+  mapa: { fila: {}, visita: {} },          // ajuste manual de campos da Fila (quando o rótulo difere do esperado)             // departamentos com acesso ao app (vazio = todos do portal); inclui subdepartamentos
   podeExcluir: [],             // usuários autorizados a excluir
   visibilidade: 'app',         // app | bitrix
   hierarquiaAuto: false, ativo: false,

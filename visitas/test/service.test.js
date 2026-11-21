@@ -212,3 +212,21 @@ test('Finalizado fica oculto por padrão e aparece a pedido; datas em formatos v
   assert.equal(todos.itens.find(i => i.id === 721).data, '2026-12-05'); assert.equal(todos.itens.find(i => i.id === 722).data, '');
   assert.ok((await svc.listar(admin, { etapa: 'SUCCESS' })).itens.some(i => i.id === 720));        // filtrar pela etapa também mostra
 });
+test('registros mostram todos os campos do SPA com rótulo e valor; rótulo parecido é achado e o ajuste manual vence', async () => {
+  const { f, svc, store } = mundo(); await svc.sync();
+  const orig = f.bx.call;
+  f.bx.call = async (m, p = {}) => { const r = await orig(m, p); if (m === 'crm.item.fields' && +p.entityTypeId === 1032) r.result.fields = { ...r.result.fields,
+    ufFatos: { title: 'Fatos e Dados Relevantes', type: 'string' }, ufSup: { title: 'Supervisor que acompanhou', type: 'employee' }, ufExtra: { title: 'Observação interna', type: 'string' }, ufAnt: { title: 'Visita antecipada', type: 'boolean' } }; return r; };
+  svc.resetModelo();
+  assert.equal((await svc.camposInfo()).visitaDetectada.fatos, 'ufFatos');                           // rótulo diferente, achado por semelhança
+  const card = f.s.itens[1036].find(c => c.companyId == 100);
+  await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'Cliente quer turbina', supervisor: '9', contatos: [5] }, vendedor);
+  f.s.itens[1032][0].ufExtra = 'nota interna'; f.s.itens[1032][0].ufAnt = 'Y'; f.s.contatos.push({ ID: '5', NAME: 'João', LAST_NAME: 'Silva' }); svc.invalidar();
+  const r = await svc.registros(admin, {}), item = r.itens[0], rot = Object.fromEntries(r.colunas.map(c => [c.label, c.k]));
+  assert.ok(['Criado em', 'Criado por', 'Contatos', 'Fatos e Dados Relevantes', 'Observação interna', 'Visita antecipada'].every(l => rot[l]));
+  assert.ok(!r.colunas.some(c => c.label === 'Segmento' || c.label === 'Data/Hora da Visita'));      // já aparecem nas colunas fixas
+  assert.equal(item.valores[rot['Fatos e Dados Relevantes']], 'Cliente quer turbina'); assert.equal(item.valores[rot['Observação interna']], 'nota interna');
+  assert.equal(item.valores[rot['Supervisor que acompanhou']], 'Sérgio Supervisor'); assert.equal(item.valores[rot['Contatos']], 'João Silva'); assert.equal(item.valores[rot['Visita antecipada']], 'Sim');
+  const um = await svc.registroDoCard(card.id, admin); assert.ok(um.campos.some(c => c.label === 'Observação interna' && c.valor === 'nota interna')); assert.equal(um.raw, undefined);
+  store.setConfig({ mapa: { visita: { fatos: 'ufExtra' } } }); svc.resetModelo(); assert.equal((await svc.camposInfo()).visitaDetectada.fatos, 'ufExtra');   // ajuste manual
+});

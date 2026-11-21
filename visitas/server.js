@@ -87,7 +87,7 @@ const CFG_CAMPOS = {
   supervisoresDepts: v => ids(v), supervisoresExtras: v => ids(v), verTudo: v => ids(v), admins: v => ids(v), podeExcluir: v => ids(v),
   motivosNaoRealizada: v => (Array.isArray(v) ? v.map(x => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 30) : []),
   deptsAcesso: v => ids(v),
-  mapa: v => ({ fila: Object.fromEntries(require('./lib/fields').CAMPOS_AJUSTAVEIS.filter(k => /^[A-Za-z0-9_]{1,80}$/.test(v?.fila?.[k] || '')).map(k => [k, v.fila[k]])) }),
+  mapa: v => { const F = require('./lib/fields'), pick = (lista, o) => Object.fromEntries(lista.filter(k => /^[A-Za-z0-9_]{1,80}$/.test(o?.[k] || '')).map(k => [k, o[k]])); return { fila: pick(F.CAMPOS_AJUSTAVEIS, v?.fila), visita: pick(F.VISITA_AJUSTAVEIS, v?.visita) }; },
   visibilidade: v => (v === 'bitrix' ? 'bitrix' : 'app'),
 };
 const ids = v => (Array.isArray(v) ? v.map(String).filter(x => /^\d{1,12}$/.test(x)).slice(0, 500) : []);

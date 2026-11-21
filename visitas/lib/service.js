@@ -424,20 +424,51 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   // ---------- registros (SPA 1032) ----------
-  const camposSel = m => ['id', 'title', 'companyId', 'contactIds', 'createdBy', 'assignedById', 'createdTime', ...Object.keys(m.visita).filter(k => !k.endsWith('_todos') && !k.endsWith('Enum')).map(k => m.visita[k]).filter(Boolean)];
+  const camposSel = m => [...new Set(['id', 'title', 'companyId', 'contactIds', 'createdBy', 'assignedById', 'createdTime', ...Object.keys(m.visitaFields || {}).filter(k => /^uf/i.test(k)), ...Object.keys(m.visita).filter(k => !k.endsWith('_todos') && !k.endsWith('Enum')).map(k => m.visita[k]).filter(Boolean)])];
   function paraRegistro(m, it) {
     const v = m.visita, vf = m.visitaFields, lista = k => { const items = itensDe(vf, v[k]); const x = val(it[v[k]]); return items.length ? (items.find(i => String(i.ID) === String(x))?.VALUE || '') : txt(x); };
-    return { id: +it.id, empresaId: +it.companyId, contatos: A(it.contactIds).map(Number), criadoPor: txt(it.createdBy), dataHora: it[v.data] || '', idFila: txt(it[v.idFila]), segmento: lista('segmento'),
+    return { raw: it, id: +it.id, empresaId: +it.companyId, contatos: A(it.contactIds).map(Number), criadoPor: txt(it.createdBy), dataHora: it[v.data] || '', idFila: txt(it[v.idFila]), segmento: lista('segmento'),
       fatos: txt(it[v.fatos]), interesses: txt(it[v.interesses]), sentimentos: txt(it[v.sentimentos]), valores: txt(it[v.valores]), populacao: txt(it[v.populacao]),
       regime: lista('regime'), oportunidades: lista('oportunidades'), antecipada: lista('antecipada'), resultado: txt(it[v.resultado]), acompanhamento: lista('acompanhamento'),
       supervisor: txt(it[v.supervisor]), anexos: A(it[v.anexos]).map(a => (a && typeof a === 'object' ? { id: a.id, url: a.urlMachine || a.url || '' } : { url: a })) };
+  }
+  // ---- todos os campos do registro (SPA 1032), com o rótulo de cada um ----
+  const fmtData = x => { const t = String(x); const m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/); return m ? `${m[3]}/${m[2]}/${m[1]}${m[4] && !(m[4] === '00' && m[5] === '00') ? ` ${m[4]}:${m[5]}` : ''}` : t; };
+  function fmtCampo(def, v, nome, extra = {}) {
+    if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return '';
+    const t = String(def?.type || ''), f = x => {
+      if (def?.items?.length) { const it = def.items.find(i => String(i.ID) === String(x)); if (it) return it.VALUE; }
+      if (extra.contato) return extra.contato(String(x));
+      if (/^(employee|user)$/.test(t) || extra.usuario) return nome(String(x));
+      if (/^date/.test(t)) return fmtData(x);
+      if (/^bool/.test(t)) return /^(y|1|true)$/i.test(String(x)) ? 'Sim' : 'Não';
+      if (x && typeof x === 'object') return x.name || x.title || x.value || (x.urlMachine || x.url ? 'arquivo' : '');
+      return String(x);
+    };
+    return (Array.isArray(v) ? v : [v]).map(f).filter(Boolean).join(', ').slice(0, 4000);
+  }
+  const colunasVisita = m => {
+    const base = [['createdTime', 'Criado em', { type: 'datetime' }], ['createdBy', 'Criado por', { usuario: true }], ['contactIds', 'Contatos', { contato: true }]];
+    const dup = new Set([m.visita.data, m.visita.segmento].filter(Boolean));
+    const ufs = Object.entries(m.visitaFields || {}).filter(([k]) => /^uf/i.test(k) && !dup.has(k)).map(([k, f]) => [k, F.label(f) || k, f]);
+    return [...base, ...ufs].map(([k, label, def]) => ({ k, label, def }));
+  };
+  async function valoresRegistros(m, regs) {
+    const cols = colunasVisita(m), uids = new Set(), cids = new Set();
+    for (const r of regs) for (const c of cols) { const v = r.raw[c.k]; const t = String(c.def?.type || ''); if (c.k === 'createdBy' || /^(employee|user)$/.test(t)) A(v).forEach(x => uids.add(String(x))); if (c.k === 'contactIds') A(v).forEach(x => cids.add(String(x))); }
+    const nm = await nomes([...uids]), cn = new Map();
+    const cl = [...cids];
+    for (let i = 0; i < cl.length; i += 50) { const r = await bx.call('crm.contact.list', { filter: { ID: cl.slice(i, i + 50) }, select: ['ID', 'NAME', 'LAST_NAME'] }).catch(() => ({ result: [] })); for (const c of r.result || []) cn.set(String(c.ID), [c.NAME, c.LAST_NAME].filter(Boolean).join(' ') || `#${c.ID}`); }
+    const contato = id => cn.get(id) || `#${id}`;
+    return { colunas: cols.map(({ k, label }) => ({ k, label })), valores: r => Object.fromEntries(cols.map(c => [c.k, fmtCampo(c.def, r.raw[c.k], nm, c.k === 'contactIds' ? { contato } : c.k === 'createdBy' ? { usuario: true } : {})])) };
   }
   async function registroDoCard(id, user) {
     const { m } = await carregar(id, user);
     const r = await bx.call('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), filter: { [m.visita.idFila]: String(id) }, order: { id: 'DESC' } });
     const it = (r.result?.items || [])[0];
     if (!it) throw fail(404, 'Este card ainda não tem registro de visita.');
-    return paraRegistro(m, it);
+    const reg = paraRegistro(m, it), vr = await valoresRegistros(m, [reg]), val = vr.valores(reg);
+    return { ...reg, raw: undefined, campos: vr.colunas.map(c => ({ label: c.label, valor: val[c.k] })).filter(c => c.valor) };
   }
   async function editarRegistro(vid, b, user) {
     const m = await modelo();
@@ -544,11 +575,12 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     let regs = (await registrosC(m)).filter(r => porId.has(r.idFila));
     const esc = await escopo(user), busca = R.norm(q.q || '');
     const tit = await tituloEmpresas(regs.map(r => r.empresaId)), nm = await nomes(regs.map(r => porId.get(r.idFila).vendedorId).concat(regs.map(r => r.supervisor)));
-    let lista = regs.map(r => { const c = porId.get(r.idFila); return { id: r.id, idFila: +r.idFila, empresa: tit(r.empresaId), segmento: c.segmento, classe: c.classe, vendedor: nm(c.vendedorId), dataHora: r.dataHora, supervisor: r.supervisor ? nm(r.supervisor) : '', contatos: r.contatos.length, anexos: r.anexos.length, resumo: r.fatos.replace(/\s+/g, ' ').slice(0, 180), podeEditar: user.papel === 'admin' || esc === null || r.criadoPor === String(user.id) || !!esc?.has(r.criadoPor), _b: R.norm(`${tit(r.empresaId)} ${c.segmento} ${nm(c.vendedorId)} ${r.fatos}`) }; });
+    let lista = regs.map(r => { const c = porId.get(r.idFila); return { _r: r, id: r.id, idFila: +r.idFila, empresa: tit(r.empresaId), segmento: c.segmento, classe: c.classe, vendedor: nm(c.vendedorId), dataHora: r.dataHora, supervisor: r.supervisor ? nm(r.supervisor) : '', contatos: r.contatos.length, anexos: r.anexos.length, resumo: r.fatos.replace(/\s+/g, ' ').slice(0, 180), podeEditar: user.papel === 'admin' || esc === null || r.criadoPor === String(user.id) || !!esc?.has(r.criadoPor), _b: R.norm(`${tit(r.empresaId)} ${c.segmento} ${nm(c.vendedorId)} ${r.fatos}`) }; });
     if (busca) lista = lista.filter(x => x._b.includes(busca));
     lista.sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)) || b.id - a.id);
     const size = 15, pages = Math.max(1, Math.ceil(lista.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));
-    return { total: lista.length, page, pages, itens: lista.slice((page - 1) * size, page * size).map(({ _b, ...x }) => x) };
+    const fatia = lista.slice((page - 1) * size, page * size), vr = await valoresRegistros(m, fatia.map(x => x._r));
+    return { total: lista.length, page, pages, colunas: vr.colunas, itens: fatia.map(({ _b, _r, ...x }) => ({ ...x, valores: vr.valores(_r) })) };
   }
   async function historico(user, q = {}) {
     const m = await modelo(), ids = new Set((await visiveis(user, await cardsC(m))).map(c => String(c.id)));
@@ -585,7 +617,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
   async function camposInfo() {
     const m = await modelo(true);
-    return { categoryId: m.categoryId, etapas: m.etapas, faltando: m.faltando, disponiveis: m.disponiveis.fila, mapa: cfg().mapa?.fila || {}, ajustaveis: F.CAMPOS_AJUSTAVEIS, segmentos: Object.values(m.empresa.segmentos).map(s => ({ nome: s.nome, cargos: Object.keys(s.cargos), classe: s.classe.length, proxima: s.proxima.length, ultima: s.ultima.length, duplicados: [...Object.values(s.cargos), s.classe, s.proxima, s.ultima].some(l => l.length > 1) })),
+    return { disponiveisVisita: m.disponiveis.visita, mapaVisita: cfg().mapa?.visita || {}, ajustaveisVisita: F.VISITA_AJUSTAVEIS, visitaDetectada: Object.fromEntries(F.VISITA_AJUSTAVEIS.map(k => [k, m.visita[k] || null])), categoryId: m.categoryId, etapas: m.etapas, faltando: m.faltando, disponiveis: m.disponiveis.fila, mapa: cfg().mapa?.fila || {}, ajustaveis: F.CAMPOS_AJUSTAVEIS, segmentos: Object.values(m.empresa.segmentos).map(s => ({ nome: s.nome, cargos: Object.keys(s.cargos), classe: s.classe.length, proxima: s.proxima.length, ultima: s.ultima.length, duplicados: [...Object.values(s.cargos), s.classe, s.proxima, s.ultima].some(l => l.length > 1) })),
       fila: Object.fromEntries(Object.keys(F.FILA_CAMPOS).map(k => [k, m.fila[k] || null])), visita: Object.fromEntries(Object.keys(F.VISITA_CAMPOS).map(k => [k, m.visita[k] || null])) };
   }
 
