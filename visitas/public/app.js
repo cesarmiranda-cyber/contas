@@ -168,6 +168,17 @@ function soltar(id, destino) {
   if (destino === 'NEW' || destino === 'PREPARATION') return modalAlterar([id], destino === 'PREPARATION' ? S.hoje : '');
   toast('Esse movimento não está disponível.');
 }
+// O menu "⋯" usa posição fixa (calculada ao abrir): não é cortado pela coluna rolável do Kanban nem coberto pelo cartão seguinte.
+const fechaMenus = ex => document.querySelectorAll('details.menu[open]').forEach(d => { if (d !== ex) d.removeAttribute('open'); });
+document.addEventListener('toggle', e => {
+  const d = e.target; if (!d.matches?.('details.menu') || !d.open) return;
+  fechaMenus(d);
+  const p = d.querySelector('.menu-p'), r = d.querySelector('summary').getBoundingClientRect(), w = p.offsetWidth, h = p.offsetHeight;
+  let top = r.bottom + 4; if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 4);
+  Object.assign(p.style, { position: 'fixed', top: top + 'px', left: Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px', right: 'auto' });
+}, true);
+window.addEventListener('scroll', () => fechaMenus(), true); window.addEventListener('resize', () => fechaMenus());
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fechaMenus(); });
 document.addEventListener('click', e => { document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.removeAttribute('open'); }); });
 async function acao(a, id) {
   const i = S.itens.find(x => x.id === id);
