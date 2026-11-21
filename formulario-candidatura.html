@@ -117,7 +117,7 @@
   /* ============ CONFIGURAÇÃO ============ */
   var WEBHOOK = 'COLE_AQUI_A_URL_DO_WEBHOOK_BITRIX/'; // ex.: https://SEU-PORTAL.bitrix24.com.br/rest/ID/CODIGO/
   var ENTITY_TYPE_ID = 1050;
-  var CATEGORY_ID = 0;
+  var CATEGORY_ID = null; // null = funil padrão do SPA; ou o ID real do funil
 
   /* Troque pelos códigos reais dos campos do SPA 1050 */
   var FIELDS = {
@@ -188,7 +188,8 @@
     btn.disabled=true;btn.textContent='Enviando...';
     try{
       var data=await b64(f);
-      var fields={title:'Candidatura - '+val('nome')+' - '+val('vaga'),categoryId:CATEGORY_ID};
+      var fields={title:'Candidatura - '+val('nome')+' - '+val('vaga')};
+      if(CATEGORY_ID!==null)fields.categoryId=CATEGORY_ID;
       var put=function(k,v){if(FIELDS[k])fields[FIELDS[k]]=v};
       put('nome',val('nome'));put('telefone',val('telefone'));put('email',val('email'));
       put('vaga',mapVal('vaga',val('vaga')));put('cidade',val('cidade'));
