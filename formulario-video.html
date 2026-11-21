@@ -1,0 +1,151 @@
+<div id="nv">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+  #nv{--navy:#0b2559;--roxo:#7a2fb8;--roxo2:#b14fd6;--verde:#4cd620;--verde2:#86d41f;--azul:#3b82c4;--bg:#f5f7fb;--campo:#f3f5fa;--mut:#6b7794;
+    font-family:'Outfit','Segoe UI',Arial,sans-serif;color:var(--navy);background:var(--bg);box-sizing:border-box;border-top:19px solid var(--verde2);padding:48px 16px 64px;min-height:100vh}
+  #nv *{box-sizing:border-box}
+  #nv .logo{text-align:center;margin-bottom:34px}
+  #nv .logo img{width:170px;max-width:60%;height:auto;filter:brightness(0)}
+  #nv .card{max-width:640px;margin:0 auto;background:#fff;border-radius:24px;padding:40px;box-shadow:0 20px 60px rgba(11,37,89,.10)}
+  #nv h2{margin:0 0 12px;font-size:32px;line-height:1.15;font-weight:600;letter-spacing:-.8px;text-align:center}
+  #nv h2 span{background:linear-gradient(90deg,var(--roxo),var(--roxo2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  #nv .sub{margin:0 0 28px;color:var(--mut);font-size:16px;line-height:1.55;text-align:center}
+  #nv .q{margin:0 0 10px;font-size:13px;font-weight:600;color:var(--navy);text-transform:uppercase;letter-spacing:1px}
+  #nv .drop{display:block;border:2px dashed #c9d1e3;border-radius:16px;padding:34px 16px;text-align:center;cursor:pointer;transition:.2s;background:var(--campo)}
+  #nv .drop:hover,#nv .drop.over{border-color:var(--roxo);background:rgba(122,47,184,.05)}
+  #nv .drop b{display:block;font-size:16px;font-weight:600;margin-bottom:4px;word-break:break-all}
+  #nv .drop small{color:var(--mut);font-size:13px}
+  #nv .drop .ico{font-size:34px;color:var(--roxo);line-height:1;margin-bottom:8px}
+  #nv .drop.ok{border-style:solid;border-color:var(--verde)}
+  #nv .drop input{display:none}
+  #nv .err{display:none;color:#d6334b;font-size:13px;margin:8px 4px 0}
+  #nv .g.invalid .err{display:block}
+  #nv .g.invalid .drop{border-color:#d6334b}
+  #nv .bar{display:none;height:10px;border-radius:99px;background:#e6eaf3;overflow:hidden;margin-top:18px}
+  #nv .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--verde),var(--azul));transition:width .2s}
+  #nv .pct{display:none;text-align:center;font-size:14px;color:var(--mut);margin-top:8px}
+  #nv button.send{margin-top:26px;width:100%;height:58px;border:0;border-radius:999px;font-size:14px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#fff;cursor:pointer;
+    background:linear-gradient(90deg,var(--verde),var(--azul));box-shadow:0 10px 26px rgba(59,130,196,.30);transition:.2s;font-family:inherit}
+  #nv button.send:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(59,130,196,.42)}
+  #nv button.send:disabled{opacity:.6;cursor:wait;transform:none}
+  #nv .fail{display:none;margin-top:14px;padding:12px;border-radius:12px;background:#fdecef;color:#b3243a;text-align:center;font-size:14px}
+  #nv .done,#nv .bad{display:none;text-align:center;padding:30px 0}
+  #nv .done .ck{width:76px;height:76px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;
+    background:linear-gradient(135deg,var(--verde),var(--azul));box-shadow:0 10px 26px rgba(59,130,196,.35)}
+  #nv .done h3,#nv .bad h3{margin:0 0 8px;font-size:26px;font-weight:600}
+  #nv .done p,#nv .bad p{margin:0;color:var(--mut)}
+  @media(max-width:560px){#nv .card{padding:26px 18px}#nv h2{font-size:25px}}
+</style>
+
+<div class="logo"><img src="https://nextevoce.com.br/wp-content/uploads/2024/08/NEXT_LOGO.png" alt="Next Internet"></div>
+
+<div class="card">
+  <div id="nv-formbox">
+    <h2>Gostaríamos que você <span>produzisse um vídeo</span> de até 3 minutos</h2>
+    <p class="sub">Neste vídeo gostaríamos que você se apresentasse, contasse-nos suas últimas experiências profissionais e que nos diga o porquê você buscou trabalhar na NEXT.</p>
+
+    <form id="nv-form" novalidate>
+      <div class="g" id="nv-g">
+        <div class="q">Vídeo apresentação *</div>
+        <label class="drop" id="nv-drop" for="nv-file">
+          <div class="ico">🎥</div>
+          <b id="nv-fname">Clique ou arraste seu vídeo aqui</b>
+          <small id="nv-fhint">MP4, MOV ou WEBM · até 100 MB</small>
+          <input type="file" id="nv-file" accept="video/*,.mp4,.mov,.webm,.avi,.mkv">
+        </label>
+        <div class="err" id="nv-err">Selecione um vídeo de até 100 MB.</div>
+      </div>
+      <div class="bar" id="nv-bar"><i id="nv-bari"></i></div>
+      <div class="pct" id="nv-pct"></div>
+
+      <button type="submit" class="send" id="nv-btn">Enviar vídeo</button>
+      <div class="fail" id="nv-fail">Não foi possível enviar agora. Verifique sua conexão e tente novamente.</div>
+    </form>
+  </div>
+
+  <div class="done" id="nv-done">
+    <div class="ck">✓</div>
+    <h3>Vídeo enviado!</h3>
+    <p>Obrigado! Recebemos a sua apresentação e entraremos em contato em breve.</p>
+  </div>
+
+  <div class="bad" id="nv-bad">
+    <h3>Link inválido</h3>
+    <p>Não encontramos a sua candidatura. Use o link enviado no seu e-mail.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ============ CONFIGURAÇÃO ============ */
+  var WEBHOOK = 'COLE_AQUI_A_URL_DO_WEBHOOK_BITRIX/'; // ex.: https://SEU-PORTAL.bitrix24.com.br/rest/ID/CODIGO/
+  var ENTITY_TYPE_ID = 1050;
+  var CAMPO_VIDEO = 'ufCrm13_1795280714611'; // VIDEO APRESENTAÇÃO
+  var MAX_MB = 100;
+  /* ====================================== */
+
+  var R = document.getElementById('nv');
+  var $ = function(s){return R.querySelector(s)};
+  var form=$('#nv-form'), file=$('#nv-file'), btn=$('#nv-btn'), drop=$('#nv-drop'), fname=$('#nv-fname'), g=$('#nv-g');
+
+  /* ID do card vem do link do e-mail: ...?id=123 */
+  var params = new URLSearchParams(location.search);
+  var itemId = parseInt(params.get('id'),10);
+  if(!itemId || itemId<1){ $('#nv-formbox').style.display='none'; $('#nv-bad').style.display='block'; return; }
+
+  function showFile(){
+    var f=file.files[0];
+    fname.textContent=f?f.name:'Clique ou arraste seu vídeo aqui';
+    $('#nv-fhint').textContent=f?(f.size/1048576).toFixed(1)+' MB':'MP4, MOV ou WEBM · até '+MAX_MB+' MB';
+    drop.classList.toggle('ok',!!f);
+  }
+  file.addEventListener('change',showFile);
+  ['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('over')})});
+  ['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.remove('over')})});
+  drop.addEventListener('drop',function(e){if(e.dataTransfer.files.length){file.files=e.dataTransfer.files;showFile()}});
+
+  function b64(f){return new Promise(function(ok,ko){var r=new FileReader();r.onload=function(){ok(String(r.result).split(',')[1])};r.onerror=ko;r.readAsDataURL(f)})}
+
+  function post(url,body,onProg){
+    return new Promise(function(ok,ko){
+      var x=new XMLHttpRequest();
+      x.open('POST',url);x.setRequestHeader('Content-Type','application/json');
+      if(x.upload)x.upload.onprogress=function(e){if(e.lengthComputable)onProg(e.loaded/e.total)};
+      x.onload=function(){var j;try{j=JSON.parse(x.responseText)}catch(e){return ko(new Error('HTTP '+x.status))}
+        if(x.status>=400||j.error)ko(new Error(j.error_description||j.error||('HTTP '+x.status)));else ok(j)};
+      x.onerror=function(){ko(new Error('rede'))};
+      x.send(body);
+    });
+  }
+
+  form.addEventListener('submit',async function(e){
+    e.preventDefault();
+    $('#nv-fail').style.display='none';
+    var f=file.files[0];
+    var bad=!f||f.size>MAX_MB*1024*1024||(f.type&&f.type.indexOf('video/')!==0);
+    g.classList.toggle('invalid',bad);
+    if(bad)return;
+
+    btn.disabled=true;btn.textContent='Enviando...';
+    var bar=$('#nv-bar'),bari=$('#nv-bari'),pct=$('#nv-pct');
+    bar.style.display='block';pct.style.display='block';bari.style.width='0';pct.textContent='Preparando vídeo...';
+    try{
+      var data=await b64(f);
+      var fields={};fields[CAMPO_VIDEO]=[f.name,data];
+      var body=JSON.stringify({entityTypeId:ENTITY_TYPE_ID,id:itemId,fields:fields});
+      await post(WEBHOOK+'crm.item.update.json',body,function(p){
+        bari.style.width=Math.round(p*100)+'%';pct.textContent='Enviando... '+Math.round(p*100)+'%';
+      });
+      $('#nv-formbox').style.display='none';$('#nv-done').style.display='block';
+      R.scrollIntoView({behavior:'smooth'});
+    }catch(err){
+      console.error(err);
+      $('#nv-fail').style.display='block';
+      bar.style.display='none';pct.style.display='none';
+    }finally{
+      btn.disabled=false;btn.textContent='Enviar vídeo';
+    }
+  });
+})();
+</script>
+</div>
