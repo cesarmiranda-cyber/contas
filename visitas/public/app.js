@@ -449,17 +449,43 @@ async function telaCfg() {
   A.innerHTML = `
   <div class="sec"><h3>Conexão com o Bitrix24</h3>${S.eu.webhook ? '<div>✅ Webhook configurado.</div>' : '<div class="aviso">Informe o webhook de entrada (permissões: crm, task, user, department, entity, im).</div>'}
     <div class="row2"><input id="c_wh" type="password" placeholder="https://seu-portal.bitrix24.com.br/rest/1/CODIGO/" autocomplete="off"><button class="btn pri" id="c_whb">Salvar webhook</button></div></div>
-  <div class="sec"><h3>Fila</h3><label><input type="checkbox" id="c_ativo" ${c.ativo ? 'checked' : ''}> <b>Fila ativa</b> (gera, move e encerra cards automaticamente)</label>
-    <div class="acoes" style="margin-top:8px"><button class="btn" id="c_prev">Prévia da sincronização</button><button class="btn" id="c_sync">Sincronizar agora</button><button class="btn" id="c_prep">Preparar Bitrix (etapas e campos)</button></div><pre id="c_out" class="mut" style="white-space:pre-wrap"></pre></div>
-  <div class="sec"><h3>Intervalos por classe</h3><div class="row2">${['A', 'B', 'C'].map(k => `<label class="f"><span>Classe ${k}: dias entre visitas / período da 1ª visita (dias úteis)</span><span style="display:flex;gap:6px"><input type="number" min="1" id="c_i${k}" value="${c.intervalos[k]}"><input type="number" min="1" id="c_p${k}" value="${c.periodos[k]}"></span></label>`).join('')}
-    <label class="f"><span>Classe E: meses entre visitas / mês da 1ª visita</span><span style="display:flex;gap:6px"><input type="number" min="1" id="c_iE" value="${c.intervalos.E}"><input type="number" min="1" max="12" id="c_mE" value="${c.mesClasseE}"></span></label></div></div>
-  <div class="sec"><h3>Regras</h3>
-    <div class="mut">Cargos que geram fila</div><div>${['Diretor', 'Gerente', 'Coordenador', 'Supervisor', 'Vendedor'].map(k => `<label style="margin-right:12px"><input type="checkbox" name="c_cargo" value="${k}" ${c.cargosFila.includes(k) ? 'checked' : ''}> ${k}</label>`).join('')}</div>
-    <div style="margin-top:6px"><label><input type="checkbox" id="c_tarefa" ${c.tarefaAtiva ? 'checked' : ''}> Criar tarefa para o vendedor nas não realizadas</label></div>
-    <div><label><input type="checkbox" id="c_atu" ${c.atualizarProxima ? 'checked' : ''}> Atualizar "Última/Próxima visita" no cadastro da empresa</label></div>
-    <div><label><input type="checkbox" id="c_sem" ${c.removerSemClasse ? 'checked' : ''}> Remover cards de empresas sem classe</label></div>
-    <div><label><input type="checkbox" id="c_ult" ${c.exigirUltimaVisita ? 'checked' : ''}> <b>Só mostrar empresas com "Última visita" preenchida no cadastro</b> (por segmento; sem ela o card não aparece nem é gerado)</label></div>
-    <div class="row2" style="margin-top:6px"><label class="f"><span>Hora do job diário (Brasília)</span><input type="number" min="0" max="23" id="c_hora" value="${c.horaJob}"></label><label class="f"><span>Varredura (segundos)</span><input type="number" min="10" id="c_sw" value="${c.sweepSegundos}"></label></div></div>
+  <div class="sec resumo-cfg"><h3>Resumo: como o app está configurado hoje</h3><ul class="rs">
+    <li>${c.ativo ? '<b class="ok">Fila LIGADA</b>: o app cria, move e encerra cards sozinho.' : '<b class="bad">Fila DESLIGADA</b>: o app só mostra os cards; não cria nem altera nada.'}</li>
+    <li>${c.exigirUltimaVisita ? 'Só aparecem clientes que <b>já têm uma visita registrada</b> no cadastro (campo "Última visita").' : 'Aparecem todos os clientes com vendedor e classe, mesmo sem "Última visita".'}</li>
+    <li>Gera visitas para: <b>${esc(c.cargosFila.join(', '))}</b>.</li>
+    <li>Visitar a cada: <b>A ${c.intervalos.A} dias · B ${c.intervalos.B} dias · C ${c.intervalos.C} dias · E ${c.intervalos.E} meses</b>.</li>
+    <li>${c.atualizarProxima ? 'Ao registrar uma visita, grava a Última e a Próxima visita no cadastro da empresa.' : 'Não grava datas no cadastro da empresa.'}</li>
+    <li>${c.tarefaAtiva ? 'Cria uma tarefa para o vendedor quando a visita não é realizada.' : 'Não cria tarefas.'}</li>
+    ${c.removerSemClasse ? '<li>Clientes sem classe saem da fila.</li>' : ''}</ul></div>
+
+  <div class="sec"><h3>1. Fila automática</h3>
+    <label class="opt"><input type="checkbox" id="c_ativo" ${c.ativo ? 'checked' : ''}><span><b>Ligar a fila automática</b><small>Quando ligada, o app cria os cards, muda a etapa conforme a data e gera a próxima visita sozinho. Desligada, ele só mostra o que já existe.</small></span></label>
+    <div class="botoes-ajuda">
+      <div><button class="btn" id="c_prev">Prévia</button><small>Mostra quantos cards seriam criados, movidos ou removidos. <b>Não altera nada.</b></small></div>
+      <div><button class="btn" id="c_sync">Sincronizar agora</button><small>Cria e atualiza os cards agora, sem esperar a rotina automática.</small></div>
+      <div><button class="btn" id="c_prep">Preparar Bitrix</button><small>Cria no Bitrix as etapas e os campos que estiverem faltando. Pode rodar quantas vezes quiser.</small></div></div>
+    <pre id="c_out" class="mut" style="white-space:pre-wrap"></pre></div>
+
+  <div class="sec"><h3>2. De quanto em quanto tempo visitar</h3><div class="mut">Depois de cada visita, a próxima é marcada somando este prazo à data da visita (cai sempre em dia útil, sem fim de semana nem feriado).</div>
+    <div class="scroll" style="margin-top:10px"><table class="tbl"><thead><tr><th>Classe do cliente</th><th>Visitar a cada</th><th>Exemplo: visita feita hoje, próxima em</th></tr></thead><tbody>
+      ${[['A', 'Classe A'], ['B', 'Classe B'], ['C', 'Classe C'], ['E', 'Classe E (estratégicos)']].map(([k, t]) => `<tr><td><span class="cls ${k}">${k}</span> ${t}</td><td><input type="number" min="1" id="c_i${k}" value="${c.intervalos[k]}" style="width:90px"> ${k === 'E' ? 'meses' : 'dias'}</td><td class="mut" data-ex="${k}"></td></tr>`).join('')}</tbody></table></div></div>
+
+  <div class="sec"><h3>3. Quais clientes aparecem no app</h3>
+    <div class="mut" style="margin-bottom:6px"><b>Gerar visitas para o cargo</b> (normalmente só Vendedor): cada cliente recebe um card para o responsável deste cargo.</div>
+    <div style="margin-bottom:10px">${['Diretor', 'Gerente', 'Coordenador', 'Supervisor', 'Vendedor'].map(k => `<label style="margin-right:14px"><input type="checkbox" name="c_cargo" value="${k}" ${c.cargosFila.includes(k) ? 'checked' : ''}> ${k}</label>`).join('')}</div>
+    <label class="opt"><input type="checkbox" id="c_ult" ${c.exigirUltimaVisita ? 'checked' : ''}><span><b>Mostrar só clientes que já têm "Última visita" no cadastro</b><small>Cliente sem esta data no cadastro da empresa não aparece e não ganha card. Dá para preencher a data pela lista "Preencher Última visita".</small></span></label>
+    <label class="opt"><input type="checkbox" id="c_sem" ${c.removerSemClasse ? 'checked' : ''}><span><b>Tirar da fila clientes sem classe</b><small>Se o cadastro da empresa não tiver classe (A, B, C ou E), o card sai da fila automaticamente.</small></span></label></div>
+
+  <div class="sec"><h3>4. O que o app grava e avisa</h3>
+    <label class="opt"><input type="checkbox" id="c_atu" ${c.atualizarProxima ? 'checked' : ''}><span><b>Gravar as datas no cadastro da empresa</b><small>Ao registrar ou reprogramar uma visita, atualiza "Última visita" e "Próxima visita" na própria empresa no Bitrix.</small></span></label>
+    <label class="opt"><input type="checkbox" id="c_tarefa" ${c.tarefaAtiva ? 'checked' : ''}><span><b>Criar tarefa quando a visita não for realizada</b><small>O vendedor recebe uma tarefa no Bitrix com o motivo informado.</small></span></label></div>
+
+  <details class="sec avanc"><summary><b>Opções avançadas</b> <span class="mut">(só se souber o que está mudando)</span></summary>
+    <div class="mut" style="margin:8px 0">Só valem quando "Mostrar só clientes com Última visita" está <b>desligado</b>: as primeiras visitas dos clientes novos são espalhadas ao longo de um período, em vez de caírem todas na mesma semana.</div>
+    <div class="row2"><label class="f"><span>Espalhar 1ª visita da classe A por (dias úteis)</span><input type="number" min="1" id="c_pA" value="${c.periodos.A}"></label><label class="f"><span>Espalhar 1ª visita da classe B por (dias úteis)</span><input type="number" min="1" id="c_pB" value="${c.periodos.B}"></label>
+      <label class="f"><span>Espalhar 1ª visita da classe C por (dias úteis)</span><input type="number" min="1" id="c_pC" value="${c.periodos.C}"></label><label class="f"><span>Mês da 1ª visita da classe E (1 = janeiro … 12 = dezembro)</span><input type="number" min="1" max="12" id="c_mE" value="${c.mesClasseE}"></label>
+      <label class="f"><span>Hora da rotina diária de sincronização (Brasília)</span><input type="number" min="0" max="23" id="c_hora" value="${c.horaJob}"></label><label class="f"><span>Intervalo da varredura automática (segundos, mínimo 30)</span><input type="number" min="30" id="c_sw" value="${c.sweepSegundos}"></label></div></details>
+
   <div class="sec"><h3>Motivos da não realização</h3><textarea id="c_mot" rows="6">${esc(c.motivosNaoRealizada.join('\n'))}</textarea><div class="mut">Um por linha. Padrão: ${esc(motivosPadrao.length)} motivos.</div></div>
   <div class="sec"><h3>Departamentos com acesso ao app</h3><div class="mut">Marque os departamentos que podem usar o app (subdepartamentos incluídos). Nenhum marcado = todos do portal. Administradores sempre têm acesso.</div>
     ${depts.length ? `<div style="columns:2 260px;margin-top:6px">${(() => { const nivel = d => { let n = 0, x = d; while (x && x.pai && depts.find(y => y.id === x.pai) && n < 8) { x = depts.find(y => y.id === x.pai); n++; } return n; }; return depts.map(d => `<label style="display:block;padding-left:${nivel(d) * 16}px;break-inside:avoid"><input type="checkbox" name="c_dept" value="${esc(d.id)}" ${c.deptsAcesso.includes(d.id) ? 'checked' : ''}> ${esc(d.nome)}</label>`).join(''); })()}</div>` : '<div class="mut">Nenhum departamento encontrado (o webhook precisa da permissão department).</div>'}</div>
@@ -473,6 +499,11 @@ async function telaCfg() {
     <div class="acoes" style="border:0;padding:0;margin:10px 0"><button class="btn" id="c_diag">Rodar diagnóstico</button><button class="btn pri" id="c_ultima">Cadastrar Última visita (lista)</button></div><div id="diag_out"></div></div>` : ''}
   <div class="sec"><h3>Log</h3><div class="scroll" style="max-height:260px;overflow:auto"><table><tbody>${log.map(l => `<tr><td>${dthBR(l.at)}</td><td>${esc(l.type)}</td><td>${esc(l.msg)}</td></tr>`).join('') || '<tr><td class="mut">Sem registros.</td></tr>'}</tbody></table></div></div>
   <div class="foot"><button class="btn pri" id="c_save">Salvar configurações</button></div>`;
+  const addDias = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  const addMeses = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCMonth(t.getUTCMonth() + n); return t.toISOString().slice(0, 10); };
+  const exemplos = () => ['A', 'B', 'C', 'E'].forEach(k => { const n = +$('#c_i' + k).value || 0, hj = S.eu.hoje, alvo = document.querySelector(`[data-ex="${k}"]`); if (alvo) alvo.textContent = n ? `${dtBR(k === 'E' ? addMeses(hj, n) : addDias(hj, n))} (ajustada para dia útil)` : ''; });
+  ['A', 'B', 'C', 'E'].forEach(k => $('#c_i' + k).oninput = exemplos); exemplos();
+  $('#c_ativo').onchange = e => { if (e.target.checked && !confirm('Ligar a fila automática?\n\nO app vai passar a criar, mover e encerrar cards sozinho. Se ainda não rodou a "Prévia", cancele e rode antes para ver o que vai mudar.')) e.target.checked = false; };
   const draft = { verTudo: [...c.verTudo], podeExcluir: [...c.podeExcluir], admins: [...c.admins], supervisoresExtras: [...c.supervisoresExtras] };
   for (const k of Object.keys(draft)) {
     const redesenha = () => { $('#l_' + k).outerHTML = lista('l_' + k, draft[k], nomes); lig(); };
