@@ -71,15 +71,15 @@ async function telaFila() {
   const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', finalizados: S.fin ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
   const r = await vapi('/api/visitas?' + q);
   S.itens = r.itens; S.total = r.total; S.grupos = r.totalGrupos; S.pages = r.pages; S.page = r.page; S.porEtapa = r.porEtapa || {};
-  S.segs = new Set([...(S.segs || []), ...S.itens.map(i => i.segmento).filter(Boolean)]); S.vends = new Map([...(S.vends || []), ...S.itens.map(i => [i.vendedorId, i.vendedor])]); S.hoje = r.hoje;
-  const uniq = () => [...S.segs].sort();
-  const op = (k, arr, lab = x => x) => `<option value="">Todos</option>` + arr.map(x => `<option value="${esc(x[0] ?? x)}" ${f[k] === String(x[0] ?? x) ? 'selected' : ''}>${esc(lab(x[1] ?? x))}</option>`).join('');
-  const vend = [...S.vends.entries()].map(([id, n]) => [id || 'sem', n]).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  S.hoje = r.hoje; S.opcoes = r.opcoes || { segmentos: [], vendedores: [] };
+  // Itens são texto simples ou pares [valor, rótulo]; (cuidado: indexar um texto pegaria letras soltas)
+  const op = (k, arr) => `<option value="">Todos</option>` + arr.map(x => { const [v, l] = Array.isArray(x) ? x : [x, x]; return `<option value="${esc(v)}" ${f[k] === String(v) ? 'selected' : ''}>${esc(l)}</option>`; }).join('');
+  const vend = S.opcoes.vendedores.map(v => [v.id, v.nome]);
   const foco = document.activeElement?.id === 'f_q' ? document.activeElement.selectionStart : null;
   $('#fil').innerHTML = `
     <label class="busca">Cliente<input type="search" id="f_q" placeholder="Buscar cliente ou segmento…" value="${esc(S.q)}"></label>
     <label>De<input type="date" id="f_de" value="${esc(f.de)}"></label><label>Até<input type="date" id="f_ate" value="${esc(f.ate)}"></label>
-    <label>Segmento<select id="f_segmento">${op('segmento', uniq())}</select></label>
+    <label>Segmento<select id="f_segmento">${op('segmento', S.opcoes.segmentos)}</select></label>
     <label>Vendedor<select id="f_vendedor">${op('vendedor', vend)}</select></label>
     <label>Classe<select id="f_classe">${op('classe', ['A', 'B', 'C', 'E'])}</select></label>
     <label>Etapa<select id="f_etapa">${op('etapa', COLS.map(c => [c, ETAPAS[c]]))}</select></label>

@@ -292,3 +292,12 @@ test('formulário do registro: Alçada e outros campos extras do SPA, validados 
   await svc.editarRegistro(reg.id, { fatos: 'ok', alcada: 'Gerente', extras: { ufOk: 'Não' } }, vendedor);
   assert.equal(it.ufAlc, '1'); assert.equal(it.ufOk, 'N');
 });
+test('opções dos filtros trazem todos os segmentos e vendedores do escopo, sem encolher com o filtro', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  for (const seg of ['Peças', 'Serviços']) f.s.itens[1036].push({ id: 950 + seg.length, title: 'x', companyId: 100, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '0', ufSeg: seg, ufClasse: 'A', ufData: '2026-12-01' });
+  svc.invalidar();
+  const todos = await svc.listar(admin, {}), so = await svc.listar(admin, { segmento: 'Peças' });
+  assert.deepEqual(todos.opcoes.segmentos, ['Motores', 'Peças', 'Serviços']); assert.deepEqual(so.opcoes.segmentos, ['Motores', 'Peças', 'Serviços']);
+  assert.ok(so.opcoes.vendedores.some(v => v.id === 'sem') && so.opcoes.vendedores.some(v => v.nome === 'Vera Vendedora')); assert.equal(so.total, 1);
+  assert.deepEqual((await svc.listar(vendedor, {})).opcoes.segmentos, ['Motores']);                 // opções respeitam o escopo: o vendedor só vê os segmentos dos seus cards
+});
