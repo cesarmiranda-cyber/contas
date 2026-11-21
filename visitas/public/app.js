@@ -17,11 +17,20 @@ class Stale extends Error {}
 const gen = { n: 0 };
 async function vapi(url) { const g = gen.n; const r = await api(url); if (g !== gen.n) throw new Stale(); return r; }
 window.addEventListener('unhandledrejection', e => { if (e.reason instanceof Stale) e.preventDefault(); });
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+// Mensagem de erro legível: o app responde {error:"texto"}; o gateway da plataforma pode responder {error:{code,message}} ou uma página HTML.
+const msgErro = (j, status) => { const e = j && j.error; const t = typeof e === 'string' ? e : (e && (e.message || e.code)) || (j && typeof j.message === 'string' ? j.message : ''); return String(t || `Erro ${status}`).slice(0, 300); };
+// Leituras (GET) tentam de novo até 3 vezes quando o app está reiniciando (502/503/504) ou a rede falha; gravações nunca repetem (evita duplicar).
 async function api(url, method = 'GET', body) {
-  const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
-  let j = {}; try { j = await r.json(); } catch {}
-  if (!r.ok) throw new Error(j.error || `Erro ${r.status}`);
-  return j;
+  for (let t = 0; ; t++) {
+    let r;
+    try { r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined }); }
+    catch { if (method === 'GET' && t < 3) { await esperar(800 * (t + 1)); continue; } throw new Error('Sem conexão com o app. Verifique a internet e tente de novo.'); }
+    let j = {}; try { j = await r.json(); } catch { /* resposta não-JSON */ }
+    if (r.ok) return j;
+    if ([502, 503, 504].includes(r.status)) { if (method === 'GET' && t < 3) { await esperar(1000 * (t + 1)); continue; } throw new Error('O app está reiniciando ou indisponível no momento. Aguarde alguns segundos e tente de novo.'); }
+    throw new Error(msgErro(j, r.status));
+  }
 }
 let tt; function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.append(t); clearTimeout(tt); tt = setTimeout(() => t.remove(), 3500); setTimeout(() => t.remove(), 3600); }
 const falha = e => { if (!(e instanceof Stale)) toast(e.message || String(e)); };
