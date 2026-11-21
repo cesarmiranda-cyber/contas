@@ -11,7 +11,7 @@ tar czf "$T/app.tgz" server.js package.json lib public
 T="$T" python3 - <<'PY' > "$T/deploy.json"
 import base64, json, os
 env = {"DATA_DIR": "/opt/data/state"}
-for k in ("BITRIX_WEBHOOK", "PREPARAR", "ATIVAR", "SPA_FILA", "SPA_VISITA"):
+for k in ("BITRIX_WEBHOOK", "PREPARAR", "ATIVAR", "SPA_FILA", "SPA_VISITA", "MANUTENCAO"):
     if os.environ.get(k): env[k] = os.environ[k]
 print(json.dumps({
   "source": {"content": base64.b64encode(open(os.environ["T"]+"/app.tgz","rb").read()).decode()},

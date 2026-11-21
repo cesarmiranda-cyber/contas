@@ -6,10 +6,11 @@ const { DEFAULT_CONFIG } = require('./rules');
 function createStore(dir) {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = path.join(dir, 'state.json');
-  let d = { config: {}, historico: [], log: [], tarefas: {}, snaps: {}, trocas: {}, excluidos: {}, admitidos: [] };
+  let d = { config: {}, historico: [], log: [], tarefas: {}, snaps: {}, trocas: {}, excluidos: {}, admitidos: [], removidos: [] };
   try { d = { ...d, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; }
   catch (e) { if (e.code !== 'ENOENT') { try { fs.renameSync(file, `${file}.corrompido-${Date.now()}`); } catch { /* sem permissão */ } } }
   d.config = { ...DEFAULT_CONFIG, ...d.config };
+  const removidos = new Set((d.removidos || []).map(String));        // cards que o app moveu para Removido de propósito (Excluir, auditoria): nunca são restaurados em massa
   const admitidos = new Set((d.admitidos || []).map(String));      // cards aprovados à mão para aparecer mesmo sem Última visita no cadastro
   let timer = null;
   const flush = () => { if (timer) { clearTimeout(timer); timer = null; } const t = file + '.tmp'; fs.writeFileSync(t, JSON.stringify(d), { mode: 0o600 }); fs.renameSync(t, file); };
@@ -31,6 +32,8 @@ function createStore(dir) {
     get ativo() { return !!d.config.ativo; },
     admitir(ids) { let n = 0; for (const i of ids) { if (!admitidos.has(String(i))) { admitidos.add(String(i)); n++; } } d.admitidos = [...admitidos]; flush(); return n; },
     admitido: id => admitidos.has(String(id)),
+    marcarRemovido(id) { removidos.add(String(id)); d.removidos = [...removidos]; flush(); },
+    removidoDeProposito: id => removidos.has(String(id)),
     get totalAdmitidos() { return admitidos.size; },
     flush,
   };

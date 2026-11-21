@@ -199,6 +199,22 @@ process.on('unhandledRejection', e => console.error('unhandledRejection', e));
 if (require.main === module) server.listen(PORT, () => {
   console.log(`Registro de Visitas em :${PORT} · Bitrix ${bitrix.enabled ? 'configurado' : 'SEM WEBHOOK'} · fila ${store.ativo ? 'ATIVA' : 'desligada'}`);
   if (process.env.ATIVAR !== undefined) store.setConfig({ ativo: /^(1|true|sim)$/i.test(process.env.ATIVAR) });
+  // Manutenção pontual (uma execução por reinício), ex.: MANUTENCAO="restaurar=2026-11-20;duplicados;reconciliar;auditoria". Cada tarefa é idempotente e fica no Log.
+  if (process.env.MANUTENCAO && bitrix.enabled) setTimeout(async () => {
+    for (const t of process.env.MANUTENCAO.split(';').map(x => x.trim()).filter(Boolean)) {
+      const [nome, arg] = t.split('=');
+      try {
+        let r;
+        if (nome === 'restaurar') r = await svc.restaurarRemovidos({ confirmar: true, desde: arg });
+        else if (nome === 'duplicados') r = await svc.corrigirAuditoria('abertos_duplicados');
+        else if (nome === 'duplicados-simular') r = await svc.corrigirAuditoria('abertos_duplicados', () => {}, { simular: true });
+        else if (nome === 'reconciliar') r = await svc.corrigirAuditoria('registro_card_aberto');
+        else if (nome === 'auditoria') r = (await svc.auditoria()).checks.map(c => `${c.severidade}:${c.contagem}:${c.titulo}`);
+        else r = 'tarefa desconhecida';
+        console.log('MANUTENCAO', t, JSON.stringify(r)); store.log('manutencao', `${t}: ${JSON.stringify(r)}`.slice(0, 480));
+      } catch (e) { console.log('MANUTENCAO ERRO', t, e.message); store.log('erro', `manutenção ${t}: ${e.message}`.slice(0, 300)); }
+    }
+  }, 4000);
   if (process.env.PREPARAR === '1' && bitrix.enabled) setTimeout(() => svc.preparar().then(r => console.log('preparar', JSON.stringify(r))).catch(e => console.error('preparar', e.message)), 3000);
   // Varredura leve a cada sweepSegundos; sincronização completa a cada hora e no job diário (a partir de horaJob, Brasília).
   let ultimoJob = '', ultimaHora = 0;
