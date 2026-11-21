@@ -450,7 +450,7 @@ async function telaCfg() {
   <div class="sec"><h3>Conexão com o Bitrix24</h3>${S.eu.webhook ? '<div>✅ Webhook configurado.</div>' : '<div class="aviso">Informe o webhook de entrada (permissões: crm, task, user, department, entity, im).</div>'}
     <div class="row2"><input id="c_wh" type="password" placeholder="https://seu-portal.bitrix24.com.br/rest/1/CODIGO/" autocomplete="off"><button class="btn pri" id="c_whb">Salvar webhook</button></div></div>
   <div class="sec resumo-cfg"><h3>Resumo: como o app está configurado hoje</h3><ul class="rs">
-    <li>${c.ativo ? '<b class="ok">Fila LIGADA</b>: o app cria, move e encerra cards sozinho.' : '<b class="bad">Fila DESLIGADA</b>: o app só mostra os cards; não cria nem altera nada.'}</li>
+    <li>${c.ativo ? '<b class="ok">Fila LIGADA</b>: o app confere as datas sozinho, cria os cards que faltam e muda a etapa conforme o prazo (detalhes em "1. Fila automática").' : '<b class="bad">Fila DESLIGADA</b>: o app só mostra os cards; não cria nem altera nada.'}</li>
     <li>${c.exigirUltimaVisita ? 'Só aparecem clientes que <b>já têm uma visita registrada</b> no cadastro (campo "Última visita").' : 'Aparecem todos os clientes com vendedor e classe, mesmo sem "Última visita".'}</li>
     <li>Gera visitas para: <b>${esc(c.cargosFila.join(', '))}</b>.</li>
     <li>Visitar a cada: <b>A ${c.intervalos.A} dias · B ${c.intervalos.B} dias · C ${c.intervalos.C} dias · E ${c.intervalos.E} meses</b>.</li>
@@ -459,7 +459,19 @@ async function telaCfg() {
     ${c.removerSemClasse ? '<li>Clientes sem classe saem da fila.</li>' : ''}</ul></div>
 
   <div class="sec"><h3>1. Fila automática</h3>
-    <label class="opt"><input type="checkbox" id="c_ativo" ${c.ativo ? 'checked' : ''}><span><b>Ligar a fila automática</b><small>Quando ligada, o app cria os cards, muda a etapa conforme a data e gera a próxima visita sozinho. Desligada, ele só mostra o que já existe.</small></span></label>
+    <label class="opt"><input type="checkbox" id="c_ativo" ${c.ativo ? 'checked' : ''}><span><b>Ligar a fila automática</b><small>Ligada: o app confere as datas sozinho, cria os cards que faltam e muda a etapa conforme o prazo. Desligada: ele só mostra o que já existe. Registrar, alterar data e "não realizada" funcionam nos dois casos.</small></span></label>
+    <details class="avanc" style="margin:4px 0 8px"><summary style="color:var(--pri);font-weight:600">Ver exatamente o que a fila automática faz (e o que não faz)</summary>
+      <div class="oque"><b>O que ela faz, por conta própria:</b><ol>
+        <li><b>Cria cards.</b> Para cada cliente e segmento que tem vendedor e classe e ainda não tem visita aberta, cria um card com a data da próxima visita (a da empresa, ou "Última visita + prazo da classe"). Isso roda a cada hora e uma vez por dia.</li>
+        <li><b>Muda a etapa pela data</b> (a cada ~30 segundos): data de hoje vira <i>Dia da visita</i>; data futura fica <i>Aguardando</i>; data que passou no mesmo mês vira <i>Atrasada</i>.</li>
+        <li><b>Fecha o mês:</b> visita que passou de mês sem registro vira <i>Não realizada</i> e o app já cria o card da próxima visita.</li>
+        <li><b>Mantém o cadastro em ordem:</b> corrige vendedor e classe do card se mudaram na empresa, remove card duplicado e tira da fila quem ficou sem classe (se a opção estiver marcada).</li></ol>
+      <b>O que ela NÃO faz:</b><ul>
+        <li>Não marca visita como realizada nem cria o registro da visita: isso só acontece quando o vendedor clica em <b>Registrar</b>.</li>
+        <li>Não apaga nada de vez: "Removido" é uma etapa, e dá para restaurar.</li>
+        <li>Não mexe em empresa sem vendedor ou sem classe, nem (com a regra da Última visita ligada) em cliente sem essa data.</li>
+        <li>Não envia mensagens. Só cria tarefa se a opção "Criar tarefa…" estiver marcada.</li></ul>
+      <div class="aviso" style="margin:8px 0 0"><div><b>Cuidado:</b> cards com data de meses passados viram <i>Não realizada</i> de uma vez, e cada um gera um card novo. Use a <b>Prévia</b> antes de ligar.</div></div></div></details>
     <div class="botoes-ajuda">
       <div><button class="btn" id="c_prev">Prévia</button><small>Mostra quantos cards seriam criados, movidos ou removidos. <b>Não altera nada.</b></small></div>
       <div><button class="btn" id="c_sync">Sincronizar agora</button><small>Cria e atualiza os cards agora, sem esperar a rotina automática.</small></div>
