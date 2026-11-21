@@ -260,3 +260,35 @@ test('diagnóstico das datas: contagens, intervalos observados e exemplos', asyn
   assert.deepEqual(s.intervalosObservados.A, [{ dias: 30, empresas: 1 }]); assert.deepEqual(s.intervalosObservados.B, [{ dias: 61, empresas: 1 }]);
   assert.ok(s.campos.ultima.includes('[Motores] Última Visita'));
 });
+test('desempenho: datas do cadastro leem só as empresas com card, uma vez, e o aquecimento prepara tudo', async () => {
+  const { f, svc, store } = mundo(); store.setConfig({ exigirUltimaVisita: true }); f.s.empresas[0].UF_U = '2026-10-20'; f.s.empresas[1].UF_U = '2026-10-21';
+  await svc.sync(); svc.resetModelo(); svc.invalidar();
+  const lidas = []; const orig = f.bx.call;
+  f.bx.call = async (m, p = {}) => { if (m === 'crm.company.list' && p.select?.includes('UF_U')) lidas.push(p.filter?.ID); return orig(m, p); };   // só leituras das datas (não a de nomes)
+  await svc.aquecer();
+  assert.equal(lidas.length, 1); assert.deepEqual([...lidas[0]].sort(), ['100', '101']);          // um lote, só as empresas dos cards (não a base inteira)
+  const r = await svc.listar(admin, {}); assert.equal(r.itens.length, 2);
+  await svc.listar(admin, {}); await svc.dashboard(admin, {});
+  assert.equal(lidas.length, 1);                                                                    // listar/dashboard não voltam a ler as datas
+});
+test('formulário do registro: Alçada e outros campos extras do SPA, validados e editáveis', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  const orig = f.bx.call;
+  f.bx.call = async (m, p = {}) => { const r = await orig(m, p); if (m === 'crm.item.fields' && +p.entityTypeId === 1032) r.result.fields = { ...r.result.fields,
+    ufAlc: { title: 'Alçada', type: 'enumeration', items: [{ ID: '1', VALUE: 'Gerente' }, { ID: '2', VALUE: 'Diretor' }] },
+    ufNum: { title: 'Valor estimado', type: 'double' }, ufOk: { title: 'Cliente ativo', type: 'boolean' }, ufRet: { title: 'Retorno em', type: 'date' }, ufQtd: { title: 'Qtd de motores', type: 'integer' },
+    ufMulti: { title: 'Vários', type: 'string', isMultiple: true }, ufArq: { title: 'Arquivo extra', type: 'file' }, ufLead: { title: 'Lead', type: 'crm' } }; return r; };
+  svc.resetModelo(); const card = f.s.itens[1036].find(c => c.companyId == 100);
+  const form = await svc.formCard(card.id, vendedor);
+  assert.deepEqual(form.opcoes.alcada, ['Gerente', 'Diretor']); assert.equal(form.campos.alcada, true);
+  assert.deepEqual(form.extras.map(e => e.label).sort(), ['Cliente ativo', 'Qtd de motores', 'Retorno em', 'Valor estimado']);   // conhecidos, múltiplos, arquivo e lead ficam de fora
+  await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'ok', alcada: 'Diretor', extras: { ufNum: '1500,5', ufOk: 'Sim', ufQtd: 'abc', ufRet: '2026-12-15', ufMulti: 'hack', naoExiste: 'x' } }, vendedor);
+  const it = f.s.itens[1032][0];
+  assert.equal(it.ufAlc, '2'); assert.equal(it.ufNum, '1500.5'); assert.equal(it.ufOk, 'Y'); assert.equal(it.ufQtd, ''); assert.equal(it.ufRet, '2026-12-15');
+  assert.equal(it.ufMulti, undefined); assert.equal(it.naoExiste, undefined);                       // só campos conhecidos entram
+  const reg = await svc.registroDoCard(card.id, vendedor);
+  assert.equal(reg.alcada, 'Diretor'); assert.deepEqual([reg.extras.ufOk, reg.extras.ufNum, reg.extras.ufRet], ['Y', '1500.5', '2026-12-15']);
+  assert.ok(reg.campos.some(c => c.label === 'Alçada' && c.valor === 'Diretor'));
+  await svc.editarRegistro(reg.id, { fatos: 'ok', alcada: 'Gerente', extras: { ufOk: 'Não' } }, vendedor);
+  assert.equal(it.ufAlc, '1'); assert.equal(it.ufOk, 'N');
+});

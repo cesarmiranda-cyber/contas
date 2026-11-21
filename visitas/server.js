@@ -195,7 +195,11 @@ if (require.main === module) server.listen(PORT, () => {
   if (process.env.PREPARAR === '1' && bitrix.enabled) setTimeout(() => svc.preparar().then(r => console.log('preparar', JSON.stringify(r))).catch(e => console.error('preparar', e.message)), 3000);
   // Varredura leve a cada sweepSegundos; sincronização completa a cada hora e no job diário (a partir de horaJob, Brasília).
   let ultimoJob = '', ultimaHora = 0;
+  let ultimoAquec = 0;
+  const aquece = () => { ultimoAquec = Date.now(); return svc.aquecer().catch(e => store.log('erro', `aquecer: ${e.message}`.slice(0, 200))); };
+  setTimeout(aquece, 1500);
   const tique = async () => {
+    if (bitrix.enabled && Date.now() - ultimoAquec > 120000) await aquece();
     if (!bitrix.enabled || !store.ativo) return;
     try {
       await svc.varrer();

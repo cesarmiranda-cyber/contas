@@ -64,7 +64,8 @@ S.agrupar = localStorage.getItem('vis.g') !== '0'; S.fin = localStorage.getItem(
 async function telaFila() {
   gen.n++; const app = $('#app');
   if (!$('#fil')) {
-    app.innerHTML = `<div class="kpis" id="kpis"></div><div class="filtros" id="fil"></div><div id="aoc"></div><div id="lista"><div class="grid">${'<div class="sk"></div>'.repeat(6)}</div></div>`;
+    app.innerHTML = `<div class="kpis" id="kpis"></div><div class="filtros" id="fil"></div><div id="aoc"></div><div id="lista"><div class="grid">${'<div class="sk"></div>'.repeat(6)}</div><div class="mut dica" id="dica" hidden>Carregando do Bitrix24… a primeira abertura pode levar alguns segundos.</div></div>`;
+    setTimeout(() => { const d = $('#dica'); if (d) d.hidden = false; }, 3500);
   } else $('#lista').classList.add('busy');
   const f = S.f, kan = S.vista === 'kanban';
   const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', finalizados: S.fin ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
@@ -225,6 +226,14 @@ async function modalNao(id) {
     (bg, close) => bg.querySelector('#n_ok').onclick = async () => { try { await api(`/api/cards/${id}/nao-realizada`, 'POST', { motivo: bg.querySelector('#n_mot').value, detalhe: bg.querySelector('#n_det').value }); close(); toast('Registrado como não realizada'); telaFila(); } catch (e) { falha(e); } });
 }
 const arq64 = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok({ nome: f.name, base64: String(r.result).split(',')[1] }); r.onerror = no; r.readAsDataURL(f); });
+// Campo extra do SPA de registros, conforme o tipo.
+function campoExtra(d, v) {
+  const id = `x_${esc(d.key)}`, rot = `<span>${esc(d.label)}</span>`;
+  if (d.type === 'enumeration') return `<div class="f">${rot}<select id="${id}"><option value="">—</option>${d.opcoes.map(o => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></div>`;
+  if (d.type === 'boolean') return `<div class="f">${rot}<select id="${id}"><option value="">—</option><option value="Y" ${v === 'Y' ? 'selected' : ''}>Sim</option><option value="N" ${v === 'N' ? 'selected' : ''}>Não</option></select></div>`;
+  const tipo = { integer: 'number', double: 'number', date: 'date', datetime: 'datetime-local' }[d.type] || 'text';
+  return `<div class="f">${rot}<input id="${id}" type="${tipo}" ${d.type === 'double' ? 'step="any"' : ''} value="${esc(v)}" maxlength="2000"></div>`;
+}
 async function formRegistro(id, editar) {
   const f = await api(`/api/cards/${id}/form`), c = f.card;
   let reg = null; if (editar) reg = await api(`/api/cards/${id}/registro`);
@@ -238,11 +247,13 @@ async function formRegistro(id, editar) {
     ${T('fatos', 'Fatos e dados *', 4)}${T('interesses', 'Interesses')}${T('sentimentos', 'Sentimentos')}${T('valores', 'Valores')}${f.campos.populacao ? T('populacao', 'População de motores', 6) : ''}
     <div class="row2">${f.opcoes.regime.length ? `<div class="f"><span>Regime de trabalho</span>${sel('regime', f.opcoes.regime, reg?.regime)}</div>` : ''}${f.opcoes.oportunidades.length ? `<div class="f"><span>Oportunidades futuras</span>${sel('oportunidades', f.opcoes.oportunidades, reg?.oportunidades)}</div>` : ''}
     ${f.opcoes.antecipada.length ? `<div class="f"><span>Reunião antecipada?</span>${sel('antecipada', f.opcoes.antecipada, reg?.antecipada)}</div>` : ''}${f.opcoes.acompanhamento.length ? `<div class="f"><span>Acompanhamento</span>${sel('acompanhamento', f.opcoes.acompanhamento, reg?.acompanhamento)}</div>` : ''}</div>
+    ${f.campos.alcada ? (f.opcoes.alcada.length ? `<div class="f"><span>Alçada</span>${sel('alcada', f.opcoes.alcada, reg?.alcada)}</div>` : `<div class="f"><span>Alçada</span><input id="r_alcada" value="${esc(reg?.alcada || '')}" maxlength="200"></div>`) : ''}
+    ${f.extras.length ? `<h4 style="margin:16px 22px 0">Outros campos do registro</h4><div class="row2">${f.extras.map(d => campoExtra(d, reg?.extras?.[d.key] || '')).join('')}</div>` : ''}
     ${T('resultado', 'Resultado / observações')}${f.campos.anexos ? '<div class="f"><span>Anexos (até 10; 20 MB no total)</span><input type="file" id="r_anexos" multiple></div>' : ''}
     <div class="foot"><button class="btn" data-close>Cancelar</button><button class="btn pri" id="r_ok">${editar ? 'Salvar alterações' : 'Registrar visita'}</button></div>`,
     (bg, close) => bg.querySelector('#r_ok').onclick = async ev => {
       const g = k => bg.querySelector('#r_' + k)?.value || '';
-      const b = { dataHora: g('dataHora'), fatos: g('fatos'), interesses: g('interesses'), sentimentos: g('sentimentos'), valores: g('valores'), populacao: g('populacao'), regime: g('regime'), oportunidades: g('oportunidades'), antecipada: g('antecipada'), acompanhamento: g('acompanhamento'), resultado: g('resultado'), supervisor: g('supervisor'),
+      const b = { dataHora: g('dataHora'), fatos: g('fatos'), interesses: g('interesses'), sentimentos: g('sentimentos'), valores: g('valores'), populacao: g('populacao'), regime: g('regime'), oportunidades: g('oportunidades'), antecipada: g('antecipada'), alcada: g('alcada'), extras: Object.fromEntries(f.extras.map(d => [d.key, bg.querySelector('#x_' + d.key)?.value ?? ''])), acompanhamento: g('acompanhamento'), resultado: g('resultado'), supervisor: g('supervisor'),
         contatos: [...bg.querySelectorAll('.contatos input:checked')].map(x => +x.value) };
       const files = [...(bg.querySelector('#r_anexos')?.files || [])];
       if (files.reduce((s, x) => s + x.size, 0) > 20e6) return toast('Anexos passam de 20 MB.');

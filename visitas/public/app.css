@@ -193,3 +193,4 @@ body.arrastando .kdel{opacity:.92;pointer-events:auto;transform:none}.kdel.over{
 .rtab tbody tr:hover .acol{background:var(--surf2)}
 .modal h4{font-size:13px}
 .rtab td{vertical-align:top}
+.dica{text-align:center;padding:14px}

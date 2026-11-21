@@ -13,6 +13,7 @@ const dia = v => {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 };
 const val = v => (Array.isArray(v) ? v[0] : v);
+const val0 = val;
 const txt = v => (v === undefined || v === null ? '' : String(v));
 const MAXTXT = 20000;
 const limpa = (v, max = MAXTXT) => txt(v).slice(0, max);
@@ -78,27 +79,45 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     if (proxima && s.proxima[0]) fields[s.proxima[0]] = proxima;
     if (Object.keys(fields).length) {
       await bx.call('crm.company.update', { id: empresaId, fields });
-      const mapa = memo.get('ult')?.v;        // mantém o cache de datas do cadastro em dia sem reler todas as empresas
-      if (mapa) { const k = `${empresaId}|${R.norm(segNome)}`, cur = mapa.get(k) || {}; mapa.set(k, { ultima: ultima || cur.ultima || '', proxima: proxima || cur.proxima || '' }); }
+      const k = `${empresaId}|${R.norm(segNome)}`, cur = ultDados.get(k) || {};   // mantém o cache de datas em dia sem reler a empresa
+      ultDados.set(k, { ultima: ultima || cur.ultima || '', proxima: proxima || cur.proxima || '' });
     }
   }
-  // Datas "Última/Próxima visita" do cadastro da empresa, por empresa+segmento (cache longo, atualizado nas gravações).
+  // Datas "Última/Próxima visita" do cadastro, por empresa+segmento. Só lê as empresas que têm card (poucas), em lotes de 50;
+  // o que já foi lido responde na hora e é renovado em segundo plano (a 1ª leitura de uma empresa é a única que espera).
+  const ultDados = new Map(), ultEmp = new Map();
   const chaveUlt = c => `${c.empresaId}|${R.norm(c.segmento)}`;
-  async function ultimasC(m) {
-    return cached('ult', 600000, async () => {
-      const mapa = new Map();
-      for (const comp of await empresasSync(m)) for (const [k, s] of Object.entries(m.empresa.segmentos)) {
-        const ultima = dia(primeiro(comp, s.ultima)), proxima = dia(primeiro(comp, s.proxima));
-        if (ultima || proxima) mapa.set(`${comp.ID}|${k}`, { ultima, proxima });
-      }
-      return mapa;
-    }, 3600000);
+  const ufsEmpresa = m => [...new Set(Object.values(m.empresa.segmentos).flatMap(s => [...s.ultima, ...s.proxima]))];
+  function guardaEmpresa(m, comp) {
+    for (const [k, s] of Object.entries(m.empresa.segmentos)) {
+      const ultima = dia(primeiro(comp, s.ultima)), proxima = dia(primeiro(comp, s.proxima)), chave = `${comp.ID}|${k}`;
+      if (ultima || proxima) ultDados.set(chave, { ultima, proxima }); else ultDados.delete(chave);
+    }
+    ultEmp.set(String(comp.ID), Date.now());
+  }
+  async function lerEmpresas(m, ids) {
+    const sel = ['ID', ...ufsEmpresa(m)], lotes = [];
+    for (let i = 0; i < ids.length; i += 50) lotes.push(ids.slice(i, i + 50));
+    await Promise.all(lotes.map(async l => { for (const c of (await bx.call('crm.company.list', { filter: { ID: l }, select: sel })).result || []) guardaEmpresa(m, c); }));
+  }
+  async function carregaUltimas(m, ids) {
+    const unicos = [...new Set(ids.map(String))], agora = Date.now();
+    const novos = unicos.filter(i => !ultEmp.has(i)), velhos = unicos.filter(i => ultEmp.has(i) && agora - ultEmp.get(i) > 600000);
+    if (novos.length) await lerEmpresas(m, novos);
+    if (velhos.length) { velhos.forEach(i => ultEmp.set(i, agora)); lerEmpresas(m, velhos).catch(() => {}); }
   }
   // Regra: sem "Última visita" no cadastro da empresa (naquele segmento), o card não aparece no app.
   async function comUltima(m, cards) {
     if (!cfg().exigirUltimaVisita) return { cards, ocultos: 0 };
-    const u = await ultimasC(m), ok = cards.filter(c => u.get(chaveUlt(c))?.ultima);
+    await carregaUltimas(m, cards.map(c => c.empresaId));
+    const ok = cards.filter(c => ultDados.get(chaveUlt(c))?.ultima);
     return { cards: ok, ocultos: cards.length - ok.length };
+  }
+  // Aquece os caches (modelo, cards e datas do cadastro) para a 1ª abertura da tela não esperar o Bitrix.
+  async function aquecer() {
+    if (!bx.enabled) return;
+    const m = await modelo(), cards = await cardsC(m);
+    await carregaUltimas(m, cards.filter(c => c.etapa !== 'FAIL').map(c => c.empresaId));
   }
   async function tituloEmpresas(ids) {
     const falta = [...new Set(ids)].filter(i => !memo.get(`emp:${i}`));
@@ -230,6 +249,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       const m = await modelo(true), h = hoje(), previa = soPrevia || (!cfg().ativo && !forcar);
       if (m.faltando.length && !Object.keys(m.empresa.segmentos).length) return { ok: false, faltando: m.faltando };
       const [empresas, cards] = await Promise.all([empresasSync(m), cardsTodos(m)]);
+      for (const comp of empresas) guardaEmpresa(m, comp);
       const porChave = new Map();
       for (const c of cards) { const k = R.chaveCard(c.empresaId, c.segmento, c.cargo); (porChave.get(k) || porChave.set(k, []).get(k)).push(c); }
       const r = { ok: true, previa, criados: 0, removidos: 0, atualizados: 0, naoRealizadas: 0, semClasse: 0, empresas: empresas.length };
@@ -324,6 +344,22 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     await podeAgir(user, card);
     return { m, card };
   }
+  // Outros campos personalizados do SPA de registros (editáveis no formulário): os que o app ainda não conhece, de tipo simples e valor único.
+  const TIPOS_EXTRA = /^(string|integer|double|boolean|date|datetime|enumeration)$/;
+  function extrasDef(m) {
+    const usados = new Set(Object.entries(m.visita).filter(([k]) => !k.endsWith('_todos') && !k.endsWith('Enum')).map(([, c]) => c).filter(Boolean));
+    return Object.entries(m.visitaFields || {}).filter(([k, d]) => /^uf/i.test(k) && !usados.has(k) && TIPOS_EXTRA.test(String(d.type || '')) && !d.isMultiple && !d.isReadOnly)
+      .map(([k, d]) => ({ key: k, label: F.label(d) || k, type: String(d.type), opcoes: (d.items || []).map(i => i.VALUE) }));
+  }
+  function valorExtra(d, x, itens) {
+    if (x === undefined || x === null) return undefined;
+    if (d.type === 'enumeration') return x ? (itens.find(i => R.norm(i.VALUE) === R.norm(x))?.ID ?? '') : '';
+    if (d.type === 'boolean') return /^(y|1|true|sim)$/i.test(String(x)) ? 'Y' : /^(n|0|false|nao|não)$/i.test(String(x)) ? 'N' : '';
+    if (d.type === 'integer') return /^-?\d{1,15}$/.test(String(x).trim()) ? String(x).trim() : '';
+    if (d.type === 'double') return Number.isFinite(Number(String(x).replace(',', '.'))) && String(x).trim() !== '' ? String(Number(String(x).replace(',', '.'))) : '';
+    if (d.type === 'date' || d.type === 'datetime') return /^\d{4}-\d{2}-\d{2}/.test(String(x)) ? String(x) : '';
+    return limpa(x, 2000);
+  }
   function camposVisita(m, b, vendedorId) {
     const v = m.visita, vf = m.visitaFields, f = {};
     const set = (k, x) => { if (v[k] && x !== undefined) f[v[k]] = x; };
@@ -333,6 +369,8 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     if (v.regime) f[v.regime] = lista('regime', b.regime);
     if (v.oportunidades) f[v.oportunidades] = lista('oportunidades', b.oportunidades);
     if (v.antecipada) f[v.antecipada] = lista('antecipada', b.antecipada);
+    if (v.alcada) f[v.alcada] = lista('alcada', b.alcada);
+    if (b.extras && typeof b.extras === 'object') for (const d of extrasDef(m)) { const x = valorExtra(d, b.extras[d.key], itensDe(vf, d.key)); if (x !== undefined) f[d.key] = x; }
     if (v.acompanhamento) f[v.acompanhamento] = lista('acompanhamento', b.acompanhamento);
     if (v.supervisor && /^\d{1,12}$/.test(txt(b.supervisor))) f[v.supervisor] = txt(b.supervisor);
     if (Array.isArray(b.anexos) && b.anexos.length && v.anexos) {
@@ -457,7 +495,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const v = m.visita, vf = m.visitaFields, lista = k => { const items = itensDe(vf, v[k]); const x = val(it[v[k]]); return items.length ? (items.find(i => String(i.ID) === String(x))?.VALUE || '') : txt(x); };
     return { raw: it, id: +it.id, empresaId: +it.companyId, contatos: A(it.contactIds).map(Number), criadoPor: txt(it.createdBy), dataHora: it[v.data] || '', idFila: txt(it[v.idFila]), segmento: lista('segmento'),
       fatos: txt(it[v.fatos]), interesses: txt(it[v.interesses]), sentimentos: txt(it[v.sentimentos]), valores: txt(it[v.valores]), populacao: txt(it[v.populacao]),
-      regime: lista('regime'), oportunidades: lista('oportunidades'), antecipada: lista('antecipada'), resultado: txt(it[v.resultado]), acompanhamento: lista('acompanhamento'),
+      regime: lista('regime'), oportunidades: lista('oportunidades'), antecipada: lista('antecipada'), resultado: txt(it[v.resultado]), acompanhamento: lista('acompanhamento'), alcada: lista('alcada'),
       supervisor: txt(it[v.supervisor]), anexos: A(it[v.anexos]).map(a => (a && typeof a === 'object' ? { id: a.id, url: a.urlMachine || a.url || '' } : { url: a })) };
   }
   // ---- todos os campos do registro (SPA 1032), com o rótulo de cada um ----
@@ -496,7 +534,12 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const it = (r.result?.items || [])[0];
     if (!it) throw fail(404, 'Este card ainda não tem registro de visita.');
     const reg = paraRegistro(m, it), vr = await valoresRegistros(m, [reg]), val = vr.valores(reg);
-    return { ...reg, raw: undefined, campos: vr.colunas.map(c => ({ label: c.label, valor: val[c.k] })).filter(c => c.valor) };
+    const extras = Object.fromEntries(extrasDef(m).map(d => {
+      const x = val0(reg.raw[d.key]); let t = '';
+      if (x !== undefined && x !== null && x !== '') t = d.type === 'enumeration' ? (itensDe(m.visitaFields, d.key).find(i => String(i.ID) === String(x))?.VALUE || '') : d.type === 'boolean' ? (/^(y|1|true)$/i.test(String(x)) ? 'Y' : 'N') : d.type === 'datetime' ? String(x).slice(0, 16) : d.type === 'date' ? String(x).slice(0, 10) : String(x);
+      return [d.key, t];
+    }));
+    return { ...reg, raw: undefined, extras, campos: vr.colunas.map(c => ({ label: c.label, valor: val[c.k] })).filter(c => c.valor) };
   }
   async function editarRegistro(vid, b, user) {
     const m = await modelo();
@@ -522,8 +565,8 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const { m, card } = await carregar(id, user);
     const v = m.visita, opt = k => itensDe(m.visitaFields, v[k]).map(i => i.VALUE);
     return { card, hoje: hoje(), contatos: await contatos(card.empresaId), supervisores: await supervisores(), trocas: store.trocas(id),
-      opcoes: { regime: opt('regime'), oportunidades: opt('oportunidades'), antecipada: opt('antecipada'), acompanhamento: opt('acompanhamento') }, motivos: cfg().motivosNaoRealizada,
-      campos: { populacao: !!v.populacao, anexos: !!v.anexos, supervisor: !!v.supervisor, regime: !!v.regime } };
+      opcoes: { regime: opt('regime'), oportunidades: opt('oportunidades'), antecipada: opt('antecipada'), acompanhamento: opt('acompanhamento'), alcada: opt('alcada') }, motivos: cfg().motivosNaoRealizada,
+      campos: { populacao: !!v.populacao, anexos: !!v.anexos, supervisor: !!v.supervisor, regime: !!v.regime, alcada: !!v.alcada }, extras: extrasDef(m) };
   }
 
   // ---------- listas e dashboard ----------
@@ -538,7 +581,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const excl = q.excluidos === '1';
     cards = cards.filter(c => (excl ? c.etapa === 'FAIL' : c.etapa !== 'FAIL'));
     if (!excl && !q.etapa && q.finalizados !== '1') cards = cards.filter(c => c.etapa !== 'SUCCESS');   // Finalizado só aparece a pedido
-    const ult = await ultimasC(m), cu = await comUltima(m, cards); cards = cu.cards;
+    const cu = await comUltima(m, cards); cards = cu.cards; await carregaUltimas(m, cards.map(c => c.empresaId));
     if (de || ate) cards = cards.filter(c => c.etapa === 'NAOREAL' || !c.data || ((!de || c.data >= de) && (!ate || c.data <= ate)) || (ABERTAS.includes(c.etapa) && c.data < de && !q.de));
     if (q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
     if (q.vendedor) cards = cards.filter(c => c.vendedorId === (q.vendedor === 'sem' ? '' : String(q.vendedor)));
@@ -554,7 +597,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const size = Math.min(todos ? 5000 : 200, Math.max(10, +q.pageSize || 50)), pages = todos ? 1 : Math.max(1, Math.ceil(unidades.length / size)), page = todos ? 1 : Math.min(pages, Math.max(1, +q.page || 1));
     const fatia = (todos ? unidades : unidades.slice((page - 1) * size, page * size)).flat();   // só a página corrente busca nomes no Bitrix
     const tit = await tituloEmpresas(fatia.map(c => c.empresaId)), nm = await nomes(fatia.map(c => c.vendedorId));
-    return { hoje: h, de, ate, ocultos: cu.ocultos, exigirUltima: cfg().exigirUltimaVisita, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), ultimaVisita: ult.get(chaveUlt(c))?.ultima || '', reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
+    return { hoje: h, de, ate, ocultos: cu.ocultos, exigirUltima: cfg().exigirUltimaVisita, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), ultimaVisita: ultDados.get(chaveUlt(c))?.ultima || '', reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
   async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i)), 600000); }
@@ -682,6 +725,6 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    preparar, camposInfo, diagnosticoDatas, supervisores, temAcesso, resetModelo: () => { modeloC = null; invalidar(); }, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    preparar, camposInfo, diagnosticoDatas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };
