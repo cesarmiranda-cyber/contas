@@ -544,7 +544,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     return { raw: it, id: +it.id, empresaId: +it.companyId, contatos: A(it.contactIds).map(Number), criadoPor: txt(it.createdBy), dataHora: it[v.data] || '', idFila: txt(it[v.idFila]), segmento: lista('segmento'),
       fatos: txt(it[v.fatos]), interesses: txt(it[v.interesses]), sentimentos: txt(it[v.sentimentos]), valores: txt(it[v.valores]), populacao: txt(it[v.populacao]),
       regime: lista('regime'), oportunidades: lista('oportunidades'), antecipada: lista('antecipada'), resultado: txt(it[v.resultado]), acompanhamento: lista('acompanhamento'), alcada: lista('alcada'),
-      supervisor: txt(it[v.supervisor]), anexos: A(it[v.anexos]).map(a => (a && typeof a === 'object' ? { id: a.id, url: a.urlMachine || a.url || '' } : { url: a })) };
+      responsavelId: txt(it.assignedById), supervisor: txt(it[v.supervisor]), anexos: A(it[v.anexos]).map(a => (a && typeof a === 'object' ? { id: a.id, url: a.urlMachine || a.url || '' } : { url: a })) };
   }
   // ---- todos os campos do registro (SPA 1032), com o rótulo de cada um ----
   const fmtData = x => { const t = String(x); const m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/); return m ? `${m[3]}/${m[2]}/${m[1]}${m[4] && !(m[4] === '00' && m[5] === '00') ? ` ${m[4]}:${m[5]}` : ''}` : t; };
@@ -668,30 +668,60 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     if (!sem.includes('supervisor') && q.supervisor) { const e = await escopoDe(q.supervisor); cards = cards.filter(c => e.has(c.vendedorId)); }
     return { m, cards };
   }
-  const grupoDe = e => (e === 'ENC' || e === 'SUCCESS' ? 'realizadas' : e === 'LATE' ? 'atrasadas' : e === 'NAOREAL' ? 'nao' : 'abertas');
+  // ================= PAINEL (dashboard) =================
+  // Fila = situação ATUAL dos cards abertos; Registros = visitas preenchidas, pelo período (data da visita). Ambos respeitam a visibilidade do usuário.
+  const CARGOS_ORDEM = ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'];
+  const cargoCanon = c => CARGOS_ORDEM.find(x => R.norm(x) === R.norm(c)) || (txt(c).trim() || 'Sem cargo');
+  async function baseDados(user, q = {}) {
+    const m = await modelo(), h = hoje(), esc = await escopo(user);
+    const vis = await visiveis(user, await cardsC(m)), porId = new Map(vis.map(c => [String(c.id), c]));
+    const respF = q.vendedor === 'sem' ? '' : String(q.vendedor || '');
+    const passa = c => (!q.segmento || R.norm(c.segmento) === R.norm(q.segmento)) && (!q.cargo || R.norm(c.cargo) === R.norm(q.cargo)) && (!q.vendedor || c.vendedorId === respF) && (!q.classe || c.classe === q.classe);
+    const naRegra = await comUltima(m, vis.filter(c => c.etapa !== 'FAIL'));
+    const cards = naRegra.cards.filter(passa);
+    const regsEsc = (await registrosC(m)).filter(r => esc === null || porId.has(r.idFila) || (r.responsavelId && esc.has(String(r.responsavelId))));
+    const regs = regsEsc.map(r => { const c = porId.get(r.idFila); return { ...r, card: c || null, data: dia(r.dataHora), feito: r.fatos.trim().length > 0, cargo: c ? c.cargo : r.alcada, respId: c ? c.vendedorId : txt(r.responsavelId), seg: c ? c.segmento : r.segmento }; })
+      .filter(r => r.card ? passa(r.card) : (!q.classe && (!q.segmento || R.norm(r.seg) === R.norm(q.segmento)) && (!q.cargo || R.norm(r.cargo) === R.norm(q.cargo)) && (!q.vendedor || r.respId === respF)));
+    return { m, h, esc, cards, todosCards: naRegra.cards, ocultos: naRegra.ocultos, regs, de: q.de || '', ate: q.ate || '' };
+  }
   async function dashboard(user, q = {}) {
-    const { cards } = await filtrados(user, q), base = (await filtrados(user, q, ['segmento', 'vendedor', 'classe', 'supervisor', 'etapa', 'motivo'])).cards;
-    const nm0 = await nomes(cards.map(c => c.vendedorId).concat(base.map(c => c.vendedorId))), nm = id => (id ? nm0(id) : 'Sem vendedor');
-    const novo = () => ({ realizadas: 0, abertas: 0, atrasadas: 0, nao: 0, total: 0 });
-    const soma = (mapa, k, extra, c) => { const o = (mapa[k] ||= { ...novo(), ...extra }); o[grupoDe(c.etapa)]++; o.total++; };
-    const mes = {}, vend = {}, seg = {}, cls = {}, mot = {};
-    for (const c of cards) {
-      soma(mes, (c.data || '').slice(0, 7) || '—', {}, c);
-      soma(vend, c.vendedorId || 'sem', { id: c.vendedorId || 'sem', nome: nm(c.vendedorId) }, c);
-      soma(seg, c.segmento || '—', { nome: c.segmento || '—' }, c);
-      soma(cls, c.classe || '—', { nome: c.classe || '—' }, c);
-      if (c.etapa === 'NAOREAL') mot[c.motivo || 'Sem motivo informado'] = (mot[c.motivo || 'Sem motivo informado'] || 0) + 1;
-    }
-    const tot = cards.reduce((a, c) => { a[grupoDe(c.etapa)]++; return a; }, novo()), ids = new Set(cards.map(c => String(c.id)));
-    const vencidas = tot.realizadas + tot.atrasadas + tot.nao, ord = o => Object.values(o).sort((a, b) => b.total - a.total);
+    const { h, cards, todosCards, ocultos, regs, de, ate } = await baseDados(user, q);
+    const abertas = cards.filter(c => ABERTAS.includes(c.etapa)), comData = abertas.filter(c => c.data);
+    const atras = comData.filter(c => c.data < h), hojeL = comData.filter(c => c.data === h);
+    const em7 = comData.filter(c => c.data > h && c.data <= R.addDays(h, 7)), em30 = comData.filter(c => c.data > h && c.data <= R.addDays(h, 30));
+    const dist = l => new Set(l.map(c => c.empresaId)).size, dentro = d => d && (!de || d >= de) && (!ate || d <= ate);
+    const faixas = [['1 a 7 dias', 1, 7], ['8 a 30 dias', 8, 30], ['31 a 90 dias', 31, 90], ['91 a 180 dias', 91, 180], ['Mais de 180 dias', 181, 1e9]].map(([nome, a, b]) => ({ nome, n: atras.filter(c => { const d = R.dayDiff(c.data, h); return d >= a && d <= b; }).length }));
+    const agenda = Array.from({ length: 30 }, (_, i) => { const d = R.addDays(h, i); return { dia: d, n: comData.filter(c => c.data === d).length, util: R.isBusinessDay(d) }; });
+    const mesFila = {}; for (const c of comData) { const o = (mesFila[c.data.slice(0, 7)] ||= { mes: c.data.slice(0, 7), atrasadas: 0, noPrazo: 0 }); c.data < h ? o.atrasadas++ : o.noPrazo++; }
+    // registros
+    const feitos = regs.filter(r => r.feito), noPeriodo = feitos.filter(r => dentro(r.data)), comVisita = new Set(feitos.map(r => String(r.idFila)));
+    const ult30 = feitos.filter(r => r.data && r.data > R.addDays(h, -30) && r.data <= h).length, ant30 = feitos.filter(r => r.data && r.data > R.addDays(h, -60) && r.data <= R.addDays(h, -30)).length;
+    const aguardando = regs.filter(r => !r.feito && r.card && ABERTAS.includes(r.card.etapa)).length;
+    const venc = cards.filter(c => c.data && c.data <= h && dentro(c.data)), feitoCard = c => c.etapa === 'ENC' || c.etapa === 'SUCCESS' || comVisita.has(String(c.id));
+    const cumpridas = venc.filter(feitoCard).length, pendentes = venc.filter(c => ABERTAS.includes(c.etapa) && !feitoCard(c)).length;
+    const contar = (l, f) => { const o = {}; for (const x of l) { let k = f(x) || 'Não informado'; if (k === 'Sem cargo') k = 'Não informado'; o[k] = (o[k] || 0) + 1; } return Object.entries(o).sort((a, b) => b[1] - a[1]).map(([nome, n]) => ({ nome, n })); };
+    const porMes = {}; for (const r of noPeriodo) porMes[r.data.slice(0, 7)] = (porMes[r.data.slice(0, 7)] || 0) + 1;
+    // cargos e responsáveis
+    const nm0 = await nomes([...new Set([...abertas.map(c => c.vendedorId), ...noPeriodo.map(r => r.respId), ...todosCards.map(c => c.vendedorId)].filter(Boolean))]), nm = id => (id ? nm0(id) : 'Sem responsável');
+    const linhaDe = (lista, regsL) => { const at = lista.filter(c => c.data && c.data < h); return { abertas: lista.length, hoje: lista.filter(c => c.data === h).length, em7: lista.filter(c => c.data && c.data > h && c.data <= R.addDays(h, 7)).length, atrasadas: at.length, registros: regsL.length, emDia: lista.length ? Math.round((lista.length - at.length) * 100 / lista.length) : null }; };
+    const nomesCargo = [...new Set([...CARGOS_ORDEM, ...abertas.map(c => cargoCanon(c.cargo)), ...noPeriodo.map(r => cargoCanon(r.cargo))])];
+    const porCargo = nomesCargo.map(cg => { const l = abertas.filter(c => cargoCanon(c.cargo) === cg); return { nome: cg, pessoas: new Set(l.map(c => c.vendedorId).filter(Boolean)).size, ...linhaDe(l, noPeriodo.filter(r => cargoCanon(r.cargo) === cg)) }; });
+    const ids = [...new Set([...abertas.map(c => c.vendedorId || 'sem'), ...noPeriodo.map(r => r.respId || 'sem')])];
+    const porResponsavel = ids.map(id => { const l = abertas.filter(c => (c.vendedorId || 'sem') === id), rr = noPeriodo.filter(r => (r.respId || 'sem') === id); return { id, nome: nm(id === 'sem' ? '' : id), cargos: [...new Set([...l.map(c => cargoCanon(c.cargo)), ...rr.map(r => cargoCanon(r.cargo))])].filter(c => c !== 'Sem cargo').sort((a, b) => nomesCargo.indexOf(a) - nomesCargo.indexOf(b)), ...linhaDe(l, rr) }; })
+      .sort((a, b) => b.atrasadas - a.atrasadas || b.abertas - a.abertas || b.registros - a.registros).slice(0, 150);
+    const porClasse = ['A', 'B', 'C', 'E'].map(k => { const l = abertas.filter(c => c.classe === k); return { nome: k, abertas: l.length, atrasadas: l.filter(c => c.data && c.data < h).length }; });
+    const segs = [...new Set(abertas.map(c => c.segmento).filter(Boolean))].sort();
+    const porSegmento = segs.map(sg => { const l = abertas.filter(c => c.segmento === sg); return { nome: sg, abertas: l.length, atrasadas: l.filter(c => c.data && c.data < h).length }; }).sort((a, b) => b.abertas - a.abertas);
     return {
-      hoje: hoje(),
-      kpis: { programadas: cards.length, realizadas: tot.realizadas, abertas: tot.abertas, atrasadas: tot.atrasadas, naoRealizadas: tot.nao,
-        reprogramacoes: store.historico.filter(h => ids.has(String(h.card))).length, taxa: vencidas ? Math.round(tot.realizadas * 100 / vencidas) : null },
-      serie: Object.entries(mes).filter(([k]) => k !== '—').sort().map(([k, v]) => ({ mes: k, ...v })),
-      porVendedor: ord(vend).slice(0, 30), porSegmento: ord(seg), porClasse: ['A', 'B', 'C', 'E'].map(k => cls[k] || { nome: k, ...novo() }).concat(cls['—'] ? [cls['—']] : []),
-      motivos: Object.entries(mot).sort((a, b) => b[1] - a[1]).map(([nome, n]) => ({ nome, n })),
-      opcoes: { segmentos: [...new Set(base.map(c => c.segmento).filter(Boolean))].sort(), vendedores: [...new Map(base.map(c => [c.vendedorId || 'sem', nm(c.vendedorId)]))].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)), classes: ['A', 'B', 'C', 'E'] },
+      hoje: h, geradoEm: new Date().toISOString(), ocultosPelaRegra: ocultos,
+      kpis: { programadas: cards.length,
+        fila: { abertas: abertas.length, hoje: hojeL.length, atrasadas: atras.length, clientesAtrasados: dist(atras), em7: em7.length, em30: em30.length, semData: abertas.length - comData.length, clientes: dist(abertas) },
+        reg: { registradas: noPeriodo.length, ult30, ant30, delta: ant30 ? Math.round((ult30 - ant30) * 100 / ant30) : null, aguardando, clientes: dist(noPeriodo), cumprimento: cumpridas + pendentes ? Math.round(cumpridas * 100 / (cumpridas + pendentes)) : null, cumpridas, pendentes } },
+      faixas, agenda, filaPorMes: Object.values(mesFila).sort((a, b) => a.mes.localeCompare(b.mes)).slice(-24),
+      porCargo, porResponsavel, porSegmento, porClasse,
+      regPorMes: Object.entries(porMes).sort().slice(-24).map(([mes, n]) => ({ mes, n })), regPorSegmento: contar(noPeriodo, r => r.seg), regPorCargo: contar(noPeriodo, r => cargoCanon(r.cargo)), regPorResp: contar(noPeriodo, r => nm(r.respId)).slice(0, 10),
+      opcoes: { segmentos: [...new Set(todosCards.map(c => c.segmento).filter(Boolean))].sort(), cargos: CARGOS_ORDEM, classes: ['A', 'B', 'C', 'E'],
+        vendedores: [...new Map(todosCards.map(c => [c.vendedorId || 'sem', c.vendedorId ? nm(c.vendedorId) : 'Sem responsável']))].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)) },
     };
   }
   // Diagnóstico (somente leitura) de como as datas de visita estão no cadastro das empresas.
@@ -925,13 +955,12 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     invalidar('cards', 'dash', 'regs');
     return { resultados: res, gravados: res.filter(x => x.ok).length };
   }
-  // Registros de visita (SPA 1032) dos cards filtrados: busca, paginação e permissão de edição.
+  // Visitas registradas (registros PREENCHIDOS do SPA 1032), no período e filtros do painel: busca, paginação e permissão de edição.
   async function registros(user, q = {}) {
-    const { m, cards } = await filtrados(user, q), porId = new Map(cards.map(c => [String(c.id), c]));
-    let regs = (await registrosC(m)).filter(r => porId.has(r.idFila));
-    const esc = await escopo(user), busca = R.norm(q.q || '');
-    const tit = await tituloEmpresas(regs.map(r => r.empresaId)), nm = await nomes(regs.map(r => porId.get(r.idFila).vendedorId).concat(regs.map(r => r.supervisor)));
-    let lista = regs.map(r => { const c = porId.get(r.idFila); return { _r: r, id: r.id, idFila: +r.idFila, empresa: tit(r.empresaId), segmento: c.segmento, classe: c.classe, vendedor: nm(c.vendedorId), dataHora: r.dataHora, supervisor: r.supervisor ? nm(r.supervisor) : '', contatos: r.contatos.length, anexos: r.anexos.length, resumo: r.fatos.replace(/\s+/g, ' ').slice(0, 180), podeEditar: esc === null || !!esc.has(String(c.vendedorId)) || r.criadoPor === String(user.id), _b: R.norm(`${tit(r.empresaId)} ${c.segmento} ${nm(c.vendedorId)} ${r.fatos}`) }; });
+    const { m, esc, regs, de, ate } = await baseDados(user, q), busca = R.norm(q.q || '');
+    const feitos = regs.filter(r => r.feito && r.data && (!de || r.data >= de) && (!ate || r.data <= ate));
+    const tit = await tituloEmpresas(feitos.map(r => r.empresaId)), nm = await nomes(feitos.map(r => r.respId).concat(feitos.map(r => r.supervisor)).filter(Boolean));
+    let lista = feitos.map(r => ({ _r: r, id: r.id, idFila: r.card ? +r.idFila : null, empresa: tit(r.empresaId), segmento: r.seg, classe: r.card?.classe || '', vendedor: r.respId ? nm(r.respId) : 'Sem responsável', cargo: cargoCanon(r.cargo), dataHora: r.dataHora, supervisor: r.supervisor ? nm(r.supervisor) : '', contatos: r.contatos.length, anexos: r.anexos.length, resumo: r.fatos.replace(/\s+/g, ' ').slice(0, 180), podeEditar: !!r.card && (esc === null || esc.has(String(r.respId)) || r.criadoPor === String(user.id)), _b: R.norm(`${tit(r.empresaId)} ${r.seg} ${r.respId ? nm(r.respId) : ''} ${r.fatos}`) }));
     if (busca) lista = lista.filter(x => x._b.includes(busca));
     lista.sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)) || b.id - a.id);
     const size = 15, pages = Math.max(1, Math.ceil(lista.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));

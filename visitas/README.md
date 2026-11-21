@@ -22,6 +22,12 @@ Registro preenchido direto no Bitrix também finaliza o card (reconciliação a 
 Tudo é descoberto pelo **rótulo** (empresa: `[Motores] Vendedor Responsável`, `Classe Motores`, `[Motores] Última Visita`...; Fila: Classe, **Alçada = cargo**, Data da visita (texto `dd/mm/aaaa hh:mm:ss`), Segmento, Usuário, ID Empresa; Registro: Fatos e dados..., ID Fila, Alçada...).
 Se algum rótulo for diferente, ajuste em **Configurações → Campos usados pelo app**. Campos extras do SPA de registros aparecem no formulário e na tabela.
 
+## Painel (Dashboard)
+- **Fila de visitas** (situação atual): fila aberta, para hoje, atrasadas, próximos 7 e 30 dias, agenda dos próximos 30 dias, atraso por faixa e fila por mês.
+- **Responsáveis:** por cargo (Vendedor, Supervisor, Coordenador, Gerente, Diretor) e por pessoa, com abertas, hoje, 7 dias, atrasadas, % em dia e registros.
+- **Visitas registradas** (por período): registradas, últimos 30 dias x anteriores, cumprimento, aguardando preenchimento, por mês, segmento, cargo e responsável.
+- Cliques nos gráficos filtram o painel; tudo respeita a visibilidade de cada usuário.
+
 ## Operação (Configurações)
 - **Fila automática** liga/desliga o que roda sozinho: cria cards que faltam, muda a etapa pela data, reconcilia registros preenchidos. Use a **Prévia** antes de ligar.
 - **Auditoria do processo** confere o ciclo (registro preenchido x card aberto, duplicados, ciclo quebrado, cards sem responsável...) e oferece correções seguras.

@@ -97,15 +97,37 @@ test('campos descobertos por rótulo, com duplicados e sem faltas', async () => 
   const { svc } = mundo(); const i = await svc.camposInfo();
   assert.deepEqual(i.faltando, []); assert.equal(i.segmentos[0].nome, 'Motores'); assert.equal(i.segmentos[0].duplicados, true); assert.equal(i.etapas.ENC, 'DT1036_19:UC_EFR0YE');
 });
-test('dashboard: indicadores, série mensal, por vendedor e filtros cruzados', async () => {
-  const { f, svc } = mundo(); await svc.sync();
-  const card = f.s.itens[1036].find(c => c.companyId == 100);
-  await svc.registrar(card.id, { dataHora: '2026-11-18T10:00', fatos: 'Visita muito boa com o cliente', supervisor: '9' }, vendedor); svc.invalidar();
-  const d = await svc.dashboard(admin, { de: '2026-01-01' });
-  assert.equal(d.kpis.programadas, 3); assert.equal(d.kpis.realizadas, 1); assert.equal(d.kpis.abertas, 2); assert.equal(d.kpis.taxa, 100);
-  assert.ok(d.serie.length >= 1 && d.serie.every(x => /^\d{4}-\d{2}$/.test(x.mes))); assert.equal(d.porVendedor[0].nome, 'Vera Vendedora'); assert.equal(d.porSegmento[0].nome, 'Motores');
-  const so = await svc.dashboard(admin, { de: '2026-01-01', classe: 'A' }); assert.equal(so.kpis.programadas, 2);
-  assert.deepEqual(so.opcoes.classes, ['A', 'B', 'C', 'E']); assert.equal(so.opcoes.vendedores.length, 1);   // opções não encolhem com o filtro de classe
+test('painel: indicadores da fila, dos registros, por cargo e por responsável, com filtros e visibilidade', async () => {
+  const { f, svc, card, u49, adm } = mundoReal();
+  const u15 = { id: '15', nome: 'Supervisor 15', papel: 'usuario' };
+  card(1, 100, 'Vendedor', 49, '18/11/2026 08:00:00'); card(2, 100, 'Vendedor', 49, '10/11/2026 08:00:00', 'PREPARATION');                 // hoje; atrasada (8 dias)
+  card(3, 100, 'Supervisor', 15, '25/11/2026 08:00:00'); card(4, 101, 'Supervisor', 15, '10/12/2026 08:00:00');                           // em 7 dias; em 22 dias
+  card(5, 101, 'Gerente', 9, '01/02/2027 08:00:00'); card(6, 101, 'Coordenador', 1, '');                                                   // longe; sem data
+  card(7, 100, 'Vendedor', 49, '05/10/2026 08:00:00', 'SUCCESS'); card(8, 101, 'Vendedor', 49, '01/09/2026 08:00:00', 'FAIL');            // finalizado; removido (fora)
+  f.s.itens[1032].push({ id: 700, companyId: '100', ufIdFila: '7', ufData: '2026-10-06T10:00:00', ufFatos: 'visita feita', createdBy: '49' },     // preenchido, ligado ao card 7
+    { id: 701, companyId: '101', ufIdFila: '99999', ufData: '2026-11-15T10:00:00', ufFatos: 'sem card', assignedById: '49', createdBy: '49' }, // preenchido, sem card, do 49
+    { id: 702, companyId: '100', ufIdFila: '1', ufData: '2026-11-18T00:00:00', createdBy: '1' });                                                // vazio, ligado ao card aberto 1
+  svc.invalidar();
+  const d = await svc.dashboard(adm, {}), fila = d.kpis.fila, reg = d.kpis.reg;
+  assert.deepEqual([fila.abertas, fila.hoje, fila.atrasadas, fila.em7, fila.em30, fila.semData, fila.clientesAtrasados], [6, 1, 1, 1, 2, 1, 1]);
+  assert.deepEqual(d.faixas.map(x => x.n), [0, 1, 0, 0, 0]);                                                    // 8 dias de atraso = faixa "8 a 30 dias"
+  assert.equal(d.agenda.length, 30); assert.equal(d.agenda[0].n, 1); assert.equal(d.agenda.find(x => x.dia === '2026-11-25').n, 1);
+  assert.deepEqual([reg.registradas, reg.aguardando, reg.clientes, reg.ult30, reg.ant30, reg.delta], [2, 1, 2, 1, 1, 0]);
+  assert.deepEqual([reg.cumpridas, reg.pendentes, reg.cumprimento], [1, 2, 33]);                                // vencidos: card 7 feito; 1 e 2 pendentes
+  const cg = Object.fromEntries(d.porCargo.map(c => [c.nome, c])); assert.deepEqual(d.porCargo.map(c => c.nome).slice(0, 5), ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor']);
+  assert.deepEqual([cg.Vendedor.abertas, cg.Vendedor.atrasadas, cg.Vendedor.emDia, cg.Vendedor.pessoas, cg.Vendedor.registros], [2, 1, 50, 1, 1]); assert.equal(cg['Sem cargo'].registros, 1);   // o registro sem card e sem Alçada cai em "Sem cargo" assert.equal(cg.Supervisor.abertas, 2); assert.equal(cg.Diretor.abertas, 0);
+  const rs = Object.fromEntries(d.porResponsavel.map(r => [r.id, r])); assert.equal(rs['49'].atrasadas, 1); assert.deepEqual(rs['49'].cargos, ['Vendedor']); assert.equal(rs['15'].em7, 1); assert.equal(rs.sem === undefined, true);
+  assert.deepEqual(d.regPorMes.map(x => x.mes), ['2026-10', '2026-11']); assert.equal(d.regPorResp[0].nome, 'Usuário #49'); assert.equal(d.regPorResp[0].n, 2); assert.ok(d.opcoes.vendedores.some(v => v.id === '49') && d.opcoes.cargos.length === 5);
+  // filtros
+  assert.equal((await svc.dashboard(adm, { cargo: 'Supervisor' })).kpis.fila.abertas, 2); assert.equal((await svc.dashboard(adm, { vendedor: '15' })).kpis.fila.abertas, 2);
+  assert.equal((await svc.dashboard(adm, { de: '2026-11-01', ate: '2026-11-30' })).kpis.reg.registradas, 1);   // só o registro de novembro
+  assert.equal((await svc.dashboard(adm, { cargo: 'Supervisor' })).opcoes.vendedores.length, d.opcoes.vendedores.length);   // opções não encolhem
+  // visibilidade: cada responsável vê só o seu (inclusive registros sem card, pelo responsável do registro)
+  const a49 = await svc.dashboard(u49, {}); assert.equal(a49.kpis.fila.abertas, 2); assert.equal(a49.kpis.reg.registradas, 2); assert.deepEqual(a49.porResponsavel.map(r => r.id), ['49']);
+  const a15 = await svc.dashboard(u15, {}); assert.equal(a15.kpis.fila.abertas, 2); assert.equal(a15.kpis.reg.registradas, 0);
+  // tabela de visitas registradas: só preenchidas; registro sem card pode ser lido mas não editado pela tela
+  const t = await svc.registros(adm, {}); assert.equal(t.total, 2); assert.equal(t.itens.find(i => i.id === 701).podeEditar, false); assert.equal(t.itens.find(i => i.id === 700).podeEditar, true);
+  assert.equal((await svc.registros(u15, {})).total, 0);
 });
 test('registros: lista, busca, paginação e permissão de edição', async () => {
   const { f, svc } = mundo(); await svc.sync();

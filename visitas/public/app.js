@@ -345,89 +345,114 @@ async function telaAlt() {
   if ($('#h_a')) { $('#h_a').onclick = () => { altPg--; telaAlt(); }; $('#h_p').onclick = () => { altPg++; telaAlt(); }; }
 }
 
-// ----- Dashboard interativo -----
+// ----- Painel (dashboard) -----
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const mesRot = m => `${MESES[+m.slice(5, 7) - 1]}/${m.slice(2, 4)}`;
 const recarrega = () => (S.aba === 'dash' ? telaDash() : telaFila());
-const GRUPOS = [['realizadas', 'Realizadas', 'var(--e-enc)'], ['abertas', 'Em aberto', 'var(--e-new)'], ['atrasadas', 'Atrasadas', 'var(--e-late)'], ['nao', 'Não realizadas', 'var(--e-nao)']];
-const D = { f: { de: '', ate: '', segmento: '', vendedor: '', classe: '', etapa: '', motivo: '' }, preset: '6m', mes: '', q: '', page: 1 };
-function periodo(preset, hoje) {
-  const [y, m] = hoje.split('-').map(Number), ini = n => { const t = y * 12 + (m - 1) - (n - 1); return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}-01`; };
-  return { '3m': ini(3), '6m': ini(6), '12m': ini(12), ano: `${y}-01-01`, tudo: '' }[preset] ?? '';
+const D = { f: { de: '', ate: '', segmento: '', cargo: '', vendedor: '', classe: '' }, preset: 'tudo', q: '', page: 1, ord: { k: 'atrasadas', dir: -1 }, todos: false };
+const iso10 = d => d.toISOString().slice(0, 10);
+function periodoPreset(p, hoje) {
+  const t = new Date(hoje + 'T00:00:00Z'), add = n => { const x = new Date(t); x.setUTCDate(x.getUTCDate() + n); return iso10(x); }, y = t.getUTCFullYear(), m = t.getUTCMonth();
+  if (p === 'mes') return { de: iso10(new Date(Date.UTC(y, m, 1))), ate: iso10(new Date(Date.UTC(y, m + 1, 0))) };
+  if (p === '30d') return { de: add(-29), ate: hoje };
+  if (p === '90d') return { de: add(-89), ate: hoje };
+  if (p === 'ano') return { de: `${y}-01-01`, ate: `${y}-12-31` };
+  return { de: '', ate: '' };
 }
 const qsDash = () => new URLSearchParams(Object.entries(D.f).filter(([, v]) => v)).toString();
-function tip(el, txt) { el.dataset.tip = txt; el.setAttribute('aria-label', txt); }
-function stack(o, max) {   // segmentos empilhados horizontais, com vão de 2px entre preenchimentos
-  return GRUPOS.map(([k, n, c]) => o[k] ? `<i style="width:${(o[k] / max) * 100}%;background:${c}" data-tip="${esc(n)}: ${o[k]}"></i>` : '').join('');
-}
-function linhas(arr, campo, sel, vazio) {
-  const max = Math.max(1, ...arr.map(x => x.total));
-  if (!arr.length || !arr.some(x => x.total)) return `<div class="mut">${vazio || 'Sem dados no período.'}</div>`;
-  return arr.map(x => { const val = campo === 'vendedor' ? x.id : x.nome, on = sel && String(sel) === String(val);
-    return `<button class="hb ${on ? 'on' : sel ? 'dim' : ''}" data-f="${campo}" data-v="${esc(val)}" data-tip="${esc(x.nome)} · ${x.total} no total · ${x.realizadas} realizadas · ${x.atrasadas} atrasadas · ${x.nao} não realizadas"><span class="hn">${esc(campo === 'classe' ? 'Classe ' + x.nome : x.nome)}</span><span class="ht">${stack(x, max)}</span><b>${x.total}</b></button>`; }).join('');
+const nf = x => Number(x).toLocaleString('pt-BR');
+const kpi = (rot, num, sub = '', tom = '', tip_ = '') => `<div class="kpi-t static" ${tom ? `data-e="${tom}"` : ''} ${tip_ ? `data-tip="${esc(tip_)}"` : ''}><span>${rot}</span><b>${num}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+// barras horizontais clicáveis [{nome, n}] que filtram o painel pelo campo informado
+function barrasN(itens, campo, atual, vazio = 'Sem dados no período.') {
+  const mx = Math.max(1, ...itens.map(x => x.n)); if (!itens.length || !itens.some(x => x.n)) return `<div class="mut">${vazio}</div>`;
+  return itens.map(x => `<button class="hb ${atual && String(atual) === String(x.nome) ? 'on' : atual ? 'dim' : ''}" ${campo ? `data-f="${campo}" data-v="${esc(x.nome)}"` : ''} data-tip="${esc(x.nome)}: ${nf(x.n)}"><span class="hn">${esc(x.nome)}</span><span class="ht"><i style="width:${(x.n / mx) * 100}%;background:${x.cor || 'var(--pri)'}"></i></span><b>${nf(x.n)}</b></button>`).join('');
 }
 function filtrosAtivos(d) {
   const f = D.f, ch = [];
-  if (D.mes) ch.push(['mes', `Mês: ${mesRot(D.mes)}`]);
+  if (D.preset !== 'tudo') ch.push(['periodo', f.de || f.ate ? `Período: ${f.de ? dtBR(f.de) : '…'} a ${f.ate ? dtBR(f.ate) : '…'}` : 'Período']);
   if (f.segmento) ch.push(['segmento', `Segmento: ${f.segmento}`]);
-  if (f.vendedor) ch.push(['vendedor', `Vendedor: ${d.opcoes.vendedores.find(v => v.id === f.vendedor)?.nome || f.vendedor}`]);
+  if (f.cargo) ch.push(['cargo', `Cargo: ${f.cargo}`]);
+  if (f.vendedor) ch.push(['vendedor', `Responsável: ${d.opcoes.vendedores.find(v => v.id === f.vendedor)?.nome || f.vendedor}`]);
   if (f.classe) ch.push(['classe', `Classe ${f.classe}`]);
-  if (f.etapa) ch.push(['etapa', `Etapa: ${ETAPAS[f.etapa] || f.etapa}`]);
-  if (f.motivo) ch.push(['motivo', `Motivo: ${f.motivo}`]);
   return ch.length ? `<div class="chips">${ch.map(([k, t]) => `<span class="chip">${esc(t)}<button data-x="${k}" aria-label="Remover filtro">✕</button></span>`).join('')}<button class="btn sm" data-x="tudo">Limpar tudo</button></div>` : '';
 }
+const secH = (t, sub) => `<div class="sec-h"><h2>${t}</h2><span class="mut">${sub}</span></div>`;
 async function telaDash() {
-  gen.n++; const app = $('#app'), hoje = S.eu.hoje;
-  if (!$('#dash')) { app.innerHTML = `<div id="dash"><div class="kpis">${'<div class="sk" style="height:76px"></div>'.repeat(6)}</div><div class="dash">${'<div class="sk" style="height:260px"></div>'.repeat(4)}</div></div>`; }
+  gen.n++; const app = $('#app');
+  if (!$('#dash')) app.innerHTML = `<div id="dash"><div class="kpis">${'<div class="sk" style="height:84px"></div>'.repeat(6)}</div><div class="dash">${'<div class="sk" style="height:240px"></div>'.repeat(3)}</div></div>`;
   else $('#dash').classList.add('busy');
-  if (!D.mes) { D.f.de = periodo(D.preset, hoje); D.f.ate = ''; }
-  const qs = qsDash(), d = await vapi('/api/dashboard?' + qs), k = d.kpis;
-  const tile = (n, rot, e, extra = '') => `<button class="kpi-t ${D.f.etapa === e && e ? 'on' : ''}" ${e ? `data-e="${e}"` : ''} data-kpi="${e}" ${extra}><b>${n}</b><span>${rot}</span></button>`;
-  const maxM = Math.max(1, ...d.serie.map(x => x.total));
+  const d = await vapi('/api/dashboard?' + qsDash()), F = d.kpis.fila, R_ = d.kpis.reg, f = D.f;
   $('#dash').classList.remove('busy');
+  const maxAg = Math.max(1, ...d.agenda.map(x => x.n)), maxFila = Math.max(1, ...d.filaPorMes.map(x => x.atrasadas + x.noPrazo)), maxReg = Math.max(1, ...d.regPorMes.map(x => x.n));
+  const delta = R_.delta === null ? '' : `<span class="${R_.delta >= 0 ? 'up' : 'down'}">${R_.delta >= 0 ? '▲' : '▼'} ${Math.abs(R_.delta)}%</span> vs. 30 dias anteriores`;
+  const cargosCards = d.porCargo.filter(c => c.abertas || ['Vendedor', 'Supervisor', 'Coordenador', 'Gerente', 'Diretor'].includes(c.nome));
+  const ord = D.ord, cmp = (a, b) => { const x = a[ord.k], y = b[ord.k]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1) - (y ?? -1)) * ord.dir; };
+  const resp = [...d.porResponsavel].sort(cmp), mostra = D.todos ? resp : resp.slice(0, 20);
+  const th = (k, t) => `<th><button class="ordb ${ord.k === k ? 'on' : ''}" data-ord="${k}">${t}${ord.k === k ? (ord.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`;
   $('#dash').innerHTML = `
-  <div class="filtros dfil"><div class="seg" role="group" aria-label="Período">${[['3m', '3 meses'], ['6m', '6 meses'], ['12m', '12 meses'], ['ano', 'Este ano'], ['tudo', 'Tudo']].map(([p, n]) => `<button class="btn ${!D.mes && D.preset === p ? 'on' : ''}" data-p="${p}">${n}</button>`).join('')}</div>
-    <label>Segmento<select id="d_segmento"><option value="">Todos</option>${d.opcoes.segmentos.map(x => `<option ${D.f.segmento === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
-    <label>Vendedor<select id="d_vendedor"><option value="">Todos</option>${d.opcoes.vendedores.map(x => `<option value="${esc(x.id)}" ${D.f.vendedor === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
-    <label>Classe<select id="d_classe"><option value="">Todas</option>${d.opcoes.classes.map(x => `<option ${D.f.classe === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
-    <div class="count">Período pela data programada · clique nos gráficos para filtrar</div></div>
+  <div class="dh"><div><h1>Painel de visitas</h1><span class="mut">Atualizado às ${new Date(d.geradoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}${d.ocultosPelaRegra ? ` · ${nf(d.ocultosPelaRegra)} cards ocultos por falta de Última visita no cadastro` : ''}</span></div><button class="btn" id="d_ref">${ico('cal')} Atualizar</button></div>
+  <div class="filtros dfil"><div class="seg" role="group" aria-label="Período dos registros">${[['tudo', 'Tudo'], ['mes', 'Este mês'], ['30d', '30 dias'], ['90d', '90 dias'], ['ano', 'Este ano']].map(([p, n]) => `<button class="btn ${D.preset === p ? 'on' : ''}" data-p="${p}">${n}</button>`).join('')}</div>
+    <label>De<input type="date" id="d_de" value="${esc(f.de)}"></label><label>Até<input type="date" id="d_ate" value="${esc(f.ate)}"></label>
+    <label>Segmento<select id="d_segmento"><option value="">Todos</option>${d.opcoes.segmentos.map(x => `<option ${f.segmento === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+    <label>Cargo<select id="d_cargo"><option value="">Todos</option>${d.opcoes.cargos.map(x => `<option ${f.cargo === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+    <label>Responsável<select id="d_vendedor"><option value="">Todos</option>${d.opcoes.vendedores.map(x => `<option value="${esc(x.id)}" ${f.vendedor === x.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
+    <label>Classe<select id="d_classe"><option value="">Todas</option>${d.opcoes.classes.map(x => `<option ${f.classe === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label></div>
   ${filtrosAtivos(d)}
-  <div class="kpis">${tile(k.programadas, 'Programadas', '')}${tile(k.realizadas, 'Realizadas', 'ENC')}${tile(k.abertas, 'Em aberto', 'NEW')}${tile(k.atrasadas, 'Atrasadas', 'LATE')}${tile(k.naoRealizadas, 'Não realizadas', 'NAOREAL')}
-    <div class="kpi-t static" data-e="${k.taxa === null ? '' : k.taxa >= 80 ? 'ENC' : k.taxa >= 50 ? 'PREPARATION' : 'LATE'}"><b>${k.taxa === null ? '—' : k.taxa + '%'}</b><span>Taxa de realização</span><div class="meter"><i style="width:${k.taxa || 0}%"></i></div></div>
-    <div class="kpi-t static"><b>${k.reprogramacoes}</b><span>Reprogramações</span></div></div>
+
+  ${secH('Fila de visitas', 'Situação atual · não depende do período')}
+  <div class="kpis">${kpi('Fila aberta', nf(F.abertas), `${nf(F.clientes)} cliente(s)`, '', 'Cards abertos (aguardando e dia da visita)')}${kpi('Para hoje', nf(F.hoje), 'visitas na data de hoje', F.hoje ? 'PREPARATION' : '')}${kpi('Atrasadas', nf(F.atrasadas), `${nf(F.clientesAtrasados)} cliente(s)`, F.atrasadas ? 'LATE' : '')}${kpi('Próximos 7 dias', nf(F.em7), 'visitas agendadas', 'NEW')}${kpi('Próximos 30 dias', nf(F.em30), 'visitas agendadas', 'NEW')}${kpi('Sem data', nf(F.semData), 'cards sem data programada', F.semData ? 'NAOREAL' : '')}</div>
   <div class="dash">
-    <section class="sec wide"><h3>Visitas por mês</h3><div class="leg">${GRUPOS.map(([, n, c]) => `<span><i style="background:${c}"></i>${n}</span>`).join('')}</div>
-      ${d.serie.length ? `<div class="mcols" role="group" aria-label="Visitas por mês">${d.serie.map(x => `<button class="mcol ${D.mes === x.mes ? 'on' : D.mes ? 'dim' : ''}" data-mes="${x.mes}" data-tip="${mesRot(x.mes)} · ${x.total} programadas · ${x.realizadas} realizadas · ${x.abertas} em aberto · ${x.atrasadas} atrasadas · ${x.nao} não realizadas"><b>${x.total}</b><span class="stk" style="height:${Math.max(4, (x.total / maxM) * 150)}px">${[...GRUPOS].map(([g, , c]) => x[g] ? `<i style="flex:${x[g]};background:${c}"></i>` : '').join('')}</span><em>${mesRot(x.mes)}</em></button>`).join('')}</div>
-      <details class="tb"><summary>Ver dados em tabela</summary><div class="scroll"><table><thead><tr><th>Mês</th>${GRUPOS.map(g => `<th>${g[1]}</th>`).join('')}<th>Total</th></tr></thead><tbody>${d.serie.map(x => `<tr><td>${mesRot(x.mes)}</td>${GRUPOS.map(([g]) => `<td>${x[g]}</td>`).join('')}<td>${x.total}</td></tr>`).join('')}</tbody></table></div></details>` : '<div class="mut">Sem visitas no período.</div>'}</section>
-    <section class="sec"><h3>Por vendedor</h3><div class="hbs">${linhas(d.porVendedor, 'vendedor', D.f.vendedor)}</div></section>
-    <section class="sec"><h3>Por segmento</h3><div class="hbs">${linhas(d.porSegmento, 'segmento', D.f.segmento)}</div><h3 style="margin-top:18px">Por classe</h3><div class="hbs">${linhas(d.porClasse, 'classe', D.f.classe)}</div></section>
-    <section class="sec"><h3>Motivos das não realizadas</h3>${d.motivos.length ? `<div class="hbs">${(() => { const mx = Math.max(...d.motivos.map(x => x.n)); return d.motivos.map(x => `<button class="hb mono ${D.f.motivo === x.nome ? 'on' : D.f.motivo ? 'dim' : ''}" data-f="motivo" data-v="${esc(x.nome)}" data-tip="${esc(x.nome)}: ${x.n}"><span class="hn">${esc(x.nome)}</span><span class="ht"><i style="width:${(x.n / mx) * 100}%;background:var(--pri)"></i></span><b>${x.n}</b></button>`).join(''); })()}</div>` : '<div class="mut">Nenhuma não realizada no período.</div>'}</section>
+    <section class="sec w2"><h3>Agenda dos próximos 30 dias</h3><div class="agenda" role="img" aria-label="Visitas agendadas por dia nos próximos 30 dias">${d.agenda.map((x, i) => `<div class="ag ${x.util ? '' : 'fds'} ${i === 0 ? 'hoje' : ''}" data-tip="${dtBR(x.dia)}${x.util ? '' : ' (fim de semana/feriado)'} · ${x.n} visita(s)"><b>${x.n || ''}</b><span class="agb" style="height:${x.n ? Math.max(6, x.n / maxAg * 84) : 2}px"></span><em>${i % 5 === 0 ? x.dia.slice(8, 10) : ''}</em></div>`).join('')}</div><div class="mut" style="margin-top:6px">Hoje é a primeira coluna. Colunas claras são fins de semana ou feriados.</div></section>
+    <section class="sec"><h3>Atraso por faixa</h3><div class="hbs">${barrasN(d.faixas.map((x, i) => ({ nome: x.nome, n: x.n, cor: ['#f59e0b', '#f97316', '#ef4444', '#dc2626', '#991b1b'][i] })), '', '', 'Nenhuma visita atrasada.')}</div></section>
+    <section class="sec wide"><h3>Fila por mês de vencimento</h3><div class="leg"><span><i style="background:var(--e-new)"></i>No prazo</span><span><i style="background:var(--e-late)"></i>Atrasadas</span></div>
+      ${d.filaPorMes.length ? `<div class="mcols">${d.filaPorMes.map(x => `<div class="mcol st" data-tip="${mesRot(x.mes)} · ${nf(x.atrasadas + x.noPrazo)} em aberto · ${nf(x.atrasadas)} atrasadas · ${nf(x.noPrazo)} no prazo"><b>${nf(x.atrasadas + x.noPrazo)}</b><span class="stk" style="height:${Math.max(4, (x.atrasadas + x.noPrazo) / maxFila * 150)}px">${x.noPrazo ? `<i style="flex:${x.noPrazo};background:var(--e-new)"></i>` : ''}${x.atrasadas ? `<i style="flex:${x.atrasadas};background:var(--e-late)"></i>` : ''}</span><em>${mesRot(x.mes)}</em></div>`).join('')}</div>` : '<div class="mut">Nenhum card aberto com data.</div>'}</section>
   </div>
-  <section class="sec" id="regs"><div class="rh"><h3>Registros de visita</h3><input type="search" id="r_q" placeholder="Buscar empresa, vendedor ou texto…" value="${esc(D.q)}" aria-label="Buscar registros"></div><div id="regs_corpo"><div class="sk" style="height:120px"></div></div></section>`;
+
+  ${secH('Responsáveis', 'Situação atual da fila por cargo e por pessoa · clique para filtrar o painel')}
+  <div class="cgs">${cargosCards.map(c => `<button class="cg ${f.cargo === c.nome ? 'on' : f.cargo ? 'dim' : ''}" data-f="cargo" data-v="${esc(c.nome)}"><div class="cg-t">${esc(c.nome)}</div><div class="cg-n">${nf(c.abertas)}</div><div class="cg-s">${c.pessoas} pessoa(s) · em aberto</div><div class="pb" title="Em dia"><i style="width:${c.emDia ?? 0}%"></i></div><div class="cg-m"><span>hoje <b>${c.hoje}</b></span><span>7 dias <b>${c.em7}</b></span><span class="${c.atrasadas ? 'bad' : ''}">atrasadas <b>${c.atrasadas}</b></span><span>registros <b>${c.registros}</b></span></div></button>`).join('')}</div>
+  <section class="sec"><h3>Por responsável</h3><div class="scroll"><table class="tbl resp"><thead><tr>${th('nome', 'Responsável')}<th>Cargos</th>${th('abertas', 'Em aberto')}${th('hoje', 'Hoje')}${th('em7', '7 dias')}${th('atrasadas', 'Atrasadas')}${th('emDia', 'Em dia')}${th('registros', 'Registros no período')}</tr></thead><tbody>${mostra.map(r => `<tr class="lk ${f.vendedor === r.id ? 'on' : ''}" data-resp="${esc(r.id)}"><td><b>${esc(r.nome)}</b></td><td>${r.cargos.map(c => `<span class="tag plain neutro">${esc(c)}</span>`).join(' ')}</td><td>${nf(r.abertas)}</td><td>${nf(r.hoje)}</td><td>${nf(r.em7)}</td><td class="${r.atrasadas ? 'bad' : ''}"><b>${nf(r.atrasadas)}</b></td><td>${r.emDia === null ? '—' : `<div class="pb sm"><i style="width:${r.emDia}%"></i></div> ${r.emDia}%`}</td><td>${nf(r.registros)}</td></tr>`).join('') || '<tr><td colspan="8" class="mut">Sem dados.</td></tr>'}</tbody></table></div>${resp.length > 20 ? `<div style="text-align:center;margin-top:8px"><button class="btn sm" id="d_todos">${D.todos ? 'Mostrar só os 20 primeiros' : `Mostrar todos (${resp.length})`}</button></div>` : ''}</section>
+
+  ${secH('Visitas registradas', 'Registros preenchidos · pelo período e filtros acima')}
+  <div class="kpis">${kpi('Registradas no período', nf(R_.registradas), `${nf(R_.clientes)} cliente(s) atendido(s)`, 'ENC')}${kpi('Últimos 30 dias', nf(R_.ult30), delta, '')}${kpi('Cumprimento', R_.cumprimento === null ? '—' : R_.cumprimento + '%', `${nf(R_.cumpridas)} feitas · ${nf(R_.pendentes)} pendentes (vencidas no período)`, R_.cumprimento === null ? '' : R_.cumprimento >= 80 ? 'ENC' : R_.cumprimento >= 50 ? 'PREPARATION' : 'LATE', 'Visitas feitas ÷ (feitas + atrasadas) entre os cards vencidos no período')}${kpi('Aguardando preenchimento', nf(R_.aguardando), 'registros criados e ainda vazios', R_.aguardando ? 'PREPARATION' : '')}</div>
+  <div class="dash">
+    <section class="sec wide"><h3>Visitas registradas por mês</h3>${d.regPorMes.length ? `<div class="mcols">${d.regPorMes.map(x => `<button class="mcol" data-mes="${x.mes}" data-tip="${mesRot(x.mes)} · ${nf(x.n)} visita(s) registrada(s) · clique para filtrar o mês"><b>${nf(x.n)}</b><span class="stk" style="height:${Math.max(4, x.n / maxReg * 150)}px"><i style="flex:1;background:var(--e-enc)"></i></span><em>${mesRot(x.mes)}</em></button>`).join('')}</div>` : '<div class="mut">Nenhuma visita registrada neste período.</div>'}</section>
+    <section class="sec"><h3>Registros por segmento</h3><div class="hbs">${barrasN(d.regPorSegmento, 'segmento', f.segmento)}</div></section>
+    <section class="sec"><h3>Registros por cargo</h3><div class="hbs">${barrasN(d.regPorCargo, 'cargo', f.cargo)}</div></section>
+    <section class="sec"><h3>Registros por responsável</h3><div class="hbs">${barrasN(d.regPorResp, '', '')}</div></section>
+  </div>
+
+  ${secH('Perfil da fila', 'Cards em aberto agora')}
+  <div class="dash">
+    <section class="sec"><h3>Por segmento</h3><div class="hbs">${barrasN(d.porSegmento.map(x => ({ nome: x.nome, n: x.abertas })), 'segmento', f.segmento, 'Sem cards abertos.')}</div></section>
+    <section class="sec"><h3>Por classe</h3><div class="hbs">${barrasN(d.porClasse.map(x => ({ nome: x.nome, n: x.abertas })), 'classe', f.classe, 'Sem cards abertos.')}</div></section>
+    <section class="sec"><h3>Atrasadas por segmento</h3><div class="hbs">${barrasN(d.porSegmento.map(x => ({ nome: x.nome, n: x.atrasadas, cor: 'var(--e-late)' })), 'segmento', f.segmento, 'Nenhuma atrasada.')}</div></section>
+  </div>
+
+  <section class="sec" id="regs"><div class="rh"><h3>Visitas registradas (detalhe)</h3><input type="search" id="r_q" placeholder="Buscar empresa, responsável ou texto…" value="${esc(D.q)}" aria-label="Buscar registros"></div><div id="regs_corpo"><div class="sk" style="height:120px"></div></div></section>`;
   ligaDash(d); registrosDash();
 }
 async function registrosDash() {
   const r = await vapi('/api/registros?' + new URLSearchParams({ ...Object.fromEntries(Object.entries(D.f).filter(([, v]) => v)), q: D.q, page: D.page }).toString()), C = $('#regs_corpo');
   if (!C) return;
-  if (!r.itens.length) { C.innerHTML = `<div class="vazio">${ico('inbox')}<b>Nenhum registro encontrado</b><div>Mude os filtros ou a busca.</div></div>`; return; }
-  C.innerHTML = `<div class="scroll rtab"><table><thead><tr><th>Data</th><th>Empresa</th><th>Segmento</th><th>Vendedor</th>${r.colunas.map(c => `<th>${esc(c.label)}</th>`).join('')}<th class="acol"></th></tr></thead><tbody>${r.itens.map(x => `<tr><td style="white-space:nowrap">${dthBR(x.dataHora)}</td><td style="min-width:200px"><b>${esc(x.empresa)}</b> <span class="cls ${esc(x.classe)}">${esc(x.classe || '–')}</span></td><td>${esc(x.segmento)}</td><td>${esc(x.vendedor)}</td>${r.colunas.map(c => { const v = x.valores[c.k] || ''; return `<td class="cel"><div class="clamp" ${v.length > 90 ? `title="${esc(v.slice(0, 600))}"` : ''}>${v ? esc(v) : '<span class="mut">—</span>'}</div></td>`; }).join('')}<td class="acol"><div class="acoes" style="border:0;padding:0;margin:0;flex-wrap:nowrap"><button class="btn sm" data-ver="${x.idFila}">Ver</button>${x.podeEditar ? `<button class="btn sm" data-edit="${x.idFila}">${ico('edit')}Editar</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>
-    <div class="filtros" style="justify-content:center;margin:12px 0 0;border:0;box-shadow:none;background:none"><button class="btn sm" data-rp="-1" ${r.page <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">Página ${r.page} de ${r.pages} · ${r.total} registro(s) · ${r.colunas.length} campos</span><button class="btn sm" data-rp="1" ${r.page >= r.pages ? 'disabled' : ''}>Próxima ›</button></div>`;
+  if (!r.itens.length) { C.innerHTML = `<div class="vazio">${ico('inbox')}<b>Nenhuma visita registrada encontrada</b><div>Mude os filtros ou a busca.</div></div>`; return; }
+  C.innerHTML = `<div class="scroll rtab"><table><thead><tr><th>Data</th><th>Empresa</th><th>Segmento</th><th>Cargo</th><th>Responsável</th>${r.colunas.map(c => `<th>${esc(c.label)}</th>`).join('')}<th class="acol"></th></tr></thead><tbody>${r.itens.map(x => `<tr><td style="white-space:nowrap">${dthBR(x.dataHora)}</td><td style="min-width:200px"><b>${esc(x.empresa)}</b> <span class="cls ${esc(x.classe)}">${esc(x.classe || '–')}</span></td><td>${esc(x.segmento)}</td><td>${esc(x.cargo)}</td><td>${esc(x.vendedor)}</td>${r.colunas.map(c => { const v = x.valores[c.k] || ''; return `<td class="cel"><div class="clamp" ${v.length > 90 ? `title="${esc(v.slice(0, 600))}"` : ''}>${v ? esc(v) : '<span class="mut">—</span>'}</div></td>`; }).join('')}<td class="acol">${x.idFila ? `<div class="acoes" style="border:0;padding:0;margin:0;flex-wrap:nowrap"><button class="btn sm" data-ver="${x.idFila}">Ver</button>${x.podeEditar ? `<button class="btn sm" data-edit="${x.idFila}">${ico('edit')}Editar</button>` : ''}</div>` : '<span class="mut" title="Registro sem card na fila (histórico)">sem card</span>'}</td></tr>`).join('')}</tbody></table></div>
+    <div class="filtros" style="justify-content:center;margin:12px 0 0;border:0;box-shadow:none;background:none"><button class="btn sm" data-rp="-1" ${r.page <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">Página ${r.page} de ${r.pages} · ${nf(r.total)} registro(s) · ${r.colunas.length} campos</span><button class="btn sm" data-rp="1" ${r.page >= r.pages ? 'disabled' : ''}>Próxima ›</button></div>`;
   C.querySelectorAll('[data-rp]').forEach(b => b.onclick = () => { D.page += +b.dataset.rp; registrosDash(); });
   C.querySelectorAll('[data-ver]').forEach(b => b.onclick = () => verRegistro(+b.dataset.ver).catch(falha));
   C.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => formRegistro(+b.dataset.edit, true).catch(falha));
 }
 function ligaDash(d) {
-  const F = D.f, muda = () => { D.page = 1; telaDash().catch(falha); };
-  document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { D.preset = b.dataset.p; D.mes = ''; muda(); });
-  [['segmento', 'd_segmento'], ['vendedor', 'd_vendedor'], ['classe', 'd_classe']].forEach(([k, id]) => $('#' + id).onchange = e => { F[k] = e.target.value; muda(); });
-  document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { F.etapa = b.dataset.kpi && F.etapa !== b.dataset.kpi ? b.dataset.kpi : ''; muda(); });
+  const F = D.f, muda = () => { D.page = 1; telaDash().catch(falha); }, hoje = S.eu.hoje;
+  $('#d_ref').onclick = () => { api('/api/invalidar', 'POST', {}).catch(() => {}).finally(() => muda()); };
+  document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { D.preset = b.dataset.p; Object.assign(F, periodoPreset(D.preset, hoje)); muda(); });
+  $('#d_de').onchange = e => { F.de = e.target.value; D.preset = 'custom'; muda(); }; $('#d_ate').onchange = e => { F.ate = e.target.value; D.preset = 'custom'; muda(); };
+  [['segmento', 'd_segmento'], ['cargo', 'd_cargo'], ['vendedor', 'd_vendedor'], ['classe', 'd_classe']].forEach(([k, id]) => $('#' + id).onchange = e => { F[k] = e.target.value; muda(); });
   document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { F[b.dataset.f] = F[b.dataset.f] === b.dataset.v ? '' : b.dataset.v; muda(); });
-  document.querySelectorAll('[data-mes]').forEach(b => b.onclick = () => {
-    if (D.mes === b.dataset.mes) { D.mes = ''; } else { D.mes = b.dataset.mes; const [y, m] = D.mes.split('-').map(Number); F.de = `${D.mes}-01`; F.ate = `${D.mes}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`; }
-    if (!D.mes) { F.de = periodo(D.preset, S.eu.hoje); F.ate = ''; }
-    D.page = 1; telaDash().catch(falha);
-  });
-  document.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { const k = b.dataset.x; if (k === 'tudo') { D.mes = ''; Object.keys(F).forEach(x => F[x] = ''); } else if (k === 'mes') D.mes = ''; else F[k] = ''; muda(); });
+  document.querySelectorAll('[data-resp]').forEach(r => r.onclick = () => { F.vendedor = F.vendedor === r.dataset.resp ? '' : r.dataset.resp; muda(); });
+  document.querySelectorAll('[data-mes]').forEach(b => b.onclick = () => { const [y, m] = b.dataset.mes.split('-').map(Number), mesIni = `${b.dataset.mes}-01`; if (F.de === mesIni) { D.preset = 'tudo'; Object.assign(F, periodoPreset('tudo', hoje)); } else { D.preset = 'custom'; F.de = mesIni; F.ate = `${b.dataset.mes}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`; } muda(); });
+  document.querySelectorAll('[data-ord]').forEach(b => b.onclick = () => { D.ord = { k: b.dataset.ord, dir: D.ord.k === b.dataset.ord ? -D.ord.dir : (b.dataset.ord === 'nome' ? 1 : -1) }; telaDash().catch(falha); });
+  if ($('#d_todos')) $('#d_todos').onclick = () => { D.todos = !D.todos; telaDash().catch(falha); };
+  document.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { const k = b.dataset.x; if (k === 'tudo') { D.preset = 'tudo'; Object.keys(F).forEach(x => F[x] = ''); } else if (k === 'periodo') { D.preset = 'tudo'; F.de = ''; F.ate = ''; } else F[k] = ''; muda(); });
   let t; $('#r_q').oninput = e => { clearTimeout(t); t = setTimeout(() => { D.q = e.target.value; D.page = 1; registrosDash().catch(falha); }, 300); };
 }
 // Dica ao passar o mouse (uma só, seguindo o cursor) para qualquer elemento com data-tip.
