@@ -5,7 +5,13 @@ const { ETYPE, A } = F;
 
 const ABERTAS = ['NEW', 'PREPARATION', 'LATE'];
 const fail = (code, msg) => { const e = new Error(msg); e.status = code; return e; };
-const dia = v => (v ? String(v).slice(0, 10) : '');
+// Normaliza data do Bitrix para AAAA-MM-DD (aceita ISO com hora e DD/MM/AAAA); texto inválido vira vazio.
+const dia = v => {
+  const t = v ? String(v).trim() : '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+  const m = t.match(/^(\d{2})[/.](\d{2})[/.](\d{4})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+};
 const val = v => (Array.isArray(v) ? v[0] : v);
 const txt = v => (v === undefined || v === null ? '' : String(v));
 const MAXTXT = 20000;
@@ -472,6 +478,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const de = q.de || '', ate = q.ate || '';   // sem período = tudo o que está no SPA (exceto removidos)
     const excl = q.excluidos === '1';
     cards = cards.filter(c => (excl ? c.etapa === 'FAIL' : c.etapa !== 'FAIL'));
+    if (!excl && !q.etapa && q.finalizados !== '1') cards = cards.filter(c => c.etapa !== 'SUCCESS');   // Finalizado só aparece a pedido
     if (de || ate) cards = cards.filter(c => c.etapa === 'NAOREAL' || !c.data || ((!de || c.data >= de) && (!ate || c.data <= ate)) || (ABERTAS.includes(c.etapa) && c.data < de && !q.de));
     if (q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
     if (q.vendedor) cards = cards.filter(c => c.vendedorId === (q.vendedor === 'sem' ? '' : String(q.vendedor)));

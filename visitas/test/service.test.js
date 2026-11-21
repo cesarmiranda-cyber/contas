@@ -127,7 +127,7 @@ test('lista mostra todos os cards do SPA, inclusive datas antigas e etapas fora 
   const { f, svc } = mundo(); await svc.sync();
   f.s.itens[1036].push({ id: 900, title: 'Antigo', companyId: 100, categoryId: 19, stageId: 'DT1036_19:SUCCESS', assignedById: '7', ufSeg: 'Motores', ufClasse: 'A', ufData: '2025-03-10' },
     { id: 901, title: 'Estranho', companyId: 101, categoryId: 19, stageId: 'DT1036_19:XYZ', assignedById: '7', ufSeg: 'Motores', ufData: '2026-01-05' });
-  svc.invalidar(); const r = await svc.listar(admin, {});
+  svc.invalidar(); const r = await svc.listar(admin, { finalizados: '1' });
   assert.equal(r.total, 4); assert.ok(r.itens.some(i => i.etapa === 'SUCCESS')); assert.ok(r.itens.some(i => i.etapa === 'OUTRA'));
 });
 test('paginação: página, total, contagem por etapa e nomes só da página', async () => {
@@ -200,4 +200,15 @@ test('filtro "sem vendedor" no painel e na lista', async () => {
   f.s.itens[1036].push({ id: 710, title: 'Órfão', companyId: 100, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '0', ufSeg: 'Peças', ufClasse: 'B', ufData: '2026-12-01' }); svc.invalidar();
   assert.deepEqual((await svc.listar(admin, { vendedor: 'sem' })).itens.map(i => i.id), [710]);
   const d = await svc.dashboard(admin, {}); assert.ok(d.opcoes.vendedores.some(v => v.id === 'sem')); assert.equal((await svc.dashboard(admin, { vendedor: 'sem' })).kpis.programadas, 1);
+});
+test('Finalizado fica oculto por padrão e aparece a pedido; datas em formatos variados são normalizadas', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  f.s.itens[1036].push({ id: 720, title: 'Velho', companyId: 100, categoryId: 19, stageId: 'DT1036_19:SUCCESS', assignedById: '7', ufSeg: 'Motores', ufClasse: 'A', ufData: '18/07/2025' },
+    { id: 721, title: 'ISO', companyId: 101, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '7', ufSeg: 'Peças', ufClasse: 'A', ufData: '2026-12-05T03:00:00+03:00' },
+    { id: 722, title: 'Lixo', companyId: 101, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '7', ufSeg: 'Serviços', ufClasse: 'A', ufData: 'amanhã' });
+  svc.invalidar();
+  const padrao = await svc.listar(admin, {}); assert.ok(!padrao.itens.some(i => i.id === 720)); assert.equal(padrao.porEtapa.SUCCESS, undefined);
+  const todos = await svc.listar(admin, { finalizados: '1' }), vel = todos.itens.find(i => i.id === 720); assert.equal(vel.data, '2025-07-18');
+  assert.equal(todos.itens.find(i => i.id === 721).data, '2026-12-05'); assert.equal(todos.itens.find(i => i.id === 722).data, '');
+  assert.ok((await svc.listar(admin, { etapa: 'SUCCESS' })).itens.some(i => i.id === 720));        // filtrar pela etapa também mostra
 });

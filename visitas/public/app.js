@@ -2,7 +2,7 @@ const $ = s => document.querySelector(s);
 const IC = { cal: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z', list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z', chart: 'M18 20V10M12 20V4M6 20v-6', gear: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z', inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.7 4H7.3a2 2 0 0 0-1.8 1.1z', pin: 'M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z' };
 const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="${IC[n]}"/></svg>`;
 const ini = n => String(n || '').split(/\s+/).map(x => x.replace(/[^\p{L}]/gu, '')).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?';
-const rel = (d, hoje) => { if (!d || !hoje) return ''; const n = Math.round((new Date(d + 'T00:00:00Z') - new Date(hoje + 'T00:00:00Z')) / 864e5); return n === 0 ? 'hoje' : n === 1 ? 'amanhã' : n > 1 ? `em ${n} dias` : n === -1 ? 'ontem' : `há ${-n} dias`; };
+const rel = (d, hoje) => { d = String(d || '').slice(0, 10); hoje = String(hoje || '').slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !/^\d{4}-\d{2}-\d{2}$/.test(hoje)) return ''; const n = Math.round((new Date(d + 'T00:00:00Z') - new Date(hoje + 'T00:00:00Z')) / 864e5); if (Number.isNaN(n)) return ''; return n === 0 ? 'hoje' : n === 1 ? 'amanhã' : n > 1 ? `em ${n} dias` : n === -1 ? 'ontem' : `há ${-n} dias`; };
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ETAPAS = { NEW: 'Aguardando', PREPARATION: 'Dia da visita', LATE: 'Atrasada', ENC: 'Encerrado', NAOREAL: 'Não realizada', SUCCESS: 'Finalizado', OUTRA: 'Outra etapa', FAIL: 'Removido' };
 const COLS = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL', 'SUCCESS', 'OUTRA'];
@@ -51,14 +51,14 @@ async function render() {
 // ----- Registro de Visitas -----
 const ABERTA = ['NEW', 'PREPARATION', 'LATE'];
 const PIOR = ['LATE', 'PREPARATION', 'NEW', 'NAOREAL', 'ENC', 'SUCCESS', 'OUTRA'];
-S.agrupar = localStorage.getItem('vis.g') !== '0'; S.q = ''; S.kan = {}; S.size = 30;
+S.agrupar = localStorage.getItem('vis.g') !== '0'; S.fin = localStorage.getItem('vis.fin') === '1'; S.q = ''; S.kan = {}; S.size = 30;
 async function telaFila() {
   gen.n++; const app = $('#app');
   if (!$('#fil')) {
     app.innerHTML = `<div class="kpis" id="kpis"></div><div class="filtros" id="fil"></div><div id="lista"><div class="grid">${'<div class="sk"></div>'.repeat(6)}</div></div>`;
   } else $('#lista').classList.add('busy');
   const f = S.f, kan = S.vista === 'kanban';
-  const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
+  const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', finalizados: S.fin ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
   const r = await vapi('/api/visitas?' + q);
   S.itens = r.itens; S.total = r.total; S.grupos = r.totalGrupos; S.pages = r.pages; S.page = r.page; S.porEtapa = r.porEtapa || {};
   S.segs = new Set([...(S.segs || []), ...S.itens.map(i => i.segmento).filter(Boolean)]); S.vends = new Map([...(S.vends || []), ...S.itens.map(i => [i.vendedorId, i.vendedor])]); S.hoje = r.hoje;
@@ -74,12 +74,14 @@ async function telaFila() {
     <label>Classe<select id="f_classe">${op('classe', ['A', 'B', 'C', 'E'])}</select></label>
     <label>Etapa<select id="f_etapa">${op('etapa', COLS.map(c => [c, ETAPAS[c]]))}</select></label>
     <div class="fim"><span class="count">${S.total} visita(s) · ${S.grupos} cliente(s)</span>
+      <label class="sw"><input type="checkbox" id="f_fin" ${S.fin ? 'checked' : ''}> Mostrar finalizados</label>
       <label class="sw ${kan ? 'off' : ''}" title="${kan ? 'No Kanban os segmentos do mesmo cliente já ficam juntos em cada coluna' : ''}"><input type="checkbox" id="f_g" ${S.agrupar ? 'checked' : ''} ${kan ? 'disabled' : ''}> Agrupar por cliente</label>
       <div class="seg">${[['cards', 'Cartões'], ['tabela', 'Tabela'], ['kanban', 'Kanban']].map(([k, n]) => `<button class="btn ${S.vista === k ? 'on' : ''}" data-v="${k}">${n}</button>`).join('')}</div>
       ${S.eu.podeExcluir ? '<button class="btn" id="b_excl">Excluídos</button>' : ''}</div>`;
   if (foco !== null) { const el = $('#f_q'); el.focus(); el.setSelectionRange(foco, foco); }
   ['de', 'ate', 'segmento', 'vendedor', 'classe', 'etapa'].forEach(k => $('#f_' + k).onchange = e => { S.page = 1; f[k] = e.target.value; localStorage.setItem('vis.f', JSON.stringify({ ...f, de: '', ate: '' })); telaFila(); });
   let tq; $('#f_q').oninput = e => { clearTimeout(tq); tq = setTimeout(() => { S.q = e.target.value; S.page = 1; telaFila().catch(falha); }, 350); };
+  $('#f_fin').onchange = e => { S.fin = e.target.checked; localStorage.setItem('vis.fin', S.fin ? '1' : '0'); S.page = 1; telaFila(); };
   $('#f_g').onchange = e => { S.agrupar = e.target.checked; localStorage.setItem('vis.g', S.agrupar ? '1' : '0'); S.page = 1; telaFila(); };
   document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { S.page = 1; S.vista = b.dataset.v; S.kan = {}; localStorage.setItem('vis.v', S.vista); telaFila(); });
   if ($('#b_excl')) $('#b_excl').onclick = telaExcluidos;
