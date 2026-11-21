@@ -101,7 +101,8 @@ async function telaFila() {
   if ($('#b_excl')) $('#b_excl').onclick = telaExcluidos;
   $('#kpis').innerHTML = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'].map(c => `<button class="kpi-t ${f.etapa === c ? 'on' : ''}" data-e="${c}" data-kpi="${c}"><b>${S.porEtapa[c] || 0}</b><span>${ETAPAS[c]}</span></button>`).join('');
   document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { f.etapa = f.etapa === b.dataset.kpi ? '' : b.dataset.kpi; S.page = 1; telaFila(); });
-  $('#aoc').innerHTML = r.ocultos > 0 ? `<div class="aviso">${ico('inbox')}<div><b>${r.ocultos} visita(s) oculta(s)</b>: a empresa não tem <b>Última visita</b> preenchida no cadastro para aquele segmento.${S.eu.config ? ' <a href="#" id="a_diag">Ver diagnóstico das datas</a>' : ''}</div></div>` : '';
+  $('#aoc').innerHTML = r.ocultos > 0 ? `<div class="aviso">${ico('inbox')}<div><b>${r.ocultos} visita(s) oculta(s)</b>: a empresa não tem <b>Última visita</b> preenchida no cadastro para aquele segmento.<div class="acoes" style="border:0;padding:0;margin-top:8px"><button class="btn sm pri" id="a_ult">Preencher Última visita</button>${S.eu.config ? '<a href="#" id="a_diag" style="align-self:center">Ver diagnóstico das datas</a>' : ''}</div></div></div>` : '';
+  if ($('#a_ult')) $('#a_ult').onclick = abrirUltimas;
   if ($('#a_diag')) $('#a_diag').onclick = e => { e.preventDefault(); S.aba = 'cfg'; S.irDiag = true; tabs(); render(); };
   $('#lista').classList.remove('busy');
   desenhaLista();
@@ -276,6 +277,65 @@ async function verRegistro(id) {
     (bg, close) => bg.querySelector('#v_ed').onclick = () => { close(); formRegistro(id, true).catch(falha); });
 }
 
+// ----- Cadastrar "Última visita" sem abrir a empresa (grava direto no cadastro) -----
+const U = { page: 1, q: '', segmento: '', vendedor: '', sel: new Set(), itens: [], hoje: '' };
+function abrirUltimas() {
+  Object.assign(U, { page: 1, q: '', segmento: '', vendedor: '', sel: new Set() });
+  modal(`<h2>Cadastrar Última visita</h2><div class="mut">Empresas cujo card está oculto por falta de <b>Última visita</b> no cadastro. A data informada é gravada direto na empresa; a Próxima visita é calculada pela classe se estiver vazia, e o card passa a aparecer.</div>
+    <div id="u_corpo"><div class="sk" style="height:160px"></div></div>
+    <div class="foot"><button class="btn pri" data-close id="u_fechar">Fechar</button></div>`, (bg, close) => {
+    bg.querySelector('.modal').classList.add('wide');
+    bg.querySelector('#u_fechar').addEventListener('click', () => recarrega());
+    carregaUltimas().catch(e => { bg.querySelector('#u_corpo').innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; });
+  });
+}
+async function carregaUltimas() {
+  const C = $('#u_corpo'); if (!C) return;
+  const qs = new URLSearchParams(Object.entries({ q: U.q, segmento: U.segmento, vendedor: U.vendedor, page: U.page }).filter(([, v]) => v !== '')).toString();
+  const r = await api('/api/sem-ultima?' + qs); if (!$('#u_corpo')) return;
+  U.itens = r.itens; U.hoje = r.hoje; U.page = r.page; U.pages = r.pages;
+  const opc = (arr, atual) => `<option value="">Todos</option>` + arr.map(x => { const [v, l] = Array.isArray(x) ? x : [x, x]; return `<option value="${esc(v)}" ${String(atual) === String(v) ? 'selected' : ''}>${esc(l)}</option>`; }).join('');
+  const foco = document.activeElement?.id === 'u_q' ? document.activeElement.selectionStart : null;
+  C.innerHTML = `<div class="filtros" style="box-shadow:none;margin:12px 0;padding:10px">
+      <label class="busca">Empresa<input type="search" id="u_q" placeholder="Buscar empresa…" value="${esc(U.q)}"></label>
+      <label>Segmento<select id="u_seg">${opc(r.opcoes.segmentos, U.segmento)}</select></label>
+      <label>Vendedor<select id="u_vend">${opc(r.opcoes.vendedores.map(v => [v.id, v.nome]), U.vendedor)}</select></label>
+      <div class="fim"><span class="count">${r.total} pendente(s)</span></div></div>
+    ${r.itens.length ? `<div class="filtros" style="box-shadow:none;margin:0 0 10px;padding:10px;background:var(--pri-s);border-color:transparent">
+      <label>Mesma data para os marcados<input type="date" id="u_lote" max="${r.hoje}"></label><button class="btn pri" id="u_aplica" disabled>Gravar nos marcados</button><span class="mut" id="u_info"></span></div>
+    <div class="scroll"><table class="tbl"><thead><tr><th><input type="checkbox" id="u_todos" aria-label="Marcar todos da página"></th><th>Empresa</th><th>Segmento</th><th>Classe</th><th>Vendedor</th><th>Card</th><th>Última visita</th><th></th></tr></thead><tbody>${r.itens.map(i => { const k = `${i.empresaId}|${i.segmento}`; return `<tr data-k="${esc(k)}"><td><input type="checkbox" data-us="${esc(k)}" ${U.sel.has(k) ? 'checked' : ''}></td><td><b>${esc(i.empresa)}</b><div class="mut u-erro" style="color:var(--e-late)"></div></td><td>${esc(i.segmento)}</td><td><span class="cls ${esc(i.classe)}">${esc(i.classe || '–')}</span></td><td>${esc(i.vendedor)}</td><td class="mut">${i.cards} aberto(s)${i.dataCard ? ' · ' + dtBR(i.dataCard) : ''}</td><td><input type="date" data-ud="${esc(k)}" max="${r.hoje}" style="width:150px"></td><td><button class="btn sm pri" data-usalvar="${esc(k)}">Salvar</button></td></tr>`; }).join('')}</tbody></table></div>
+    <div class="filtros pg" style="box-shadow:none;border:0;background:none"><button class="btn sm" data-upg="-1" ${U.page <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">Página ${U.page} de ${U.pages}</span><button class="btn sm" data-upg="1" ${U.page >= U.pages ? 'disabled' : ''}>Próxima ›</button></div>`
+    : `<div class="vazio">${ico('inbox')}<b>Nenhuma empresa pendente</b><div>Todas as visitas deste filtro já têm Última visita no cadastro.</div></div>`}`;
+  if (foco !== null) { const el = $('#u_q'); el.focus(); el.setSelectionRange(foco, foco); }
+  const recarga = () => { U.page = 1; carregaUltimas().catch(falha); };
+  let tq; $('#u_q').oninput = e => { clearTimeout(tq); tq = setTimeout(() => { U.q = e.target.value; recarga(); }, 350); };
+  $('#u_seg').onchange = e => { U.segmento = e.target.value; recarga(); };
+  $('#u_vend').onchange = e => { U.vendedor = e.target.value; recarga(); };
+  C.querySelectorAll('[data-upg]').forEach(b => b.onclick = () => { U.page += +b.dataset.upg; carregaUltimas().catch(falha); });
+  if (!r.itens.length) return;
+  const atualizaLote = () => { $('#u_aplica').disabled = !U.sel.size || !$('#u_lote').value; $('#u_info').textContent = U.sel.size ? `${U.sel.size} marcado(s)` : ''; };
+  C.querySelectorAll('[data-us]').forEach(c => c.onchange = () => { c.checked ? U.sel.add(c.dataset.us) : U.sel.delete(c.dataset.us); atualizaLote(); });
+  $('#u_todos').onchange = e => { C.querySelectorAll('[data-us]').forEach(c => { c.checked = e.target.checked; e.target.checked ? U.sel.add(c.dataset.us) : U.sel.delete(c.dataset.us); }); atualizaLote(); };
+  $('#u_lote').oninput = atualizaLote;
+  const monta = (k, data) => { const [empresaId, ...seg] = k.split('|'); return { empresaId: +empresaId, segmento: seg.join('|'), data }; };
+  const grava = async (pares, botoes) => {
+    botoes.forEach(b => b.disabled = true);
+    try {
+      const r2 = await api('/api/ultima-visita', 'POST', { itens: pares.map(([k, d]) => monta(k, d)) });
+      let ok = 0;
+      r2.resultados.forEach((x, n) => {
+        const k = pares[n][0], tr = C.querySelector(`tr[data-k="${CSS.escape(k)}"]`);
+        if (x.ok) { ok++; U.sel.delete(k); tr?.remove(); } else if (tr) tr.querySelector('.u-erro').textContent = x.erro || 'Não foi possível gravar.';
+      });
+      if (ok) toast(`${ok} Última visita gravada(s) no cadastro`);
+      if (ok === pares.length) carregaUltimas().catch(falha);
+    } catch (e) { falha(e); }
+    botoes.forEach(b => { if (document.body.contains(b)) b.disabled = false; });
+  };
+  C.querySelectorAll('[data-usalvar]').forEach(b => b.onclick = () => { const k = b.dataset.usalvar, d = C.querySelector(`[data-ud="${CSS.escape(k)}"]`).value; if (!d) return toast('Informe a data da última visita.'); grava([[k, d]], [b]); });
+  $('#u_aplica').onclick = ev => grava([...U.sel].map(k => [k, $('#u_lote').value]), [ev.target]);
+}
+
 // ----- Visita Alterada -----
 let altPg = 1;
 async function telaAlt() {
@@ -410,7 +470,7 @@ async function telaCfg() {
     <h4 style="margin:14px 0 4px">Registro de visita (SPA de registros)</h4><div class="row2">${[['data', 'Data/hora da visita'], ['fatos', 'Fatos e dados'], ['interesses', 'Interesses'], ['sentimentos', 'Sentimentos'], ['valores', 'Valores'], ['populacao', 'População de motores'], ['regime', 'Regime de trabalho'], ['oportunidades', 'Oportunidades futuras'], ['antecipada', 'Reunião antecipada'], ['resultado', 'Resultado / observações'], ['acompanhamento', 'Acompanhamento'], ['anexos', 'Anexos'], ['supervisor', 'Supervisor que acompanhou'], ['idFila', 'ID Fila (liga ao card)'], ['segmento', 'Segmento']].map(([k, t]) => `<label class="f"><span>${t} · detectado: <b>${esc(info.visitaDetectada[k] || 'não encontrado')}</b></span><select data-mapav="${k}"><option value="">(automático)</option>${info.disponiveisVisita.map(d => `<option value="${esc(d.key)}" ${info.mapaVisita[k] === d.key ? 'selected' : ''}>${esc(d.label)} · ${esc(d.key)}${d.type ? ' (' + esc(d.type) + ')' : ''}</option>`).join('')}</select></label>`).join('')}</div>
     <div class="foot" style="margin:12px 0 0;padding:0;background:none;border:0;position:static"><button class="btn pri" id="c_mapa">Salvar mapeamento</button></div></div>` : ''}
   ${S.eu.webhook ? `<div class="sec" id="sec_diag"><h3>Diagnóstico das datas de visita (cadastro das empresas)</h3><div class="mut">Somente leitura. Mostra, por segmento, quantas empresas têm vendedor, classe, última e próxima visita, e qual intervalo existe de fato entre as duas datas (a regra que a automação atual aplica).</div>
-    <div class="acoes" style="border:0;padding:0;margin:10px 0"><button class="btn" id="c_diag">Rodar diagnóstico</button></div><div id="diag_out"></div></div>` : ''}
+    <div class="acoes" style="border:0;padding:0;margin:10px 0"><button class="btn" id="c_diag">Rodar diagnóstico</button><button class="btn pri" id="c_ultima">Cadastrar Última visita (lista)</button></div><div id="diag_out"></div></div>` : ''}
   <div class="sec"><h3>Log</h3><div class="scroll" style="max-height:260px;overflow:auto"><table><tbody>${log.map(l => `<tr><td>${dthBR(l.at)}</td><td>${esc(l.type)}</td><td>${esc(l.msg)}</td></tr>`).join('') || '<tr><td class="mut">Sem registros.</td></tr>'}</tbody></table></div></div>
   <div class="foot"><button class="btn pri" id="c_save">Salvar configurações</button></div>`;
   const draft = { verTudo: [...c.verTudo], podeExcluir: [...c.podeExcluir], admins: [...c.admins], supervisoresExtras: [...c.supervisoresExtras] };
@@ -460,6 +520,7 @@ async function telaCfg() {
       finally { if (vivo()) b.disabled = false; }
     };
     $('#c_diag').onclick = () => rodarDiag(false);
+    $('#c_ultima').onclick = abrirUltimas;
     api('/api/jobs/diagnostico').then(j => { if (!vivo() || S.irDiag) return; if (j.status === 'concluido') mostra(j.resultado, j.fim); else if (j.status === 'rodando') rodarDiag(true); }).catch(() => {});
     if (S.irDiag) { S.irDiag = false; $('#sec_diag').scrollIntoView(); rodarDiag(false); }
   }

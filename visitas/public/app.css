@@ -194,3 +194,4 @@ body.arrastando .kdel{opacity:.92;pointer-events:auto;transform:none}.kdel.over{
 .modal h4{font-size:13px}
 .rtab td{vertical-align:top}
 .dica{text-align:center;padding:14px}
+.modal.wide{max-width:1180px}.filtros .fim .count{white-space:nowrap}

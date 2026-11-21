@@ -301,3 +301,24 @@ test('opções dos filtros trazem todos os segmentos e vendedores do escopo, sem
   assert.ok(so.opcoes.vendedores.some(v => v.id === 'sem') && so.opcoes.vendedores.some(v => v.nome === 'Vera Vendedora')); assert.equal(so.total, 1);
   assert.deepEqual((await svc.listar(vendedor, {})).opcoes.segmentos, ['Motores']);                 // opções respeitam o escopo: o vendedor só vê os segmentos dos seus cards
 });
+test('cadastrar Última visita sem abrir a empresa: lista ocultos, grava no cadastro, respeita escopo e cria o card', async () => {
+  const { f, svc, store } = mundo(); store.setConfig({ exigirUltimaVisita: true });
+  f.s.empresas.push({ ID: '104', TITLE: 'Épsilon', UF_V: '8', UF_C: '2' }, { ID: '105', TITLE: 'Zeta sem card', UF_V: '7', UF_C: '3' });
+  const novo = (id, emp, vend, data) => f.s.itens[1036].push({ id, title: 'x', companyId: emp, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: vend, ufSeg: 'Motores', ufClasse: 'A', ufData: data });
+  novo(910, 100, '7', '2026-12-01'); novo(911, 101, '7', '2026-12-02'); novo(912, 104, '8', '2026-12-03');
+  const lista = await svc.semUltima(admin, {}); assert.equal(lista.total, 3); assert.deepEqual(lista.itens.map(i => i.empresa), ['Alfa Motores', 'Beta Diesel', 'Épsilon']);
+  assert.equal((await svc.semUltima(vendedor, {})).total, 2);                                         // vendedor só vê as suas
+  assert.equal((await svc.semUltima(admin, { q: 'beta' })).total, 1); assert.equal((await svc.semUltima(admin, { vendedor: '8' })).total, 1);
+  const r = await svc.salvarUltimas(vendedor, [
+    { empresaId: 100, segmento: 'Motores', data: '2026-10-20' }, { empresaId: 101, segmento: 'Motores', data: '2027-01-01' },
+    { empresaId: 104, segmento: 'Motores', data: '2026-10-20' }, { empresaId: 100, segmento: 'Peças', data: '2026-10-20' }, { empresaId: 105, segmento: 'Motores', data: '2026-11-10' }]);
+  assert.deepEqual(r.resultados.map(x => x.ok), [true, false, false, false, true]);
+  assert.match(r.resultados[1].erro, /futuro/); assert.match(r.resultados[2].erro, /sua nem da sua equipe/); assert.match(r.resultados[3].erro, /Segmento sem campo/);
+  const alfa = f.s.empresas.find(e => e.ID === '100');
+  assert.equal(alfa.UF_U, '2026-10-20'); assert.equal(alfa.UF_P, R.proximaVisita('A', '2026-10-20'));         // grava a Última e calcula a Próxima (estava vazia)
+  const zeta = f.s.itens[1036].find(c => c.companyId === 105); assert.ok(zeta); assert.equal(zeta.ufData, R.proximaVisita('C', '2026-11-10'));   // sem card e fila ativa: criou na hora
+  const visiveis = await svc.listar(admin, {}); assert.deepEqual(visiveis.itens.map(i => i.empresa).sort(), ['Alfa Motores', 'Zeta sem card']); assert.equal(visiveis.ocultos, 2);
+  assert.equal((await svc.semUltima(admin, {})).total, 2);                                             // some da lista de pendentes
+  f.s.empresas.find(e => e.ID === '101').UF_P = '2027-03-01'; await svc.salvarUltimas(admin, [{ empresaId: 101, segmento: 'Motores', data: '2026-10-25' }]);
+  assert.equal(f.s.empresas.find(e => e.ID === '101').UF_P, '2027-03-01');                              // Próxima já preenchida não é sobrescrita
+});

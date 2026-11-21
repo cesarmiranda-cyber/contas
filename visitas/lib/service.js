@@ -680,6 +680,65 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     });
     return { hoje: h, exigirUltimaVisita: cfg().exigirUltimaVisita, empresas: emps.length, intervalosDoApp: cfg().intervalos, segmentos };
   }
+  // ---- Cadastrar "Última visita" sem abrir a empresa ----
+  // Lista os cards abertos ocultos (empresa+segmento sem Última visita no cadastro), agrupados, dentro do escopo do usuário.
+  async function semUltima(user, q = {}) {
+    const m = await modelo();
+    let cards = (await visiveis(user, await cardsC(m))).filter(c => ABERTAS.includes(c.etapa));
+    await carregaUltimas(m, cards.map(c => c.empresaId));
+    cards = cards.filter(c => !ultDados.get(chaveUlt(c))?.ultima);
+    const g = new Map();
+    for (const c of cards) { const k = chaveUlt(c); const x = g.get(k) || g.set(k, { empresaId: c.empresaId, segmento: c.segmento, classe: c.classe, vendedorId: c.vendedorId, cards: 0, dataCard: '' }).get(k); x.cards++; if (c.data && (!x.dataCard || c.data < x.dataCard)) x.dataCard = c.data; }
+    let lista = [...g.values()];
+    const opcoes = { segmentos: [...new Set(lista.map(x => x.segmento).filter(Boolean))].sort(), vendedores: [] };
+    const nmAll = await nomes(lista.map(x => x.vendedorId)); opcoes.vendedores = [...new Map(lista.map(x => [x.vendedorId || 'sem', x.vendedorId ? nmAll(x.vendedorId) : 'Sem vendedor']))].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+    if (q.segmento) lista = lista.filter(x => R.norm(x.segmento) === R.norm(q.segmento));
+    if (q.vendedor) lista = lista.filter(x => x.vendedorId === (q.vendedor === 'sem' ? '' : String(q.vendedor)));
+    const tit = await tituloEmpresas(lista.map(x => x.empresaId));
+    lista = lista.map(x => ({ ...x, empresa: tit(x.empresaId), vendedor: x.vendedorId ? nmAll(x.vendedorId) : 'Sem vendedor', proximaCadastro: ultDados.get(`${x.empresaId}|${R.norm(x.segmento)}`)?.proxima || '' }));
+    if (q.q) { const b = R.norm(q.q); lista = lista.filter(x => R.norm(`${x.empresa} ${x.segmento}`).includes(b)); }
+    lista.sort((a, b) => a.empresa.localeCompare(b.empresa) || a.segmento.localeCompare(b.segmento));
+    const size = 25, pages = Math.max(1, Math.ceil(lista.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));
+    return { hoje: hoje(), total: lista.length, page, pages, opcoes, itens: lista.slice((page - 1) * size, page * size) };
+  }
+  // Grava a Última visita direto no cadastro da empresa (e a Próxima, se estiver vazia). Vendedor só altera as próprias; admin altera todas.
+  async function salvarUltimas(user, itens) {
+    const m = await modelo(), h = hoje(), esc = await escopo(user), lista = A(itens).slice(0, 100);
+    if (!lista.length) throw fail(400, 'Nenhuma empresa informada.');
+    const ids = [...new Set(lista.map(i => String(i?.empresaId)).filter(x => /^\d{1,12}$/.test(x)))];
+    const sel = ['ID', 'TITLE', ...new Set(Object.values(m.empresa.segmentos).flatMap(s => [...(s.cargos.Vendedor || []), ...s.classe, ...s.ultima, ...s.proxima]))], comps = new Map();
+    for (let i = 0; i < ids.length; i += 50) for (const c of (await bx.call('crm.company.list', { filter: { ID: ids.slice(i, i + 50) }, select: sel })).result || []) comps.set(String(c.ID), c);
+    const existentes = (await cardsC(m)), res = [];
+    for (const it of lista) {
+      const r = { empresaId: it?.empresaId, segmento: it?.segmento, ok: false };
+      try {
+        const segKey = R.norm(it?.segmento), seg = m.empresa.segmentos[segKey], comp = comps.get(String(it?.empresaId)), data = String(it?.data || '');
+        if (!seg || !seg.ultima[0]) throw fail(400, 'Segmento sem campo "Última visita" no cadastro.');
+        if (!comp) throw fail(404, 'Empresa não encontrada.');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || Number.isNaN(Date.parse(data))) throw fail(400, 'Data inválida.');
+        if (data > h) throw fail(400, 'A última visita não pode estar no futuro.');
+        if (data < '2000-01-01') throw fail(400, 'Data muito antiga.');
+        const l = leituraEmpresa(m, comp, segKey, 'Vendedor');
+        if (esc && !esc.has(String(l.vendedor))) throw fail(403, 'Esta empresa não é sua nem da sua equipe.');
+        const fields = { [seg.ultima[0]]: data };
+        const proxima = l.classe ? R.proximaVisita(l.classe, data, cfg()) : '';
+        if (!l.proxima && proxima && seg.proxima[0]) fields[seg.proxima[0]] = proxima;
+        await bx.call('crm.company.update', { id: comp.ID, fields });
+        ultDados.set(`${comp.ID}|${segKey}`, { ultima: data, proxima: fields[seg.proxima[0]] || l.proxima || '' });
+        // Fila ativa e ainda sem card nesse segmento: cria já (sem esperar a sincronização horária).
+        const tem = existentes.some(c => c.empresaId === +comp.ID && R.norm(c.segmento) === segKey && c.etapa !== 'FAIL');
+        if (store.ativo && !tem && l.vendedor && l.classe) {
+          let d = fields[seg.proxima[0]] || l.proxima || proxima; if (d && R.etapaPorData(d, h) === 'NAOREAL') d = R.nextBusinessDay(h);
+          if (d) await criarCard(m, { empresaId: +comp.ID, empresa: comp.TITLE, segmento: seg.nome, cargo: 'Vendedor', classe: l.classe, vendedorId: l.vendedor, data: d });
+        }
+        store.log('ultima', `Última visita ${data} gravada em ${comp.TITLE} (${seg.nome}) por ${user.nome || user.id}`);
+        r.ok = true;
+      } catch (e) { r.erro = e.message; }
+      res.push(r);
+    }
+    invalidar('cards', 'dash', 'regs');
+    return { resultados: res, gravados: res.filter(x => x.ok).length };
+  }
   // Registros de visita (SPA 1032) dos cards filtrados: busca, paginação e permissão de edição.
   async function registros(user, q = {}) {
     const { m, cards } = await filtrados(user, q), porId = new Map(cards.map(c => [String(c.id), c]));
@@ -733,6 +792,6 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    preparar, camposInfo, diagnosticoDatas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    preparar, camposInfo, diagnosticoDatas, semUltima, salvarUltimas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };
