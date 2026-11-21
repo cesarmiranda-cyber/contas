@@ -392,3 +392,54 @@ test('auditoria detecta cada tipo de problema e as correções seguras funcionam
   assert.equal(Object.fromEntries((await svc.auditoria()).checks.map(c => [c.id, c])).sem_proximo.contagem, 1);
   await svc.corrigirAuditoria('sem_proximo'); svc.invalidar(); assert.equal(Object.fromEntries((await svc.auditoria()).checks.map(c => [c.id, c])).sem_proximo.contagem, 0);
 });
+// ===== Auditoria de visibilidade: cada responsável vê só o seu; "Quem vê tudo" vê todos =====
+async function mundoIsolado() {
+  const w = mundo(); w.f.s.empresas.push({ ID: '104', TITLE: 'Épsilon', UF_V: '8', UF_C: '1' }); await w.svc.sync();
+  const card = id => w.f.s.itens[1036].find(c => String(c.companyId) === String(id));
+  const u7 = { id: '7', nome: 'Vera', papel: 'usuario' }, u8 = { id: '8', nome: 'Outro', papel: 'usuario' }, u9 = { id: '9', nome: 'Chefe', papel: 'usuario' };
+  await w.svc.registrar(card(100).id, { dataHora: '2026-11-18T10:00', fatos: 'visita do 7' }, u7);
+  await w.svc.registrar(card(104).id, { dataHora: '2026-11-18T11:00', fatos: 'visita do 8' }, u8);
+  await w.svc.reprogramar(card(101).id, { data: '2026-12-15', motivo: 'cliente viajando' }, u7);
+  w.svc.invalidar();
+  return { ...w, card, u7, u8, u9, adm: { id: '1', nome: 'Admin', papel: 'admin', config: true }, todos: { id: '3', nome: 'Diretor', papel: 'usuario' } };
+}
+test('visibilidade: com "Quem vê tudo" vazio só os administradores do portal veem tudo; chefe de departamento NÃO vê a equipe', async () => {
+  const { svc, u7, u8, u9, adm } = await mundoIsolado();
+  const n = async u => (await svc.listar(u, { finalizados: '1' })).total;
+  assert.equal(await n(adm), 5); assert.equal(await n(u7), 3); assert.equal(await n(u8), 2);      // 7 tem 3 cards, 8 tem 2
+  assert.equal(await n(u9), 0);                                                                       // 9 chefia o departamento do fake, mas não vê ninguém
+  assert.equal(await svc.veTudo(adm), true); assert.equal(await svc.veTudo(u7), false); assert.equal(await svc.veTudo(u9), false);
+});
+test('visibilidade: com a lista preenchida, nem administrador vê o dos outros; quem está na lista vê tudo', async () => {
+  const { f, svc, store, card, u7, u8, adm, todos } = await mundoIsolado();
+  store.setConfig({ verTudo: ['3'] }); svc.invalidar();
+  const n = async u => (await svc.listar(u, { finalizados: '1' })).total;
+  assert.equal(await n(todos), 5); assert.equal(await n(adm), 0); assert.equal(await n(u7), 3); assert.equal(await n(u8), 2);
+  // leituras
+  for (const [u, esperado] of [[adm, 0], [u7, 3], [u8, 2], [todos, 5]]) {
+    assert.equal((await svc.dashboard(u, {})).kpis.programadas, esperado, 'dashboard');
+    assert.equal((await svc.registros(u, {})).total, { 0: 0, 3: 1, 2: 1, 5: 2 }[esperado], 'registros');
+  }
+  assert.equal((await svc.historico(adm)).total, 0); assert.equal((await svc.historico(u7)).total, 1); assert.equal((await svc.historico(u8)).total, 0); assert.equal((await svc.historico(todos)).total, 1);
+  assert.equal((await svc.semUltima(adm, {})).total, 0);
+  // filtros não ampliam o alcance
+  assert.equal((await svc.listar(u8, { vendedor: '7', finalizados: '1' })).total, 0); assert.equal((await svc.dashboard(u8, { vendedor: '7' })).kpis.programadas, 0);
+  assert.equal((await svc.listar(u8, { supervisor: '9', finalizados: '1' })).total, 0);               // filtro de supervisor só restringe, nunca amplia
+  assert.equal((await svc.listar(u7, { excluidos: '1' })).total, 0);
+  // acesso direto por ID aos cards e registros alheios é negado
+  const c7 = card(100), c8 = card(104), reg7 = f.s.itens[1032].find(r => String(r.ufIdFila) === String(c7.id));
+  for (const quem of [u8, adm]) {
+    await assert.rejects(svc.formCard(c7.id, quem), /não é seu/); await assert.rejects(svc.registroDoCard(c7.id, quem), /não é seu/);
+    await assert.rejects(svc.reprogramar(card(101).id, { data: '2027-01-10', motivo: 'x' }, quem), /não é seu/); await assert.rejects(svc.naoRealizada(card(101).id, { motivo: 'Outro motivo' }, quem), /não é seu/);
+    await assert.rejects(svc.excluir(card(101).id, {}, quem), /não é seu|pode excluir/); await assert.rejects(svc.proxima(card(101).id, quem), /não é seu/); await assert.rejects(svc.reverter(card(101).id, quem), /não é seu|reverter/);
+    await assert.rejects(svc.editarRegistro(reg7.id, { fatos: 'invadindo' }, quem), /não pode editar/);
+  }
+  const abre = f.s.itens[1036].find(c => c.id !== c7.id && String(c.companyId) === '100' && c.stageId === 'DT1036_19:NEW');
+  await assert.rejects(svc.registrar(abre.id, { dataHora: '2026-11-18T10:00', fatos: 'x' }, u8), /não é seu/);
+  const sal = await svc.salvarUltimas(adm, [{ empresaId: 100, segmento: 'Motores', data: '2026-10-01' }]); assert.match(sal.resultados[0].erro, /sua nem da sua equipe/);
+  // quem é dono (ou vê tudo) consegue
+  await svc.editarRegistro(reg7.id, { fatos: 'ajuste do dono' }, u7); assert.equal(reg7.ufFatos, 'ajuste do dono');
+  await svc.editarRegistro(reg7.id, { fatos: 'ajuste do diretor' }, todos); assert.equal(reg7.ufFatos, 'ajuste do diretor');
+  assert.equal((await svc.registros(u7, {})).itens[0].podeEditar, true); assert.equal((await svc.registros(todos, {})).itens.every(i => i.podeEditar), true);
+  void c8;
+});

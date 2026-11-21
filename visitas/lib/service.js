@@ -151,13 +151,22 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     return out;
   }
   // null = vê tudo; senão Set de vendedores visíveis (o próprio + equipe dos departamentos que chefia)
+  // REGRA DE VISIBILIDADE: cada responsável vê somente os próprios registros. Só quem está em "Quem vê tudo" (Configurações) vê os de todos.
+  // Enquanto "Quem vê tudo" estiver vazio (configuração inicial), os administradores do portal veem tudo para não ficarem trancados de fora.
+  // null = vê tudo; senão, Set com o próprio ID (o vendedor do card).
   async function escopo(user) {
-    const c = cfg();
-    if (user.papel === 'admin' || c.verTudo.map(String).includes(String(user.id))) return null;
-    return cached(`esc:${user.id}`, 300000, async () => {
-      const set = new Set([String(user.id)]);
+    const ver = cfg().verTudo.map(String);
+    if (ver.includes(String(user.id))) return null;
+    if (!ver.length && user.papel === 'admin') return null;
+    return new Set([String(user.id)]);
+  }
+  const veTudo = async user => (await escopo(user)) === null;
+  // Equipe de um supervisor (departamentos que ele chefia): usada SOMENTE no filtro "supervisor" do painel, nunca para dar acesso.
+  async function equipeDe(userId) {
+    return cached(`eq:${userId}`, 300000, async () => {
+      const set = new Set([String(userId)]);
       const ds = await departamentos();
-      const chefiados = ds.filter(d => d.chefe === String(user.id)).map(d => d.id);
+      const chefiados = ds.filter(d => d.chefe === String(userId)).map(d => d.id);
       if (chefiados.length) {
         const todos = new Set(chefiados);
         for (let ch = true; ch;) { ch = false; for (const d of ds) if (!todos.has(d.id) && todos.has(d.pai)) { todos.add(d.id); ch = true; } }
@@ -553,7 +562,8 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const it = r.result?.item || r.result;
     if (!it) throw fail(404, 'Registro não encontrado.');
     const reg = paraRegistro(m, it), esc = await escopo(user);
-    const pode = user.papel === 'admin' || reg.criadoPor === String(user.id) || esc === null || (esc && esc.has(reg.criadoPor));
+    const card = reg.idFila ? await umCard(m, reg.idFila).catch(() => null) : null;
+    const pode = esc === null || (card ? esc.has(String(card.vendedorId)) : false) || reg.criadoPor === String(user.id);
     if (!pode) throw fail(403, 'Você não pode editar este registro.');
     if (!txt(b.fatos).trim()) throw fail(400, 'Preencha "Fatos e dados".');
     const f = camposVisita(m, b);
@@ -609,7 +619,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const tit = await tituloEmpresas(fatia.map(c => c.empresaId)), nm = await nomes(fatia.map(c => c.vendedorId));
     return { hoje: h, de, ate, opcoes, ocultos: cu.ocultos, exigirUltima: cfg().exigirUltimaVisita, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), ultimaVisita: ultDados.get(chaveUlt(c))?.ultima || '', reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
-  async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
+  const escopoDe = equipeDe;
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i)), 600000); }
   // Cards no escopo do usuário + filtros do painel (período na data programada). `sem` ignora um filtro (para as opções dos seletores).
   async function filtrados(user, q = {}, sem = []) {
@@ -845,7 +855,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     let regs = (await registrosC(m)).filter(r => porId.has(r.idFila));
     const esc = await escopo(user), busca = R.norm(q.q || '');
     const tit = await tituloEmpresas(regs.map(r => r.empresaId)), nm = await nomes(regs.map(r => porId.get(r.idFila).vendedorId).concat(regs.map(r => r.supervisor)));
-    let lista = regs.map(r => { const c = porId.get(r.idFila); return { _r: r, id: r.id, idFila: +r.idFila, empresa: tit(r.empresaId), segmento: c.segmento, classe: c.classe, vendedor: nm(c.vendedorId), dataHora: r.dataHora, supervisor: r.supervisor ? nm(r.supervisor) : '', contatos: r.contatos.length, anexos: r.anexos.length, resumo: r.fatos.replace(/\s+/g, ' ').slice(0, 180), podeEditar: user.papel === 'admin' || esc === null || r.criadoPor === String(user.id) || !!esc?.has(r.criadoPor), _b: R.norm(`${tit(r.empresaId)} ${c.segmento} ${nm(c.vendedorId)} ${r.fatos}`) }; });
+    let lista = regs.map(r => { const c = porId.get(r.idFila); return { _r: r, id: r.id, idFila: +r.idFila, empresa: tit(r.empresaId), segmento: c.segmento, classe: c.classe, vendedor: nm(c.vendedorId), dataHora: r.dataHora, supervisor: r.supervisor ? nm(r.supervisor) : '', contatos: r.contatos.length, anexos: r.anexos.length, resumo: r.fatos.replace(/\s+/g, ' ').slice(0, 180), podeEditar: esc === null || !!esc.has(String(c.vendedorId)) || r.criadoPor === String(user.id), _b: R.norm(`${tit(r.empresaId)} ${c.segmento} ${nm(c.vendedorId)} ${r.fatos}`) }; });
     if (busca) lista = lista.filter(x => x._b.includes(busca));
     lista.sort((a, b) => String(b.dataHora).localeCompare(String(a.dataHora)) || b.id - a.id);
     const size = 15, pages = Math.max(1, Math.ceil(lista.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));
@@ -892,6 +902,6 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    preparar, camposInfo, diagnosticoDatas, reconciliar, auditoria, corrigirAuditoria, semUltima, salvarUltimas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    veTudo, preparar, camposInfo, diagnosticoDatas, reconciliar, auditoria, corrigirAuditoria, semUltima, salvarUltimas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };

@@ -95,7 +95,7 @@ const CFG_CAMPOS = {
 const ids = v => (Array.isArray(v) ? v.map(String).filter(x => /^\d{1,12}$/.test(x)).slice(0, 500) : []);
 
 const routes = {
-  'GET /api/eu': async (u, b, user) => ({ acesso: await svc.temAcesso(user).catch(() => true), id: user.id, nome: user.nome, papel: user.papel, config: user.config, podeExcluir: svc.podeExcluir(user), hoje: svc.hoje(), webhook: bitrix.enabled, ativo: store.ativo }),
+  'GET /api/eu': async (u, b, user) => ({ veTudo: await svc.veTudo(user), acesso: await svc.temAcesso(user).catch(() => true), id: user.id, nome: user.nome, papel: user.papel, config: user.config, podeExcluir: svc.podeExcluir(user), hoje: svc.hoje(), webhook: bitrix.enabled, ativo: store.ativo }),
   'GET /api/config': async (u, b, user) => { exigeConfig(user); return { config: store.config, webhook: bitrix.enabled, motivosPadrao: R.MOTIVOS }; },
   'PUT /api/config': async (u, body, user) => {
     exigeConfig(user);
