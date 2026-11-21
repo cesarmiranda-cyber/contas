@@ -119,15 +119,19 @@
   var ENTITY_TYPE_ID = 1050;
   var CATEGORY_ID = null; // null = funil padrão do SPA; ou o ID real do funil
 
-  /* Troque pelos códigos reais dos campos do SPA 1050 */
+  /* Campos do SPA 1050 (Talentos) */
   var FIELDS = {
-    nome:'ufCrm_NOME', telefone:'ufCrm_TELEFONE', email:'ufCrm_EMAIL', vaga:'ufCrm_VAGA',
-    cidade:'ufCrm_CIDADE', trabalhando:'ufCrm_TRABALHANDO', instrucao:'ufCrm_INSTRUCAO', curriculo:'ufCrm_CURRICULO'
+    nome:'ufCrm13_1795280507316', telefone:'ufCrm13_1795280513843', email:'ufCrm13_1795280520099', vaga:'ufCrm13_1795280638139',
+    cidade:'ufCrm13_1795280650732', trabalhando:'ufCrm13_1795280728', instrucao:'ufCrm13_1795280831', curriculo:'ufCrm13_1795280703515'
   };
-  /* Se forem campos do tipo LISTA, informe o ID de cada opção. Ex.: trabalhando:{'Não':101,'Sim':102} */
-  var IDS = { vaga:{}, trabalhando:{}, instrucao:{} };
+  /* IDs das opções das listas */
+  var IDS = {
+    vaga:{'ANALISTA DE DEPARTAMENTO PESSOAL':835,'ANALISTA DE MARKETING':837,'ANALISTA DE SUPORTE':839,'ANALISTA FINANCEIRO PLENO':841,'ASSISTENTE DE COMPRAS':843,'ATENDIMENTO AO CLIENTE':845,'AUXILIAR ADMINISTRATIVO':847,'AUXILIAR ALMOXARIFE':849,'AUXILIAR FINANCEIRO':851,'DESIGN GRÁFICO I':853,'GERENTE DE INFRA. DE TECNOLOGIA':855,'GERENTE DE REDES EXTERNO':857,'GERENTE DE SUPORTE TÉCNICO E TECNOLOGIA':859,'INSTALADOR REPARADOR':861,'LÍDER DE VENDAS':863,'MONTADOR DE EQUIPAMENTOS ELETRÔNICOS':865,'MOTORISTA DE FURGÃO':867,'SUPERVISOR DE ATENDIMENTO':869,'SUPERVISOR DE MONTAGEM E INSTALAÇÃO':871,'CONSULTOR DE VENDAS':873,'AUXILIAR DE MARKETING':875,'SERVICE DESK':877,'EXECUTIVO':879,'AUXILIAR DE INSTALAÇÃO':881},
+    trabalhando:{'Não':885,'Sim':887},
+    instrucao:{'Superior Completo':891,'Superior Incompleto':893,'Ensino Médio Completo':895,'Ensino Médio Incompleto':897,'Ensino Fundamental Completo':899,'Ensino Fundamental Incompleto':901}
+  };
 
-  var VAGAS = ['Técnico de Campo','Atendente','Vendedor','Auxiliar Administrativo','Outra'];
+  var VAGAS = ["ANALISTA DE DEPARTAMENTO PESSOAL", "ANALISTA DE MARKETING", "ANALISTA DE SUPORTE", "ANALISTA FINANCEIRO PLENO", "ASSISTENTE DE COMPRAS", "ATENDIMENTO AO CLIENTE", "AUXILIAR ADMINISTRATIVO", "AUXILIAR ALMOXARIFE", "AUXILIAR FINANCEIRO", "DESIGN GRÁFICO I", "GERENTE DE INFRA. DE TECNOLOGIA", "GERENTE DE REDES EXTERNO", "GERENTE DE SUPORTE TÉCNICO E TECNOLOGIA", "INSTALADOR REPARADOR", "LÍDER DE VENDAS", "MONTADOR DE EQUIPAMENTOS ELETRÔNICOS", "MOTORISTA DE FURGÃO", "SUPERVISOR DE ATENDIMENTO", "SUPERVISOR DE MONTAGEM E INSTALAÇÃO", "CONSULTOR DE VENDAS", "AUXILIAR DE MARKETING", "SERVICE DESK", "EXECUTIVO", "AUXILIAR DE INSTALAÇÃO"];
   var INSTRUCAO = ['Superior Completo','Superior Incompleto','Ensino Médio Completo','Ensino Médio Incompleto','Ensino Fundamental Completo','Ensino Fundamental Incompleto'];
   var MAX_MB = 10;
   /* ====================================== */
