@@ -192,7 +192,31 @@
     btn.disabled=true;btn.textContent='Enviando...';
     try{
       var data=await b64(f);
+      var call=async function(m,body){
+        var r=await fetch(WEBHOOK+m+'.json',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        var j=await r.json();
+        if(!r.ok||j.error)throw new Error(j.error_description||j.error||('HTTP '+r.status));
+        return j;
+      };
+
+      /* 1) Contato (cliente): reaproveita se já existe um com o mesmo e-mail */
+      var contactId=null;
+      try{
+        var dup=await call('crm.duplicate.findbycomm',{type:'EMAIL',values:[val('email')],entity_type:'CONTACT'});
+        if(dup.result&&dup.result.CONTACT&&dup.result.CONTACT.length)contactId=dup.result.CONTACT[0];
+        if(!contactId){
+          var c=await call('crm.contact.add',{fields:{
+            NAME:val('nome'),OPENED:'Y',
+            PHONE:[{VALUE:val('telefone'),VALUE_TYPE:'WORK'}],
+            EMAIL:[{VALUE:val('email'),VALUE_TYPE:'WORK'}]
+          }});
+          contactId=c.result;
+        }
+      }catch(ce){console.error('contato',ce)}
+
+      /* 2) Card do SPA vinculado ao contato */
       var fields={title:'Candidatura - '+val('nome')+' - '+val('vaga')};
+      if(contactId)fields.contactId=contactId;
       if(CATEGORY_ID!==null)fields.categoryId=CATEGORY_ID;
       var put=function(k,v){if(FIELDS[k])fields[FIELDS[k]]=v};
       put('nome',val('nome'));put('telefone',val('telefone'));put('email',val('email'));
@@ -201,10 +225,7 @@
       put('instrucao',mapVal('instrucao',val('instrucao')));
       put('curriculo',[f.name,data]);
 
-      var r=await fetch(WEBHOOK+'crm.item.add.json',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({entityTypeId:ENTITY_TYPE_ID,fields:fields})});
-      var j=await r.json();
-      if(!r.ok||j.error)throw new Error(j.error_description||j.error||('HTTP '+r.status));
+      var j=await call('crm.item.add',{entityTypeId:ENTITY_TYPE_ID,fields:fields});
       $('#nx-formbox').style.display='none';$('#nx-done').style.display='block';
       R.scrollIntoView({behavior:'smooth'});
     }catch(err){
