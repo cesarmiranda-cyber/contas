@@ -17,6 +17,10 @@ class Stale extends Error {}
 const gen = { n: 0 };
 async function vapi(url) { const g = gen.n; const r = await api(url); if (g !== gen.n) throw new Stale(); return r; }
 window.addEventListener('unhandledrejection', e => { if (e.reason instanceof Stale) e.preventDefault(); });
+// Acompanha uma tarefa em segundo plano consultando a cada 2 s; `vivo()` falso (a pessoa saiu da tela) encerra a consulta.
+async function acompanhaJob(nome, aoAtualizar, vivo) {
+  for (;;) { const j = await api('/api/jobs/' + nome); if (!vivo()) return null; aoAtualizar(j); if (j.status !== 'rodando') return j; await esperar(2000); }
+}
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 // Mensagem de erro legível: o app responde {error:"texto"}; o gateway da plataforma pode responder {error:{code,message}} ou uma página HTML.
 const msgErro = (j, status) => { const e = j && j.error; const t = typeof e === 'string' ? e : (e && (e.message || e.code)) || (j && typeof j.message === 'string' ? j.message : ''); return String(t || `Erro ${status}`).slice(0, 300); };
@@ -426,10 +430,9 @@ async function telaCfg() {
   $('#c_save').onclick = async () => { try { await salvar(); S.eu = await api('/api/eu'); toast('Configurações salvas'); } catch (e) { falha(e); } };
   if ($('#c_mapa')) $('#c_mapa').onclick = async () => { try { const fila = {}, visita = {}; document.querySelectorAll('[data-mapa]').forEach(x => { if (x.value) fila[x.dataset.mapa] = x.value; }); document.querySelectorAll('[data-mapav]').forEach(x => { if (x.value) visita[x.dataset.mapav] = x.value; }); await api('/api/config', 'PUT', { mapa: { fila, visita } }); toast('Mapeamento salvo'); telaCfg(); } catch (e) { falha(e); } };
   if ($('#c_diag')) {
-    const rodarDiag = async () => {
-      const o = $('#diag_out'), b = $('#c_diag'); b.disabled = true; o.innerHTML = '<div class="sk" style="height:90px"></div>';
-      try {
-        const d = await api('/api/diagnostico-datas'), n = x => Number(x).toLocaleString('pt-BR');
+    const o = $('#diag_out'), b = $('#c_diag'), vivo = () => document.body.contains(o);
+    const mostra = (d, fim) => {
+        const n = x => Number(x).toLocaleString('pt-BR');
         o.innerHTML = `<div class="mut" style="margin-bottom:8px">${n(d.empresas)} empresas lidas · regra "só com Última visita": <b>${d.exigirUltimaVisita ? 'ligada' : 'desligada'}</b> · intervalos do app: A ${d.intervalosDoApp.A}d, B ${d.intervalosDoApp.B}d, C ${d.intervalosDoApp.C}d, E ${d.intervalosDoApp.E} meses</div>` + d.segmentos.map(s => `<div class="sec" style="box-shadow:none;margin:0 0 10px"><h3>${esc(s.nome)}</h3>
           <div class="mut">Campos lidos — vendedor: ${esc(s.campos.vendedor.join(' | ') || 'nenhum')} · classe: ${esc(s.campos.classe.join(' | ') || 'nenhum')} · última: ${esc(s.campos.ultima.join(' | ') || 'nenhum')} · próxima: ${esc(s.campos.proxima.join(' | ') || 'nenhum')}</div>
           <div class="scroll" style="margin:8px 0"><table><tbody>
@@ -443,15 +446,34 @@ async function telaCfg() {
           <div class="mut"><b>Intervalo mais comum entre última e próxima (dias), por classe:</b> ${Object.entries(s.intervalosObservados).map(([c, l]) => `Classe ${esc(c)}: ${l.map(x => `${x.dias}d (${n(x.empresas)})`).join(', ')}`).join(' · ') || 'sem dados'}</div>
           ${s.exemplos.semUltima.length ? `<div class="mut" style="margin-top:6px"><b>Exemplos sem última visita:</b> ${s.exemplos.semUltima.map(esc).join('; ')}</div>` : ''}
           ${s.exemplos.inconsistentes.length ? `<div class="mut" style="margin-top:6px"><b>Exemplos de datas inconsistentes:</b> ${s.exemplos.inconsistentes.map(esc).join('; ')}</div>` : ''}</div>`).join('');
-      } catch (e) { o.innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; }
-      b.disabled = false;
+      o.insertAdjacentHTML('beforeend', `<div class="mut" style="margin-top:8px">Gerado às ${new Date(fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}. Rode de novo para atualizar.</div>`);
     };
-    $('#c_diag').onclick = rodarDiag;
-    if (S.irDiag) { S.irDiag = false; $('#sec_diag').scrollIntoView(); rodarDiag(); }
+    const progresso = j => `<div class="aviso">${ico('inbox')}<div><b>Executando há ${j.segundos}s</b> — ${esc(j.passo || 'trabalhando…')}<div class="mut">Pode continuar usando o app: o diagnóstico roda em segundo plano e esta tela acompanha sozinha.</div></div></div>`;
+    const rodarDiag = async retomar => {
+      b.disabled = true; o.innerHTML = progresso({ segundos: 0, passo: 'Iniciando…' });
+      try {
+        if (!retomar) await api('/api/jobs/diagnostico', 'POST', {});
+        const j = await acompanhaJob('diagnostico', x => { if (x.status === 'rodando') o.innerHTML = progresso(x); }, vivo);
+        if (!j) return;
+        if (j.status === 'concluido') mostra(j.resultado, j.fim); else o.innerHTML = `<div class="aviso erro">${esc(j.erro || 'O diagnóstico não terminou.')}</div>`;
+      } catch (e) { if (vivo()) o.innerHTML = `<div class="aviso erro">${esc(e.message)}</div>`; }
+      finally { if (vivo()) b.disabled = false; }
+    };
+    $('#c_diag').onclick = () => rodarDiag(false);
+    api('/api/jobs/diagnostico').then(j => { if (!vivo() || S.irDiag) return; if (j.status === 'concluido') mostra(j.resultado, j.fim); else if (j.status === 'rodando') rodarDiag(true); }).catch(() => {});
+    if (S.irDiag) { S.irDiag = false; $('#sec_diag').scrollIntoView(); rodarDiag(false); }
   }
   $('#c_whb').onclick = async () => { try { await api('/api/webhook', 'PUT', { webhook: $('#c_wh').value }); S.eu = await api('/api/eu'); toast('Webhook salvo e testado'); telaCfg(); } catch (e) { falha(e); } };
-  const rodar = (id, url, body) => $(id).onclick = async ev => { ev.target.disabled = true; $('#c_out').textContent = 'Executando…'; try { await salvar(); $('#c_out').textContent = JSON.stringify(await api(url, 'POST', body), null, 2); } catch (e) { $('#c_out').textContent = e.message; } ev.target.disabled = false; };
-  rodar('#c_prev', '/api/sincronizar', { previa: true }); rodar('#c_sync', '/api/sincronizar', { forcar: true }); rodar('#c_prep', '/api/preparar', {});
+  const rodar = (id, nome, body) => $(id).onclick = async ev => {
+    const btn = ev.target, out = $('#c_out'), vivo = () => document.body.contains(out); btn.disabled = true; out.textContent = 'Iniciando…';
+    try {
+      await salvar(); await api('/api/jobs/' + nome, 'POST', body);
+      const j = await acompanhaJob(nome, x => { if (x.status === 'rodando') out.textContent = `Executando há ${x.segundos}s… ${x.passo || ''} (roda em segundo plano; pode continuar usando o app)`; }, vivo);
+      if (j) out.textContent = j.status === 'concluido' ? JSON.stringify(j.resultado, null, 2) : (j.erro || 'Falhou.');
+    } catch (e) { if (vivo()) out.textContent = e.message; }
+    if (document.body.contains(btn)) btn.disabled = false;
+  };
+  rodar('#c_prev', 'sincronizar', { previa: true }); rodar('#c_sync', 'sincronizar', { forcar: true }); rodar('#c_prep', 'preparar', {});
 }
 
 (async () => {

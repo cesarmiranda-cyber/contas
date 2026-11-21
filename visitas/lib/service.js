@@ -646,8 +646,12 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     };
   }
   // Diagnóstico (somente leitura) de como as datas de visita estão no cadastro das empresas.
-  async function diagnosticoDatas() {
-    const m = await modelo(true), h = hoje(), [emps, cards] = await Promise.all([empresasSync(m), cardsTodos(m)]);
+  async function diagnosticoDatas(passo = () => {}) {
+    passo('Lendo o mapeamento de campos…');
+    const m = await modelo(true), h = hoje();
+    passo('Lendo empresas e cards do Bitrix24 (pode levar alguns minutos em bases grandes)…');
+    const [emps, cards] = await Promise.all([empresasSync(m), cardsTodos(m)]);
+    passo(`Analisando ${emps.length} empresas…`);
     const porChave = new Map(); for (const c of cards) { const k = `${c.empresaId}|${R.norm(c.segmento)}`; (porChave.get(k) || porChave.set(k, []).get(k)).push(c); }
     const nome = id => m.empresa.rotulos?.[id] || id, ex = (l, t) => { if (l.length < 6) l.push(t); };
     const segmentos = Object.entries(m.empresa.segmentos).map(([k, s]) => {
