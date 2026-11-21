@@ -87,6 +87,7 @@ const CFG_CAMPOS = {
   supervisoresDepts: v => ids(v), supervisoresExtras: v => ids(v), verTudo: v => ids(v), admins: v => ids(v), podeExcluir: v => ids(v),
   motivosNaoRealizada: v => (Array.isArray(v) ? v.map(x => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 30) : []),
   deptsAcesso: v => ids(v),
+  mapa: v => ({ fila: Object.fromEntries(require('./lib/fields').CAMPOS_AJUSTAVEIS.filter(k => /^[A-Za-z0-9_]{1,80}$/.test(v?.fila?.[k] || '')).map(k => [k, v.fila[k]])) }),
   visibilidade: v => (v === 'bitrix' ? 'bitrix' : 'app'),
 };
 const ids = v => (Array.isArray(v) ? v.map(String).filter(x => /^\d{1,12}$/.test(x)).slice(0, 500) : []);
@@ -99,7 +100,7 @@ const routes = {
     const p = {}; for (const [k, f] of Object.entries(CFG_CAMPOS)) if (body[k] !== undefined) p[k] = f(body[k]);
     if (p.cargosFila && !p.cargosFila.length) throw bad(400, 'Escolha ao menos um cargo que gera fila.');
     if (p.motivosNaoRealizada && !p.motivosNaoRealizada.length) throw bad(400, 'Mantenha ao menos um motivo.');
-    svc.invalidar();
+    svc.invalidar(); if (body.mapa !== undefined) svc.resetModelo();
     store.log('config', `Configuração alterada por ${user.nome || user.id}: ${Object.keys(p).join(', ')}`);
     return store.setConfig(p);
   },

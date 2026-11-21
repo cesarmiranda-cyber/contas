@@ -7,7 +7,7 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const ETAPAS = { NEW: 'Aguardando', PREPARATION: 'Dia da visita', LATE: 'Atrasada', ENC: 'Encerrado', NAOREAL: 'Não realizada', SUCCESS: 'Finalizado', OUTRA: 'Outra etapa', FAIL: 'Removido' };
 const COLS = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL', 'SUCCESS', 'OUTRA'];
 const nomeEtapa = i => (i.etapa === 'OUTRA' && i.etapaNome) || ETAPAS[i.etapa] || i.etapa;
-const S = { page: 1, size: 50, total: 0, pages: 1, eu: null, aba: 'fila', vista: 'cards', f: { de: '', ate: '', segmento: '', vendedor: '', classe: '', etapa: '', supervisor: '' }, itens: [], sel: new Set(), dashPag: 'fila', cfg: null };
+const S = { page: 1, size: 30, total: 0, pages: 1, eu: null, aba: 'fila', vista: 'cards', f: { de: '', ate: '', segmento: '', vendedor: '', classe: '', etapa: '', supervisor: '' }, itens: [], sel: new Set(), dashPag: 'fila', cfg: null };
 try { Object.assign(S.f, JSON.parse(localStorage.getItem('vis.f') || '{}')); S.vista = localStorage.getItem('vis.v') || 'cards'; } catch {}
 const dtBR = d => (d ? d.slice(0, 10).split('-').reverse().join('/') : '—');
 const dthBR = d => (d ? `${dtBR(d)} ${d.length > 10 ? d.slice(11, 16) : ''}` : '—');
@@ -49,71 +49,124 @@ async function render() {
 }
 
 // ----- Registro de Visitas -----
+const ABERTA = ['NEW', 'PREPARATION', 'LATE'];
+const PIOR = ['LATE', 'PREPARATION', 'NEW', 'NAOREAL', 'ENC', 'SUCCESS', 'OUTRA'];
+S.agrupar = localStorage.getItem('vis.g') !== '0'; S.q = ''; S.kan = {}; S.size = 30;
 async function telaFila() {
   gen.n++; const app = $('#app');
   if (!$('#fil')) {
     app.innerHTML = `<div class="kpis" id="kpis"></div><div class="filtros" id="fil"></div><div id="lista"><div class="grid">${'<div class="sk"></div>'.repeat(6)}</div></div>`;
   } else $('#lista').classList.add('busy');
-  const f = S.f;
-  const q = new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), page: S.page, pageSize: S.vista === 'kanban' ? 200 : S.size }).toString();
+  const f = S.f, kan = S.vista === 'kanban';
+  const q = new URLSearchParams(Object.entries({ ...f, q: S.q, agrupar: S.agrupar && !kan ? '1' : '', all: kan ? '1' : '', page: S.page, pageSize: S.size }).filter(([, v]) => v !== '' && v !== undefined)).toString();
   const r = await vapi('/api/visitas?' + q);
-  S.itens = r.itens; S.total = r.total; S.pages = r.pages; S.page = r.page; S.porEtapa = r.porEtapa || {};
+  S.itens = r.itens; S.total = r.total; S.grupos = r.totalGrupos; S.pages = r.pages; S.page = r.page; S.porEtapa = r.porEtapa || {};
   S.segs = new Set([...(S.segs || []), ...S.itens.map(i => i.segmento).filter(Boolean)]); S.vends = new Map([...(S.vends || []), ...S.itens.map(i => [i.vendedorId, i.vendedor])]); S.hoje = r.hoje;
   const uniq = () => [...S.segs].sort();
   const op = (k, arr, lab = x => x) => `<option value="">Todos</option>` + arr.map(x => `<option value="${esc(x[0] ?? x)}" ${f[k] === String(x[0] ?? x) ? 'selected' : ''}>${esc(lab(x[1] ?? x))}</option>`).join('');
-  const vend = [...S.vends.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  const vend = [...S.vends.entries()].map(([id, n]) => [id || 'sem', n]).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  const foco = document.activeElement?.id === 'f_q' ? document.activeElement.selectionStart : null;
   $('#fil').innerHTML = `
+    <label class="busca">Cliente<input type="search" id="f_q" placeholder="Buscar cliente ou segmento…" value="${esc(S.q)}"></label>
     <label>De<input type="date" id="f_de" value="${esc(f.de)}"></label><label>Até<input type="date" id="f_ate" value="${esc(f.ate)}"></label>
     <label>Segmento<select id="f_segmento">${op('segmento', uniq())}</select></label>
     <label>Vendedor<select id="f_vendedor">${op('vendedor', vend)}</select></label>
     <label>Classe<select id="f_classe">${op('classe', ['A', 'B', 'C', 'E'])}</select></label>
     <label>Etapa<select id="f_etapa">${op('etapa', COLS.map(c => [c, ETAPAS[c]]))}</select></label>
-    <div class="count">${S.total} visita(s)</div><div class="spacer seg">${[['cards', 'Cartões'], ['tabela', 'Tabela'], ['kanban', 'Kanban']].map(([k, n]) => `<button class="btn ${S.vista === k ? 'on' : ''}" data-v="${k}">${n}</button>`).join('')}</div>
-    ${S.eu.podeExcluir ? '<button class="btn" id="b_excl">Excluídos</button>' : ''}`;
+    <div class="fim"><span class="count">${S.total} visita(s) · ${S.grupos} cliente(s)</span>
+      <label class="sw ${kan ? 'off' : ''}" title="${kan ? 'No Kanban os segmentos do mesmo cliente já ficam juntos em cada coluna' : ''}"><input type="checkbox" id="f_g" ${S.agrupar ? 'checked' : ''} ${kan ? 'disabled' : ''}> Agrupar por cliente</label>
+      <div class="seg">${[['cards', 'Cartões'], ['tabela', 'Tabela'], ['kanban', 'Kanban']].map(([k, n]) => `<button class="btn ${S.vista === k ? 'on' : ''}" data-v="${k}">${n}</button>`).join('')}</div>
+      ${S.eu.podeExcluir ? '<button class="btn" id="b_excl">Excluídos</button>' : ''}</div>`;
+  if (foco !== null) { const el = $('#f_q'); el.focus(); el.setSelectionRange(foco, foco); }
   ['de', 'ate', 'segmento', 'vendedor', 'classe', 'etapa'].forEach(k => $('#f_' + k).onchange = e => { S.page = 1; f[k] = e.target.value; localStorage.setItem('vis.f', JSON.stringify({ ...f, de: '', ate: '' })); telaFila(); });
-  document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { S.page = 1; S.vista = b.dataset.v; localStorage.setItem('vis.v', S.vista); telaFila(); });
+  let tq; $('#f_q').oninput = e => { clearTimeout(tq); tq = setTimeout(() => { S.q = e.target.value; S.page = 1; telaFila().catch(falha); }, 350); };
+  $('#f_g').onchange = e => { S.agrupar = e.target.checked; localStorage.setItem('vis.g', S.agrupar ? '1' : '0'); S.page = 1; telaFila(); };
+  document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { S.page = 1; S.vista = b.dataset.v; S.kan = {}; localStorage.setItem('vis.v', S.vista); telaFila(); });
   if ($('#b_excl')) $('#b_excl').onclick = telaExcluidos;
   $('#kpis').innerHTML = ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'].map(c => `<button class="kpi-t ${f.etapa === c ? 'on' : ''}" data-e="${c}" data-kpi="${c}"><b>${S.porEtapa[c] || 0}</b><span>${ETAPAS[c]}</span></button>`).join('');
   document.querySelectorAll('[data-kpi]').forEach(b => b.onclick = () => { f.etapa = f.etapa === b.dataset.kpi ? '' : b.dataset.kpi; S.page = 1; telaFila(); });
   $('#lista').classList.remove('busy');
   desenhaLista();
 }
-function acoesCard(i) {
-  const a = [];
-  if (['NEW', 'PREPARATION', 'LATE'].includes(i.etapa)) a.push(`<button class="btn pri sm" data-a="reg" data-id="${i.id}">Registrar visita</button><button class="btn sm" data-a="alt" data-id="${i.id}">Alterar data</button><button class="btn sm" data-a="nao" data-id="${i.id}">Não realizada</button>`);
-  if (i.etapa === 'ENC') a.push(`<button class="btn sm" data-a="ver" data-id="${i.id}">Ver registro</button><button class="btn sm" data-a="edit" data-id="${i.id}">✎ Editar</button>`);
-  if (i.reprogramado && ['NEW', 'PREPARATION', 'LATE'].includes(i.etapa)) a.push(`<button class="btn sm" data-a="rev" data-id="${i.id}">Reverter data</button>`);
-  if (i.podeExcluir && i.etapa !== 'FAIL') a.push(`<button class="btn sm bad" data-a="del" data-id="${i.id}">Excluir</button>`);
-  return a.join('');
+// Ações de uma linha: a principal à vista e as demais num menu "⋯".
+function acoesLinha(i) {
+  const abre = ABERTA.includes(i.etapa), b = (a, t, c = '') => `<button class="btn sm ${c}" data-a="${a}" data-id="${i.id}">${t}</button>`;
+  const sec = [];
+  if (abre) sec.push(b('alt', 'Alterar data'), b('nao', 'Não realizada'));
+  if (i.etapa === 'ENC') sec.push(b('edit', '✎ Editar registro'));
+  if (i.reprogramado && abre) sec.push(b('rev', 'Reverter data'));
+  if (i.podeExcluir && i.etapa !== 'FAIL') sec.push(b('del', 'Excluir', 'bad'));
+  const prim = abre ? b('reg', 'Registrar', 'pri') : i.etapa === 'ENC' ? b('ver', 'Ver registro') : '';
+  return `${prim}${sec.length ? `<details class="menu"><summary class="btn sm" aria-label="Mais ações">⋯</summary><div class="menu-p">${sec.join('')}</div></details>` : ''}`;
 }
-function cardHtml(i) {
-  const r = rel(i.data, S.hoje);
-  return `<article class="card" data-e="${i.etapa}"><div class="card-h"><h3>${esc(i.empresa)}</h3><span class="tag" data-e="${i.etapa}">${esc(nomeEtapa(i))}</span></div>
-    <div class="meta"><span class="cls ${esc(i.classe)}" title="Classe ${esc(i.classe || '—')}">${esc(i.classe || '–')}</span><span>${esc(i.segmento)}</span><span class="who"><span class="av">${esc(ini(i.vendedor))}</span>${esc(i.vendedor)}</span></div>
-    <div class="when">${ico('cal')}${dtBR(i.data)}${r ? ` <span class="mut">${r}</span>` : ''}${i.atrasoDias ? ` <span class="tag bad">${i.atrasoDias} dia(s) de atraso</span>` : ''}${i.reprogramado ? ' <span class="tag warn">data alterada</span>' : ''}</div>
+function linhaHtml(i, kan) {
+  const r = rel(i.data, S.hoje), abre = ABERTA.includes(i.etapa);
+  return `<div class="srow" data-e="${i.etapa}" data-id="${i.id}" ${abre && kan ? 'draggable="true"' : ''}>
+    <div class="srow-t"><span class="segn">${esc(i.segmento || '—')}</span><span class="cls ${esc(i.classe)}" title="Classe ${esc(i.classe || '—')}">${esc(i.classe || '–')}</span>${kan ? '' : `<span class="tag" data-e="${i.etapa}">${esc(nomeEtapa(i))}</span>`}</div>
+    <div class="srow-s"><span class="who"><span class="av">${esc(ini(i.vendedor))}</span>${esc(i.vendedor)}</span><span class="dt">${ico('cal')}${dtBR(i.data)}${r ? ` <span class="mut">${r}</span>` : ''}</span>${i.atrasoDias ? `<span class="tag bad">${i.atrasoDias}d de atraso</span>` : ''}${i.reprogramado ? '<span class="tag warn">data alterada</span>' : ''}</div>
     ${i.etapa === 'NAOREAL' && i.motivo ? `<div class="mut">Motivo: ${esc(i.motivo)}${i.detalhe ? ' — ' + esc(i.detalhe) : ''}</div>` : ''}
-    <div class="acoes">${acoesCard(i)}</div></article>`;
+    <div class="srow-a">${acoesLinha(i)}</div></div>`;
+}
+const agrupaItens = it => { const m = new Map(); for (const i of it) (m.get(i.empresaId) || m.set(i.empresaId, []).get(i.empresaId)).push(i); return [...m.values()]; };
+const piorEtapa = g => PIOR.find(e => g.some(i => i.etapa === e)) || g[0].etapa;
+const rotGrupo = g => { const n = new Set(g.map(i => i.segmento)).size; return g.length > 1 ? `<span class="tag plain neutro">${n > 1 ? n + ' segmentos' : g.length + ' visitas'}</span>` : ''; };
+function grupoHtml(g, kan) {
+  return `<article class="card grp" data-e="${piorEtapa(g)}"><div class="card-h"><h3>${esc(g[0].empresa)}</h3>${rotGrupo(g)}</div><div class="srows">${g.map(i => linhaHtml(i, kan)).join('')}</div></article>`;
 }
 function pager() {
-  if (S.pages <= 1 && S.total <= 50) return '';
-  return `<div class="filtros" style="justify-content:center;margin-top:12px"><button class="btn sm" data-pg="-1" ${S.page <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">Página ${S.page} de ${S.pages}</span><button class="btn sm" data-pg="1" ${S.page >= S.pages ? 'disabled' : ''}>Próxima ›</button>
-    ${S.vista !== 'kanban' ? `<select id="pg_size" aria-label="Itens por página">${[25, 50, 100, 200].map(n => `<option ${n === S.size ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}</div>`;
+  if (S.pages <= 1 && S.vista === 'kanban') return '';
+  if (S.vista === 'kanban') return '';
+  return `<div class="filtros pg"><button class="btn sm" data-pg="-1" ${S.page <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">Página ${S.page} de ${S.pages}</span><button class="btn sm" data-pg="1" ${S.page >= S.pages ? 'disabled' : ''}>Próxima ›</button>
+    <select id="pg_size" aria-label="Por página">${[15, 30, 60, 100].map(n => `<option ${n === S.size ? 'selected' : ''} value="${n}">${n} ${S.agrupar ? 'clientes' : 'itens'}</option>`).join('')}</select></div>`;
 }
 function ligaPager(L) {
   L.querySelectorAll('[data-pg]').forEach(b => b.onclick = () => { S.page += +b.dataset.pg; telaFila(); window.scrollTo(0, 0); });
   if ($('#pg_size')) $('#pg_size').onchange = e => { S.size = +e.target.value; S.page = 1; telaFila(); };
 }
+function kanbanHtml(it) {
+  const cols = COLS.filter(c => ['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'].includes(c) || it.some(i => i.etapa === c));
+  return `<div class="kdica">${ico('pin')} Arraste um item para outra coluna: <b>Encerrado</b> abre o registro, <b>Não realizada</b> pede o motivo, <b>Aguardando / Dia da visita</b> altera a data${S.eu.podeExcluir ? ' e a faixa inferior exclui' : ''}.</div>
+  <div class="kanban">${cols.map(c => { const gs = agrupaItens(it.filter(i => i.etapa === c)), lim = S.kan[c] || 20;
+    return `<div class="col" data-e="${c}" data-col="${c}"><h4>${ETAPAS[c]} <b>${gs.reduce((n, g) => n + g.length, 0)}</b></h4><div class="colb">${gs.slice(0, lim).map(g => grupoHtml(g, true)).join('') || '<div class="mut" style="padding:10px">Vazio</div>'}${gs.length > lim ? `<button class="btn sm" data-mais="${c}">Ver mais (${gs.length - lim})</button>` : ''}</div></div>`; }).join('')}</div>`;
+}
+function tabelaHtml(it) {
+  const linha = (i, mostraEmpresa) => `<tr data-e="${i.etapa}"><td>${ABERTA.includes(i.etapa) ? `<input type="checkbox" data-sel="${i.id}" ${S.sel.has(i.id) ? 'checked' : ''} aria-label="Selecionar">` : ''}</td><td>${mostraEmpresa ? `<b>${esc(i.empresa)}</b> <span class="mut">${esc(i.segmento)}</span>` : `<span class="segn">${esc(i.segmento || '—')}</span>`}</td><td><span class="cls ${esc(i.classe)}">${esc(i.classe || '–')}</span></td><td>${esc(i.vendedor)}</td><td style="white-space:nowrap">${dtBR(i.data)} <span class="mut">${rel(i.data, S.hoje)}</span></td><td><span class="tag" data-e="${i.etapa}">${esc(nomeEtapa(i))}</span></td><td><div class="srow-a" style="justify-content:flex-end">${acoesLinha(i)}</div></td></tr>`;
+  const corpo = S.agrupar ? agrupaItens(it).map(g => `<tr class="gh"><td colspan="7"><b>${esc(g[0].empresa)}</b> ${rotGrupo(g)}</td></tr>${g.map(i => linha(i, false)).join('')}`).join('') : it.map(i => linha(i, true)).join('');
+  return `<div style="margin-bottom:10px"><button class="btn" id="b_grupo" disabled>Alterar data dos selecionados</button></div><div class="scroll"><table class="tbl"><thead><tr><th></th><th>${S.agrupar ? 'Segmento' : 'Cliente'}</th><th>Classe</th><th>Vendedor</th><th>Data</th><th>Etapa</th><th></th></tr></thead><tbody>${corpo}</tbody></table></div>`;
+}
 function desenhaLista() {
   const L = $('#lista'), it = S.itens;
   if (!it.length) { L.innerHTML = `<div class="vazio">${ico('inbox')}<b>Nenhuma visita encontrada</b><div>Ajuste os filtros ou rode a sincronização em Configurações.</div></div>`; return; }
-  if (S.vista === 'cards') L.innerHTML = `<div class="grid">${it.map(cardHtml).join('')}</div>`;
-  else if (S.vista === 'kanban') L.innerHTML = `<div class="kanban">${COLS.filter(c => c.length && (['NEW', 'PREPARATION', 'LATE', 'ENC', 'NAOREAL'].includes(c) || it.some(i => i.etapa === c))).map(c => `<div class="col" data-e="${c}"><h4>${ETAPAS[c]} <b>${S.porEtapa[c] ?? it.filter(i => i.etapa === c).length}</b></h4>${it.filter(i => i.etapa === c).map(cardHtml).join('')}</div>`).join('')}</div>`;
-  else L.innerHTML = `<div style="margin-bottom:10px"><button class="btn" id="b_grupo" disabled>Alterar data dos selecionados</button></div><div class="scroll"><table><thead><tr><th></th><th>Empresa</th><th>Segmento</th><th>Classe</th><th>Vendedor</th><th>Data</th><th>Etapa</th><th></th></tr></thead><tbody>${it.map(i => `<tr><td>${['NEW', 'PREPARATION', 'LATE'].includes(i.etapa) ? `<input type="checkbox" data-sel="${i.id}" ${S.sel.has(i.id) ? 'checked' : ''}>` : ''}</td><td>${esc(i.empresa)}</td><td>${esc(i.segmento)}</td><td>${esc(i.classe)}</td><td>${esc(i.vendedor)}</td><td>${dtBR(i.data)}</td><td><span class="tag" data-e="${i.etapa}">${esc(nomeEtapa(i))}</span></td><td><div class="acoes">${acoesCard(i)}</div></td></tr>`).join('')}</tbody></table></div>`;
+  if (S.vista === 'cards') L.innerHTML = `<div class="grid">${(S.agrupar ? agrupaItens(it) : it.map(i => [i])).map(g => grupoHtml(g, false)).join('')}</div>`;
+  else if (S.vista === 'kanban') L.innerHTML = kanbanHtml(it);
+  else L.innerHTML = tabelaHtml(it);
   L.insertAdjacentHTML('beforeend', pager()); ligaPager(L);
-  L.querySelectorAll('[data-a]').forEach(b => b.onclick = () => acao(b.dataset.a, +b.dataset.id));
+  L.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { b.closest('details')?.removeAttribute('open'); acao(b.dataset.a, +b.dataset.id); });
   L.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { c.checked ? S.sel.add(+c.dataset.sel) : S.sel.delete(+c.dataset.sel); if ($('#b_grupo')) $('#b_grupo').disabled = !S.sel.size; });
   if ($('#b_grupo')) { $('#b_grupo').disabled = !S.sel.size; $('#b_grupo').onclick = () => modalAlterar([...S.sel]); }
+  L.querySelectorAll('[data-mais]').forEach(b => b.onclick = () => { S.kan[b.dataset.mais] = (S.kan[b.dataset.mais] || 20) + 25; desenhaLista(); });
+  if (S.vista === 'kanban') ligaKanban(L);
 }
+// Arrastar e soltar no Kanban: a coluna de destino decide a ação (mesmas regras dos botões).
+function ligaKanban(L) {
+  let zona = $('#kdel'); zona?.remove();
+  if (S.eu.podeExcluir) { zona = document.createElement('div'); zona.id = 'kdel'; zona.className = 'kdel'; zona.textContent = 'Solte aqui para excluir'; document.body.append(zona); }
+  const fim = () => { document.body.classList.remove('arrastando'); document.querySelectorAll('.over').forEach(x => x.classList.remove('over')); };
+  L.querySelectorAll('.srow[draggable]').forEach(r => { r.ondragstart = e => { e.dataTransfer.setData('text/plain', r.dataset.id); e.dataTransfer.effectAllowed = 'move'; r.classList.add('drag'); document.body.classList.add('arrastando'); }; r.ondragend = () => { r.classList.remove('drag'); fim(); }; });
+  L.querySelectorAll('[data-col]').forEach(c => { c.ondragover = e => { e.preventDefault(); c.classList.add('over'); }; c.ondragleave = () => c.classList.remove('over'); c.ondrop = e => { e.preventDefault(); const id = +e.dataTransfer.getData('text/plain'); fim(); soltar(id, c.dataset.col); }; });
+  if (zona) { zona.ondragover = e => { e.preventDefault(); zona.classList.add('over'); }; zona.ondragleave = () => zona.classList.remove('over'); zona.ondrop = e => { e.preventDefault(); const id = +e.dataTransfer.getData('text/plain'); fim(); acao('del', id); }; }
+}
+function soltar(id, destino) {
+  const i = S.itens.find(x => x.id === id);
+  if (!i || i.etapa === destino) return;
+  if (!ABERTA.includes(i.etapa)) return toast('Só visitas abertas (Aguardando, Dia da visita ou Atrasada) podem ser movidas.');
+  if (destino === 'ENC') return formRegistro(id).catch(falha);
+  if (destino === 'NAOREAL') return modalNao(id).catch(falha);
+  if (destino === 'LATE') return toast('"Atrasada" é automática: acontece quando a data programada passa.');
+  if (destino === 'NEW' || destino === 'PREPARATION') return modalAlterar([id], destino === 'PREPARATION' ? S.hoje : '');
+  toast('Esse movimento não está disponível.');
+}
+document.addEventListener('click', e => { document.querySelectorAll('details.menu[open]').forEach(d => { if (!d.contains(e.target)) d.removeAttribute('open'); }); });
 async function acao(a, id) {
   const i = S.itens.find(x => x.id === id);
   try {
@@ -131,8 +184,8 @@ async function telaExcluidos() {
   modal(`<h2>Excluídos</h2>${r.itens.length ? `<table><tbody>${r.itens.map(i => `<tr><td>${esc(i.empresa)}<div class="mut">${esc(i.segmento)} · ${dtBR(i.data)}</div></td><td><button class="btn sm" data-r="${i.id}">Restaurar</button></td></tr>`).join('')}</tbody></table>` : '<div class="vazio">Nada excluído.</div>'}<div class="foot"><button class="btn" data-close>Fechar</button></div>`,
     (bg, close) => bg.querySelectorAll('[data-r]').forEach(b => b.onclick = async () => { try { await api(`/api/cards/${b.dataset.r}/restaurar`, 'POST', {}); toast('Card restaurado'); close(); telaFila(); } catch (e) { falha(e); } }));
 }
-function modalAlterar(ids) {
-  modal(`<h2>Alterar visita</h2><div class="mut">${ids.length} card(s)</div><div class="f"><span>Nova data</span><input type="date" id="a_data"></div><div class="f"><span>Motivo (obrigatório; classe E é livre)</span><textarea id="a_mot" rows="3"></textarea></div><div class="foot"><button class="btn" data-close>Cancelar</button><button class="btn pri" id="a_ok">Salvar</button></div>`,
+function modalAlterar(ids, dataPadrao = '') {
+  modal(`<h2>Alterar visita</h2><div class="mut">${ids.length} card(s)</div><div class="f"><span>Nova data</span><input type="date" id="a_data" value="${esc(dataPadrao)}"></div><div class="f"><span>Motivo (obrigatório; classe E é livre)</span><textarea id="a_mot" rows="3"></textarea></div><div class="foot"><button class="btn" data-close>Cancelar</button><button class="btn pri" id="a_ok">Salvar</button></div>`,
     (bg, close) => bg.querySelector('#a_ok').onclick = async () => {
       const data = bg.querySelector('#a_data').value, motivo = bg.querySelector('#a_mot').value;
       try {
@@ -312,6 +365,9 @@ async function telaCfg() {
     ${depts.length ? `<div style="columns:2 260px;margin-top:6px">${(() => { const nivel = d => { let n = 0, x = d; while (x && x.pai && depts.find(y => y.id === x.pai) && n < 8) { x = depts.find(y => y.id === x.pai); n++; } return n; }; return depts.map(d => `<label style="display:block;padding-left:${nivel(d) * 16}px;break-inside:avoid"><input type="checkbox" name="c_dept" value="${esc(d.id)}" ${c.deptsAcesso.includes(d.id) ? 'checked' : ''}> ${esc(d.nome)}</label>`).join(''); })()}</div>` : '<div class="mut">Nenhum departamento encontrado (o webhook precisa da permissão department).</div>'}</div>
   ${[['verTudo', 'Quem vê tudo'], ['podeExcluir', 'Quem pode excluir'], ['admins', 'Acesso à configuração (além dos administradores do portal)'], ['supervisoresExtras', 'Supervisores (lista extra)']].map(([k, t]) => `<div class="sec"><h3>${t}</h3>${lista('l_' + k, c[k], nomes)}<div style="display:flex;gap:6px"><input id="q_${k}" placeholder="Buscar usuário (2+ letras)" style="flex:1"><select id="s_${k}" style="min-width:160px"></select><button class="btn" id="a_${k}">Adicionar</button></div></div>`).join('')}
   <div class="sec"><h3>Campos mapeados</h3>${!info ? '<div class="mut">Conecte o webhook primeiro.</div>' : info.erro ? `<div class="aviso erro">${esc(info.erro)}</div>` : `${info.faltando.length ? `<div class="aviso">Faltando:<br>${info.faltando.map(esc).join('<br>')}<br>Use “Preparar Bitrix” para criar o que for possível.</div>` : '<div>✅ Tudo mapeado.</div>'}<div class="scroll"><table><thead><tr><th>Segmento</th><th>Cargos</th><th>Classe</th><th>Próxima</th><th>Última</th></tr></thead><tbody>${info.segmentos.map(s => `<tr><td>${esc(s.nome)}${s.duplicados ? ' <span class="tag warn">campos duplicados</span>' : ''}</td><td>${s.cargos.map(esc).join(', ')}</td><td>${s.classe}</td><td>${s.proxima}</td><td>${s.ultima}</td></tr>`).join('')}</tbody></table></div>`}</div>
+  ${info && !info.erro && info.disponiveis ? `<div class="sec"><h3>Campos da Fila (SPA) usados pelo app</h3><div class="mut">O app acha os campos pelo nome. Se alguma coluna (ex.: a data) vier vazia, escolha aqui o campo certo do seu SPA.</div>
+    <div class="row2">${[['data', 'Data programada'], ['vendedor', 'Vendedor (campo do SPA; vazio = responsável do card)'], ['segmento', 'Segmento'], ['classe', 'Classe'], ['cargo', 'Cargo']].map(([k, t]) => `<label class="f"><span>${t} · detectado: <b>${esc(info.fila[k] || 'não encontrado')}</b></span><select data-mapa="${k}"><option value="">(automático)</option>${info.disponiveis.map(d => `<option value="${esc(d.key)}" ${info.mapa[k] === d.key ? 'selected' : ''}>${esc(d.label)} · ${esc(d.key)}${d.type ? ' (' + esc(d.type) + ')' : ''}</option>`).join('')}</select></label>`).join('')}</div>
+    <div class="foot" style="margin:12px 0 0;padding:0;background:none;border:0;position:static"><button class="btn pri" id="c_mapa">Salvar mapeamento</button></div></div>` : ''}
   <div class="sec"><h3>Log</h3><div class="scroll" style="max-height:260px;overflow:auto"><table><tbody>${log.map(l => `<tr><td>${dthBR(l.at)}</td><td>${esc(l.type)}</td><td>${esc(l.msg)}</td></tr>`).join('') || '<tr><td class="mut">Sem registros.</td></tr>'}</tbody></table></div></div>
   <div class="foot"><button class="btn pri" id="c_save">Salvar configurações</button></div>`;
   const draft = { verTudo: [...c.verTudo], podeExcluir: [...c.podeExcluir], admins: [...c.admins], supervisoresExtras: [...c.supervisoresExtras] };
@@ -329,6 +385,7 @@ async function telaCfg() {
       motivosNaoRealizada: $('#c_mot').value.split('\n') });
   };
   $('#c_save').onclick = async () => { try { await salvar(); S.eu = await api('/api/eu'); toast('Configurações salvas'); } catch (e) { falha(e); } };
+  if ($('#c_mapa')) $('#c_mapa').onclick = async () => { try { const fila = {}; document.querySelectorAll('[data-mapa]').forEach(x => { if (x.value) fila[x.dataset.mapa] = x.value; }); await api('/api/config', 'PUT', { mapa: { fila } }); toast('Mapeamento salvo'); telaCfg(); } catch (e) { falha(e); } };
   $('#c_whb').onclick = async () => { try { await api('/api/webhook', 'PUT', { webhook: $('#c_wh').value }); S.eu = await api('/api/eu'); toast('Webhook salvo e testado'); telaCfg(); } catch (e) { falha(e); } };
   const rodar = (id, url, body) => $(id).onclick = async ev => { ev.target.disabled = true; $('#c_out').textContent = 'Executando…'; try { await salvar(); $('#c_out').textContent = JSON.stringify(await api(url, 'POST', body), null, 2); } catch (e) { $('#c_out').textContent = e.message; } ev.target.disabled = false; };
   rodar('#c_prev', '/api/sincronizar', { previa: true }); rodar('#c_sync', '/api/sincronizar', { forcar: true }); rodar('#c_prep', '/api/preparar', {});

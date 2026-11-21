@@ -161,3 +161,43 @@ test('cache da lista: serve o antigo na hora após expirar, e uma gravação nun
     const depois = await svc.listar(admin, {}); assert.equal(depois.itens.find(i => i.id === card.id).etapa, 'ENC');   // sem dado velho após gravar
   } finally { Date.now = real; }
 });
+function renomeiaData(f, label, tipo) {
+  const orig = f.bx.call;
+  f.bx.call = async (m, p = {}) => { const r = await orig(m, p); if (m === 'crm.item.fields' && +p.entityTypeId === 1036) { r.result.fields = { ...r.result.fields, ufData: { title: label, formLabel: label, type: tipo } }; } return r; };
+}
+test('data programada com rótulo diferente é achada pelo tipo date; ajuste manual vence', async () => {
+  const { f, svc, store } = mundo(); renomeiaData(f, 'Agendamento', 'date'); svc.resetModelo();
+  assert.equal((await svc.camposInfo()).fila.data, 'ufData');
+  const m = mundo(); renomeiaData(m.f, 'Quando', 'string'); m.svc.resetModelo();
+  assert.notEqual((await m.svc.camposInfo()).fila.data, 'ufData');                 // texto: não adivinha
+  m.store.setConfig({ mapa: { fila: { data: 'ufData' } } }); m.svc.resetModelo();
+  assert.equal((await m.svc.camposInfo()).fila.data, 'ufData');
+  const ajuste = (await m.svc.camposInfo()).disponiveis.find(x => x.key === 'ufData'); assert.equal(ajuste.label, 'Quando');
+  void f; void svc; void store;
+});
+test('card sem responsável (0) aparece como "Sem vendedor"', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  f.s.itens[1036].push({ id: 700, title: 'Órfão', companyId: 100, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '0', ufSeg: 'Peças', ufClasse: 'B', ufData: '2026-12-01' });
+  svc.invalidar(); const r = await svc.listar(admin, {});
+  assert.equal(r.itens.find(i => i.id === 700).vendedor, 'Sem vendedor'); assert.equal(r.itens.find(i => i.id === 700).vendedorId, '');
+});
+test('agrupar por cliente: segmentos do mesmo cliente nunca se separam entre páginas; busca por nome', async () => {
+  const { f, svc } = mundo();
+  for (let i = 0; i < 12; i++) f.s.empresas.push({ ID: String(300 + i), TITLE: `Cliente ${String(i).padStart(2, '0')}`, UF_V: '7', UF_C: '3' });
+  await svc.sync();
+  for (const seg of ['Peças', 'Serviços']) f.s.itens[1036].push({ id: 800 + seg.length, title: 'x', companyId: 100, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '7', ufSeg: seg, ufClasse: 'A', ufData: '2026-11-24' });
+  svc.invalidar();
+  const p1 = await svc.listar(admin, { agrupar: '1', pageSize: 10, page: 1 }), p2 = await svc.listar(admin, { agrupar: '1', pageSize: 10, page: 2 });
+  assert.equal(p1.totalGrupos, 14); assert.equal(p1.total, 16); assert.equal(p1.pages, 2);
+  const nas = [p1, p2].map(p => new Set(p.itens.filter(i => i.empresaId === 100).map(i => i.segmento)));
+  assert.ok(nas.some(s => s.size === 3) && nas.every(s => s.size === 0 || s.size === 3));         // Motores+Peças+Serviços juntos, em uma única página
+  assert.ok(p1.itens.length + p2.itens.length === 16);
+  assert.equal((await svc.listar(admin, { q: 'cliente 07' })).total, 1);
+  assert.equal((await svc.listar(admin, { all: '1' })).itens.length, 16);                     // kanban: tudo de uma vez
+});
+test('filtro "sem vendedor" no painel e na lista', async () => {
+  const { f, svc } = mundo(); await svc.sync();
+  f.s.itens[1036].push({ id: 710, title: 'Órfão', companyId: 100, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '0', ufSeg: 'Peças', ufClasse: 'B', ufData: '2026-12-01' }); svc.invalidar();
+  assert.deepEqual((await svc.listar(admin, { vendedor: 'sem' })).itens.map(i => i.id), [710]);
+  const d = await svc.dashboard(admin, {}); assert.ok(d.opcoes.vendedores.some(v => v.id === 'sem')); assert.equal((await svc.dashboard(admin, { vendedor: 'sem' })).kpis.programadas, 1);
+});

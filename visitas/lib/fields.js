@@ -58,7 +58,18 @@ const STAGE_NOMES = [
   ['NEW', /^aguardando/], ['PREPARATION', /^dia da visita/], ['LATE', /^atrasad/], ['ENC', /^encerrad/], ['NAOREAL', /^nao realizad/], ['SUCCESS', /^finalizad/], ['FAIL', /^removid/],
 ];
 
-async function descobrir(bx) {
+// "Data programada" com rótulo diferente: tenta rótulos parecidos, depois qualquer campo de data do SPA, depois begindate/closedate.
+function acharData(ff) {
+  const c = Object.entries(ff || {}).map(([k, f]) => [k, norm(label(f)), String(f.type || '')]);
+  const uf = k => /^uf/i.test(k);
+  return c.find(([, n]) => /^data (programada|da visita|agendada|prevista|de visita|proxima visita)|programad/.test(n))?.[0]
+    || c.find(([k, n]) => uf(k) && /data/.test(n) && /(visita|program|agend|previst)/.test(n))?.[0]
+    || c.find(([k, , t]) => uf(k) && /^date/.test(t))?.[0]
+    || ['begindate', 'closedate'].find(k => ff[k]) || null;
+}
+const CAMPOS_AJUSTAVEIS = ['data', 'vendedor', 'segmento', 'classe', 'cargo', 'motivo', 'detalhe'];
+
+async function descobrir(bx, mapa = {}) {
   const [emp, fila, visita, cats] = await Promise.all([
     bx.call('crm.company.fields'), bx.call('crm.item.fields', { entityTypeId: ETYPE.fila }), bx.call('crm.item.fields', { entityTypeId: ETYPE.visita }),
     bx.call('crm.category.list', { entityTypeId: ETYPE.fila }).catch(() => ({ result: { categories: [] } })),
@@ -81,9 +92,13 @@ async function descobrir(bx) {
     if (s.SEMANTICS === 'S' && !etapas.SUCCESS) etapas.SUCCESS = s.STATUS_ID;
     if (s.SEMANTICS === 'F' && !etapas.FAIL) etapas.FAIL = s.STATUS_ID;
   }
+  const filaMap = mapear(ff, FILA_CAMPOS);
+  if (!filaMap.data) filaMap.data = acharData(ff);
+  for (const k of CAMPOS_AJUSTAVEIS) if (mapa?.fila?.[k] && ff[mapa.fila[k]]) filaMap[k] = mapa.fila[k];   // ajuste manual do administrador
   const m = {
     empresa, categoryId, etapas, etapaNomes,
-    fila: { ...mapear(ff, FILA_CAMPOS), motivoEnum: enumMap(ff[achar(ff, FILA_CAMPOS.motivo)[0]]) },
+    fila: { ...filaMap, motivoEnum: enumMap(ff[filaMap.motivo]) },
+    disponiveis: { fila: Object.entries(ff).map(([key, f]) => ({ key, label: label(f) || key, type: String(f.type || '') })).sort((a, b) => a.label.localeCompare(b.label)) },
     visita: { ...mapear(vf, VISITA_CAMPOS), ...Object.fromEntries(['regime', 'oportunidades', 'antecipada', 'acompanhamento', 'alcada'].map(k => [`${k}Enum`, enumMap(vf[achar(vf, VISITA_CAMPOS[k])[0]])])) },
     filaFields: ff, visitaFields: vf,
   };
@@ -95,4 +110,4 @@ async function descobrir(bx) {
   ];
   return m;
 }
-module.exports = { ETYPE, descobrir, mapearEmpresa, achar, label, A, enumMap, FILA_CAMPOS, VISITA_CAMPOS, STAGE_NOMES };
+module.exports = { CAMPOS_AJUSTAVEIS, ETYPE, descobrir, mapearEmpresa, achar, label, A, enumMap, FILA_CAMPOS, VISITA_CAMPOS, STAGE_NOMES };

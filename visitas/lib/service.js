@@ -18,7 +18,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   let modeloC = null, modeloAt = 0;
   async function modelo(force) {
     if (!force && modeloC && Date.now() - modeloAt < 300000) return modeloC;
-    modeloC = await F.descobrir(bx); modeloAt = Date.now(); return modeloC;
+    modeloC = await F.descobrir(bx, cfg().mapa); modeloAt = Date.now(); return modeloC;
   }
   const memo = new Map();
   let epoca = 0;     // invalidar() muda a época: uma busca iniciada antes de uma gravação não pode repor dado velho no cache
@@ -141,18 +141,23 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
 
   // ---------- cards ----------
   const etapaCod = (m, stageId) => Object.entries(m.etapas).find(([, v]) => v === stageId)?.[0] || '';
+  // Responsável: campo "Vendedor" do SPA (se houver), senão o responsável do card; 0/vazio = sem vendedor.
+  function vendedorDe(m, it) {
+    const x = txt(val(m.fila.vendedor && it[m.fila.vendedor])) || txt(it.assignedById);
+    return /^[1-9]\d*$/.test(x) ? x : '';
+  }
   function paraCard(m, it) {
     const f = m.fila, ff = m.filaFields;
     const lista = k => { const v = it[f[k]]; const items = itensDe(ff, f[k]); const x = val(v); return items.length ? (items.find(i => String(i.ID) === String(x))?.VALUE || '') : txt(x); };
     return {
-      id: +it.id, titulo: it.title, empresaId: +it.companyId || 0, etapa: etapaCod(m, it.stageId) || 'OUTRA', etapaNome: m.etapaNomes?.[it.stageId] || '', vendedorId: txt(it.assignedById),
+      id: +it.id, titulo: it.title, empresaId: +it.companyId || 0, etapa: etapaCod(m, it.stageId) || 'OUTRA', etapaNome: m.etapaNomes?.[it.stageId] || '', vendedorId: vendedorDe(m, it),
       segmento: lista('segmento'), cargo: lista('cargo') || 'Vendedor', classe: R.classeLetra(lista('classe')), data: dia(it[f.data]),
       motivo: lista('motivo'), detalhe: txt(it[f.detalhe]), criado: it.createdTime || '',
     };
   }
   async function cardsTodos(m, extra = {}) {
     const f = m.fila;
-    const sel = ['id', 'title', 'companyId', 'stageId', 'assignedById', 'createdTime', ...['segmento', 'cargo', 'classe', 'data', 'motivo', 'detalhe'].map(k => f[k]).filter(Boolean)];
+    const sel = ['id', 'title', 'companyId', 'stageId', 'assignedById', 'createdTime', ...['segmento', 'cargo', 'classe', 'data', 'motivo', 'detalhe', 'vendedor'].map(k => f[k]).filter(Boolean)];
     return (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.fila, select: sel, filter: { categoryId: m.categoryId, ...extra }, order: { id: 'ASC' } })).map(i => paraCard(m, i));
   }
   const cardsC = m => cached('cards', 45000, () => cardsTodos(m), 600000);
@@ -469,16 +474,20 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     cards = cards.filter(c => (excl ? c.etapa === 'FAIL' : c.etapa !== 'FAIL'));
     if (de || ate) cards = cards.filter(c => c.etapa === 'NAOREAL' || !c.data || ((!de || c.data >= de) && (!ate || c.data <= ate)) || (ABERTAS.includes(c.etapa) && c.data < de && !q.de));
     if (q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
-    if (q.vendedor) cards = cards.filter(c => c.vendedorId === String(q.vendedor));
+    if (q.vendedor) cards = cards.filter(c => c.vendedorId === (q.vendedor === 'sem' ? '' : String(q.vendedor)));
     if (q.classe) cards = cards.filter(c => c.classe === q.classe);
     if (q.etapa) cards = cards.filter(c => c.etapa === q.etapa);
     if (q.supervisor) { const s = await escopoDe(q.supervisor); cards = cards.filter(c => s.has(c.vendedorId)); }
+    if (q.q) { const t = await tituloEmpresas(cards.map(c => c.empresaId)), b = R.norm(q.q); cards = cards.filter(c => R.norm(`${t(c.empresaId)} ${c.segmento}`).includes(b)); }
     cards.sort((x, y) => (x.data || '9999').localeCompare(y.data || '9999') || x.id - y.id);
     const porEtapa = {}; for (const c of cards) porEtapa[c.etapa] = (porEtapa[c.etapa] || 0) + 1;
-    const size = Math.min(200, Math.max(10, +q.pageSize || 50)), pages = Math.max(1, Math.ceil(cards.length / size)), page = Math.min(pages, Math.max(1, +q.page || 1));
-    const fatia = cards.slice((page - 1) * size, page * size);          // só a página corrente busca nomes no Bitrix
+    const todos = q.all === '1', agrupar = q.agrupar === '1';
+    let unidades = cards.map(c => [c]);                                    // unidade de paginação: o card ou, agrupando, o cliente com todos os seus segmentos
+    if (agrupar || todos) { const g = new Map(); for (const c of cards) (g.get(c.empresaId) || g.set(c.empresaId, []).get(c.empresaId)).push(c); unidades = [...g.values()]; unidades.forEach(u => u.sort((x, y) => x.segmento.localeCompare(y.segmento) || x.id - y.id)); }
+    const size = Math.min(todos ? 5000 : 200, Math.max(10, +q.pageSize || 50)), pages = todos ? 1 : Math.max(1, Math.ceil(unidades.length / size)), page = todos ? 1 : Math.min(pages, Math.max(1, +q.page || 1));
+    const fatia = (todos ? unidades : unidades.slice((page - 1) * size, page * size)).flat();   // só a página corrente busca nomes no Bitrix
     const tit = await tituloEmpresas(fatia.map(c => c.empresaId)), nm = await nomes(fatia.map(c => c.vendedorId));
-    return { hoje: h, de, ate, total: cards.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: nm(c.vendedorId), podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
+    return { hoje: h, de, ate, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
   async function escopoDe(userId) { return escopo({ id: userId, papel: 'x' }); }
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i)), 600000); }
@@ -489,7 +498,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     if (!sem.includes('de') && q.de) cards = cards.filter(c => c.data && c.data >= q.de);
     if (!sem.includes('ate') && q.ate) cards = cards.filter(c => c.data && c.data <= q.ate);
     if (!sem.includes('segmento') && q.segmento) cards = cards.filter(c => R.norm(c.segmento) === R.norm(q.segmento));
-    if (!sem.includes('vendedor') && q.vendedor) cards = cards.filter(c => c.vendedorId === String(q.vendedor));
+    if (!sem.includes('vendedor') && q.vendedor) cards = cards.filter(c => c.vendedorId === (q.vendedor === 'sem' ? '' : String(q.vendedor)));
     if (!sem.includes('classe') && q.classe) cards = cards.filter(c => c.classe === q.classe);
     if (!sem.includes('etapa') && q.etapa) cards = cards.filter(c => c.etapa === q.etapa);
     if (!sem.includes('motivo') && q.motivo) cards = cards.filter(c => c.motivo === q.motivo);
@@ -499,13 +508,13 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   const grupoDe = e => (e === 'ENC' || e === 'SUCCESS' ? 'realizadas' : e === 'LATE' ? 'atrasadas' : e === 'NAOREAL' ? 'nao' : 'abertas');
   async function dashboard(user, q = {}) {
     const { cards } = await filtrados(user, q), base = (await filtrados(user, q, ['segmento', 'vendedor', 'classe', 'supervisor', 'etapa', 'motivo'])).cards;
-    const nm = await nomes(cards.map(c => c.vendedorId).concat(base.map(c => c.vendedorId)));
+    const nm0 = await nomes(cards.map(c => c.vendedorId).concat(base.map(c => c.vendedorId))), nm = id => (id ? nm0(id) : 'Sem vendedor');
     const novo = () => ({ realizadas: 0, abertas: 0, atrasadas: 0, nao: 0, total: 0 });
     const soma = (mapa, k, extra, c) => { const o = (mapa[k] ||= { ...novo(), ...extra }); o[grupoDe(c.etapa)]++; o.total++; };
     const mes = {}, vend = {}, seg = {}, cls = {}, mot = {};
     for (const c of cards) {
       soma(mes, (c.data || '').slice(0, 7) || '—', {}, c);
-      soma(vend, c.vendedorId, { id: c.vendedorId, nome: nm(c.vendedorId) }, c);
+      soma(vend, c.vendedorId || 'sem', { id: c.vendedorId || 'sem', nome: nm(c.vendedorId) }, c);
       soma(seg, c.segmento || '—', { nome: c.segmento || '—' }, c);
       soma(cls, c.classe || '—', { nome: c.classe || '—' }, c);
       if (c.etapa === 'NAOREAL') mot[c.motivo || 'Sem motivo informado'] = (mot[c.motivo || 'Sem motivo informado'] || 0) + 1;
@@ -519,7 +528,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
       serie: Object.entries(mes).filter(([k]) => k !== '—').sort().map(([k, v]) => ({ mes: k, ...v })),
       porVendedor: ord(vend).slice(0, 30), porSegmento: ord(seg), porClasse: ['A', 'B', 'C', 'E'].map(k => cls[k] || { nome: k, ...novo() }).concat(cls['—'] ? [cls['—']] : []),
       motivos: Object.entries(mot).sort((a, b) => b[1] - a[1]).map(([nome, n]) => ({ nome, n })),
-      opcoes: { segmentos: [...new Set(base.map(c => c.segmento).filter(Boolean))].sort(), vendedores: [...new Map(base.map(c => [c.vendedorId, nm(c.vendedorId)]))].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)), classes: ['A', 'B', 'C', 'E'] },
+      opcoes: { segmentos: [...new Set(base.map(c => c.segmento).filter(Boolean))].sort(), vendedores: [...new Map(base.map(c => [c.vendedorId || 'sem', nm(c.vendedorId)]))].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)), classes: ['A', 'B', 'C', 'E'] },
     };
   }
   // Registros de visita (SPA 1032) dos cards filtrados: busca, paginação e permissão de edição.
@@ -569,11 +578,11 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
   async function camposInfo() {
     const m = await modelo(true);
-    return { categoryId: m.categoryId, etapas: m.etapas, faltando: m.faltando, segmentos: Object.values(m.empresa.segmentos).map(s => ({ nome: s.nome, cargos: Object.keys(s.cargos), classe: s.classe.length, proxima: s.proxima.length, ultima: s.ultima.length, duplicados: [...Object.values(s.cargos), s.classe, s.proxima, s.ultima].some(l => l.length > 1) })),
+    return { categoryId: m.categoryId, etapas: m.etapas, faltando: m.faltando, disponiveis: m.disponiveis.fila, mapa: cfg().mapa?.fila || {}, ajustaveis: F.CAMPOS_AJUSTAVEIS, segmentos: Object.values(m.empresa.segmentos).map(s => ({ nome: s.nome, cargos: Object.keys(s.cargos), classe: s.classe.length, proxima: s.proxima.length, ultima: s.ultima.length, duplicados: [...Object.values(s.cargos), s.classe, s.proxima, s.ultima].some(l => l.length > 1) })),
       fila: Object.fromEntries(Object.keys(F.FILA_CAMPOS).map(k => [k, m.fila[k] || null])), visita: Object.fromEntries(Object.keys(F.VISITA_CAMPOS).map(k => [k, m.visita[k] || null])) };
   }
 
   return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    preparar, camposInfo, supervisores, temAcesso, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    preparar, camposInfo, supervisores, temAcesso, resetModelo: () => { modeloC = null; invalidar(); }, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };
