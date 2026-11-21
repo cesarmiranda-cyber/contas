@@ -36,7 +36,7 @@ function achar(fields, re) {
 }
 const FILA_CAMPOS = {
   segmento: /^segmento$/, cargo: /^cargo$/, classe: /^classe$/, data: /^data programada$/,
-  motivo: /^motivo da nao realizacao$/, detalhe: /^detalhe do motivo$/, vendedor: /^vendedor$/,
+  motivo: /^motivo da nao realizacao$/, detalhe: /^detalhe do motivo$/, vendedor: /^vendedor$/, alcada: /^alcada$/,
 };
 const VISITA_CAMPOS = {
   data: /^data\/?\s*hora da visita$|^data da visita$/, fatos: /^fatos e dados$/, interesses: /^interesses$/, sentimentos: /^sentimentos$/, valores: /^valores$/,
@@ -79,7 +79,7 @@ function acharData(ff) {
     || c.find(([k, , t]) => uf(k) && /^date/.test(t))?.[0]
     || ['begindate', 'closedate'].find(k => ff[k]) || null;
 }
-const CAMPOS_AJUSTAVEIS = ['data', 'vendedor', 'segmento', 'classe', 'cargo', 'motivo', 'detalhe'];
+const CAMPOS_AJUSTAVEIS = ['data', 'vendedor', 'segmento', 'classe', 'cargo', 'motivo', 'detalhe', 'alcada'];
 
 async function descobrir(bx, mapa = {}) {
   const [emp, fila, visita, cats] = await Promise.all([

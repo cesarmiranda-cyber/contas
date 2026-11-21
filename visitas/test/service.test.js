@@ -443,3 +443,30 @@ test('visibilidade: com a lista preenchida, nem administrador vê o dos outros; 
   assert.equal((await svc.registros(u7, {})).itens[0].podeEditar, true); assert.equal((await svc.registros(todos, {})).itens.every(i => i.podeEditar), true);
   void c8;
 });
+test('exceção pontual: cards já agendados para o futuro entram no app sem Última visita e seguem o fluxo normal', async () => {
+  const { f, svc, store } = mundo(); store.setConfig({ exigirUltimaVisita: true });
+  const orig = f.bx.call;
+  f.bx.call = async (m, p = {}) => { const r = await orig(m, p); if (m === 'crm.item.fields' && +p.entityTypeId === 1036) r.result.fields = { ...r.result.fields, ufAlc: { title: 'Alçada', type: 'enumeration', items: [{ ID: '1', VALUE: 'Gerente' }, { ID: '2', VALUE: 'Supervisor' }] } }; return r; };
+  svc.resetModelo();
+  const novo = (id, emp, data, extra = {}) => f.s.itens[1036].push({ id, title: 'x', companyId: emp, categoryId: 19, stageId: 'DT1036_19:NEW', assignedById: '7', ufSeg: 'Motores', ufClasse: 'A', ufData: data, ...extra });
+  novo(930, 100, '2026-12-10', { ufAlc: '2' });                 // futuro, empresa sem Última visita
+  novo(931, 101, '2026-10-05');                                  // data passada, empresa sem Última visita
+  novo(932, 100, '2026-11-18', { ufSeg: 'Peças' });              // hoje, empresa sem Última visita (não é "futuro": não entra)
+  let l = await svc.listar(admin, {}); assert.equal(l.itens.length, 0); assert.equal(l.ocultos, 3); assert.equal(l.agendados, 1);
+  const r = await svc.admitirAgendados(admin); assert.equal(r.admitidos, 1);
+  l = await svc.listar(admin, {}); assert.deepEqual(l.itens.map(i => i.id), [930]); assert.equal(l.ocultos, 2); assert.equal(l.agendados, 0); assert.equal(l.itens[0].alcada, 'Supervisor');   // Alçada aparece
+  assert.equal((await svc.admitirAgendados(admin)).admitidos, 0);                                               // repetir não admite de novo
+  // card admitido segue o fluxo: no dia da visita a varredura move a etapa; os não admitidos ficam intocados
+  f.s.itens[1036].find(c => c.id === 930).ufData = '2026-11-18'; svc.invalidar();
+  const v = await svc.varrer(); assert.equal(v.ajustados, 1); assert.equal(f.s.itens[1036].find(c => c.id === 930).stageId, 'DT1036_19:PREPARATION');
+  assert.equal(f.s.itens[1036].find(c => c.id === 931).stageId, 'DT1036_19:NEW');
+  assert.equal((await svc.listar(admin, {})).itens.length, 1);                                                 // continua visível no dia da visita (não some)
+  // registrar encerra, grava a Última visita e a próxima nasce automática
+  const rg = await svc.registrar(930, { dataHora: '2026-11-18T10:00', fatos: 'ok' }, vendedor);
+  assert.equal(f.s.empresas[0].UF_U, '2026-11-18'); assert.ok(rg.proximoCard); assert.equal(f.s.itens[1036].find(c => c.id === rg.proximoCard).ufData, R.proximaVisita('A', '2026-11-18'));
+  svc.invalidar(); const depois = await svc.listar(admin, { finalizados: '1' }); assert.ok(depois.itens.some(i => i.id === rg.proximoCard));      // próximo já visível (empresa agora tem Última visita)
+});
+test('cards admitidos persistem após reiniciar o servidor', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vis-')); const a = createStore(dir); assert.equal(a.admitir([1, 2, 2]), 2); a.flush();
+  const b = createStore(dir); assert.equal(b.admitido(1), true); assert.equal(b.admitido(3), false); assert.equal(b.totalAdmitidos, 2);
+});

@@ -118,6 +118,7 @@ const routes = {
   'GET /api/diagnostico-datas': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.diagnosticoDatas(); },
   'GET /api/sem-ultima': async (u, b, user) => { exigeBitrix(); return svc.semUltima(user, Object.fromEntries(u.searchParams)); },
   'POST /api/ultima-visita': async (u, b, user) => { exigeBitrix(); return svc.salvarUltimas(user, b.itens); },
+  'POST /api/admitir-agendados': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.admitirAgendados(user); },
   'GET /api/campos': async (u, b, user) => { exigeConfig(user); exigeBitrix(); return svc.camposInfo(); },
   'GET /api/usuarios': async (u, b, user) => {
     exigeConfig(user); exigeBitrix(); const q = String(u.searchParams.get('q') || '').trim().slice(0, 60); if (q.length < 2) return [];

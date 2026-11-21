@@ -108,10 +108,25 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
   // Regra: sem "Última visita" no cadastro da empresa (naquele segmento), o card não aparece no app.
   async function comUltima(m, cards) {
-    if (!cfg().exigirUltimaVisita) return { cards, ocultos: 0 };
+    if (!cfg().exigirUltimaVisita) return { cards, ocultos: 0, agendados: 0 };
     await carregaUltimas(m, cards.map(c => c.empresaId));
-    const ok = cards.filter(c => ultDados.get(chaveUlt(c))?.ultima);
-    return { cards: ok, ocultos: cards.length - ok.length };
+    const ok = [], h = hoje(); let agendados = 0;
+    for (const c of cards) {
+      if (ultDados.get(chaveUlt(c))?.ultima || store.admitido(c.id)) ok.push(c);
+      else if (ABERTAS.includes(c.etapa) && c.data && c.data > h) agendados++;       // oculto, mas já agendado para o futuro: candidato a "incluir no app"
+    }
+    return { cards: ok, ocultos: cards.length - ok.length, agendados };
+  }
+  // Exceção pontual: inclui no app os cards abertos JÁ agendados para o futuro, mesmo sem Última visita no cadastro.
+  // Ficam fixados como visíveis (inclusive no dia da visita); os próximos cards seguem o ciclo normal.
+  async function admitirAgendados(user) {
+    const m = await modelo(), h = hoje(), todos = (await cardsC(m)).filter(c => ABERTAS.includes(c.etapa) && c.data && c.data > h);
+    await carregaUltimas(m, todos.map(c => c.empresaId));
+    const alvo = todos.filter(c => !ultDados.get(chaveUlt(c))?.ultima && !store.admitido(c.id));
+    const n = store.admitir(alvo.map(c => c.id));
+    store.log('admitir', `${n} card(s) já agendados para o futuro incluídos no app por ${user.nome || user.id} (sem Última visita no cadastro)`);
+    invalidar('cards', 'dash');
+    return { ok: true, admitidos: n, totalAdmitidos: store.totalAdmitidos };
   }
   // Aquece os caches (modelo, cards e datas do cadastro) para a 1ª abertura da tela não esperar o Bitrix.
   async function aquecer() {
@@ -208,12 +223,12 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     return {
       id: +it.id, titulo: it.title, empresaId: +it.companyId || 0, etapa: etapaCod(m, it.stageId) || 'OUTRA', etapaNome: m.etapaNomes?.[it.stageId] || '', vendedorId: vendedorDe(m, it),
       segmento: lista('segmento'), cargo: lista('cargo') || 'Vendedor', classe: R.classeLetra(lista('classe')), data: dia(it[f.data]),
-      motivo: lista('motivo'), detalhe: txt(it[f.detalhe]), criado: it.createdTime || '',
+      motivo: lista('motivo'), detalhe: txt(it[f.detalhe]), alcada: f.alcada ? lista('alcada') : '', criado: it.createdTime || '',
     };
   }
   async function cardsTodos(m, extra = {}) {
     const f = m.fila;
-    const sel = ['id', 'title', 'companyId', 'stageId', 'assignedById', 'createdTime', ...['segmento', 'cargo', 'classe', 'data', 'motivo', 'detalhe', 'vendedor'].map(k => f[k]).filter(Boolean)];
+    const sel = ['id', 'title', 'companyId', 'stageId', 'assignedById', 'createdTime', ...['segmento', 'cargo', 'classe', 'data', 'motivo', 'detalhe', 'vendedor', 'alcada'].map(k => f[k]).filter(Boolean)];
     return (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.fila, select: sel, filter: { categoryId: m.categoryId, ...extra }, order: { id: 'ASC' } })).map(i => paraCard(m, i));
   }
   const cardsC = m => cached('cards', 45000, () => cardsTodos(m), 600000);
@@ -269,8 +284,8 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
           for (const cargo of cfg().cargosFila) {
             if (!seg.cargos[cargo]) continue;
             const { vendedor, classe, proxima, ultima } = leituraEmpresa(m, comp, segKey, cargo);
-            const semUlt = cfg().exigirUltimaVisita && !ultima;
             const k = R.chaveCard(comp.ID, seg.nome, cargo), ex = porChave.get(k) || [], abertos = ex.filter(c => ABERTAS.includes(c.etapa));
+            const semUlt = cfg().exigirUltimaVisita && !ultima && !abertos.some(c => store.admitido(c.id));   // card admitido à mão segue o fluxo normal
             if (!vendedor || !classe) {
               r.semClasse++;
               if (cfg().removerSemClasse) for (const c of abertos) { r.removidos++; acoes.push(() => mover(m, c.id, 'FAIL')); }
@@ -617,7 +632,7 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
     const size = Math.min(todos ? 5000 : 200, Math.max(10, +q.pageSize || 50)), pages = todos ? 1 : Math.max(1, Math.ceil(unidades.length / size)), page = todos ? 1 : Math.min(pages, Math.max(1, +q.page || 1));
     const fatia = (todos ? unidades : unidades.slice((page - 1) * size, page * size)).flat();   // só a página corrente busca nomes no Bitrix
     const tit = await tituloEmpresas(fatia.map(c => c.empresaId)), nm = await nomes(fatia.map(c => c.vendedorId));
-    return { hoje: h, de, ate, opcoes, ocultos: cu.ocultos, exigirUltima: cfg().exigirUltimaVisita, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), ultimaVisita: ultDados.get(chaveUlt(c))?.ultima || '', reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
+    return { hoje: h, de, ate, opcoes, ocultos: cu.ocultos, agendados: cu.agendados, exigirUltima: cfg().exigirUltimaVisita, total: cards.length, totalGrupos: unidades.length, page, pageSize: size, pages, porEtapa, itens: fatia.map(c => ({ ...c, empresa: tit(c.empresaId), vendedor: c.vendedorId ? nm(c.vendedorId) : 'Sem vendedor', podeExcluir: podeExcluir(user), ultimaVisita: ultDados.get(chaveUlt(c))?.ultima || '', reprogramado: !!store.snap(c.id), atrasoDias: c.data && ABERTAS.includes(c.etapa) ? Math.max(0, R.dayDiff(c.data, h)) : 0 })) };
   }
   const escopoDe = equipeDe;
   async function registrosC(m) { return cached('regs', 60000, async () => (await bx.listAll('crm.item.list', { entityTypeId: ETYPE.visita, select: camposSel(m), order: { id: 'DESC' } })).map(i => paraRegistro(m, i)), 600000); }
@@ -902,6 +917,6 @@ function createService({ bitrix: bx, store, now = () => new Date() }) {
   }
 
   return { modelo, sync, varrer, listar, dashboard, registros, historico, formCard, registrar, editarRegistro, registroDoCard, reprogramar, reprogramarGrupo, reverter, naoRealizada, excluir, restaurar, proxima, participantes,
-    veTudo, preparar, camposInfo, diagnosticoDatas, reconciliar, auditoria, corrigirAuditoria, semUltima, salvarUltimas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
+    veTudo, admitirAgendados, preparar, camposInfo, diagnosticoDatas, reconciliar, auditoria, corrigirAuditoria, semUltima, salvarUltimas, supervisores, temAcesso, resetModelo: () => { modeloC = null; ultDados.clear(); ultEmp.clear(); invalidar(); }, aquecer, nomes, departamentos, podeExcluir, contatos, invalidar, hoje, _t: { gerarProximo, paraCard } };
 }
 module.exports = { createService, ABERTAS };
