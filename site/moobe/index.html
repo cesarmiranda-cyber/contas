@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moobe — Consultoria de processos e agentes de IA para PMEs</title>
+<meta name="description" content="Consultoria de processos de negócio e desenvolvimento de agentes de IA para empresas de pequeno e médio porte: mais vendas e processos sob controle.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#0b1020; --bg2:#111833; --card:#151d3b; --line:#26305a;
+  --text:#e9ecf8; --muted:#a3accb; --brand:#4f7cff; --brand2:#22d3a6; --btn-text:#06101f;
+}
+@media (prefers-color-scheme: light){
+  :root{--bg:#f7f8fc; --bg2:#eef1fa; --card:#ffffff; --line:#dde2f0; --text:#10162f; --muted:#56608a; --brand:#2f5bea; --brand2:#0f9f7c; --btn-text:#fff}
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+a{color:inherit}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+header{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;text-decoration:none}
+.logo svg{width:28px;height:28px}
+nav ul{display:flex;gap:24px;list-style:none;padding:0}
+nav a{text-decoration:none;color:var(--muted);font-size:15px}
+nav a:hover{color:var(--text)}
+.btn{display:inline-block;padding:12px 22px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand2));color:var(--btn-text);font-weight:700;text-decoration:none;border:0;cursor:pointer;font-size:16px}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.btn:hover{filter:brightness(1.08)}
+.hero{padding:88px 0 72px;background:radial-gradient(900px 400px at 80% -10%,color-mix(in srgb,var(--brand) 30%,transparent),transparent)}
+.tag{display:inline-block;font-size:13px;color:var(--brand2);border:1px solid var(--line);padding:4px 12px;border-radius:99px;margin-bottom:20px}
+h1{font-size:clamp(32px,5.5vw,56px);line-height:1.1;letter-spacing:-.02em;max-width:18ch}
+h1 em{font-style:normal;background:linear-gradient(135deg,var(--brand),var(--brand2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:60ch;margin:20px 0 32px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+section{padding:72px 0}
+section.alt{background:var(--bg2)}
+h2{font-size:clamp(26px,3.5vw,38px);line-height:1.2;letter-spacing:-.01em;margin-bottom:12px}
+.sub{color:var(--muted);max-width:62ch;margin-bottom:36px}
+.grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+.card h3{font-size:19px;margin-bottom:8px}
+.card p,.card li{color:var(--muted);font-size:15px}
+.card ul{padding-left:18px;margin-top:10px}
+.ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--brand) 18%,transparent);margin-bottom:14px;font-size:20px}
+.steps{counter-reset:s;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.step{counter-increment:s;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+.step::before{content:counter(s);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand2));color:var(--btn-text);font-weight:800;margin-bottom:12px}
+.step h3{font-size:18px;margin-bottom:6px}.step p{color:var(--muted);font-size:15px}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:12px}
+summary{cursor:pointer;font-weight:600}
+details p{color:var(--muted);margin-top:10px}
+.contact{display:grid;gap:32px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-items:start}
+form{display:grid;gap:12px}
+label{font-size:14px;color:var(--muted)}
+input,textarea,select{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;margin-top:4px}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px}
+textarea{min-height:110px;resize:vertical}
+.note{font-size:13px;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:32px 0;color:var(--muted);font-size:14px}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media(max-width:720px){nav ul{display:none}.hero{padding:56px 0 48px}section{padding:52px 0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f7cff"/><stop offset="1" stop-color="#22d3a6"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#g)"/><path d="M7 22V10l5 7 4-7 4 7 5-7v12" fill="none" stroke="#06101f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Moobe</a>
+    <nav><ul>
+      <li><a href="#servicos">Serviços</a></li>
+      <li><a href="#agentes">Agentes de IA</a></li>
+      <li><a href="#metodo">Como trabalhamos</a></li>
+      <li><a href="#faq">Dúvidas</a></li>
+    </ul></nav>
+    <a class="btn" href="#contato">Falar com a Moobe</a>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <span class="tag">Consultoria de processos + Inteligência Artificial</span>
+    <h1>Venda mais e tenha seus processos <em>sob controle</em></h1>
+    <p class="lead">Ajudamos pequenas e médias empresas a organizar a operação e a colocar agentes de IA para trabalhar nas vendas e nos processos do dia a dia — sem depender de planilhas, lembretes e de “quem sabe como se faz”.</p>
+    <div class="cta">
+      <a class="btn" href="#contato">Agendar diagnóstico gratuito</a>
+      <a class="btn ghost" href="#servicos">Conhecer os serviços</a>
+    </div>
+  </div>
+</section>
+
+<section id="problema" class="alt">
+  <div class="wrap">
+    <h2>Você reconhece algum destes sinais?</h2>
+    <p class="sub">Quando a empresa cresce, o jeito improvisado de operar vira gargalo.</p>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(215px,1fr))">
+      <div class="card"><div class="ico">⏳</div><h3>Leads esfriam</h3><p>Contatos chegam por vários canais e o retorno demora. A venda vai para quem respondeu primeiro.</p></div>
+      <div class="card"><div class="ico">🧩</div><h3>Cada um faz de um jeito</h3><p>O processo vive na cabeça das pessoas. Qualidade e prazo variam, e treinar alguém novo é lento.</p></div>
+      <div class="card"><div class="ico">📉</div><h3>Falta visibilidade</h3><p>Você não sabe onde as vendas travam, o que está atrasado nem quanto custa cada retrabalho.</p></div>
+      <div class="card"><div class="ico">🔁</div><h3>Tarefa repetitiva demais</h3><p>Equipe qualificada gasta o dia copiando dados, cobrando status e respondendo as mesmas perguntas.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="servicos">
+  <div class="wrap">
+    <h2>Dois serviços que se complementam</h2>
+    <p class="sub">Primeiro entendemos e organizamos o processo; depois automatizamos o que faz sentido com IA.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ico">🗺️</div>
+        <h3>Consultoria de processos de negócio</h3>
+        <p>Mapeamos como a empresa funciona hoje, achamos gargalos e desenhamos o processo ideal para o seu porte.</p>
+        <ul>
+          <li>Diagnóstico e mapeamento de processos</li>
+          <li>Funil e processo comercial</li>
+          <li>Indicadores, rotinas e responsáveis</li>
+          <li>Padronização e documentação simples de usar</li>
+        </ul>
+      </div>
+      <div class="card" id="agentes">
+        <div class="ico">🤖</div>
+        <h3>Agentes de IA para processos</h3>
+        <p>Desenvolvemos agentes sob medida que executam tarefas dentro dos seus processos, integrados às ferramentas que você já usa.</p>
+        <ul>
+          <li>Agentes para vendas e atendimento</li>
+          <li>Agentes para controle e acompanhamento de processos</li>
+          <li>Integração com CRM, e-mail, WhatsApp e planilhas</li>
+          <li>Supervisão humana e registro de cada ação</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>O que um agente de IA faz pela sua empresa</h2>
+    <p class="sub">Exemplos de aplicações. Definimos com você o que gera mais retorno no seu caso.</p>
+    <div class="grid">
+      <div class="card"><h3>📈 Para vender mais</h3><ul>
+        <li>Responde e qualifica leads na hora</li>
+        <li>Faz follow-up até o cliente decidir</li>
+        <li>Prepara propostas e lembra a equipe de oportunidades paradas</li>
+        <li>Reativa clientes antigos</li></ul></div>
+      <div class="card"><h3>🎛️ Para controlar processos</h3><ul>
+        <li>Cobra prazos e responsáveis automaticamente</li>
+        <li>Confere dados e aponta pendências</li>
+        <li>Gera relatórios e alertas de atraso</li>
+        <li>Dá andamento a aprovações e solicitações</li></ul></div>
+      <div class="card"><h3>🛡️ Com segurança</h3><ul>
+        <li>Regras claras do que o agente pode ou não fazer</li>
+        <li>Aprovação humana em decisões sensíveis</li>
+        <li>Histórico completo para auditoria</li>
+        <li>Cuidado com dados pessoais (LGPD)</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section id="metodo">
+  <div class="wrap">
+    <h2>Como trabalhamos</h2>
+    <p class="sub">Começamos pequeno, medimos e crescemos conforme o resultado aparece.</p>
+    <div class="steps">
+      <div class="step"><h3>Diagnóstico</h3><p>Conversa e levantamento para entender metas, processos e onde está a perda.</p></div>
+      <div class="step"><h3>Desenho do processo</h3><p>Organizamos o fluxo, os responsáveis e os indicadores antes de automatizar.</p></div>
+      <div class="step"><h3>Agente piloto</h3><p>Construímos um agente para o processo de maior impacto e testamos com sua equipe.</p></div>
+      <div class="step"><h3>Operação e melhoria</h3><p>Acompanhamos os números, ajustamos e expandimos para novos processos.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="alt">
+  <div class="wrap">
+    <h2>Dúvidas frequentes</h2>
+    <p class="sub">&nbsp;</p>
+    <details><summary>Preciso trocar as ferramentas que já uso?</summary><p>Na maioria dos casos não. Os agentes se integram ao que você já tem (CRM, e-mail, WhatsApp, planilhas, sistemas de gestão) sempre que houver integração disponível.</p></details>
+    <details><summary>Minha empresa é pequena. Isso é para mim?</summary><p>Sim, o trabalho é dimensionado para PMEs. Começamos por um processo, o de maior impacto, sem projetos gigantes.</p></details>
+    <details><summary>A IA vai substituir minha equipe?</summary><p>O objetivo é tirar da equipe o trabalho repetitivo para que ela foque em relacionar-se com clientes e tomar decisões. Os agentes trabalham com regras e supervisão humana.</p></details>
+    <details><summary>Quanto tempo leva para ter um agente funcionando?</summary><p>Depende do processo e das integrações. No diagnóstico definimos o escopo e o prazo do piloto antes de qualquer compromisso.</p></details>
+    <details><summary>Meus dados ficam seguros?</summary><p>Tratamos dados com acesso restrito e seguindo a LGPD. Combinamos com você quais informações o agente pode acessar.</p></details>
+  </div>
+</section>
+
+<section id="contato">
+  <div class="wrap contact">
+    <div>
+      <h2>Vamos conversar?</h2>
+      <p class="sub">Conte um pouco sobre sua empresa. Retornamos para agendar um diagnóstico gratuito e sem compromisso.</p>
+      <p><a class="btn" id="wa" href="https://wa.me/5500000000000?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20processos%20e%20agentes%20de%20IA." target="_blank" rel="noopener">Chamar no WhatsApp</a></p>
+      <p class="note" style="margin-top:14px">contato@moobe.com.br</p>
+    </div>
+    <form id="f">
+      <label>Nome<input name="nome" required autocomplete="name"></label>
+      <label>E-mail<input name="email" type="email" required autocomplete="email"></label>
+      <label>Empresa<input name="empresa" autocomplete="organization"></label>
+      <label>O que você quer melhorar?
+        <select name="foco">
+          <option>Vender mais</option><option>Organizar processos</option><option>Automatizar com agentes de IA</option><option>Ainda não sei</option>
+        </select></label>
+      <label>Mensagem<textarea name="msg"></textarea></label>
+      <button class="btn" type="submit">Enviar mensagem</button>
+      <p class="note">Ao enviar, abre seu e-mail com a mensagem pronta para a Moobe.</p>
+    </form>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>© <span id="y"></span> Moobe. Todos os direitos reservados.</span>
+    <span>Consultoria de processos e agentes de IA para PMEs</span>
+  </div>
+</footer>
+
+<script>
+document.getElementById('y').textContent=new Date().getFullYear();
+document.getElementById('f').addEventListener('submit',function(e){
+  e.preventDefault();
+  var d=new FormData(e.target);
+  var corpo=['Nome: '+d.get('nome'),'E-mail: '+d.get('email'),'Empresa: '+d.get('empresa'),'Foco: '+d.get('foco'),'','Mensagem:',d.get('msg')].join('\n');
+  location.href='mailto:contato@moobe.com.br?subject='+encodeURIComponent('Contato pelo site — '+d.get('nome'))+'&body='+encodeURIComponent(corpo);
+});
+</script>
+</body>
+</html>
