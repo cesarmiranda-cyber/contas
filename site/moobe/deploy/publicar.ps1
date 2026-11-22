@@ -17,7 +17,7 @@ Write-Host "1/3 Conferindo a pasta de destino (nao cria nem apaga nada fora dela
 plink -i $Key "$User@$Server" "test -d '$Dest' && ls -ld '$Dest' || echo 'PASTA NAO EXISTE: $Dest'"
 
 Write-Host "2/3 Enviando index.html, logo.png e favicon.svg para $Dest ..."
-pscp -i $Key -batch @files "$User@${Server}:$Dest/"
+pscp -i $Key @files "$User@${Server}:$Dest/"
 
 Write-Host "3/3 Conferindo os arquivos publicados..."
 plink -i $Key "$User@$Server" "ls -l '$Dest'"
