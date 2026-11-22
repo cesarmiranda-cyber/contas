@@ -8,219 +8,314 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#0e0e0e; --paper:#ffffff; --grey:#cacdc6; --soft:#cacdc6; --line:#b4b8ad;
-  --muted:#3f4239; --green:#c0d391; --green-d:#47601a;
+  --ink:#1d1d1f; --paper:#ffffff; --fog:#f5f5f7; --grey:#cacdc6; --green:#c0d391;
+  --green-d:#4d6a17; --muted:#6e6e73; --black:#000;
 }
 *{box-sizing:border-box;margin:0}
 html{scroll-behavior:smooth}
-body{font:400 17px/1.6 "Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
+body{font:400 19px/1.5 "Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
 a{color:inherit}
-.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
-header{position:sticky;top:0;z-index:10;background:rgba(202,205,198,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.nav{display:flex;align-items:center;justify-content:space-between;height:72px}
-.logo img{height:30px;display:block}
-nav ul{display:flex;gap:28px;list-style:none;padding:0}
-nav a{text-decoration:none;color:var(--muted);font-size:16px;font-weight:500}
-nav a:hover{color:var(--ink)}
-.btn{display:inline-block;padding:14px 26px;border-radius:999px;background:var(--ink);color:#fff;font:600 16px "Outfit",sans-serif;text-decoration:none;border:2px solid var(--ink);cursor:pointer;transition:.15s}
-.btn:hover{background:var(--green);color:var(--ink);border-color:var(--green)}
-.btn.ghost{background:transparent;color:var(--ink);border-color:var(--ink)}
-.btn.ghost:hover{background:var(--ink);color:#fff;border-color:var(--ink)}
-.btn.sm{padding:10px 20px;font-size:15px}
-.btn.green{background:var(--green);color:var(--ink);border-color:var(--green)}
-.btn.green:hover{background:#fff;border-color:#fff}
-.dot{display:inline-block;width:.42em;height:.42em;background:var(--green);margin-left:.06em}
-.eyebrow{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--green-d);margin-bottom:18px}
-.eyebrow::before{content:"";width:10px;height:10px;background:var(--green)}
-.hero{padding:104px 0 96px;background:var(--grey)}
-h1{font-size:clamp(40px,7vw,80px);line-height:1.02;letter-spacing:-.035em;font-weight:600;max-width:15ch}
-.lead{font-size:clamp(18px,2vw,22px);color:var(--muted);max-width:56ch;margin:28px 0 36px;line-height:1.55}
-.cta{display:flex;gap:12px;flex-wrap:wrap}
-section{padding:96px 0}
-section.soft{background:var(--soft)}
-section.dark{background:var(--ink);color:#fff}
-h2{font-size:clamp(30px,4.4vw,52px);line-height:1.08;letter-spacing:-.03em;font-weight:600;max-width:20ch;margin-bottom:16px}
-.sub{color:var(--muted);max-width:58ch;margin-bottom:48px;font-size:18px}
-.dark .sub{color:#b9bcae}
-.grid{display:grid;gap:20px}
-.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.g4{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.card{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:32px}
-.soft .card{border-color:transparent}
-.card{border-color:#e3e5da}
-.card .num::after{background:#e3e5da}
-.card h3{font-size:22px;font-weight:600;letter-spacing:-.01em;margin-bottom:10px;line-height:1.25}
-.card p{color:var(--muted);font-size:16px}
-.card ul{list-style:none;padding:0;margin-top:18px;display:grid;gap:10px}
-.card li{position:relative;padding-left:22px;font-size:16px}
-.card li::before{content:"";position:absolute;left:0;top:.5em;width:8px;height:8px;background:var(--green)}
-.num{font-size:15px;font-weight:600;color:var(--green-d);margin-bottom:22px;display:flex;align-items:center;gap:8px}
-.num::after{content:"";flex:1;height:1px;background:var(--line)}
-.big{padding:44px}
-.big h3{font-size:30px;letter-spacing:-.02em}
-.dark .card{background:#181a15;border-color:#2a2d24}
-.dark .card h3{color:#fff}
-.dark .card p,.dark .card li{color:#c9ccbd}
-.dark .card h3 span{color:var(--green)}
-.step{border-top:2px solid var(--ink);padding-top:20px}
-.step b{display:block;font-size:14px;color:var(--green-d);margin-bottom:10px;letter-spacing:.06em}
-.step h3{font-size:22px;font-weight:600;margin-bottom:8px;letter-spacing:-.01em}
-.step p{color:var(--muted);font-size:16px}
-details{border-top:1px solid var(--line);padding:22px 0}
-details:last-of-type{border-bottom:1px solid var(--line)}
-.soft .sub{color:#3f4239}
-summary{cursor:pointer;font-weight:500;font-size:20px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+/* nav */
+header{position:sticky;top:0;z-index:20;background:rgba(245,245,247,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid rgba(0,0,0,.08)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:52px;max-width:1080px;margin:0 auto;padding:0 24px}
+.logo img{height:22px;display:block}
+nav ul{display:flex;gap:34px;list-style:none;padding:0}
+nav a{text-decoration:none;font-size:14px;color:#424245}
+nav a:hover{color:#000}
+.navcta{font-size:13px;text-decoration:none;background:var(--ink);color:#fff;padding:6px 14px;border-radius:999px}
+.navcta:hover{background:#000}
+
+/* buttons / links */
+.btn{display:inline-block;padding:13px 26px;border-radius:999px;background:var(--ink);color:#fff;font:500 17px "Outfit",sans-serif;text-decoration:none;border:0;cursor:pointer;transition:background .2s}
+.btn:hover{background:#000}
+.btn.green{background:var(--green);color:#000}.btn.green:hover{background:#d3e3a8}
+.more{font-size:21px;color:var(--green-d);text-decoration:none;font-weight:500}
+.more::after{content:" ›"}
+.more:hover{text-decoration:underline}
+.dark .more{color:var(--green)}
+.row{display:flex;gap:28px;align-items:center;justify-content:center;flex-wrap:wrap}
+.dot{display:inline-block;width:.34em;height:.34em;background:var(--green);margin-left:.05em;vertical-align:baseline}
+
+/* type */
+.eyebrow{font-size:21px;font-weight:600;color:var(--green-d);margin-bottom:10px}
+.dark .eyebrow{color:var(--green)}
+h1{font-size:clamp(46px,9vw,104px);line-height:1.02;letter-spacing:-.045em;font-weight:600}
+h2{font-size:clamp(36px,6vw,68px);line-height:1.05;letter-spacing:-.04em;font-weight:600}
+h3{font-size:clamp(24px,3vw,34px);line-height:1.12;letter-spacing:-.025em;font-weight:600}
+.lead{font-size:clamp(20px,2.4vw,28px);line-height:1.3;color:var(--muted);font-weight:400;letter-spacing:-.015em;max-width:30em;margin:22px auto 0}
+.dark .lead{color:#a1a1a6}
+.center{text-align:center}
+
+/* sections */
+section{padding:120px 0}
+.hero{padding:96px 0 72px;text-align:center;background:var(--fog)}
+.hero h1{max-width:12em;margin:0 auto}
+.hero .row{margin-top:34px}
+.fog{background:var(--fog)}
+.dark{background:var(--black);color:#f5f5f7}
+.grey{background:var(--grey)}
+.sechead{text-align:center;margin-bottom:64px}
+.sechead h2{max-width:14em;margin:0 auto}
+
+/* flow visual */
+.stage{margin:72px auto 0;max-width:1000px;background:var(--paper);border-radius:32px;padding:48px 32px;box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;text-align:left}
+.node{position:relative;padding:0 14px}
+.node::before{content:"";position:absolute;top:19px;left:0;right:0;height:2px;background:var(--grey)}
+.node:first-child::before{left:14px}.node:last-child::before{right:calc(100% - 14px - 40px)}
+.pin{position:relative;width:40px;height:40px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:15px;font-weight:600;z-index:1}
+.node.on .pin{background:var(--green);color:#000}
+.node b{display:block;margin-top:18px;font-size:19px;font-weight:600;letter-spacing:-.01em}
+.node span{display:block;margin-top:4px;font-size:15px;color:var(--muted);line-height:1.35}
+.flowtag{display:inline-block;margin-top:10px;font-size:13px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--green);color:#000}
+
+/* tiles */
+.tiles{display:grid;gap:20px}
+.t2{grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.t4{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+.t3{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.tile{border-radius:28px;padding:44px 40px;background:var(--paper);overflow:hidden}
+.fog .tile{background:var(--paper)}
+.tile.g{background:var(--grey)}
+.tile.k{background:#161617;color:#f5f5f7}
+.tile.gr{background:var(--green)}
+.tile p{color:var(--muted);margin-top:14px;font-size:19px;line-height:1.4}
+.tile.g p,.tile.gr p{color:#3a3d33}
+.tile.k p{color:#a1a1a6}
+.tile ul{list-style:none;padding:0;margin:26px 0 30px;display:grid;gap:12px}
+.tile li{padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,.12);font-size:18px}
+.tile.k li{border-color:#2c2c2e}
+.tile li:last-child{border-bottom:0}
+.tile .n{font-size:15px;font-weight:600;color:var(--green-d);margin-bottom:56px;display:block}
+.tile.k .n{color:var(--green)}
+.tile.g .n,.tile.gr .n{color:#2d3a10}
+.tile.tall{min-height:420px;display:flex;flex-direction:column}
+.tile.tall .more{margin-top:auto;padding-top:24px}
+.tile.small{padding:32px 28px;min-height:250px}
+.tile.small h3{font-size:24px}
+.tile.small p{font-size:17px}
+
+/* steps */
+.steps{display:grid;gap:40px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.step .big{font-size:72px;font-weight:600;letter-spacing:-.05em;line-height:1;color:var(--grey)}
+.step h3{margin-top:14px;font-size:26px}
+.step p{margin-top:8px;color:var(--muted);font-size:18px}
+
+/* statement */
+.statement h2{font-size:clamp(40px,7.4vw,92px);max-width:11em;margin:0 auto}
+
+/* faq */
+.faq{max-width:760px;margin:0 auto}
+details{border-bottom:1px solid #d2d2d7;padding:24px 0}
+details:first-child{border-top:1px solid #d2d2d7}
+summary{cursor:pointer;font-weight:500;font-size:22px;list-style:none;display:flex;justify-content:space-between;gap:20px;letter-spacing:-.015em}
 summary::-webkit-details-marker{display:none}
-summary::after{content:"+";font-size:26px;line-height:1;color:var(--green-d)}
+summary::after{content:"+";font-size:30px;line-height:.9;color:var(--muted);font-weight:300}
 details[open] summary::after{content:"–"}
-details p{color:var(--muted);margin-top:12px;max-width:68ch}
-.contact{display:grid;gap:56px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start}
-form{display:grid;gap:16px}
-label{font-size:14px;font-weight:500;color:#c9ccbd}
-input,textarea,select{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #3a3d33;background:#181a15;color:#fff;font:inherit;font-size:16px;margin-top:6px}
+details p{margin-top:14px;color:var(--muted);font-size:19px;max-width:40em}
+
+/* contact */
+.contact{max-width:640px;margin:0 auto}
+form{display:grid;gap:14px;margin-top:48px;text-align:left}
+label{font-size:14px;color:#a1a1a6;font-weight:500}
+input,textarea,select{width:100%;padding:15px 16px;border-radius:14px;border:1px solid #3a3a3c;background:#1c1c1e;color:#fff;font:inherit;font-size:17px;margin-top:6px}
 input:focus,textarea:focus,select:focus{outline:2px solid var(--green);outline-offset:1px}
 textarea{min-height:120px;resize:vertical}
-.note{font-size:14px;color:#9a9d90}
-.contact p.line{margin-top:18px;color:#c9ccbd}
-footer{padding:36px 0;color:var(--muted);font-size:15px;border-top:1px solid var(--line)}
+.note{font-size:14px;color:#86868b;text-align:center}
+.mail{margin-top:26px;color:#a1a1a6;font-size:17px}
+
+footer{background:var(--fog);padding:28px 0;color:var(--muted);font-size:13px;border-top:1px solid #d2d2d7}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
-.foot img{height:22px;display:block}
-@media(max-width:760px){nav ul{display:none}.hero{padding:64px 0 56px}section{padding:64px 0}.card{padding:26px}.big{padding:30px}}
+.foot img{height:18px;display:block;opacity:.85}
+
+/* reveal */
+.js .rv{opacity:0;transform:translateY(28px);transition:opacity .9s cubic-bezier(.2,.7,.2,1),transform .9s cubic-bezier(.2,.7,.2,1)}
+.js .rv.in{opacity:1;transform:none}
+.js .rv.d1{transition-delay:.1s}.js .rv.d2{transition-delay:.2s}.js .rv.d3{transition-delay:.3s}
+@media (prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+
+@media(max-width:820px){
+  nav ul{display:none}
+  section{padding:80px 0}
+  .hero{padding:64px 0 48px}
+  .flow{grid-template-columns:1fr;gap:28px}
+  .node{padding:0;display:grid;grid-template-columns:40px 1fr;column-gap:16px;align-items:start}
+  .node::before{display:none}
+  .node b{margin-top:0}
+  .node .txt{grid-column:2}
+  .stage{padding:32px 24px;border-radius:24px}
+  .tile{padding:32px 26px;border-radius:24px}
+  .tile .n{margin-bottom:32px}
+  .tile.tall,.tile.small{min-height:0}
+}
 </style>
+<script>document.documentElement.classList.add('js')</script>
 </head>
 <body>
 <header>
-  <div class="wrap nav">
+  <div class="nav">
     <a class="logo" href="#" aria-label="Moobe"><img src="logo.png" alt="Moobe"></a>
     <nav><ul>
       <li><a href="#servicos">Serviços</a></li>
-      <li><a href="#agentes">Agentes de IA</a></li>
-      <li><a href="#metodo">Como trabalhamos</a></li>
+      <li><a href="#agentes">Agentes</a></li>
+      <li><a href="#metodo">Método</a></li>
       <li><a href="#faq">Dúvidas</a></li>
     </ul></nav>
-    <a class="btn sm" href="#contato">Falar com a Moobe</a>
+    <a class="navcta" href="#contato">Fale conosco</a>
   </div>
 </header>
 
 <main>
+<!-- HERO -->
 <section class="hero">
   <div class="wrap">
-    <div class="eyebrow">Consultoria para pequenas e médias empresas</div>
-    <h1>Mais vendas. Processos sob controle<span class="dot"></span></h1>
-    <p class="lead">Organizamos a forma como sua empresa vende e opera e, onde faz sentido, colocamos agentes de IA para executar as tarefas repetitivas. Menos improviso, mais resultado.</p>
-    <div class="cta">
+    <p class="eyebrow rv">Consultoria para pequenas e médias empresas</p>
+    <h1 class="rv d1">Mais vendas.<br>Processos sob controle<span class="dot"></span></h1>
+    <p class="lead rv d2">Organizamos como sua empresa vende e opera. E colocamos agentes de IA para fazer o trabalho repetitivo.</p>
+    <div class="row rv d3">
       <a class="btn" href="#contato">Agendar diagnóstico gratuito</a>
-      <a class="btn ghost" href="#servicos">Conhecer os serviços</a>
+      <a class="more" href="#servicos">Conhecer os serviços</a>
+    </div>
+
+    <div class="stage rv">
+      <div class="flow" aria-label="Exemplo de processo comercial com agente">
+        <div class="node on"><div class="pin">1</div><div class="txt"><b>Lead chega</b><span>WhatsApp, site, e-mail ou indicação</span><em class="flowtag" style="font-style:normal">Agente responde</em></div></div>
+        <div class="node on"><div class="pin">2</div><div class="txt"><b>Qualificação</b><span>Perfil, urgência e orçamento registrados no CRM</span><em class="flowtag" style="font-style:normal">Agente qualifica</em></div></div>
+        <div class="node"><div class="pin">3</div><div class="txt"><b>Proposta</b><span>Time comercial conduz a conversa e fecha</span></div></div>
+        <div class="node on"><div class="pin">4</div><div class="txt"><b>Acompanhamento</b><span>Follow-up e alertas de oportunidades paradas</span><em class="flowtag" style="font-style:normal">Agente cobra</em></div></div>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="soft">
+<!-- PROBLEMA -->
+<section class="dark">
   <div class="wrap">
-    <h2>Quando a empresa cresce, o improviso vira gargalo.</h2>
-    <p class="sub">Alguns sinais de que é hora de organizar o processo.</p>
-    <div class="grid g4">
-      <div class="card"><div class="num">01</div><h3>Leads esfriam</h3><p>O contato chega por vários canais e o retorno demora. A venda vai para quem respondeu primeiro.</p></div>
-      <div class="card"><div class="num">02</div><h3>Cada um faz de um jeito</h3><p>O processo vive na cabeça das pessoas. Qualidade e prazo variam e treinar alguém novo é lento.</p></div>
-      <div class="card"><div class="num">03</div><h3>Falta visibilidade</h3><p>Você não sabe onde a venda trava, o que está atrasado nem quanto custa o retrabalho.</p></div>
-      <div class="card"><div class="num">04</div><h3>Tarefa repetitiva demais</h3><p>Gente boa gasta o dia copiando dados, cobrando status e respondendo as mesmas perguntas.</p></div>
+    <div class="sechead">
+      <p class="eyebrow rv">O problema</p>
+      <h2 class="rv d1">A empresa cresceu. O improviso virou gargalo.</h2>
+    </div>
+    <div class="tiles t4">
+      <div class="tile k small rv"><h3>Leads esfriam.</h3><p>O retorno demora e a venda vai para quem respondeu primeiro.</p></div>
+      <div class="tile k small rv d1"><h3>Cada um faz de um jeito.</h3><p>O processo vive na cabeça das pessoas.</p></div>
+      <div class="tile k small rv d2"><h3>Falta visibilidade.</h3><p>Ninguém sabe onde a venda trava nem o que está atrasado.</p></div>
+      <div class="tile k small rv d3"><h3>Muito trabalho repetitivo.</h3><p>Gente boa gasta o dia copiando dados e cobrando status.</p></div>
     </div>
   </div>
 </section>
 
-<section id="servicos">
+<!-- SERVICOS -->
+<section id="servicos" class="fog">
   <div class="wrap">
-    <h2>Dois serviços que andam juntos.</h2>
-    <p class="sub">Primeiro entendemos e organizamos o processo. Depois automatizamos o que faz sentido.</p>
-    <div class="grid g2">
-      <div class="card big">
-        <div class="num">Serviço 1</div>
-        <h3>Consultoria de processos de negócio</h3>
-        <p>Mapeamos como a empresa funciona hoje, achamos os gargalos e desenhamos o processo ideal para o seu porte.</p>
+    <div class="sechead">
+      <p class="eyebrow rv">Serviços</p>
+      <h2 class="rv d1">Primeiro o processo. Depois a automação.</h2>
+      <p class="lead rv d2">Dois trabalhos que se completam.</p>
+    </div>
+    <div class="tiles t2">
+      <div class="tile g tall rv">
+        <span class="n">Consultoria</span>
+        <h3>Processos de negócio</h3>
+        <p>Mapeamos como a empresa funciona hoje, achamos os gargalos e desenhamos o processo certo para o seu porte.</p>
         <ul>
-          <li>Diagnóstico e mapeamento de processos</li>
+          <li>Diagnóstico e mapeamento</li>
           <li>Funil e processo comercial</li>
           <li>Indicadores, rotinas e responsáveis</li>
-          <li>Padronização simples de usar no dia a dia</li>
         </ul>
+        <a class="more" href="#contato" style="color:#2d3a10">Quero um diagnóstico</a>
       </div>
-      <div class="card big" id="agentes">
-        <div class="num">Serviço 2</div>
-        <h3>Agentes de IA para vendas e processos</h3>
-        <p>Desenvolvemos agentes sob medida que executam tarefas dentro dos seus processos, ligados às ferramentas que você já usa.</p>
+      <div class="tile k tall rv d1" id="agentes">
+        <span class="n">Agentes de IA</span>
+        <h3>Vendas e processos no automático</h3>
+        <p>Agentes sob medida que executam tarefas dentro dos seus processos, ligados às ferramentas que você já usa.</p>
         <ul>
           <li>Atendimento e qualificação de leads</li>
           <li>Acompanhamento e controle de processos</li>
-          <li>Integração com CRM, e-mail, WhatsApp e planilhas</li>
-          <li>Supervisão humana e registro de cada ação</li>
+          <li>CRM, e-mail, WhatsApp e planilhas</li>
         </ul>
+        <a class="more" href="#contato" style="color:var(--green)">Conversar sobre agentes</a>
       </div>
     </div>
   </div>
 </section>
 
-<section class="dark">
+<!-- O QUE FAZ -->
+<section>
   <div class="wrap">
-    <h2>O que um agente faz pela sua empresa<span class="dot"></span></h2>
-    <p class="sub">Exemplos de aplicação. Definimos com você o que dá mais retorno no seu caso.</p>
-    <div class="grid g3">
-      <div class="card"><h3><span>→</span> Para vender mais</h3><ul>
-        <li>Responde e qualifica leads na hora</li>
-        <li>Faz follow-up até o cliente decidir</li>
-        <li>Avisa a equipe de oportunidades paradas</li>
-        <li>Reativa clientes antigos</li></ul></div>
-      <div class="card"><h3><span>→</span> Para controlar processos</h3><ul>
-        <li>Cobra prazos e responsáveis</li>
-        <li>Confere dados e aponta pendências</li>
-        <li>Gera relatórios e alertas de atraso</li>
-        <li>Dá andamento a aprovações e pedidos</li></ul></div>
-      <div class="card"><h3><span>→</span> Com segurança</h3><ul>
-        <li>Regras claras do que o agente pode fazer</li>
-        <li>Aprovação humana em decisões sensíveis</li>
-        <li>Histórico completo para auditoria</li>
-        <li>Cuidado com dados pessoais (LGPD)</li></ul></div>
+    <div class="sechead">
+      <p class="eyebrow rv">Na prática</p>
+      <h2 class="rv d1">O que um agente faz pela sua empresa<span class="dot"></span></h2>
+    </div>
+    <div class="tiles t3">
+      <div class="tile g rv">
+        <h3>Para vender mais</h3>
+        <ul><li>Responde e qualifica leads na hora</li><li>Faz follow-up até o cliente decidir</li><li>Avisa sobre oportunidades paradas</li><li>Reativa clientes antigos</li></ul>
+      </div>
+      <div class="tile gr rv d1">
+        <h3>Para controlar processos</h3>
+        <ul><li>Cobra prazos e responsáveis</li><li>Confere dados e aponta pendências</li><li>Gera relatórios e alertas de atraso</li><li>Dá andamento a aprovações</li></ul>
+      </div>
+      <div class="tile k rv d2">
+        <h3>Com segurança</h3>
+        <ul><li>Regras claras do que o agente pode fazer</li><li>Aprovação humana em decisões sensíveis</li><li>Histórico completo para auditoria</li><li>Cuidado com dados pessoais (LGPD)</li></ul>
+      </div>
     </div>
   </div>
 </section>
 
-<section id="metodo">
+<!-- METODO -->
+<section id="metodo" class="fog">
   <div class="wrap">
-    <h2>Como trabalhamos.</h2>
-    <p class="sub">Começamos pequeno, medimos e crescemos conforme o resultado aparece.</p>
-    <div class="grid g4">
-      <div class="step"><b>01</b><h3>Diagnóstico</h3><p>Conversa e levantamento para entender metas, processos e onde está a perda.</p></div>
-      <div class="step"><b>02</b><h3>Desenho do processo</h3><p>Organizamos fluxo, responsáveis e indicadores antes de automatizar.</p></div>
-      <div class="step"><b>03</b><h3>Piloto</h3><p>Construímos um agente para o processo de maior impacto e testamos com sua equipe.</p></div>
-      <div class="step"><b>04</b><h3>Operação e melhoria</h3><p>Acompanhamos os números, ajustamos e levamos para novos processos.</p></div>
+    <div class="sechead">
+      <p class="eyebrow rv">Como trabalhamos</p>
+      <h2 class="rv d1">Começamos pequeno. Crescemos com o resultado.</h2>
+    </div>
+    <div class="steps">
+      <div class="step rv"><div class="big">1</div><h3>Diagnóstico</h3><p>Entendemos metas, processos e onde está a perda.</p></div>
+      <div class="step rv d1"><div class="big">2</div><h3>Desenho</h3><p>Organizamos fluxo, responsáveis e indicadores antes de automatizar.</p></div>
+      <div class="step rv d2"><div class="big">3</div><h3>Piloto</h3><p>Um agente no processo de maior impacto, testado com sua equipe.</p></div>
+      <div class="step rv d3"><div class="big">4</div><h3>Evolução</h3><p>Medimos, ajustamos e levamos para novos processos.</p></div>
     </div>
   </div>
 </section>
 
-<section id="faq" class="soft">
+<!-- STATEMENT -->
+<section class="grey statement center">
   <div class="wrap">
-    <h2>Dúvidas frequentes.</h2>
-    <p class="sub">&nbsp;</p>
-    <details><summary>Preciso trocar as ferramentas que já uso?</summary><p>Na maioria dos casos não. Os agentes se integram ao que você já tem (CRM, e-mail, WhatsApp, planilhas, sistemas de gestão) sempre que houver integração disponível.</p></details>
-    <details><summary>Minha empresa é pequena. Isso é para mim?</summary><p>Sim. O trabalho é dimensionado para PMEs. Começamos por um processo, o de maior impacto, sem projetos gigantes.</p></details>
-    <details><summary>A IA vai substituir minha equipe?</summary><p>O objetivo é tirar da equipe o trabalho repetitivo para que ela foque em atender clientes e decidir. Os agentes trabalham com regras e supervisão humana.</p></details>
-    <details><summary>Quanto tempo leva para ter um agente funcionando?</summary><p>Depende do processo e das integrações. No diagnóstico definimos escopo e prazo do piloto antes de qualquer compromisso.</p></details>
-    <details><summary>Meus dados ficam seguros?</summary><p>Tratamos os dados com acesso restrito e seguindo a LGPD. Combinamos com você quais informações o agente pode acessar.</p></details>
+    <h2 class="rv">Pessoas decidem.<br>Agentes executam<span class="dot"></span></h2>
+    <p class="lead rv d1" style="color:#3a3d33">Sua equipe fica com o que exige relacionamento e julgamento. O resto roda sozinho, com supervisão.</p>
   </div>
 </section>
 
-<section id="contato" class="dark">
+<!-- FAQ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sechead"><h2 class="rv">Dúvidas frequentes</h2></div>
+    <div class="faq rv">
+      <details><summary>Preciso trocar as ferramentas que já uso?</summary><p>Na maioria dos casos não. Os agentes se integram ao que você já tem (CRM, e-mail, WhatsApp, planilhas, sistemas de gestão) sempre que houver integração disponível.</p></details>
+      <details><summary>Minha empresa é pequena. Isso é para mim?</summary><p>Sim. O trabalho é dimensionado para PMEs. Começamos por um processo, o de maior impacto, sem projetos gigantes.</p></details>
+      <details><summary>A IA vai substituir minha equipe?</summary><p>O objetivo é tirar da equipe o trabalho repetitivo para que ela foque em atender clientes e decidir. Os agentes trabalham com regras e supervisão humana.</p></details>
+      <details><summary>Quanto tempo leva para ter um agente funcionando?</summary><p>Depende do processo e das integrações. No diagnóstico definimos escopo e prazo do piloto antes de qualquer compromisso.</p></details>
+      <details><summary>Meus dados ficam seguros?</summary><p>Tratamos os dados com acesso restrito e seguindo a LGPD. Combinamos com você quais informações o agente pode acessar.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- CONTATO -->
+<section id="contato" class="dark center">
   <div class="wrap contact">
-    <div>
-      <h2>Vamos conversar<span class="dot"></span></h2>
-      <p class="sub">Conte um pouco sobre sua empresa. Retornamos para agendar um diagnóstico gratuito e sem compromisso.</p>
+    <h2 class="rv">Vamos conversar<span class="dot"></span></h2>
+    <p class="lead rv d1">Conte um pouco sobre sua empresa. Retornamos para agendar um diagnóstico gratuito e sem compromisso.</p>
+    <div class="row rv d2" style="margin-top:32px">
       <a class="btn green" href="https://wa.me/5500000000000?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20processos%20e%20agentes%20de%20IA." target="_blank" rel="noopener">Chamar no WhatsApp</a>
-      <p class="line">contato@moobe.com.br</p>
     </div>
-    <form id="f">
+    <p class="mail rv d2">contato@moobe.com.br</p>
+    <form id="f" class="rv">
       <label>Nome<input name="nome" required autocomplete="name"></label>
       <label>E-mail<input name="email" type="email" required autocomplete="email"></label>
       <label>Empresa<input name="empresa" autocomplete="organization"></label>
@@ -243,6 +338,12 @@ footer{padding:36px 0;color:var(--muted);font-size:15px;border-top:1px solid var
 
 <script>
 document.getElementById('y').textContent=new Date().getFullYear();
+(function(){
+  var els=document.querySelectorAll('.rv');
+  if(!('IntersectionObserver' in window)){els.forEach(function(e){e.classList.add('in')});return}
+  var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target)}})},{threshold:.12,rootMargin:'0px 0px -6% 0px'});
+  els.forEach(function(e){io.observe(e)});
+})();
 document.getElementById('f').addEventListener('submit',function(e){
   e.preventDefault();
   var d=new FormData(e.target);
