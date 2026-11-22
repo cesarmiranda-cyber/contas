@@ -18,6 +18,7 @@ plink -i $Key "$User@$Server" "test -d '$Dest' && ls -ld '$Dest' || echo 'PASTA 
 
 Write-Host "2/3 Enviando index.html, logo.png e favicon.svg para $Dest ..."
 pscp -i $Key @files "$User@${Server}:$Dest/"
+if ($LASTEXITCODE -ne 0) { throw "Falha no envio (pscp). Nada foi publicado. Confira a senha da chave e tente de novo." }
 
 Write-Host "3/3 Conferindo os arquivos publicados..."
 plink -i $Key "$User@$Server" "ls -l '$Dest'"
