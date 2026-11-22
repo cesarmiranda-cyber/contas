@@ -16,7 +16,7 @@ services:
       traefik.docker.network: traefik_public
       traefik.http.routers.moobe.rule: Host(`moobe.com.br`) || Host(`www.moobe.com.br`)
       traefik.http.routers.moobe.entrypoints: websecure
-      traefik.http.routers.moobe.tls.certresolver: tenants
+      traefik.http.routers.moobe.tls.certresolver: le
       traefik.http.services.moobe.loadbalancer.server.port: "80"
 networks:
   traefik_public:
