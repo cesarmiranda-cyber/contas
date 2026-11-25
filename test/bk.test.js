@@ -147,69 +147,113 @@ test('BK: cria no Bitrix24 as empresas das unidades (CNPJ igual só vincula; com
   const us = (await call('GET', '/api/bk/unidades?pp=100')).itens; assert.ok(us.every(u => u.empresaBitrixId)); assert.equal(us.find(u => u.bkn === '7').empresaBitrixId, '5');
 });
 
-test('BK: Kanban do funil 18 — colunas, tipos, alertas, mover, vínculo por CNPJ e unidade pelo card', async () => {
-  const { createBxEmpresas } = require('../lib/bxEmpresas'), { createBxFunil } = require('../lib/bxFunil'), { cnpjValido } = require('../lib/cnpj');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-')), fin = createFinStore(dir), calls = [], empresas = [{ ID: '5', TITLE: 'BK Anhaia', UF_C: '13.574.594/0654-84' }];
-  const deals = [
-    { ID: '101', TITLE: 'BKN 7 — Anhaia Mello: licença', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '5', UF_CRM_1795613816: ['530', '558'], DATE_CREATE: '2026-11-20T10:00:00-03:00' },
-    { ID: '102', TITLE: 'BKN 8 — Loja Oito', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '0', UF_CRM_1795613816: [], DATE_CREATE: '2026-11-21T10:00:00-03:00' },
-    { ID: '103', TITLE: 'BKN 99 — Loja Nova', CATEGORY_ID: '18', STAGE_ID: 'C18:WON', COMPANY_ID: '5', UF_CRM_1795613816: ['562'], DATE_CREATE: '2026-11-19T10:00:00-03:00' }];
-  const bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) { calls.push([m, p]);
-    if (m === 'crm.company.fields') return { result: { UF_C: { formLabel: 'CNPJ' } } };
-    if (m === 'crm.company.list') return { result: empresas }; if (m === 'crm.company.add') { empresas.push({ ID: '6', TITLE: p.fields.TITLE, UF_C: p.fields.UF_C }); return { result: '6' }; }
-    if (m === 'crm.status.list') return { result: [['C18:NEW', 'Solicitação'], ['C18:WON', 'Finalizada'], ['C18:LOSE', 'Cancelado']].map(([STATUS_ID, NAME]) => ({ STATUS_ID, NAME })) };
-    if (m === 'crm.deal.fields') return { result: { UF_CRM_1795613816: { isMultiple: true, items: [{ ID: '530', VALUE: 'Licença sanitária' }, { ID: '558', VALUE: 'Defesa' }, { ID: '562', VALUE: 'Visita técnica' }] } } };
-    if (m === 'crm.deal.list') return { result: deals.filter(x => String(x.CATEGORY_ID) === String(p.filter.CATEGORY_ID)) };
-    if (m === 'crm.deal.get') return { result: deals.find(x => x.ID === String(p.id)) };
-    if (m === 'crm.deal.update') { Object.assign(deals.find(x => x.ID === String(p.id)), p.fields); return { result: true }; }
-    if (m === 'crm.requisite.list') return { result: [] }; return { result: true }; } };
-  const cnpjApi = { cnpjValido, consultar: async c => ({ cnpj: c, razao: 'LOJA OITO LTDA', fantasia: 'Loja Oito', cidade: 'Santos', uf: 'SP', cep: '11000000', bairro: 'Centro' }) };
-  const api = createBkApi({ fin, bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), cnpjApi, store: { log() {} }, dir });
-  const call = async (m, p, b) => { const u = new URL('http://x' + p); return (await api.handle(m, u.pathname, u, async () => b || {})).json; };
-  await call('POST', '/api/bk/importar', { csv: 'BKN;Unidade BK;CNPJ;Cidade;Estado\n7;Anhaia Mello;13574594065484;São Paulo;SP\n' });
-  let k = await call('GET', '/api/bk/kanban');
-  assert.deepEqual(k.etapas.map(e => e.nome), ['Solicitação', 'Finalizada', 'Cancelado']); assert.equal(k.cards.length, 3); assert.deepEqual(k.resumo, { total: 3, semEmpresa: 1, semTipo: 1, semUnidade: 2 });
-  assert.equal(k.cards[0].id, '102'); assert.ok(k.cards[0].semEmpresa && k.cards[0].semTipo);                  // pendentes no topo
-  const c1 = k.cards.find(c => c.id === '101'); assert.deepEqual(c1.tiposNomes, ['Licença sanitária', 'Defesa']); assert.equal(c1.unidade.nome, 'Anhaia Mello'); assert.equal(c1.empresa.nome, 'BK Anhaia');
-  await call('POST', '/api/bk/kanban/101/mover', { etapa: 'C18:WON' }); assert.equal(deals[0].STAGE_ID, 'C18:WON'); await assert.rejects(call('POST', '/api/bk/kanban/101/mover', { etapa: 'C14:X' }), /Etapa inválida/);
-  await call('PUT', '/api/bk/kanban/102/tipos', { tipos: ['562'] }); assert.deepEqual(deals[1].UF_CRM_1795613816, ['562']); await assert.rejects(call('PUT', '/api/bk/kanban/102/tipos', { tipos: ['1'] }), /inválido/);
-  await assert.rejects(call('POST', '/api/bk/kanban/102/empresa/buscar', { cnpj: '123' }), /CNPJ inválido/);
-  const bu = await call('POST', '/api/bk/kanban/102/empresa/buscar', { cnpj: '11.222.333/0001-81' }); assert.equal(bu.encontradas.length, 0); assert.equal(bu.receita.razao, 'LOJA OITO LTDA');
-  const ach = await call('POST', '/api/bk/kanban/102/empresa/buscar', { cnpj: '13.574.594/0654-84' }); assert.equal(ach.encontradas[0].id, '5'); assert.ok(!bitrix.calls || true);
-  assert.equal(deals[1].COMPANY_ID, '0');                                                                       // buscar não vincula sozinho
-  const cr = await call('POST', '/api/bk/kanban/102/empresa/criar', { cnpj: '11222333000181', nome: 'Loja Oito' }); assert.equal(cr.empresa.id, '6'); assert.equal(deals[1].COMPANY_ID, '6');
-  const nu = await call('POST', '/api/bk/kanban/103/unidade', {}); assert.equal(nu.unidade.bkn, '99'); assert.equal(nu.unidade.nome, 'Loja Nova'); await assert.rejects(call('POST', '/api/bk/kanban/103/unidade', {}), /Já existe/);
-  k = await call('GET', '/api/bk/kanban'); assert.deepEqual(k.resumo, { total: 3, semEmpresa: 0, semTipo: 0, semUnidade: 1 });   // falta só a unidade do BKN 8
+// Bitrix24 de mentira para o funil 18 (negócios, campos do usuário, formulário, contatos).
+function fakeFunil18() {
+  const st = { deals: [], uf: new Map(), cfg: [{ name: 'main', title: 'Sobre o negócio', type: 'section', elements: [{ name: 'TITLE' }, { name: 'CLIENT' }, { name: 'UF_CRM_1795613816' }, { name: 'UF_CRM_1795615183' }] }], cfgSet: null, file: 900, calls: [], comentarios: [] };
+  const add = (cod, o) => st.uf.set(cod, { ID: String(st.uf.size + 1), FIELD_NAME: cod, ...o });
+  add('UF_CRM_1795613816', { MULTIPLE: 'N', USER_TYPE_ID: 'enumeration', LIST: [{ ID: '530', VALUE: 'Licença sanitária' }, { ID: '532', VALUE: 'ASO' }, { ID: '558', VALUE: 'Defesa' }] }); add('UF_CRM_1795615183', { MULTIPLE: 'Y', USER_TYPE_ID: 'crm' });
+  const fields = () => Object.fromEntries([...st.uf.values()].map(f => [f.FIELD_NAME, { isMultiple: f.MULTIPLE === 'Y', items: (f.LIST || []).map(i => ({ ID: i.ID, VALUE: i.VALUE })) }]));
+  const stages = [['C18:NEW', 'Solicitação'], ['C18:UC_L', 'Levantamento Documento'], ['C18:UC_V', 'Verfiicação Documentação'], ['C18:UC_E', 'Envio de Documentos'], ['C18:WON', 'Finalizada'], ['C18:LOSE', 'Cancelado']];
+  const itemsDe = lst => (lst || []).map((i, k) => ({ ID: i.ID || String(1000 + st.uf.size * 100 + k), VALUE: i.VALUE, SORT: i.SORT }));
+  st.bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) {
+    st.calls.push([m, p]);
+    switch (m) {
+      case 'crm.deal.fields': return { result: fields() };
+      case 'crm.deal.userfield.list': return { result: [...st.uf.values()].filter(f => !p.filter || f.FIELD_NAME === p.filter.FIELD_NAME) };
+      case 'crm.deal.userfield.add': { const f = p.fields; add('UF_CRM_' + f.FIELD_NAME, { MULTIPLE: f.MULTIPLE, USER_TYPE_ID: f.USER_TYPE_ID, LIST: itemsDe(f.LIST) }); return { result: 1 }; }
+      case 'crm.deal.userfield.update': { const f = [...st.uf.values()].find(x => x.ID === String(p.id)); f.LIST = itemsDe(p.fields.LIST); return { result: true }; }
+      case 'crm.deal.userfield.delete': for (const [k, v] of st.uf) if (v.ID === String(p.id)) st.uf.delete(k); return { result: true };
+      case 'crm.item.details.configuration.get': return { result: JSON.parse(JSON.stringify(st.cfg)) };
+      case 'crm.item.details.configuration.set': st.cfgSet = p.data; st.cfg = p.data; return { result: true };
+      case 'crm.status.list': return { result: stages.map(([STATUS_ID, NAME]) => ({ STATUS_ID, NAME })) };
+      case 'crm.deal.list': return { result: st.deals.filter(x => String(x.CATEGORY_ID) === String(p.filter.CATEGORY_ID)) };
+      case 'crm.deal.get': return { result: st.deals.find(x => x.ID === String(p.id)) };
+      case 'crm.deal.update': { const x = st.deals.find(y => y.ID === String(p.id)); for (const [k, v] of Object.entries(p.fields)) { if (Array.isArray(v) && v.some(i => i && i.fileData)) x[k] = v.map(i => (i.fileData ? { id: ++st.file, nome: i.fileData[0], showUrl: '/f/' + st.file } : { id: i.id })); else x[k] = v; } return { result: true }; }
+      case 'crm.company.fields': return { result: { UF_C: { formLabel: 'CNPJ' } } }; case 'crm.company.userfield.list': return { result: [] };
+      case 'crm.company.list': return { result: [{ ID: '5', TITLE: 'BK Anhaia', UF_C: '13.574.594/0654-84' }] };
+      case 'crm.company.add': return { result: '6' };
+      case 'crm.contact.list': return { result: p.filter && p.filter.COMPANY_ID ? [{ ID: '31', NAME: 'Ana', LAST_NAME: 'Gerente', EMAIL: [{ VALUE: 'ana@bk.com' }] }, { ID: '32', NAME: 'Sem Email' }] : [{ ID: '31', NAME: 'Ana', LAST_NAME: 'Gerente', EMAIL: [{ VALUE: 'ana@bk.com' }] }] };
+      case 'crm.contact.get': return { result: { ID: p.id, NAME: 'Ana', LAST_NAME: 'Gerente', EMAIL: [{ VALUE: 'ana@bk.com' }] } };
+      case 'crm.timeline.comment.add': st.comentarios.push(p.fields.COMMENT); return { result: 1 };
+      case 'crm.requisite.list': return { result: [] };
+      default: return { result: true };
+    } } };
+  return st;
+}
+const apiFunil18 = (st, extra = {}) => {
+  const { createBxEmpresas } = require('../lib/bxEmpresas'), { createBxFunil } = require('../lib/bxFunil'), { cnpjValido } = require('../lib/cnpj'), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-')), fin = createFinStore(dir);
+  const cnpjApi = { cnpjValido, consultar: async c => { if (!cnpjValido(c)) throw new Error('CNPJ inválido.'); return { cnpj: c, razao: 'LOJA OITO LTDA', fantasia: 'Loja Oito', cidade: 'Santos', uf: 'SP', cep: '11000000', bairro: 'Centro' }; } };
+  const api = createBkApi({ fin, bitrix: st.bitrix, bx: createBxEmpresas({ bitrix: st.bitrix }), funil: createBxFunil({ bitrix: st.bitrix }), cnpjApi, store: { log() {} }, dir, ...extra });
+  const call = async (m, p, b, user) => { const u = new URL('http://x' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user || { nome: 'Mônica', perfil: 'admin' })).json; };
+  return { api, call };
+};
+
+test('BK funil 18: preparar campos (Tipo de Serviço múltiplo, unidade, documentos), migração do tipo e formulário do negócio', async () => {
+  const st = fakeFunil18(); st.deals.push({ ID: '101', TITLE: 'BKN 7 — Anhaia', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '5', UF_CRM_1795613816: '530' });
+  const { call } = apiFunil18(st);
+  let k = await call('GET', '/api/bk/kanban'); assert.equal(k.campos.prontos, false); assert.equal(k.campos.novoTipo, false); assert.deepEqual(k.cards[0].tiposNomes, ['Licença sanitária']);   // funciona com o campo antigo
+  const sim = await call('POST', '/api/bk/kanban/preparar', {}); assert.equal(sim.simulacao, true); assert.ok(sim.criar.includes('Tipo de Serviço') && sim.criar.includes('Documentos Recebidos'));
+  const r = await call('POST', '/api/bk/kanban/preparar', { simular: false }); assert.ok(r.criados.includes('Tipo de Serviço')); assert.equal(r.migrados, 1);
+  assert.equal(st.uf.get('UF_CRM_BK_TIPO_SERV').MULTIPLE, 'Y'); assert.deepEqual(st.uf.get('UF_CRM_BK_TIPO_SERV').LIST.map(i => i.VALUE), ['Licença sanitária', 'ASO', 'Defesa']); assert.equal(st.uf.get('UF_CRM_BK_DOCS_RECEB').MULTIPLE, 'Y'); assert.equal(st.uf.get('UF_CRM_BK_LICENCA').LIST.length, 3);
+  const main = st.cfgSet.find(s => s.name === 'main').elements.map(e => e.name); assert.ok(main.includes('UF_CRM_BK_TIPO_SERV') && !main.includes('UF_CRM_1795613816') && main.includes('UF_CRM_1795615183') && main.includes('CLIENT'));
+  assert.ok(st.cfgSet.find(s => s.name === 'bk_unidade').elements.some(e => e.name === 'UF_CRM_BK_RT_NOME')); assert.ok(st.cfgSet.find(s => s.name === 'bk_docs'));
+  k = await call('GET', '/api/bk/kanban'); assert.equal(k.campos.prontos, true); assert.equal(k.multiplo, true); assert.deepEqual(k.cards[0].tiposNomes, ['Licença sanitária']); assert.equal(k.cards[0].tipos.length, 1);
+  assert.equal((await call('POST', '/api/bk/kanban/preparar', { simular: false })).criados.length, 0);   // idempotente
+  await call('PUT', '/api/bk/kanban/101/tipos', { tipos: st.uf.get('UF_CRM_BK_TIPO_SERV').LIST.slice(0, 2).map(i => i.ID) }); assert.equal(st.deals[0].UF_CRM_BK_TIPO_SERV.length, 2);
 });
 
-test('BK: documentos da solicitação — campos, solicitar (move para Levantamento), anexar vários arquivos sem perder os anteriores', async () => {
-  const { createBxEmpresas } = require('../lib/bxEmpresas'), { createBxFunil } = require('../lib/bxFunil');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bk-')), fin = createFinStore(dir), users = []; let proximoArq = 500;
-  const deal = { ID: '201', TITLE: 'BKN 55 — Loja', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '5' }, aplic = [];
-  const campos = () => ({ UF_CRM_BK_DOCS_SOLIC: { isMultiple: true, items: [{ ID: '1', VALUE: 'Cartão CNPJ' }, { ID: '2', VALUE: 'ASO' }] }, UF_CRM_BK_DOCS_SOLIC_A: { items: [{ ID: '8', VALUE: 'Gerente do BK' }, { ID: '9', VALUE: 'Empresa envolvida' }] }, UF_CRM_BK_DOCS_DATA: {}, UF_CRM_BK_DOCS_RECEB: {}, UF_CRM_BK_DOCS_NUTRI: {} });
-  const bitrix = { enabled: true, base: 'https://p.bitrix24.com.br/rest/1/x', async call(m, p) {
-    if (m === 'crm.deal.userfield.list') return { result: users.map(n => ({ FIELD_NAME: n })) }; if (m === 'crm.deal.userfield.add') { users.push('UF_CRM_' + p.fields.FIELD_NAME); aplic.push(p.fields); return { result: 1 }; }
-    if (m === 'crm.deal.fields') return { result: users.length >= 5 ? campos() : {} };
-    if (m === 'crm.company.fields') return { result: {} }; if (m === 'crm.company.userfield.list') return { result: [] }; if (m === 'crm.company.list') return { result: [{ ID: '5', TITLE: 'BK Loja' }] };
-    if (m === 'crm.contact.list') return { result: [{ ID: '31', NAME: 'Ana', LAST_NAME: 'Gerente', EMAIL: [{ VALUE: 'ana@bk.com' }] }, { ID: '32', NAME: 'Sem Email' }] };
-    if (m === 'crm.status.list') return { result: [['C18:NEW', 'Solicitação'], ['C18:UC_L', 'Levantamento Documento'], ['C18:WON', 'Finalizada']].map(([STATUS_ID, NAME]) => ({ STATUS_ID, NAME })) };
-    if (m === 'crm.deal.get') return { result: deal }; if (m === 'crm.deal.list') return { result: [deal] }; if (m === 'crm.deal.fields') return { result: users.length >= 5 ? campos() : {} };
-    if (m === 'crm.deal.update') { for (const [k, v] of Object.entries(p.fields)) { if (Array.isArray(v) && v.some(i => i && i.fileData)) deal[k] = v.map(i => (i.fileData ? { id: ++proximoArq, nome: i.fileData[0] } : { id: i.id })); else deal[k] = v; } return { result: true }; }
-    return { result: true }; } };
-  const api = createBkApi({ fin, bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), store: { log() {} }, dir });
-  const call = async (m, p, b) => { const u = new URL('http://x' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, { nome: 'Mônica' })).json; };
-  await assert.rejects(call('POST', '/api/bk/kanban/201/documentos/solicitar', { docs: ['1'], para: '8' }), /ainda não existem/);
-  assert.equal((await call('POST', '/api/bk/kanban/preparar', {})).criar.length, 5);
-  const pr = await call('POST', '/api/bk/kanban/preparar', { simular: false }); assert.equal(pr.criados.length, 5); assert.equal(aplic.find(f => f.FIELD_NAME === 'BK_DOCS_RECEB').MULTIPLE, 'Y'); assert.equal(aplic.find(f => f.FIELD_NAME === 'BK_DOCS_SOLIC').LIST.length >= 10, true);
-  assert.equal((await call('POST', '/api/bk/kanban/preparar', { simular: false })).criados.length, 0);   // idempotente
-  await assert.rejects(call('POST', '/api/bk/kanban/201/documentos/solicitar', { docs: [], para: '8' }), /ao menos um/); await assert.rejects(call('POST', '/api/bk/kanban/201/documentos/solicitar', { docs: ['1'], para: '99' }), /a quem/);
-  const s = await call('POST', '/api/bk/kanban/201/documentos/solicitar', { docs: ['1', '2'], para: '8', mensagem: 'Olá, precisamos dos documentos.' });
-  assert.equal(s.moveuPara, 'Levantamento Documento'); assert.equal(deal.STAGE_ID, 'C18:UC_L'); assert.deepEqual(deal.UF_CRM_BK_DOCS_SOLIC, ['1', '2']); assert.deepEqual(s.emails, [{ nome: 'Ana Gerente', email: 'ana@bk.com' }]);
+test('BK funil 18: checklist por tipo de serviço (modelos, itens no Bitrix24, bloqueio ao avançar) e prazos por tipo', async () => {
+  const st = fakeFunil18(), { call } = apiFunil18(st); st.deals.push({ ID: '101', TITLE: 'BKN 7 — Anhaia', CATEGORY_ID: '18', STAGE_ID: 'C18:UC_V', COMPANY_ID: '5' });
+  await call('POST', '/api/bk/kanban/preparar', { simular: false }); const tipos = st.uf.get('UF_CRM_BK_TIPO_SERV').LIST, lic = tipos.find(t => t.VALUE === 'Licença sanitária').ID, aso = tipos.find(t => t.VALUE === 'ASO').ID; st.deals[0].UF_CRM_BK_TIPO_SERV = [lic, aso];
+  await assert.rejects(call('PUT', '/api/bk/kanban/checklists', { checklists: { ASO: ['x'] } }, { nome: 'Op', perfil: 'financeiro' }), /administrador/);
+  await call('PUT', '/api/bk/kanban/checklists', { checklists: { 'Licença sanitária': ['CNPJ conferido', 'Planta anexada'], ASO: 'Exame admissional\nExame periódico' } });
+  assert.deepEqual(st.uf.get('UF_CRM_BK_CHECK').LIST.map(i => i.VALUE), ['Licença sanitária › CNPJ conferido', 'Licença sanitária › Planta anexada', 'ASO › Exame admissional', 'ASO › Exame periódico']); assert.equal(st.uf.get('UF_CRM_BK_CHECK').MULTIPLE, 'Y');
+  assert.ok(st.cfgSet.find(s => s.name === 'bk_check'));
+  await call('PUT', '/api/bk/kanban/checklists', { checklists: { 'Licença sanitária': ['CNPJ conferido', 'Planta anexada', 'Laudo da água'], ASO: ['Exame admissional', 'Exame periódico'] } });   // item novo entra, os antigos ficam
+  assert.equal(st.uf.get('UF_CRM_BK_CHECK').LIST.length, 5);
+  let c = (await call('GET', '/api/bk/kanban')).cards[0]; assert.equal(c.checklist.total, 5); assert.equal(c.checklist.pendentes, 5); assert.deepEqual(c.checklist.grupos.map(g => g.tipo), ['Licença sanitária', 'ASO']); assert.equal(c.checklistPendente, true);
+  await assert.rejects(call('POST', '/api/bk/kanban/101/mover', { etapa: 'C18:UC_E' }), /Checklist de verificação incompleto: faltam 5/);
+  await call('POST', '/api/bk/kanban/101/mover', { etapa: 'C18:LOSE' }); assert.equal(st.deals[0].STAGE_ID, 'C18:LOSE'); st.deals[0].STAGE_ID = 'C18:UC_V';   // cancelar nunca é bloqueado
+  const chaves = c.checklist.grupos.flatMap(g => g.itens.map(i => i.chave)); await assert.rejects(call('PUT', '/api/bk/kanban/101/checklist', { feitos: ['ASO › inventado'] }), /inválido/);
+  await call('PUT', '/api/bk/kanban/101/checklist', { feitos: chaves.slice(0, 3) }); c = (await call('GET', '/api/bk/kanban')).cards[0]; assert.equal(c.checklist.feitos, 3); assert.equal(c.checklist.grupos[0].itens.filter(i => i.feito).length, 3);
+  await assert.rejects(call('POST', '/api/bk/kanban/101/mover', { etapa: 'C18:UC_E' }), /faltam 2.*ASO \(2\)/);
+  await call('PUT', '/api/bk/kanban/101/checklist', { feitos: chaves }); await call('POST', '/api/bk/kanban/101/mover', { etapa: 'C18:UC_E' }); assert.equal(st.deals[0].STAGE_ID, 'C18:UC_E');
+  st.deals[0].STAGE_ID = 'C18:UC_V'; st.deals[0].UF_CRM_BK_CHECK = []; st.deals[0].UF_CRM_BK_TIPO_SERV = [lic, aso, tipos.find(t => t.VALUE === 'Defesa').ID];   // tipo sem modelo não trava, mas é avisado
+  c = (await call('GET', '/api/bk/kanban')).cards[0]; assert.deepEqual(c.checklist.semModelo, ['Defesa']);
+  await call('PUT', '/api/bk/kanban/101/prazos', { prazos: { 'Licença sanitária': '2026-12-10', ASO: '2026-11-01' } }); assert.equal(st.deals[0].UF_CRM_BK_PRAZOS, 'Licença sanitária: 10/12/2026\nASO: 01/11/2026');
+  c = (await call('GET', '/api/bk/kanban')).cards[0]; assert.equal(c.prazos['Licença sanitária'], '2026-12-10'); assert.equal(c.prazoVencido, true); await assert.rejects(call('PUT', '/api/bk/kanban/101/prazos', { prazos: { 'Outro': '2026-12-10' } }), /não está neste negócio/);
+  st.deals[0].UF_CRM_BK_PRAZOS = 'ASO: 20/12/2026'; c = (await call('GET', '/api/bk/kanban')).cards[0]; assert.equal(c.prazoVencido, false);   // quem edita no Bitrix24 também vale
+});
+
+test('BK funil 18: dados da unidade nos dois sentidos (app ⇄ formulário do negócio) e unidade criada a partir do negócio', async () => {
+  const st = fakeFunil18(), { api, call } = apiFunil18(st); st.deals.push({ ID: '101', TITLE: 'BKN 7 — Anhaia', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '5' }, { ID: '102', TITLE: 'BKN 88 — Loja Nova', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '5' });
+  await call('POST', '/api/bk/importar', { csv: 'BKN;Unidade BK;CNPJ;Cidade;Estado\n7;Anhaia Mello;13574594065484;São Paulo;SP\n' }); await call('PUT', `/api/bk/unidades/${api.unidades()[0].id}`, { rt: { nome: 'Dra. Ana' } });
+  await call('POST', '/api/bk/kanban/preparar', { simular: false }); const lic = st.uf.get('UF_CRM_BK_LICENCA').LIST;
+  await call('GET', '/api/bk/kanban'); const x = st.deals.find(d => d.ID === '101');
+  assert.equal(x.UF_CRM_BK_BKN, '7'); assert.equal(x.UF_CRM_BK_UNIDADE, 'Anhaia Mello'); assert.equal(x.UF_CRM_BK_CIDADE, 'São Paulo'); assert.equal(x.UF_CRM_BK_RT_NOME, 'Dra. Ana'); assert.equal(x.UF_CRM_BK_LICENCA, lic.find(i => i.VALUE === 'Pendente').ID);   // app → Bitrix24
+  x.UF_CRM_BK_CIDADE = 'Campinas'; x.UF_CRM_BK_LICENCA = lic.find(i => i.VALUE === 'Sim').ID; x.UF_CRM_BK_LIC_VALIDADE = '2027-05-01T03:00:00+03:00'; await call('GET', '/api/bk/kanban');                                       // Bitrix24 → app
+  const un = api.unidades().find(u => u.bkn === '7'); assert.equal(un.cidade, 'Campinas'); assert.equal(un.licenca, 'sim'); assert.equal(un.licencaValidade, '2027-05-01');
+  const id = un.id; await call('PUT', `/api/bk/unidades/${id}`, { uf: 'MG' }); await call('GET', '/api/bk/kanban'); assert.equal(x.UF_CRM_BK_UF, 'MG'); assert.equal(x.UF_CRM_BK_CIDADE, 'Campinas');   // edição no app volta ao Bitrix24 sem desfazer o outro lado
+  x.UF_CRM_BK_UF = 'RJ'; await call('PUT', `/api/bk/unidades/${id}`, { uf: 'ES' }); await call('GET', '/api/bk/kanban'); assert.equal(api.unidades().find(u => u.id === id).uf, 'RJ');   // mudaram os dois: vale o Bitrix24
+  const y = st.deals.find(d => d.ID === '102'); y.UF_CRM_BK_UNIDADE = 'Loja Nova SP'; y.UF_CRM_BK_CNPJ = '11.222.333/0001-81'; y.UF_CRM_BK_RT_NOME = 'Dr. Beto'; y.UF_CRM_BK_LICENCA = lic.find(i => i.VALUE === 'Não').ID;
+  const nu = await call('POST', '/api/bk/kanban/102/unidade', {}); assert.equal(nu.unidade.nome, 'Loja Nova SP'); const u2 = api.unidades().find(u => u.bkn === '88'); assert.equal(u2.cnpj, '11222333000181'); assert.equal(u2.rt.nome, 'Dr. Beto'); assert.equal(u2.licenca, 'nao'); assert.equal(u2.empresaBitrixId, '5');
+});
+
+test('BK funil 18: pedir documentos a contatos/empresas do CRM, anexar vários arquivos e vincular empresa/contato no card', async () => {
+  const st = fakeFunil18(), { call } = apiFunil18(st); st.deals.push({ ID: '201', TITLE: 'BKN 55 — Loja', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '5' }, { ID: '202', TITLE: 'BKN 8 — Oito', CATEGORY_ID: '18', STAGE_ID: 'C18:NEW', COMPANY_ID: '0' });
+  await assert.rejects(call('POST', '/api/bk/kanban/201/pedir', { refs: ['C_31'] }), /ainda não existem/); await call('POST', '/api/bk/kanban/preparar', { simular: false });
+  const op = await call('GET', '/api/bk/kanban/201/pedir/opcoes'); assert.deepEqual(op.opcoes.map(o => o.ref), ['CO_5', 'C_31', 'C_32']);
+  await assert.rejects(call('POST', '/api/bk/kanban/201/pedir', { refs: [] }), /a quem/); await assert.rejects(call('POST', '/api/bk/kanban/201/pedir', { refs: ['X_1'] }), /a quem/);
+  const p = await call('POST', '/api/bk/kanban/201/pedir', { refs: ['C_31', 'CO_5'], mensagem: 'Olá, precisamos dos documentos.' });
+  assert.deepEqual(st.deals[0].UF_CRM_1795615183, ['C_31', 'CO_5']); assert.equal(st.deals[0].STAGE_ID, 'C18:UC_L'); assert.equal(p.moveuPara, 'Levantamento Documento'); assert.deepEqual(p.emails, [{ nome: 'Ana Gerente', email: 'ana@bk.com' }]); assert.ok(st.comentarios.some(c => /Documentos solicitados/.test(c)));
+  let c = (await call('GET', '/api/bk/kanban')).cards.find(x => x.id === '201'); assert.deepEqual(c.pedir.map(x => x.nome), ['Ana Gerente', 'BK Anhaia']);
   const b64 = Buffer.from('conteudo').toString('base64');
-  await call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'recebidos', arquivos: [{ nome: 'cnpj.pdf', dados: b64 }] });
-  await call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'recebidos', arquivos: [{ nome: 'aso.pdf', dados: 'data:application/pdf;base64,' + b64 }, { nome: 'ru/im.pdf', dados: b64 }] });
-  assert.equal(deal.UF_CRM_BK_DOCS_RECEB.length, 3);                                                          // anexos acumulam
-  await call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'nutrimix', arquivos: [{ nome: 'plano.docx', dados: b64 }] }); assert.equal(deal.UF_CRM_BK_DOCS_NUTRI.length, 1);
-  await assert.rejects(call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'outro', arquivos: [{ nome: 'x', dados: b64 }] }), /Escolha onde/); await assert.rejects(call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'recebidos', arquivos: [{ nome: 'x', dados: '' }] }), /vazio/);
-  const k = await call('GET', '/api/bk/kanban'), c = k.cards[0]; assert.equal(k.docs.prontos, true); assert.deepEqual(c.docs.solicitados, ['Cartão CNPJ', 'ASO']); assert.equal(c.docs.para, 'Gerente do BK'); assert.equal(c.docs.recebidos.length, 3); assert.equal(c.docs.nutrimix.length, 1); assert.equal(c.docs.nomes.length, 4);
+  await call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'recebidos', arquivos: [{ nome: 'cnpj.pdf', dados: b64 }] }); await call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'recebidos', arquivos: [{ nome: 'aso.pdf', dados: 'data:application/pdf;base64,' + b64 }, { nome: 'ru/im.pdf', dados: b64 }] });
+  await call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'nutrimix', arquivos: [{ nome: 'plano.docx', dados: b64 }] });
+  assert.equal(st.deals[0].UF_CRM_BK_DOCS_RECEB.length, 3); assert.equal(st.deals[0].UF_CRM_BK_DOCS_NUTRI.length, 1); await assert.rejects(call('POST', '/api/bk/kanban/201/documentos/anexar', { campo: 'outro', arquivos: [{ nome: 'x', dados: b64 }] }), /Escolha onde/);
+  c = (await call('GET', '/api/bk/kanban')).cards.find(x => x.id === '201'); assert.equal(c.docs.recebidos.length, 3); assert.equal(c.docs.nutrimix.length, 1); assert.equal(c.docs.nomes.length, 4);
+  await assert.rejects(call('GET', '/api/bk/kanban/202/contatos'), /Vincule primeiro/); await assert.rejects(call('POST', '/api/bk/kanban/202/empresa/buscar', { cnpj: '123' }), /CNPJ inválido/);
+  const ach = await call('POST', '/api/bk/kanban/202/empresa/buscar', { cnpj: '13.574.594/0654-84' }); assert.equal(ach.encontradas[0].id, '5'); assert.equal(st.deals[1].COMPANY_ID, '0');   // buscar não vincula sozinho
+  await call('POST', '/api/bk/kanban/202/empresa/vincular', { empresaId: '5' }); assert.equal(st.deals[1].COMPANY_ID, '5');
+  const ct = await call('GET', '/api/bk/kanban/202/contatos'); assert.equal(ct.contatos.length, 2); await call('POST', '/api/bk/kanban/202/contato', { contatoId: '31' }); assert.equal(st.deals[1].CONTACT_ID, '31'); await assert.rejects(call('POST', '/api/bk/kanban/202/contato', { contatoId: '99' }), /não pertence/);
 });

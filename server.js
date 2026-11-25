@@ -238,7 +238,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, r.json);
     }
     if (u.pathname.startsWith('/api/bk/')) {
-      const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : /^\/api\/bk\/kanban\/\d+\/documentos\/anexar$/.test(u.pathname) ? 14e6 : 1e6));
+      const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : /^\/api\/bk\/kanban\/\d+\/documentos\/anexar$/.test(u.pathname) ? 14e6 : 1e6), req.user);
       return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
     }
     if (u.pathname.startsWith('/api/settings/integracoes')) return send(res, 200, await integ.handle(req.method, u.pathname, () => readBody(req, 100000)));
@@ -305,6 +305,7 @@ server.listen(PORT, () => {
     try { const a = await demApi.avisar(); if (a.enviados.length) console.log('avisos de prazo (processos)', a.enviados.length); } catch (e) { console.error('avisos processos', e.message); }
     try { if (demApi.dados().config.importarFormularios !== false) { const r = await demApi.sincronizarServicos({ simular: false }), f = r.importar; if (f.criados.length || f.erros.length || r.espelho.refeitos || r.espelho.erros.length || r.automatico.length) console.log('sincronia Bitrix24 ⇄ app', JSON.stringify({ criados: f.criados.length, semClassificar: f.semClassificar.length, refeitos: r.espelho.refeitos, automaticos: r.automatico.length, erros: [...f.erros, ...r.espelho.erros].slice(0, 3) })); } } catch (e) { console.error('formulários do Bitrix24', e.message); }
     try { if (demApi.dados().config.fechamentoAuto) { const f = await demApi.fechamento({ simular: false }); if (f.criados.length || f.erros.length) console.log('fechamento comercial', JSON.stringify({ criados: f.criados.length, semClassificar: f.semClassificar.length, erros: f.erros.slice(0, 3) })); } } catch (e) { console.error('fechamento comercial', e.message); }
+    try { const r = await bkApi.sincronizarSolicitacoes(); if (r && (r.unidades || r.negocios)) console.log('sync solicitações BK', JSON.stringify(r)); } catch (e) { console.error('sync solicitações BK', e.message); }
     try { const r = await bkApi.sincronizarFunil({ simular: false }); console.log('sync BK', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync BK', e.message); } };
   setTimeout(sincBitrix, 60000); setInterval(sincBitrix, 3600 * 1000);
   const avisarBk = () => bitrix.enabled && bkApi.avisar().then(r => r.enviados.length && console.log('avisos BK', r.enviados.length)).catch(e => console.error('avisos BK', e.message));
