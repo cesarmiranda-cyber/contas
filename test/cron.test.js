@@ -229,3 +229,20 @@ test('consultoras: incluir, inativar, transferir; recorrência a partir do clien
   assert.ok((await call('POST', '/modelos/gerar', { semanas: 12 })).criadas > 0);   // agora a Iris gera
   await call('PUT', `/consultoras/${mo.id}`, { ativo: true }); assert.equal(api.dados().consultoras[0].ativo, true);
 });
+
+test('visibilidade: consultora vê só as próprias visitas, salvo se o administrador a incluir em "vê tudo"', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json'), hoje = require('../lib/rules').todayBR();
+  fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica', 'Iris'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }], visitas: [{ data: hoje, consultora: 'Mônica', cliente: 'Domus', min: 60 }, { data: hoje, consultora: 'Iris', cliente: 'Domus', min: 90 }] }));
+  const api = createCronApi({ bitrix: fakeBitrix(), bx: createBxEmpresas({ bitrix: fakeBitrix() }), funil: createBxFunil({ bitrix: fakeBitrix() }), store: { log() {} }, dir, seedFile: seed });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/cron' + p); const r = await api.handle(m, u.pathname, u, async () => b || {}, user); return r.json; };
+  const [mo, ir] = api.dados().consultoras; mo.bitrixId = '7'; ir.bitrixId = '8';
+  const adm = { perfil: 'admin' }, eu = { perfil: 'operacional', bitrixId: '7' }, q = `/periodo?de=${hoje}&ate=${hoje}`;
+  assert.equal((await call('GET', q, null, adm)).itens.length, 2);
+  const meu = await call('GET', q + `&consultora=${ir.id}`, null, eu); assert.equal(meu.itens.length, 1); assert.equal(meu.itens[0].consultora, mo.id);   // pedir a agenda da outra não adianta
+  const b = await call('GET', '/bootstrap', null, eu); assert.equal(b.consultoras.length, 1); assert.equal(b.escopoProprio, true); assert.equal((await call('GET', '/bootstrap', null, adm)).escopoProprio, false);
+  assert.equal((await call('GET', `/semana?data=${hoje}`, null, eu)).total, 1);
+  assert.equal((await call('GET', '/periodo?de=' + hoje + '&ate=' + hoje, null, { perfil: 'operacional', bitrixId: '999' })).itens.length, 0);   // não ligada a nenhuma consultora: não vê nada
+  await call('POST', '/consultoras/visibilidade', { ids: [mo.id, 'inexistente'] }, adm); assert.deepEqual(api.dados().config.verTudo, [mo.id]);
+  assert.equal((await call('GET', q, null, eu)).itens.length, 2); assert.equal((await call('GET', '/bootstrap', null, eu)).escopoProprio, false);
+  assert.equal((await call('GET', q, null, { perfil: 'operacional', bitrixId: '8' })).itens.length, 1);   // a Iris continua só com as dela
+});
