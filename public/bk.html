@@ -83,6 +83,22 @@ nav{align-items:center}nav .sp{flex:1}
 .kb-ac{margin-top:7px!important}.kb-ac .btn{padding:3px 10px;font-size:12px}
 .kb-mv small{display:block;padding:6px 10px 2px;color:var(--mut);font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}.kb-mv a{padding:8px 10px;color:var(--ink);text-decoration:none;font-size:13.5px;border-radius:6px}.kb-mv a:hover{background:var(--brandbg)}.kb-mv button{white-space:nowrap}
 .kb-mv .kb-ls{max-height:280px;overflow:auto;display:grid;gap:2px;padding:2px 6px}.kb-mv .kb-ls label{display:flex;gap:8px;align-items:center;padding:4px 4px;border-radius:5px;cursor:pointer;font-size:13.5px}.kb-mv .kb-ls label:hover{background:var(--brandbg)}
+
+/* Unidades */
+.u-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.u-top input[type=search]{flex:1;min-width:220px;max-width:420px}.u-top select.ativo{border-color:var(--brand);color:var(--brand)}
+.u-seg{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.u-seg .kb-chip b{margin-left:3px}
+.u-lista{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ur{display:grid;grid-template-columns:78px minmax(200px,2.2fr) 130px minmax(160px,1.6fr) 150px 130px;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);font-size:13.5px}.ur:last-child{border-bottom:0}
+.ur[data-id]{cursor:pointer}.ur[data-id]:hover,.ur[data-id]:focus-visible{background:var(--brandbg);outline:none}.ur.off{opacity:.62}
+.ur.uc{background:var(--bg);padding:8px 16px;position:sticky;top:0}.uh{border:0;background:none;font:inherit;font-size:12px;font-weight:650;color:var(--mut);text-align:left;cursor:pointer;padding:0;text-transform:none}.uh:hover{color:var(--brand)}
+.u-bkn{font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:600}.u-nome{min-width:0}.u-nome b,.u-rt b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.u-nome small{display:block;color:var(--mut);font-size:12px;margin-top:1px}
+.u-rt{min-width:0}.vl{display:inline-flex;flex-direction:column;line-height:1.25;font-variant-numeric:tabular-nums}.vl small{font-size:11px;font-weight:600}.vl.b{color:var(--bad)}.vl.w{color:var(--warn)}.vl.ok{color:var(--ink)}.vl.ok small{color:var(--mut)}
+.sel.i{background:var(--brandbg);color:var(--brand)}.sel.n{background:var(--bg);color:var(--mut)}
+.u-pag{display:flex;gap:10px;align-items:center;margin-top:12px}
+@media(max-width:900px){.ur{grid-template-columns:64px minmax(0,1fr) 120px;row-gap:4px}.ur .u-rt,.ur .u-et,.uc .u-rt,.uc .u-et{display:none}.ur .u-si{grid-column:3}}
+@media(max-width:560px){.ur{grid-template-columns:56px minmax(0,1fr)}.ur .u-lic,.uc .u-lic{display:none}.ur .u-si{grid-column:2}}
+.kb-wrap{position:relative}.kb-edge{position:absolute;top:50%;transform:translateY(-50%);z-index:4;width:34px;height:56px;border:1px solid var(--line);background:var(--surface);color:var(--brand);border-radius:10px;font-size:22px;cursor:pointer;box-shadow:0 2px 8px #0002;display:grid;place-items:center}.kb-edge.l{left:-14px}.kb-edge.r{right:-14px}.kb-edge:hover{background:var(--brandbg)}.kb-edge[hidden]{display:none}
+.kb-set{display:flex;gap:2px;align-items:center}.kb-set .kb-mn{font-size:21px;font-weight:700;line-height:.9;padding:2px 7px;border:1px solid var(--line);margin-left:2px}.kb-set .kb-mn[disabled]{opacity:.25;cursor:default}
 </style>
 </head>
 <body>
@@ -132,9 +148,10 @@ function kbDesenha() {
   const casa = c => (!t || `${c.titulo} ${c.bkn} ${c.unidade ? c.unidade.nome + ' ' + c.unidade.cidade + ' ' + c.unidade.rt : ''} ${c.empresa ? c.empresa.nome : ''}`.toLowerCase().includes(t)) && (!KB.tipos.size || c.tipos.some(x => KB.tipos.has(x)))
     && (!KB.pend || (KB.pend === 'empresa' ? c.semEmpresa : KB.pend === 'tipo' ? c.semTipo : KB.pend === 'unidade' ? c.semUnidade : KB.pend === 'check' ? c.checklistPendente : c.prazoVencido));
   const vis = r.cards.filter(casa), pends = [['empresa', 'Sem empresa', r.resumo.semEmpresa], ['tipo', 'Sem tipo', r.resumo.semTipo], ['unidade', 'Sem unidade no app', r.resumo.semUnidade], ['check', 'Checklist pendente', r.resumo.checklistPendente], ['prazo', 'Prazo vencido', r.resumo.prazoVencido]];
+  const seq = r.etapas.filter(e => e.tom !== 'n'), vizinha = (c, d) => { const i = seq.findIndex(e => e.id === c.etapa); return i < 0 ? null : seq[i + d] || null; };   // setas ‹ › andam entre as etapas do fluxo (cancelar fica no menu)
   const principal = c => { const e = etapa(c); return c.semEmpresa ? ['vi', 'Vincular empresa'] : c.semTipo ? ['ti', 'Definir tipo'] : e.envio ? ['ge', 'Gerar documentos'] : e.levantamento && r.campos.docs ? ['do', 'Pedir documentos'] : e.verificacao && c.checklist.pendentes ? ['de', 'Checklist'] : null; };
   const card = c => { const e = etapa(c), pr = podeEditar ? principal(c) : null, tn = c.tiposNomes; const alerta = c.semEmpresa || c.semTipo || c.checklistPendente || c.prazoVencido;
-    return `<div class="kb-cd ${alerta ? 'alerta' : ''}" data-id="${h(c.id)}" ${podeEditar ? 'draggable="true"' : ''}><div class="kb-h"><b>${h(tituloCard(c))}</b>${podeEditar ? `<button class="kb-mn" data-mn="${h(c.id)}" aria-label="Mais ações">⋯</button>` : ''}</div>
+    return `<div class="kb-cd ${alerta ? 'alerta' : ''}" data-id="${h(c.id)}" ${podeEditar ? 'draggable="true"' : ''}><div class="kb-h"><b>${h(tituloCard(c))}</b>${podeEditar ? `<span class="kb-set"><button class="kb-mn" data-pv="${h(c.id)}" title="Mover para a etapa anterior" aria-label="Etapa anterior" ${vizinha(c, -1) ? '' : 'disabled'}>‹</button><button class="kb-mn" data-nx="${h(c.id)}" title="Mover para a próxima etapa" aria-label="Próxima etapa" ${vizinha(c, 1) ? '' : 'disabled'}>›</button><button class="kb-mn" data-mn="${h(c.id)}" aria-label="Mais ações">⋯</button></span>` : ''}</div>
       <small>${c.unidade ? [c.unidade.cidade, c.unidade.uf].filter(Boolean).join('/') || 'cidade não informada' : 'Unidade não cadastrada no app'}${c.empresa ? ' · ' + h(c.empresa.nome) : ''}</small>
       <div class="kb-tg">${tn.slice(0, 2).map(n => `<span title="${c.prazos[n] ? 'Prazo: ' + dt(c.prazos[n]) : ''}">${h(n)}${c.prazos[n] ? ' · ' + dt(c.prazos[n]).slice(0, 5) : ''}</span>`).join('')}${tn.length > 2 ? `<span title="${h(tn.slice(2).join(', '))}">+${tn.length - 2}</span>` : ''}${c.semTipo ? '<span class="al">Sem tipo</span>' : ''}${c.semEmpresa ? '<span class="al">Sem empresa</span>' : ''}${c.semUnidade && !c.semEmpresa ? '<span class="w">Sem unidade</span>' : ''}${c.checklistPendente && !e.verificacao ? '<span class="al">Checklist pendente</span>' : e.verificacao && c.checklist.total ? `<span class="${c.checklist.pendentes ? 'w' : 'ok'}">✔ ${c.checklist.feitos}/${c.checklist.total}</span>` : ''}${c.prazoVencido ? '<span class="al">Prazo vencido</span>' : ''}${c.docs && (c.docs.recebidos.length || c.docs.nutrimix.length) ? `<span title="Recebidos / elaborados pela Nutrimix">📎 ${c.docs.recebidos.length}${c.docs.nutrimix.length ? '+' + c.docs.nutrimix.length : ''}</span>` : ''}</div>
       ${pr ? `<div class="kb-ac"><button class="btn ${pr[0] === 'vi' ? 'p' : ''}" data-${pr[0]}="${h(c.id)}">${pr[1]}</button></div>` : ''}</div>`; };
@@ -142,9 +159,11 @@ function kbDesenha() {
   <div class="kb-top"><input id="kq" type="search" placeholder="Buscar BKN, unidade, cidade, RT ou empresa" value="${h(KB.q)}"><button class="btn ${KB.tipos.size ? 'p' : ''}" id="ktp">Tipo de serviço${KB.tipos.size ? ` (${KB.tipos.size})` : ''} ▾</button>
   <select id="kpe" class="${KB.pend ? 'ativo' : ''}"><option value="">Pendências</option>${pends.map(([k, n, q]) => `<option value="${k}" ${KB.pend === k ? 'selected' : ''}>${n} (${q})</option>`).join('')}</select>
   <span class="mut kb-n">${vis.length === r.resumo.total ? r.resumo.total : vis.length + ' de ' + r.resumo.total} solicitação(ões)</span><span class="sp"></span><button class="btn" id="kl" aria-label="Rolar para a esquerda">‹</button><button class="btn" id="kr" aria-label="Rolar para a direita">›</button><button class="btn" id="kre" title="Recarregar do Bitrix24 (atualiza sozinho a cada minuto)">↻</button><a class="btn" href="https://${h(BOOT.bitrixHost || '')}/crm/deal/kanban/category/18/" target="_blank" rel="noopener" title="Abrir o funil no Bitrix24">Bitrix24 ↗</a></div>
-  <div class="kb-col">${r.etapas.map(e => { const l = vis.filter(c => c.etapa === e.id); return `<div class="kb-cx ${e.tom} ${l.length ? '' : 'vazio'}" data-col="${h(e.id)}"><h3>${h(e.nome)} <span class="cnt">${l.length}</span></h3><div class="kb-lista">${l.map(card).join('') || '<p class="mut" style="font-size:12.5px;margin:4px 2px">Vazio</p>'}</div></div>`; }).join('')}</div>`;
+  <div class="kb-wrap"><button class="kb-edge l" id="kel" aria-label="Rolar para a esquerda" hidden>‹</button><button class="kb-edge r" id="ker" aria-label="Rolar para a direita" hidden>›</button><div class="kb-col">${r.etapas.map(e => { const l = vis.filter(c => c.etapa === e.id); return `<div class="kb-cx ${e.tom} ${l.length ? '' : 'vazio'}" data-col="${h(e.id)}"><h3>${h(e.nome)} <span class="cnt">${l.length}</span></h3><div class="kb-lista">${l.map(card).join('') || '<p class="mut" style="font-size:12.5px;margin:4px 2px">Vazio</p>'}</div></div>`; }).join('')}</div></div>`;
   const col = $('#tela').querySelector('.kb-col'); col.scrollLeft = keep; const passo = () => 280;
-  $('#kl').onclick = () => col.scrollBy({ left: -passo(), behavior: 'smooth' }); $('#kr').onclick = () => col.scrollBy({ left: passo(), behavior: 'smooth' }); $('#kre').onclick = () => kanban();
+  const rola = d => col.scrollBy({ left: d * passo(), behavior: 'smooth' }), bordas = () => { $('#kel').hidden = col.scrollLeft < 8; $('#ker').hidden = col.scrollLeft + col.clientWidth >= col.scrollWidth - 8; };
+  $('#kl').onclick = () => rola(-1); $('#kr').onclick = () => rola(1); $('#kel').onclick = () => rola(-1); $('#ker').onclick = () => rola(1); $('#kre').onclick = () => kanban(); col.onscroll = bordas; bordas();
+  col.onwheel = e => { if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; if (!e.target.closest('.kb-lista')) { col.scrollLeft += e.deltaY; e.preventDefault(); } };
   let tq; $('#kq').oninput = e => { clearTimeout(tq); tq = setTimeout(() => { KB.q = e.target.value; kbDesenha(); const i = $('#kq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 200); };
   $('#kpe').onchange = e => { KB.pend = e.target.value; kbDesenha(); };
   $('#ktp').onclick = e => { e.stopPropagation(); menuFlutuante(e.currentTarget, `<small>Tipo de serviço (marque um ou mais)</small><div class="kb-ls">${r.tipos.map(x => `<label><input type="checkbox" value="${h(x.id)}" ${KB.tipos.has(x.id) ? 'checked' : ''}> ${h(x.nome)}</label>`).join('')}</div><button data-lim>Limpar filtro</button>`, m => { m.querySelectorAll('input').forEach(i => i.onchange = () => { i.checked ? KB.tipos.add(i.value) : KB.tipos.delete(i.value); kbDesenha(); }); m.querySelector('[data-lim]').onclick = () => { KB.tipos.clear(); kbDesenha(); }; }); };
@@ -152,6 +171,8 @@ function kbDesenha() {
   const abre = id => por.get(id);
   const mover = async (c, etapaId) => { if (!c || c.etapa === etapaId) return; const antes = c.etapa; c.etapa = etapaId; kbDesenha();   // o card muda de coluna na hora; se o Bitrix24 recusar, volta
     try { await api('POST', `/kanban/${c.id}/mover`, { etapa: etapaId }); aviso(`“${tituloCard(c)}” movido para ${(r.etapas.find(e => e.id === etapaId) || {}).nome}.`); } catch (er) { c.etapa = antes; kbDesenha(); aviso(er.message, true); } };
+  $('#tela').querySelectorAll('[data-pv]').forEach(b => b.onclick = e => { e.stopPropagation(); const c = abre(b.dataset.pv), v = vizinha(c, -1); if (v) mover(c, v.id); });
+  $('#tela').querySelectorAll('[data-nx]').forEach(b => b.onclick = e => { e.stopPropagation(); const c = abre(b.dataset.nx), v = vizinha(c, 1); if (v) mover(c, v.id); });
   const acao = { vi: c => kbVincular(c), ti: c => kbTipos(c, r), ge: c => kbGerar(c, r), do: c => kbDocs(c, r), de: c => kbDetalhe(c, r) };
   for (const k of Object.keys(acao)) $('#tela').querySelectorAll(`[data-${k}]`).forEach(b => b.onclick = e => { e.stopPropagation(); acao[k](abre(b.getAttribute('data-' + k))); });
   $('#tela').querySelectorAll('.kb-cd').forEach(el => el.onclick = e => { if (!e.target.closest('button')) kbDetalhe(abre(el.dataset.id), r); });
@@ -318,26 +339,37 @@ const processo = guarda(async () => {
 });
 
 // ---------- Unidades ----------
+// Nomes em CAIXA ALTA ficam legíveis (siglas curtas e números continuam como estão).
+const bonito = t => String(t || '').replace(/\S+/g, w => { if (w !== w.toUpperCase() || !/[A-ZÀ-Ú]/.test(w)) return w; if (/^(DE|DA|DO|DAS|DOS|E)$/.test(w)) return w.toLowerCase(); if (w.length <= 3 || /\d/.test(w)) return w; return w[0] + w.slice(1).toLowerCase(); });
+const diasAte = d => Math.round((Date.parse(d + 'T00:00:00Z') - Date.parse(BOOT.hoje + 'T00:00:00Z')) / 864e5);
+const validade = (d, rotulo) => { if (!d) return '<span class="mut">—</span>'; const n = diasAte(d); return `<span class="vl ${n < 0 ? 'b' : n <= 30 ? 'w' : 'ok'}" title="${rotulo}: ${dt(d)}">${dt(d)}<small>${n < 0 ? 'vencida há ' + -n + ' d' : n === 0 ? 'vence hoje' : n <= 90 ? 'em ' + n + ' d' : ''}</small></span>`; };
+const TOM_ETAPA = { aguardando: 'w', enviado: 'i', reenviado: 'i', em_analise: 'i', aguarda_licenca: 'i', deferido: 'ok', desligado: 'n' };
 const unidades = guarda(async () => {
-  await boot();
-  const q = new URLSearchParams({ ...F, pp: 25 }); const l = await api('GET', '/unidades?' + q);
-  const ufs = [...new Set(BOOT.resumo.porUf.map(x => x.uf))].sort();
-  $('#tela').innerHTML = `<h1>Unidades</h1><p class="sub">${l.total} unidade(s). Clique numa linha para ver a ficha, o RT e o histórico.</p>
-  <div class="tools"><input id="fq" type="search" placeholder="Buscar BKN, nome, cidade, RT ou CNPJ" value="${h(F.q)}" style="flex:1;min-width:220px">
-  <select id="fuf"><option value="">Todos os estados</option>${ufs.map(u => `<option ${u === F.uf ? 'selected' : ''}>${h(u)}</option>`).join('')}</select>
-  <select id="fet"><option value="">Todas as etapas</option>${BOOT.etapas.map(([k, n]) => `<option value="${k}" ${k === F.etapa ? 'selected' : ''}>${h(n)}</option>`).join('')}</select>
-  <select id="fsi">${[['', 'Toda situação'], ['conforme', 'Conformes'], ['pendente', 'Com pendência'], ['semrt', 'Sem RT'], ['vencendo', 'Vencendo']].map(([k, n]) => `<option value="${k}" ${k === F.situacao ? 'selected' : ''}>${n}</option>`).join('')}</select>
-  ${podeEditar ? '<button class="btn p" id="nova">Nova unidade</button><button class="btn" id="imp">Importar CSV</button>' : ''}<button class="btn" id="exp">Exportar CSV</button></div>
-  <div class="box tw"><table><tr><th>BKN</th><th>Unidade</th><th>Cidade/UF</th><th>Licença</th><th>RT</th><th>Etapa</th><th>Situação</th></tr>
-  ${l.itens.map(u => `<tr class="cl" data-id="${h(u.id)}"><td>${h(u.bkn)}</td><td>${h(u.nome)}</td><td>${h(u.cidade)}${u.uf ? '/' + h(u.uf) : ''}</td><td>${u.licenca === 'sim' ? 'Sim' + (u.licencaValidade ? ' · até ' + dt(u.licencaValidade) : '') : u.licenca === 'nao' ? 'Não' : '—'}</td><td>${h(u.rt.nome) || (u.necessitaRt === 'sim' ? '<span class="sel b">sem RT</span>' : '—')}</td><td>${h((BOOT.etapas.find(e => e[0] === u.etapa) || [])[1])}</td><td>${selUnidade(u)}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">Nenhuma unidade encontrada.</td></tr>'}</table>
-  <div class="pag"><button class="btn" id="pa" ${l.pagina <= 1 ? 'disabled' : ''}>‹</button> página ${l.pagina} de ${l.paginas} <button class="btn" id="pn" ${l.pagina >= l.paginas ? 'disabled' : ''}>›</button></div></div>`;
+  await boot(); if (!F.ordem) { F.ordem = 'bkn'; F.dir = 'asc'; }
+  const q = new URLSearchParams({ ...F, pp: 30 }), l = await api('GET', '/unidades?' + q), r = BOOT.resumo, ufs = [...new Set(r.porUf.map(x => x.uf))].sort();
+  const seg = [['', 'Todas', r.total], ['conforme', 'Conformes', r.conformes], ['pendente', 'Com pendência', r.comPendencia], ['semrt', 'Sem RT', r.semRt], ['vencendo', 'Vencendo', r.vencidos + r.criticos]];
+  const cab = (k, n, cls = '') => `<button class="uh ${cls}" data-o="${k}" title="Ordenar por ${n.toLowerCase()}">${n}${F.ordem === k ? (F.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button>`;
+  const linha = u => { const e = (BOOT.etapas.find(x => x[0] === u.etapa) || [, u.etapa])[1], sit = u.pendencias && u.pendencias.length ? `<span class="sel b" title="${h(u.pendencias.join(' · '))}">${u.pendencias.length} pendência(s)</span>` : u.ativa ? '<span class="sel ok">Conforme</span>' : '<span class="sel">Inativa</span>';
+    return `<div class="ur ${u.ativa ? '' : 'off'}" data-id="${h(u.id)}" tabindex="0"><span class="u-bkn">${h(u.bkn)}</span><span class="u-nome"><b title="${h(u.nome)}">${h(bonito(u.nome))}</b><small>${h([u.cidade, u.uf].filter(Boolean).join('/') || 'cidade não informada')}${u.empresaBitrixId ? '' : ' · sem empresa'}</small></span>
+      <span class="u-lic">${u.licenca === 'sim' ? validade(u.licencaValidade, 'Validade da licença') : u.licenca === 'nao' ? '<span class="sel b">Sem licença</span>' : '<span class="mut">pendente</span>'}</span>
+      <span class="u-rt">${u.rt.nome ? `<b title="${h(u.rt.nome)}">${h(bonito(u.rt.nome))}</b>${u.rt.validade ? validade(u.rt.validade, 'Validade do RT') : ''}` : u.necessitaRt === 'sim' ? '<span class="sel b">sem RT</span>' : '<span class="mut">dispensa</span>'}</span>
+      <span class="u-et"><span class="sel ${TOM_ETAPA[u.etapa] || ''}">${h(e)}</span></span><span class="u-si">${sit}</span></div>`; };
+  $('#tela').innerHTML = `<div class="u-top"><input id="fq" type="search" placeholder="Buscar BKN, nome, cidade, RT ou CNPJ" value="${h(F.q)}"><select id="fuf" class="${F.uf ? 'ativo' : ''}"><option value="">Estado</option>${ufs.map(u => `<option ${u === F.uf ? 'selected' : ''}>${h(u)}</option>`).join('')}</select>
+  <select id="fet" class="${F.etapa ? 'ativo' : ''}"><option value="">Etapa</option>${BOOT.etapas.map(([k, n]) => `<option value="${k}" ${k === F.etapa ? 'selected' : ''}>${h(n)}</option>`).join('')}</select><span class="sp"></span>
+  <button class="btn" id="umn" aria-label="Importar ou exportar" title="Importar / exportar">⋯</button>${podeEditar ? '<button class="btn p" id="nova">+ Nova unidade</button>' : ''}</div>
+  <div class="u-seg">${seg.map(([k, n, q]) => `<button class="kb-chip" aria-pressed="${(F.situacao || '') === k}" data-s="${k}">${n} <b>${q}</b></button>`).join('')}<span class="mut" style="margin-left:auto;font-size:12.5px">${l.total} unidade(s)</span></div>
+  <div class="u-lista"><div class="ur uc">${cab('bkn', 'BKN', 'u-bkn')}${cab('nome', 'Unidade', 'u-nome')}${cab('licenca', 'Licença', 'u-lic')}${cab('rt', 'Responsável técnico', 'u-rt')}${cab('etapa', 'Etapa', 'u-et')}${cab('situacao', 'Situação', 'u-si')}</div>
+  ${l.itens.map(linha).join('') || '<p class="mut" style="padding:24px;text-align:center">Nenhuma unidade com esses filtros.</p>'}</div>
+  <div class="u-pag"><span class="mut">${l.total ? `${(l.pagina - 1) * 30 + 1}–${Math.min(l.total, l.pagina * 30)} de ${l.total}` : ''}</span><span class="sp"></span><button class="btn" id="pa" ${l.pagina <= 1 ? 'disabled' : ''}>‹ Anterior</button><span class="mut">página ${l.pagina} de ${l.paginas}</span><button class="btn" id="pn" ${l.pagina >= l.paginas ? 'disabled' : ''}>Próxima ›</button></div>`;
   const re = () => unidades(); let t;
-  $('#fq').oninput = e => { clearTimeout(t); t = setTimeout(() => { F.q = e.target.value; F.page = 1; re(); }, 350); };
-  $('#fuf').onchange = e => { F.uf = e.target.value; F.page = 1; re(); }; $('#fet').onchange = e => { F.etapa = e.target.value; F.page = 1; re(); }; $('#fsi').onchange = e => { F.situacao = e.target.value; F.page = 1; re(); };
+  $('#fq').oninput = e => { clearTimeout(t); t = setTimeout(async () => { F.q = e.target.value; F.page = 1; await re(); const i = $('#fq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
+  $('#fuf').onchange = e => { F.uf = e.target.value; F.page = 1; re(); }; $('#fet').onchange = e => { F.etapa = e.target.value; F.page = 1; re(); };
+  $('#tela').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { F.situacao = b.dataset.s; F.page = 1; re(); });
+  $('#tela').querySelectorAll('[data-o]').forEach(b => b.onclick = () => { F.dir = F.ordem === b.dataset.o && F.dir === 'asc' ? 'desc' : 'asc'; F.ordem = b.dataset.o; F.page = 1; re(); });
   $('#pa').onclick = () => { F.page = l.pagina - 1; re(); }; $('#pn').onclick = () => { F.page = l.pagina + 1; re(); };
-  $('#tela').querySelectorAll('tr.cl').forEach(r => r.onclick = () => ficha(r.dataset.id));
-  if (podeEditar) { $('#nova').onclick = () => formUnidade(); $('#imp').onclick = importar; }
-  $('#exp').onclick = guarda(async () => { const t = await api('GET', '/unidades?pp=100&page=1'); const todas = []; for (let p = 1; p <= t.paginas; p++) todas.push(...(await api('GET', '/unidades?pp=100&page=' + p)).itens); csv(todas); });
+  $('#tela').querySelectorAll('.ur[data-id]').forEach(r => { r.onclick = () => ficha(r.dataset.id); r.onkeydown = e => { if (e.key === 'Enter') ficha(r.dataset.id); }; });
+  if (podeEditar) $('#nova').onclick = () => formUnidade();
+  $('#umn').onclick = e => { e.stopPropagation(); menuFlutuante(e.currentTarget, `${podeEditar ? '<button data-u="imp">Importar CSV</button>' : ''}<button data-u="exp">Exportar CSV</button>`, m => m.querySelectorAll('[data-u]').forEach(b => b.onclick = guarda(async () => { m.remove(); if (b.dataset.u === 'imp') return importar(); const t = await api('GET', '/unidades?pp=100&page=1'); const todas = []; for (let p = 1; p <= t.paginas; p++) todas.push(...(await api('GET', '/unidades?pp=100&page=' + p)).itens); csv(todas); }))); };
 });
 function csv(ls) {
   const c = ['BKN', 'Unidade', 'CNPJ', 'Cidade', 'UF', 'Licença', 'Validade licença', 'Precisa RT', 'RT', 'CRN', 'Validade RT', 'Etapa', 'Previsão virada', 'Pendências'];
