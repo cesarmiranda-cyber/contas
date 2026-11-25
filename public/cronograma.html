@@ -39,7 +39,7 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .col{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}.cx{flex:0 0 255px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
 .cx h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between}.ct{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:pointer}.ct:hover{border-color:var(--brand)}.ct small{color:var(--mut);display:block}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:20px;width:min(720px,94vw);max-height:92vh}dialog::backdrop{background:#0008}
-.dur{display:flex;align-items:center;gap:6px;color:var(--ink)}.dur input{width:72px}.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.fk{display:grid;gap:2px;font-size:14px;align-content:start}.fk small{font-size:12px;color:var(--mut)}.fk a{font-weight:600}.dur{display:flex;align-items:center;gap:6px;color:var(--ink)}.dur input{width:72px}.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
 .msg{padding:9px 12px;border-radius:8px;margin:0 0 12px;background:var(--brandbg);color:var(--brand)}.msg.e{background:var(--badbg);color:var(--bad)}
 .fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin:6px 0 4px}
 .st{position:relative;background:var(--surface);border:1px solid var(--line);padding:12px 14px 14px;margin-right:-1px}
@@ -93,7 +93,7 @@ const fm = m => Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, 
 const somaDias = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const ABAS = [['semana', 'Semana'], ['clientes', 'Clientes'], ['recorrencias', 'Recorrências'], ['conferencia', 'Conferência mensal'], ['configuracoes', 'Configurações'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
 let ME = {}, BOOT = {}, aba = 'semana', podeEditar = false, podeAdmin = false, operacional = false;
-let W = { view: 'semana', data: '', consultora: '', q: '', status: '', fer: false, page: 1 }, CL = { q: '', filtro: '', page: 1 };
+let W = { view: 'kanban', data: '', consultora: '', q: '', status: '', fer: false, page: 1 }, CL = { q: '', filtro: '', page: 1 };
 function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
 const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
 function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#gbk').hidden = false; $('#gav').scrollTop = 0; $('#gav').querySelectorAll('[data-x]').forEach(b => b.onclick = gavFecha); }
@@ -207,24 +207,29 @@ const semana = guarda(async () => {
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [['Data', 'Consultora', 'Cliente', 'Duração', 'Situação', 'Feriado', 'Observação'].map(q).join(';'), ...rows].join('\r\n')], { type: 'text/csv' })); a.download = `visitas-${W.data.slice(0, 7)}.csv`; a.click(); }; }
 });
 const lk = (url, txt) => `<a href="${h(url)}" target="_blank" rel="noopener">${h(txt)}</a>`;
-function vinculos(c) {   // empresa, contato e negócio do Bitrix24 de um cliente
+function vinculos(c, cards) {   // empresa, contato e negócio do Bitrix24 de um cliente
   if (!c) return '';
   const H = BOOT.host, e = c.empresaBitrixId ? lk(`https://${H}/crm/company/details/${c.empresaBitrixId}/`, 'Empresa #' + c.empresaBitrixId) : '<b style="color:var(--warn)">empresa não vinculada</b>';
   const t = c.contatoBitrixId ? lk(c.contatoUrl || `https://${H}/crm/contact/details/${c.contatoBitrixId}/`, c.contatoNome || 'Contato #' + c.contatoBitrixId) : '<b style="color:var(--warn)">sem contato</b>';
   const n = c.dealId ? lk(c.dealUrl || `https://${H}/crm/deal/details/${c.dealId}/`, 'Negócio #' + c.dealId) : '<b style="color:var(--mut)">negócio ainda não criado</b>';
+  if (cards) return `<div class="fk"><small>Empresa (Bitrix24)</small>${e}</div><div class="fk"><small>Contato (Bitrix24)</small>${t}</div><div class="fk"><small>Negócio no funil Assessoria Recorrente / RT</small>${n}</div>`;
   return `<label>Empresa (Bitrix24)${e}</label><label>Contato (Bitrix24)${t}</label><label class="w">Negócio no funil Assessoria Recorrente / RT${n}</label>`;
 }
 async function visitaDrawer(v) {
   if (!v) return; const id = v.id;
   const c = (await api('GET', '/clientes?q=' + encodeURIComponent(v.clienteNome))).itens.find(x => x.id === v.clienteId);
-  gav(`${topo()}<h2 style="margin:0">${h(v.clienteNome)}</h2><p class="mut" style="margin:0 0 12px">${h(v.consultoraNome)} · ${dt(v.data)} · ${fm(v.min)} · <span class="pill">${h(BOOT.status[v.status])}</span></p>
+  const ag = v.status === 'agendada' || v.status === 'remarcada', atras = v.status === 'agendada' && v.data < BOOT.hoje, dias = Math.round((Date.parse(BOOT.hoje + 'T00:00:00Z') - Date.parse(v.data + 'T00:00:00Z')) / 864e5), mod = v.modeloId ? ((await api('GET', '/modelos').catch(() => [])).find(m => m.id === v.modeloId) || null) : null;
+  const fato = (r, x) => `<div class="fk"><small>${r}</small><b>${x}</b></div>`, cor = { realizada: 'ok', faltou: 'b', cancelada: 'b', remarcada: 'w' }[v.status] || '';
+  gav(`${topo()}<h2 style="margin:0 0 6px">${h(v.clienteNome)}</h2><p style="margin:0 0 14px"><span class="sel ${cor}">${h(BOOT.status[v.status])}</span>${atras ? ` <span class="sel b">${dias} dia(s) de atraso</span>` : ''}${mod ? ` <span class="sel">↻ ${h(mod.freqNome)}</span>` : ''}</p>
   ${v.feriado ? `<div class="box" style="border-color:var(--bad)"><b>Feriado na cidade do cliente:</b> ${h(v.feriado)}.${v.sugestao ? ` Sugestão: ${dt(v.sugestao)}.` : ''}${podeEditar && v.sugestao ? ` <button class="btn" id="vs">Remarcar para ${dm(v.sugestao)}</button>` : ''}</div>` : ''}
-  <div class="f"><label>Cliente<b style="color:var(--ink)">${h(v.clienteNome)}</b></label><label>Cidade<b style="color:var(--ink)">${c ? h(c.cidade || 'não informada (usando São Paulo/SP)') + (c.uf ? '/' + h(c.uf) : '') : '—'}</b></label>
-  ${vinculos(c)}${v.obs ? `<label class="w">Observação<span style="color:var(--ink)">${h(v.obs)}</span></label>` : ''}</div>
-  ${podeEditar ? `<div class="dr"><button class="btn d" id="vx">Excluir</button><button class="btn" id="vo" title="Cria um negócio no funil Comercial B2B a partir desta visita">Criar oportunidade</button><button class="btn" id="vr">Marcar realizada</button><button class="btn p" id="ve">Editar</button></div>` : ''}`);
+  ${podeEditar && ag ? `<button class="btn p" id="vreg" style="width:100%;padding:12px;font-size:15px;margin-bottom:14px">✔ Registrar visita</button>` : ''}
+  <div class="box"><h2>A visita</h2><div class="fg">${fato('Consultora', h(v.consultoraNome))}${fato('Data', `${DIAS_CURTOS[diaSemana(v.data)]}, ${dt(v.data)}`)}${fato('Duração', fm(v.min))}${fato('Origem', v.origem === 'recorrencia' ? 'Recorrência' : 'Manual')}</div>
+  ${v.obs ? `<div style="margin-top:12px"><small class="mut">Observação</small><div style="white-space:pre-wrap">${h(v.obs)}</div></div>` : ''}</div>
+  <div class="box"><h2>Cliente</h2><div class="fg">${fato('Cidade', c ? h(c.cidade || 'não informada (usando São Paulo/SP)') + (c.uf ? '/' + h(c.uf) : '') : '—')}${c ? vinculos(c, true) : ''}</div></div>
+  ${podeEditar ? `<div class="dr" style="justify-content:space-between;flex-wrap:wrap"><button class="btn d" id="vx">Excluir</button><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="vo" title="Cria um negócio no funil Comercial B2B a partir desta visita">Criar oportunidade</button><button class="btn" id="ve">Editar</button></span></div>` : ''}`);
   if (podeEditar) { $('#ve').onclick = () => visitaForm(v); $('#vx').onclick = guarda(async () => { if (!confirm('Excluir esta visita?')) return; await api('DELETE', '/visitas/' + id); gavFecha(); semana(); });
     $('#vo').onclick = guarda(async () => { const t = prompt('Qual é a oportunidade? (ex.: rótulos fora do contrato de consultoria)'); if (!t) return; const d2 = prompt('Detalhes (opcional):') || ''; const r = await api('POST', `/visitas/${id}/oportunidade`, { titulo: t, detalhes: d2 }); gavFecha(); aviso(`Oportunidade criada no funil Comercial B2B (negócio #${r.dealId}).`); semana(); });
-    $('#vr').onclick = guarda(async () => { await api('PUT', '/visitas/' + id, { status: 'realizada' }); gavFecha(); semana(); });
+    if ($('#vreg')) $('#vreg').onclick = () => registrarVisita(v);
     if ($('#vs')) $('#vs').onclick = guarda(async () => { await api('POST', `/visitas/${id}/mover`, { data: v.sugestao }); gavFecha(); semana(); }); }
 }
 // Registro da visita pela consultora: o cartão muda de coluna sozinho (o kanban só espelha a situação).
