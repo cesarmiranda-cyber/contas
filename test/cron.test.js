@@ -210,3 +210,22 @@ test('recorrência: quinzenal, mensal, personalizada, data final e criação pel
   const m = api.dados().modelos[0]; await call('PUT', `/modelos/${m.id}`, { ativo: false }); assert.equal(api.dados().modelos[0].ativo, false);
   await call('DELETE', `/modelos/${m.id}`); assert.equal(api.dados().modelos.length, 0);
 });
+
+test('consultoras: incluir, inativar, transferir; recorrência a partir do cliente', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json');
+  fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica', 'Iris'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }], visitas: [] }));
+  const api = createCronApi({ bitrix: fakeBitrix(), bx: createBxEmpresas({ bitrix: fakeBitrix() }), funil: createBxFunil({ bitrix: fakeBitrix() }), store: { log() {} }, dir, seedFile: seed });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/cron' + p); const r = await api.handle(m, u.pathname, u, async () => b || {}, { papel: 'admin', areas: [] }); return r.json; };
+  const hoje = require('../lib/rules').todayBR(), [mo, ir] = api.dados().consultoras, cl = api.dados().clientes[0].id;
+  const nova = await call('POST', '/consultoras', { nome: 'Luana' }); assert.equal(nova.ativo, true); await assert.rejects(call('POST', '/consultoras', { nome: 'luana' }), /Já existe/);
+  const r = await call('POST', `/clientes/${cl}/recorrencia`, { freq: 'quinzenal', data: hoje, min: 90, consultora: mo.id });
+  assert.ok(r.criadas >= 3); assert.equal(api.dados().clientes[0].padrao.freq, 'quinzenal');
+  await assert.rejects(call('POST', `/clientes/${cl}/recorrencia`, { freq: 'semanal', data: hoje, min: 90, consultora: mo.id }), /Já existe uma recorrência/);
+  const ina = await call('PUT', `/consultoras/${mo.id}`, { ativo: false }); assert.equal(ina.ativo, false); assert.ok(ina.visitasFuturas >= 3); assert.equal(ina.modelosAtivos, 1); assert.equal(ina.bitrixId, mo.bitrixId);
+  await assert.rejects(call('POST', '/visitas', { clienteId: cl, consultora: mo.id, data: hoje, min: 60 }), /inativa/);
+  assert.equal((await call('POST', '/modelos/gerar', { semanas: 12 })).criadas, 0);   // inativa não gera
+  const t = await call('POST', `/consultoras/${mo.id}/transferir`, { para: ir.id }); assert.ok(t.visitas >= 3); assert.equal(t.recorrencias, 1);
+  assert.ok(api.dados().visitas.filter(v => v.status === 'agendada').every(v => v.consultora === ir.id));
+  assert.ok((await call('POST', '/modelos/gerar', { semanas: 12 })).criadas > 0);   // agora a Iris gera
+  await call('PUT', `/consultoras/${mo.id}`, { ativo: true }); assert.equal(api.dados().consultoras[0].ativo, true);
+});
