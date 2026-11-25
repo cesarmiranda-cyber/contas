@@ -238,7 +238,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, r.json);
     }
     if (u.pathname.startsWith('/api/bk/')) {
-      const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : 1e6));
+      const r = await bkApi.handle(req.method, u.pathname, u, () => readBody(req, u.pathname === '/api/bk/importar' ? 3e6 : /^\/api\/bk\/kanban\/\d+\/documentos\/anexar$/.test(u.pathname) ? 14e6 : 1e6));
       return r ? send(res, 200, r.json) : send(res, 404, { error: 'não encontrado' });
     }
     if (u.pathname.startsWith('/api/settings/integracoes')) return send(res, 200, await integ.handle(req.method, u.pathname, () => readBody(req, 100000)));
