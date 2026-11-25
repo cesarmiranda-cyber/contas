@@ -85,6 +85,8 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .bars{display:flex;gap:10px;align-items:flex-end;height:210px}.bc{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end}.bc small{font-size:11.5px;color:var(--ink2)}.bp{font-weight:700}.bp.t-g{color:var(--kb-g)}.bp.t-w{color:var(--kb-w)}.bp.t-b{color:var(--kb-b)}.bb{position:relative;width:100%;max-width:46px;flex:1;display:flex;align-items:flex-end;justify-content:center}.bb i{position:absolute;bottom:0;left:0;right:0;border-radius:5px 5px 0 0}.bb .rl{left:22%;right:22%}
 .hb{display:grid;grid-template-columns:70px 1fr 28px;gap:8px;align-items:center;margin:6px 0;font-size:13px}.hb div{background:var(--brandbg);border-radius:5px;height:14px}.hb i{display:block;height:100%;background:var(--kb-done);border-radius:5px}.hb b{text-align:right}
 .pb{height:9px;background:var(--line);border-radius:5px;overflow:hidden}.pb i{display:block;height:100%}.li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}.li:last-child{border:0}
+.mvm{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0003;padding:6px;display:grid;min-width:210px}.mvm small{padding:4px 10px;color:var(--mut);font-size:11.5px}.mvm button{text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;font:inherit;font-size:13.5px;color:var(--ink);cursor:pointer}.mvm button:hover{background:var(--brandbg)}
+.cx.alvo{outline:2px dashed var(--brand)}.ct[draggable=true]{cursor:grab}.ct.arr{opacity:.4}
 /* Barra de rolagem do kanban */
 .kbar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.kbar .btn{padding:4px 14px;font-size:18px;line-height:1.2}.kchips{display:flex;gap:6px;overflow-x:auto;flex:1;scrollbar-width:none}.kchips::-webkit-scrollbar{display:none}
 .kchip{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:99px;padding:3px 11px;font:inherit;font-size:12.5px;white-space:nowrap;cursor:pointer}.kchip b{margin-left:3px}.kchip.t-b{color:var(--kb-b);border-color:var(--kb-b)}.kchip.t-w{color:var(--kb-w);border-color:var(--kb-w)}.kchip.t-g{color:var(--kb-g);border-color:var(--kb-g)}.kchip.t-done{color:var(--kb-done);border-color:var(--kb-done)}.kchip:hover{background:var(--brandbg)}
@@ -102,7 +104,7 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .ct-t{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.ct-t b{font-size:13.5px}.ct-d{font-size:12px;font-weight:600;color:var(--mut);white-space:nowrap}
 .ct-s{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:12.5px;color:var(--mut)}.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--brandbg);color:var(--brand);font-size:9.5px;font-weight:700}
 .ct-b{display:inline-block;margin-top:6px;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:600;background:var(--kb-bbg);color:var(--kb-b)}.ct.t-w .ct-b{background:var(--kb-wbg);color:var(--kb-w)}
-.ct .acoes{margin-top:9px}.ct .acoes .btn{padding:4px 10px;font-size:12.5px}.ct.fer{border-left-color:var(--kb-b)}
+.ct .acoes{margin-top:9px;flex-wrap:wrap}.ct .acoes .btn{white-space:nowrap}.ct .acoes .btn{padding:4px 10px;font-size:12.5px}.ct.fer{border-left-color:var(--kb-b)}
 </style>
 </head>
 <body>
@@ -119,7 +121,7 @@ const dt = s => s ? s.split('-').reverse().join('/') : '—';
 const dm = s => s.split('-').reverse().slice(0, 2).join('/');
 const fm = m => Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
 const somaDias = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const ABAS = [['semana', 'Agenda'], ['clientes', 'Clientes'], ['recorrencias', 'Recorrências'], ['dashboard', 'Dashboard'], ['configuracoes', 'Configurações'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
+const ABAS = [['semana', 'Agenda'], ['clientes', 'Clientes'], ['dashboard', 'Dashboard'], ['configuracoes', 'Configurações']];
 let ME = {}, BOOT = {}, aba = 'semana', podeEditar = false, podeAdmin = false, operacional = false;
 let W = { view: 'kanban', data: '', consultora: '', q: '', status: '', fer: false, page: 1 }, CL = { q: '', filtro: '', page: 1 };
 function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
@@ -131,7 +133,7 @@ const topo = () => '<div class="top"><span class="sp"></span><button class="btn"
 const recarrega = () => ({ semana, clientes, recorrencias, dashboard, conferencia, configuracoes, feriados, processo })[aba]();
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
 function abrirAba(a) {
-  aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
+  aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a || (k === 'configuracoes' && ['recorrencias', 'feriados', 'processo'].includes(a))}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
   gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, recorrencias, dashboard, conferencia, configuracoes, feriados, processo })[a]();
 }
@@ -188,7 +190,7 @@ const semana = guarda(async () => {
       ['realizada', 'Realizadas', 'done', v => v.status === 'realizada'], ['faltou', 'Não aconteceu', 'n', v => v.status === 'faltou'], ['remarcada', 'Remarcadas', 'n', v => v.status === 'remarcada'], ['cancelada', 'Canceladas', 'n', v => v.status === 'cancelada']];
     const ini = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(x => x[0]).join('').toUpperCase(), tomDe = v => (ag(v) ? (v.data < hj ? 'b' : v.data === hj ? 'w' : 'g') : v.status === 'realizada' ? 'done' : 'n');
     const kcard = v => { const atr = ag(v) && v.data < hj, dd = Math.round((Date.parse(hj + 'T00:00:00Z') - Date.parse(v.data + 'T00:00:00Z')) / 864e5);
-      return `<div class="ct t-${tomDe(v)} ${v.feriado ? 'fer' : ''}" data-id="${h(v.id)}"><div class="ct-t"><b>${h(v.clienteNome)}</b><span class="ct-d">${fm(v.min)}</span></div><div class="ct-s"><span class="av">${h(ini(v.consultoraNome))}</span>${h(v.consultoraNome)} · ${DIAS_CURTOS[diaSemana(v.data)]} ${dm(v.data)}</div>${atr ? `<div class="ct-b">${dd} dia(s) de atraso</div>` : ''}${v.feriado ? `<div class="ct-b">Feriado: ${h(v.feriado)}</div>` : ''}${podeEditar && ag(v) ? `<span class="acoes"><button class="btn p" data-ok="${h(v.id)}">✔ Registrar</button><button class="btn" data-alt="${h(v.id)}">Alterar</button></span>` : ''}</div>`; };
+      return `<div class="ct t-${tomDe(v)} ${v.feriado ? 'fer' : ''}" data-id="${h(v.id)}" ${podeEditar ? 'draggable="true"' : ''}><div class="ct-t"><b>${h(v.clienteNome)}</b><span class="ct-d">${fm(v.min)}</span></div><div class="ct-s"><span class="av">${h(ini(v.consultoraNome))}</span>${h(v.consultoraNome)} · ${DIAS_CURTOS[diaSemana(v.data)]} ${dm(v.data)}</div>${atr ? `<div class="ct-b">${dd} dia(s) de atraso</div>` : ''}${v.feriado ? `<div class="ct-b">Feriado: ${h(v.feriado)}</div>` : ''}${podeEditar && ag(v) ? `<span class="acoes"><button class="btn p" data-ok="${h(v.id)}">✔ Registrar</button><button class="btn" data-mv="${h(v.id)}" title="Mover este cartão para outra coluna">Mover ▾</button></span>` : podeEditar ? `<span class="acoes"><button class="btn" data-mv="${h(v.id)}" title="Mover este cartão para outra coluna">Mover ▾</button></span>` : ''}</div>`; };
     V.innerHTML = `<div class="kbar"><button class="btn" id="kl" aria-label="Rolar para a esquerda">‹</button><span class="kchips">${COLS.map(([k, n, cor, f]) => `<button class="kchip t-${cor || 'n'}" data-j="${k}">${n} <b>${p.itens.filter(f).length}</b></button>`).join('')}</span><button class="btn" id="kr" aria-label="Rolar para a direita">›</button></div><div class="col">${COLS.map(([k, n, cor, f]) => { const l = p.itens.filter(f).sort((a, b) => (k === 'realizada' ? b.data.localeCompare(a.data) : a.data.localeCompare(b.data))); return `<div class="cx t-${cor || 'n'}" data-col="${k}"><h3>${n} <span class="cnt">${l.length}</span></h3>${podeEditar && k === 'atrasadas' && l.length ? '<button class="btn" data-lote style="width:100%;margin-bottom:8px;font-size:12px;padding:4px">Marcar todas como realizadas</button>' : ''}${l.slice(0, 60).map(kcard).join('') || '<p class="mut" style="font-size:13px">Vazio</p>'}${l.length > 60 ? `<p class="mut" style="font-size:12.5px">+ ${l.length - 60} (use a Lista)</p>` : ''}</div>`; }).join('')}</div>`;
     const col = V.querySelector('.col'), passo = () => (V.querySelector('.cx') || { offsetWidth: 280 }).offsetWidth + 12;
     $('#kl').onclick = () => col.scrollBy({ left: -passo(), behavior: 'smooth' }); $('#kr').onclick = () => col.scrollBy({ left: passo(), behavior: 'smooth' });
@@ -197,6 +199,12 @@ const semana = guarda(async () => {
     V.querySelectorAll('[data-lote]').forEach(b => b.onclick = guarda(async () => { const ids = p.itens.filter(v => ag(v) && v.data < hj).map(v => v.id); if (!confirm(`Marcar ${ids.length} visita(s) atrasada(s) como realizadas?\nUse só se elas já foram cumpridas (por exemplo, o que foi importado do cronograma de outubro).`)) return; const r = await api('POST', '/visitas/lote', { ids, status: 'realizada' }); aviso(`${r.atualizadas} visita(s) marcadas como realizadas.`); semana(); }));
     V.querySelectorAll('[data-ok]').forEach(b => b.onclick = () => registrarVisita(VM.get(b.dataset.ok)));
     V.querySelectorAll('[data-alt]').forEach(b => b.onclick = () => visitaForm(VM.get(b.dataset.alt)));
+    V.querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); menuMover(b, VM.get(b.dataset.mv)); });
+    if (podeEditar) {   // arrastar também move: solta na coluna de destino
+      V.querySelectorAll('.ct').forEach(c => { c.ondragstart = e => { e.dataTransfer.setData('text/plain', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; setTimeout(() => c.classList.add('arr'), 0); }; c.ondragend = () => { c.classList.remove('arr'); V.querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); }; });
+      V.querySelectorAll('.cx').forEach(x => { x.ondragover = e => { e.preventDefault(); x.classList.add('alvo'); }; x.ondragleave = e => { if (!x.contains(e.relatedTarget)) x.classList.remove('alvo'); };
+        x.ondrop = guarda(async e => { e.preventDefault(); x.classList.remove('alvo'); const v = VM.get(e.dataTransfer.getData('text/plain')); if (v) await moverVisita(v, x.dataset.col); }); });
+    }
     } else if (W.view === 'semana' || W.view === 'dia') {
     const dias = W.view === 'dia' ? [W.data] : [0, 1, 2, 3, 4].map(i => somaDias(intervalo()[0], i));
     if (W.view === 'dia') {   // consultoras em colunas
@@ -262,8 +270,30 @@ async function visitaDrawer(v) {
     if ($('#vreg')) $('#vreg').onclick = () => registrarVisita(v);
     if ($('#vs')) $('#vs').onclick = guarda(async () => { await api('POST', `/visitas/${id}/mover`, { data: v.sugestao }); gavFecha(); semana(); }); }
 }
+// Mover o cartão do kanban: cada destino aplica a regra certa (registro exige relato; datas pedem a nova data).
+const COL_NOME = { atrasadas: 'Atrasadas', hoje: 'Hoje', proximas: 'Próximas', realizada: 'Realizadas', faltou: 'Não aconteceu', remarcada: 'Remarcadas', cancelada: 'Canceladas' };
+function pedeData(titulo, sug, ok) {
+  gav(`${topo()}<h2 style="margin:0 0 12px">${h(titulo)}</h2><form id="fd"><div class="box"><div class="f"><label class="w">Nova data<input type="date" name="data" value="${h(sug)}" required></label></div></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Confirmar</button></div></form>`);
+  $('#fd').onsubmit = guarda(async e => { e.preventDefault(); await ok(new FormData(e.target).get('data')); gavFecha(); semana(); });
+}
+async function moverVisita(v, destino) {
+  const hj = BOOT.hoje, ag = v.status === 'agendada';
+  if (destino === 'atrasadas') return aviso('A coluna Atrasadas é automática: mostra as visitas vencidas sem registro.', true);
+  if (destino === 'realizada' || destino === 'faltou' || destino === 'cancelada') { if (v.status === destino) return; return registrarVisita(v, destino); }
+  if (destino === 'hoje') { if (ag && v.data === hj) return; await api('PUT', '/visitas/' + v.id, { status: 'agendada', data: hj }); aviso(`${v.clienteNome} movida para hoje.`); return semana(); }
+  if (destino === 'proximas') return pedeData(`Reagendar ${v.clienteNome}`, somaDias(hj, 1), d => api('PUT', '/visitas/' + v.id, { status: 'agendada', data: d }));
+  if (destino === 'remarcada') return pedeData(`Remarcar ${v.clienteNome}`, somaDias(hj, 1), d => api('POST', `/visitas/${v.id}/remarcar`, { data: d }));
+}
+function menuMover(btn, v) {
+  document.querySelectorAll('.mvm').forEach(x => x.remove());
+  const m = document.createElement('div'); m.className = 'mvm'; const op = [['hoje', 'Hoje'], ['proximas', 'Reagendar (escolher data)'], ['realizada', 'Registrar como realizada'], ['faltou', 'Não aconteceu'], ['remarcada', 'Remarcar (nova data)'], ['cancelada', 'Cancelar']];
+  m.innerHTML = '<small>Mover para…</small>' + op.map(([k, n]) => `<button data-d="${k}">${n}</button>`).join('');
+  const r = btn.getBoundingClientRect(); m.style.top = Math.min(window.innerHeight - 250, r.bottom + 4) + 'px'; m.style.left = Math.max(8, Math.min(window.innerWidth - 230, r.left)) + 'px'; document.body.appendChild(m);
+  m.querySelectorAll('button').forEach(b => b.onclick = guarda(async () => { m.remove(); await moverVisita(v, b.dataset.d); }));
+  setTimeout(() => document.addEventListener('click', function f() { m.remove(); document.removeEventListener('click', f); }), 0);
+}
 // Registro da visita pela consultora: o cartão muda de coluna sozinho (o kanban só espelha a situação).
-function registrarVisita(v) {
+function registrarVisita(v, inicial) {
   gav(`${topo()}<h2 style="margin:0 0 4px">Registrar visita</h2><p class="mut" style="margin:0 0 12px">${h(v.clienteNome)} · ${h(v.consultoraNome)} · ${dt(v.data)}</p><form id="fr"><div id="fe"></div>
   <div class="box"><div class="f"><label class="w">O que aconteceu?<select name="r" id="rr"><option value="realizada">A visita foi realizada</option><option value="faltou">Não aconteceu (cliente ausente, imprevisto)</option><option value="remarcar">Remarcar para outra data</option><option value="cancelada">Cancelar a visita</option></select></label>
   <label id="rdt" hidden>Nova data<input type="date" name="data" value="${somaDias(BOOT.hoje, 1)}"></label><span id="rmin">${durCampo('r', v.min, 'Duração real')}</span></div></div>
@@ -271,7 +301,9 @@ function registrarVisita(v) {
   <label class="w" id="rpe">Pendências e próximos passos<textarea name="pendencias" rows="3" placeholder="O que ficou combinado ou pendente (opcional)"></textarea></label></div></div>
   <div class="box"><div class="f"><label class="w">Observação da visita (opcional)<textarea name="obs" rows="2">${h(v.obs || '')}</textarea></label></div></div>
   <div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Registrar</button></div></form>`);
+  if (inicial) $('#rr').value = inicial;
   $('#rr').onchange = () => { const r = $('#rr').value; $('#rdt').hidden = r !== 'remarcar'; $('#rmin').hidden = r !== 'realizada'; $('#rrg').hidden = r === 'remarcar'; $('#rpe').hidden = r !== 'realizada'; $('#rrl').textContent = r === 'realizada' ? 'O que foi feito na visita *' : 'Motivo *'; $('#rrt').textContent = r === 'realizada' ? 'Registro da visita' : 'Motivo'; };
+  $('#rr').onchange();
   $('#fr').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
     try { if (f.r === 'remarcar') await api('POST', `/visitas/${v.id}/remarcar`, { data: f.data });
       else await api('POST', `/visitas/${v.id}/registrar`, { resultado: f.r, min: f.r === 'realizada' ? durOk(lerDur(f, 'r')) : undefined, resumo: f.resumo, pendencias: f.pendencias, obs: f.obs });
@@ -438,11 +470,13 @@ async function confForm(r) {
 const configuracoes = guarda(async () => {
   await boot(); let us = []; try { us = await api('GET', '/usuarios-bitrix'); } catch (e) { aviso(e.message, true); }
   const ativas = BOOT.consultoras.filter(c => c.ativo).length;
-  $('#tela').innerHTML = `<h1>Configurações</h1><h2 style="margin:14px 0 4px;font-size:17px">Consultoras</h2><p class="sub">${ativas} ativa(s) de ${BOOT.consultoras.length}. Cada consultora é um <b>usuário do Bitrix24</b>: depois de ligar, ela entra com a conta do Bitrix24 (o administrador libera o acesso em Contas → Configurações → Usuários e acessos, perfil “Consultora”) e vê só a sua agenda. Consultora <b>inativa</b> sai das listas e das recorrências novas, mas o histórico fica.</p>
+  $('#tela').innerHTML = `<h1>Configurações</h1><div class="tools"><button class="btn" id="cg-rec">Recorrências</button><button class="btn" id="cg-fer">Feriados</button><button class="btn" id="cg-ajuda">Como funciona</button></div><h2 style="margin:14px 0 4px;font-size:17px">Consultoras</h2><p class="sub">${ativas} ativa(s) de ${BOOT.consultoras.length}. Cada consultora é um <b>usuário do Bitrix24</b>: depois de ligar, ela entra com a conta do Bitrix24 (o administrador libera o acesso em Contas → Configurações → Usuários e acessos, perfil “Consultora”) e vê só a sua agenda. Consultora <b>inativa</b> sai das listas e das recorrências novas, mas o histórico fica.</p>
   ${podeAdmin ? '<div class="tools"><button class="btn p" id="nova">Incluir consultora</button><button class="btn" id="aut">Ligar automaticamente por nome</button></div>' : ''}
   <div class="box tw"><table><tr><th>Consultora</th><th>Situação</th><th>Usuário no Bitrix24</th><th title="Por padrão cada consultora vê só as suas visitas">Vê todas as agendas</th><th></th></tr>${BOOT.consultoras.map(c => `<tr style="${c.ativo ? '' : 'opacity:.6'}"><td><b>${h(c.nome)}</b></td><td>${c.ativo ? '<span class="sel ok">ativa</span>' : '<span class="sel b">inativa</span>'}</td><td>${podeAdmin ? `<select data-c="${h(c.id)}"><option value="">— não ligada —</option>${us.map(u => `<option value="${h(u.id)}" ${u.id === c.bitrixId ? 'selected' : ''}>${h(u.nome)}</option>`).join('')}</select>` : h((us.find(u => u.id === c.bitrixId) || {}).nome || (c.bitrixId ? '#' + c.bitrixId : '—'))}</td><td style="text-align:center"><input type="checkbox" data-vt="${h(c.id)}" ${c.verTudo ? 'checked' : ''} ${podeAdmin ? '' : 'disabled'} aria-label="Vê todas as agendas" style="width:18px;height:18px"></td><td>${podeAdmin ? `<button class="btn" data-n="${h(c.id)}">Renomear</button> <button class="btn ${c.ativo ? 'd' : ''}" data-a="${h(c.id)}">${c.ativo ? 'Inativar' : 'Ativar'}</button>` : ''}</td></tr>`).join('')}</table></div>
   <p class="mut" style="font-size:13px"><b>Quem vê o quê:</b> cada consultora enxerga e registra <b>somente as suas visitas</b>. Marque “Vê todas as agendas” para quem coordena a equipe. Administradores e o financeiro sempre veem tudo.</p>
   ${us.length ? '' : '<p class="mut">Nenhum usuário do Bitrix24 encontrado (ou o webhook ainda não foi conectado).</p>'}`;
+  const ir = (id, a) => $('#cg-' + id).onclick = () => { aviso(''); abrirAba(a); };
+  ir('rec', 'recorrencias'); ir('fer', 'feriados'); ir('ajuda', 'processo');
   if (!podeAdmin) return;
   $('#tela').querySelectorAll('select[data-c]').forEach(x => x.onchange = guarda(async () => { await api('PUT', '/consultoras/' + x.dataset.c, { bitrixId: x.value }); aviso('Salvo.'); await boot(); }));
   $('#tela').querySelectorAll('[data-vt]').forEach(x => x.onchange = guarda(async () => { const ids = [...$('#tela').querySelectorAll('[data-vt]:checked')].map(y => y.dataset.vt); await api('POST', '/consultoras/visibilidade', { ids }); aviso('Permissão salva.'); await boot(); }));
