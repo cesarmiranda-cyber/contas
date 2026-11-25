@@ -58,6 +58,18 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .ct[draggable=true]{cursor:grab}.ct.arr{opacity:.4}.cx.alvo{outline:2px dashed var(--brand);background:var(--brandbg)}
 .col{min-height:60vh}.cx{min-height:120px}
 .lst{margin:0;padding-left:18px;color:var(--ink2)}.mut{color:var(--mut)}.dr{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+/* Kanban do funil BK (18) */
+.kb-col{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start;scroll-snap-type:x proximity}
+.kb-cx{flex:0 0 300px;scroll-snap-align:start;border-top:4px solid var(--kn);background:var(--knbg);border-radius:10px;padding:10px 10px 4px;min-height:140px;--kn:#1c4a82;--knbg:#e8eff8}.kb-cx.ok{--kn:#1e8e3e;--knbg:#e6f4ea}.kb-cx.n{--kn:#7a8594;--knbg:#f0f1f3}.kb-cx.alvo{outline:2px dashed var(--brand)}
+@media(prefers-color-scheme:dark){.kb-cx{--kn:#7fb0ee;--knbg:#1b2a3d}.kb-cx.ok{--kn:#6fd49a;--knbg:#14301f}.kb-cx.n{--kn:#9aa6b5;--knbg:#1d242e}}
+.kb-cx h3{margin:0 0 10px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;color:var(--kn)}.kb-cx h3 .cnt{background:var(--surface);padding:1px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.kb-cd{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--kn);border-radius:8px;padding:10px 11px;margin-bottom:9px;font-size:13px;cursor:pointer;box-shadow:0 1px 2px #0000000d}.kb-cd:hover{border-color:var(--brand)}.kb-cd[draggable=true]{cursor:grab}.kb-cd.arr{opacity:.4}.kb-cd.alerta{border-left-color:var(--bad)}
+.kb-cd b{font-size:13.5px;display:block}.kb-cd small{display:block;color:var(--mut);margin-top:2px}.kb-tg{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}.kb-tg span{background:var(--brandbg);color:var(--brand);border-radius:99px;padding:1px 9px;font-size:11.5px;font-weight:600}.kb-tg span.al{background:var(--badbg);color:var(--bad)}.kb-tg span.w{background:var(--warnbg);color:var(--warn)}
+.kb-ac{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.kb-ac .btn{padding:3px 10px;font-size:12.5px;white-space:nowrap}
+.kb-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.kb-bar .btn{padding:4px 14px;font-size:18px;line-height:1.2}
+.kb-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.kb-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:99px;padding:3px 11px;font:inherit;font-size:12.5px;cursor:pointer}.kb-chip[aria-pressed=true]{background:var(--brand);border-color:var(--brand);color:#fff}
+.kb-mv{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0003;padding:6px;display:grid;min-width:200px}.kb-mv small{padding:4px 10px;color:var(--mut)}.kb-mv button{text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;font:inherit;color:var(--ink);cursor:pointer}.kb-mv button:hover{background:var(--brandbg)}
 </style>
 </head>
 <body>
@@ -73,8 +85,8 @@ const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp
 const api = (m, u, b) => nmJson(m, '/api/bk' + u, b);
 const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = s => s ? s.split('-').reverse().join('/') : '—';
-const ABAS = [['painel', 'Painel'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações'], ['processo', 'Como funciona']];
-let ME = {}, BOOT = {}, aba = 'painel', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false, podeAdmin = false;
+const ABAS = [['kanban', 'Kanban'], ['painel', 'Painel'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações'], ['processo', 'Como funciona']];
+let ME = {}, BOOT = {}, aba = 'kanban', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false, podeAdmin = false;
 const NIV = { vencido: 'b', critico: 'b', atencao: 'w', ok: 'ok' };
 function aviso(t, erro) { const m = $('#msg'); m.innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
 const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
@@ -82,10 +94,72 @@ const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } c
 function abrirAba(a) {
   aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
-  gavFecha(); history.replaceState(null, '', '#' + a); ({ painel, processo, unidades, esteira, medicao, config })[a]();
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ kanban, painel, processo, unidades, esteira, medicao, config })[a]();
 }
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
 const selUnidade = u => u.pendencias && u.pendencias.length ? `<span class="sel b">${u.pendencias.length} pendência(s)</span>` : u.ativa ? '<span class="sel ok">Conforme</span>' : '<span class="sel">Inativa</span>';
+
+
+// ---------- Kanban: espelho do funil 18 (BK) no Bitrix24 ----------
+let KB = { q: '', tipos: new Set(), pend: '' };
+const kanban = guarda(async () => {
+  if (!BOOT.hoje) await boot();
+  const r = await api('GET', '/kanban'), sc = $('#tela').querySelector('.kb-col'), keep = sc ? sc.scrollLeft : 0;
+  const t = KB.q.toLowerCase().trim(), casa = c => (!t || `${c.titulo} ${c.bkn} ${c.unidade ? c.unidade.nome + ' ' + c.unidade.cidade + ' ' + c.unidade.rt : ''} ${c.empresa ? c.empresa.nome : ''}`.toLowerCase().includes(t))
+    && (!KB.tipos.size || c.tipos.some(x => KB.tipos.has(x))) && (!KB.pend || (KB.pend === 'empresa' ? c.semEmpresa : KB.pend === 'tipo' ? c.semTipo : c.semUnidade));
+  const vis = r.cards.filter(casa);
+  const card = c => `<div class="kb-cd ${c.semEmpresa || c.semTipo ? 'alerta' : ''}" data-id="${h(c.id)}" ${podeEditar ? 'draggable="true"' : ''}><b>${h(c.unidade ? `BKN ${c.unidade.bkn} — ${c.unidade.nome}` : c.titulo)}</b>
+    <small>${c.unidade ? [c.unidade.cidade, c.unidade.uf].filter(Boolean).join('/') || 'cidade não informada' : 'Unidade não cadastrada no app'}${c.unidade && c.unidade.rt ? ' · RT ' + h(c.unidade.rt) : ''}</small>${c.empresa ? `<small>${h(c.empresa.nome)}</small>` : ''}
+    <div class="kb-tg">${c.tiposNomes.slice(0, 2).map(n => `<span>${h(n)}</span>`).join('')}${c.tiposNomes.length > 2 ? `<span title="${h(c.tiposNomes.slice(2).join(', '))}">+${c.tiposNomes.length - 2}</span>` : ''}${c.semTipo ? '<span class="al">Sem tipo</span>' : ''}${c.semEmpresa ? '<span class="al">Sem empresa</span>' : ''}${c.semUnidade ? '<span class="w">Sem unidade no app</span>' : ''}</div>
+    ${podeEditar ? `<div class="kb-ac">${c.semEmpresa ? `<button class="btn p" data-vi="${h(c.id)}">Vincular empresa</button>` : ''}${c.semTipo ? `<button class="btn" data-ti="${h(c.id)}">Definir tipo</button>` : ''}<button class="btn" data-mv="${h(c.id)}">Mover ▾</button></div>` : ''}</div>`;
+  $('#tela').innerHTML = `<div class="tools" style="margin-bottom:8px"><input id="kq" type="search" placeholder="Buscar por BKN, unidade, cidade, RT ou empresa" value="${h(KB.q)}" style="flex:1;min-width:220px"><button class="btn" id="kre" title="Recarregar do Bitrix24">↻ Atualizar</button><a class="btn" href="https://${h(BOOT.bitrixHost || '')}/crm/deal/kanban/category/18/" target="_blank" rel="noopener">Abrir no Bitrix24</a></div>
+  <div class="kb-chips"><span class="mut" style="align-self:center;font-size:12.5px">Tipo de solicitação:</span>${r.tipos.map(x => `<button class="kb-chip" aria-pressed="${KB.tipos.has(x.id)}" data-tp="${h(x.id)}">${h(x.nome)}</button>`).join('')}</div>
+  <div class="kb-chips"><span class="mut" style="align-self:center;font-size:12.5px">Pendências:</span><button class="kb-chip" aria-pressed="${KB.pend === 'empresa'}" data-pe="empresa">Sem empresa <b>${r.resumo.semEmpresa}</b></button><button class="kb-chip" aria-pressed="${KB.pend === 'tipo'}" data-pe="tipo">Sem tipo <b>${r.resumo.semTipo}</b></button><button class="kb-chip" aria-pressed="${KB.pend === 'unidade'}" data-pe="unidade">Sem unidade no app <b>${r.resumo.semUnidade}</b></button><span class="mut" style="align-self:center;font-size:12.5px;margin-left:auto">${vis.length} de ${r.resumo.total} solicitação(ões)</span></div>
+  <div class="kb-bar"><button class="btn" id="kl" aria-label="Rolar para a esquerda">‹</button><span class="mut" style="flex:1;text-align:center;font-size:12.5px">Espelho do funil BK do Bitrix24 · arraste o card ou use “Mover” para mudar a etapa nos dois lugares</span><button class="btn" id="kr" aria-label="Rolar para a direita">›</button></div>
+  <div class="kb-col">${r.etapas.map(e => { const l = vis.filter(c => c.etapa === e.id); return `<div class="kb-cx ${e.tom}" data-col="${h(e.id)}"><h3>${h(e.nome)} <span class="cnt">${l.length}</span></h3>${l.map(card).join('') || '<p class="mut" style="font-size:13px">Vazio</p>'}</div>`; }).join('')}</div>`;
+  const col = $('#tela').querySelector('.kb-col'); col.scrollLeft = keep; const passo = () => ($('.kb-cx') || { offsetWidth: 300 }).offsetWidth + 12;
+  $('#kl').onclick = () => col.scrollBy({ left: -passo(), behavior: 'smooth' }); $('#kr').onclick = () => col.scrollBy({ left: passo(), behavior: 'smooth' });
+  let tq; $('#kq').oninput = e => { clearTimeout(tq); tq = setTimeout(async () => { KB.q = e.target.value; await kanban(); const i = $('#kq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
+  $('#kre').onclick = () => kanban();
+  $('#tela').querySelectorAll('[data-tp]').forEach(b => b.onclick = () => { KB.tipos.has(b.dataset.tp) ? KB.tipos.delete(b.dataset.tp) : KB.tipos.add(b.dataset.tp); kanban(); });
+  $('#tela').querySelectorAll('[data-pe]').forEach(b => b.onclick = () => { KB.pend = KB.pend === b.dataset.pe ? '' : b.dataset.pe; kanban(); });
+  const por = new Map(r.cards.map(c => [c.id, c]));
+  $('#tela').querySelectorAll('.kb-cd').forEach(el => el.onclick = e => { if (!e.target.closest('button')) kbDetalhe(por.get(el.dataset.id), r); });
+  $('#tela').querySelectorAll('[data-vi]').forEach(b => b.onclick = e => { e.stopPropagation(); kbVincular(por.get(b.dataset.vi)); });
+  $('#tela').querySelectorAll('[data-ti]').forEach(b => b.onclick = e => { e.stopPropagation(); kbTipos(por.get(b.dataset.ti), r); });
+  const mover = guarda(async (c, etapa) => { if (c.etapa === etapa) return; await api('POST', `/kanban/${c.id}/mover`, { etapa }); aviso('Etapa atualizada no Bitrix24.'); kanban(); });
+  $('#tela').querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); document.querySelectorAll('.kb-mv').forEach(x => x.remove()); const c = por.get(b.dataset.mv), m = document.createElement('div'); m.className = 'kb-mv'; m.innerHTML = '<small>Mover para…</small>' + r.etapas.filter(x => x.id !== c.etapa).map(x => `<button data-e="${h(x.id)}">${h(x.nome)}</button>`).join('');
+    const rc = b.getBoundingClientRect(); m.style.top = Math.min(innerHeight - 220, rc.bottom + 4) + 'px'; m.style.left = Math.max(8, Math.min(innerWidth - 220, rc.left)) + 'px'; document.body.appendChild(m); m.querySelectorAll('button').forEach(x => x.onclick = () => { m.remove(); mover(c, x.dataset.e); });
+    setTimeout(() => document.addEventListener('click', function f() { m.remove(); document.removeEventListener('click', f); }), 0); });
+  if (podeEditar) {
+    $('#tela').querySelectorAll('.kb-cd').forEach(el => { el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); setTimeout(() => el.classList.add('arr'), 0); }; el.ondragend = () => el.classList.remove('arr'); });
+    $('#tela').querySelectorAll('.kb-cx').forEach(x => { x.ondragover = e => { e.preventDefault(); x.classList.add('alvo'); }; x.ondragleave = e => { if (!x.contains(e.relatedTarget)) x.classList.remove('alvo'); }; x.ondrop = e => { e.preventDefault(); x.classList.remove('alvo'); const c = por.get(e.dataTransfer.getData('text/plain')); if (c) mover(c, x.dataset.col); }; });
+  }
+});
+function kbDetalhe(c, r) {
+  gav(`<div style="display:flex;justify-content:flex-end"><button class="btn" data-x aria-label="Fechar">✕</button></div><h2 style="margin:0 0 6px">${h(c.unidade ? `BKN ${c.unidade.bkn} — ${c.unidade.nome}` : c.titulo)}</h2><p class="mut" style="margin:0 0 12px">${h(c.titulo)} · criada em ${dt(c.criado)}</p>
+  <div class="box"><h2>Solicitação</h2><div class="kb-tg" style="margin:0 0 8px">${c.tiposNomes.map(n => `<span>${h(n)}</span>`).join('') || '<span class="al">Sem tipo</span>'}</div><p style="margin:0">Etapa: <b>${h((r.etapas.find(e => e.id === c.etapa) || {}).nome || c.etapa)}</b></p>${podeEditar ? `<div class="dr" style="justify-content:flex-start"><button class="btn" id="dt">Alterar tipo</button><a class="btn" href="${h(c.url)}" target="_blank" rel="noopener">Abrir negócio no Bitrix24</a></div>` : `<p><a href="${h(c.url)}" target="_blank" rel="noopener">Abrir negócio no Bitrix24</a></p>`}</div>
+  <div class="box"><h2>Unidade</h2>${c.unidade ? `<p style="margin:0">${h(c.unidade.cidade || '—')}${c.unidade.uf ? '/' + h(c.unidade.uf) : ''}${c.unidade.rt ? ' · RT ' + h(c.unidade.rt) : ''}</p>` : `<p class="mut" style="margin:0 0 8px">Nenhuma unidade do app tem o BKN deste card.</p>${podeEditar ? '<button class="btn" id="du">Cadastrar unidade a partir do card</button>' : ''}`}</div>
+  <div class="box"><h2>Empresa</h2>${c.empresa ? `<p style="margin:0"><b>${h(c.empresa.nome)}</b>${c.empresa.cnpj ? ' · ' + h(c.empresa.cnpj) : ''}</p>` : `<p class="mut" style="margin:0 0 8px">Sem empresa vinculada.</p>${podeEditar ? '<button class="btn p" id="dv">Vincular por CNPJ</button>' : ''}`}</div>`);
+  if ($('#dt')) $('#dt').onclick = () => kbTipos(c, r); if ($('#dv')) $('#dv').onclick = () => kbVincular(c);
+  if ($('#du')) $('#du').onclick = guarda(async () => { const bkn = c.bkn || prompt('BKN da unidade:'); if (!bkn) return; const x = await api('POST', `/kanban/${c.id}/unidade`, { bkn }); gavFecha(); aviso(`Unidade BKN ${x.unidade.bkn} cadastrada.`); kanban(); });
+}
+function kbTipos(c, r) {
+  gav(`<div style="display:flex;justify-content:flex-end"><button class="btn" data-x aria-label="Fechar">✕</button></div><h2 style="margin:0 0 6px">Tipo de solicitação</h2><p class="mut" style="margin:0 0 12px">${h(c.titulo)}${r.multiplo ? '' : ' · o campo aceita só um valor'}</p><form id="ft"><div id="fe"></div><div class="box" style="display:grid;gap:6px;max-height:60vh;overflow:auto">${r.tipos.map(x => `<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="${r.multiplo ? 'checkbox' : 'radio'}" name="t" value="${h(x.id)}" ${c.tipos.includes(x.id) ? 'checked' : ''}> ${h(x.nome)}</label>`).join('')}</div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar no Bitrix24</button></div></form>`);
+  $('#ft').onsubmit = async e => { e.preventDefault(); const tipos = [...e.target.querySelectorAll('[name=t]:checked')].map(x => x.value); try { await api('PUT', `/kanban/${c.id}/tipos`, { tipos }); gavFecha(); aviso('Tipo de solicitação salvo no Bitrix24.'); kanban(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+}
+function kbVincular(c) {
+  gav(`<div style="display:flex;justify-content:flex-end"><button class="btn" data-x aria-label="Fechar">✕</button></div><h2 style="margin:0 0 6px">Vincular empresa</h2><p class="mut" style="margin:0 0 12px">${h(c.titulo)}</p><div id="fe"></div>
+  <form id="fv" class="box"><label style="display:grid;gap:3px;font-size:12.5px;color:var(--mut)">CNPJ da empresa<span style="display:flex;gap:6px"><input name="cnpj" value="${h(c.unidade && c.unidade.cnpj ? c.unidade.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : '')}" placeholder="00.000.000/0000-00" style="flex:1;min-width:0" autofocus><button class="btn p">Buscar</button></span></label></form><div id="res"></div>`);
+  const grava = guarda(async (fn) => { await fn(); gavFecha(); aviso('Empresa vinculada ao negócio no Bitrix24.'); kanban(); });
+  $('#fv').onsubmit = async e => { e.preventDefault(); $('#fe').innerHTML = ''; $('#res').innerHTML = '<p class="mut">Buscando…</p>';
+    try { const r = await api('POST', `/kanban/${c.id}/empresa/buscar`, { cnpj: e.target.cnpj.value });
+      if (r.encontradas.length) $('#res').innerHTML = `<div class="box"><h2>Encontrada no Bitrix24</h2>${r.encontradas.map(x => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0"><span><b>${h(x.nome)}</b><br><small class="mut">${h(x.cnpj)}${x.cidade ? ' · ' + h(x.cidade) + (x.uf ? '/' + h(x.uf) : '') : ''}</small></span><button class="btn p" data-v="${h(x.id)}">Confirmar vínculo</button></div>`).join('')}</div>`;
+      else $('#res').innerHTML = `<div class="box"><h2>Nenhuma empresa com esse CNPJ</h2><p class="mut" style="margin:0 0 8px">${r.receita ? `Receita Federal: <b>${h(r.receita.razao)}</b>${r.receita.fantasia ? ' (' + h(r.receita.fantasia) + ')' : ''} · ${h(r.receita.cidade)}/${h(r.receita.uf)}` : 'Não consegui consultar a Receita agora; você pode criar mesmo assim.'}</p><label style="display:grid;gap:3px;font-size:12.5px;color:var(--mut)">Nome da empresa<input id="cn" value="${h(c.unidade ? c.unidade.nome : (r.receita && (r.receita.fantasia || r.receita.razao)) || '')}"></label><div class="dr"><button class="btn p" id="cc">Criar empresa no Bitrix24 e vincular</button></div></div>`;
+      $('#res').querySelectorAll('[data-v]').forEach(b => b.onclick = () => grava(() => api('POST', `/kanban/${c.id}/empresa/vincular`, { empresaId: b.dataset.v })));
+      if ($('#cc')) $('#cc').onclick = () => grava(() => api('POST', `/kanban/${c.id}/empresa/criar`, { cnpj: r.cnpj, nome: $('#cn').value }));
+    } catch (er) { $('#res').innerHTML = ''; $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+}
 
 // ---------- Painel ----------
 const painel = guarda(async () => {
@@ -331,7 +405,7 @@ const config = guarda(async () => {
   if (!NM.token) return NM.paraLogin();
   try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
     ME = j.usuario; podeEditar = ME.perfil === 'admin' || ME.perfil === 'financeiro'; podeAdmin = ME.perfil === 'admin'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
-    const a = location.hash.slice(1); abrirAba(ABAS.some(x => x[0] === a) ? a : 'painel');
+    const a = location.hash.slice(1); abrirAba(ABAS.some(x => x[0] === a) ? a : 'kanban');
   } catch { NM.paraLogin(); }
 })();
 </script>
