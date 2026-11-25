@@ -70,6 +70,19 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .kb-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.kb-bar .btn{padding:4px 14px;font-size:18px;line-height:1.2}
 .kb-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.kb-chip{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:99px;padding:3px 11px;font:inherit;font-size:12.5px;cursor:pointer}.kb-chip[aria-pressed=true]{background:var(--brand);border-color:var(--brand);color:#fff}
 .kb-mv{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px #0003;padding:6px;display:grid;min-width:200px}.kb-mv small{padding:4px 10px;color:var(--mut)}.kb-mv button{text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;font:inherit;color:var(--ink);cursor:pointer}.kb-mv button:hover{background:var(--brandbg)}
+
+/* Kanban BK — enxuto */
+nav{align-items:center}nav .sp{flex:1}
+.kb-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.kb-top input[type=search]{flex:1;min-width:200px;max-width:380px}.kb-top select.ativo{border-color:var(--brand);color:var(--brand)}.kb-n{font-size:12.5px;white-space:nowrap}
+.kb-col{height:calc(100vh - 230px);min-height:340px;align-items:stretch!important;gap:10px}
+.kb-cx{flex:0 0 262px!important;display:flex;flex-direction:column;min-height:0;padding:9px 8px 4px!important}.kb-cx.vazio{flex-basis:170px!important}
+.kb-lista{overflow-y:auto;flex:1;min-height:0;padding:1px 2px 6px}.kb-cx h3{margin-bottom:8px!important}
+.kb-cd{padding:8px 10px!important;margin-bottom:7px!important}.kb-h{display:flex;justify-content:space-between;gap:6px;align-items:flex-start}.kb-h b{font-size:13px!important;line-height:1.3}.kb-cd small{font-size:12px!important;line-height:1.35}
+.kb-mn{border:0;background:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 4px;border-radius:5px}.kb-mn:hover{background:var(--brandbg);color:var(--brand)}
+.kb-tg{margin-top:6px!important;gap:3px!important}.kb-tg span{font-size:11px!important;padding:1px 7px!important}.kb-tg span.ok{background:var(--okbg);color:var(--ok)}
+.kb-ac{margin-top:7px!important}.kb-ac .btn{padding:3px 10px;font-size:12px}
+.kb-mv small{display:block;padding:6px 10px 2px;color:var(--mut);font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}.kb-mv a{padding:8px 10px;color:var(--ink);text-decoration:none;font-size:13.5px;border-radius:6px}.kb-mv a:hover{background:var(--brandbg)}.kb-mv button{white-space:nowrap}
+.kb-mv .kb-ls{max-height:280px;overflow:auto;display:grid;gap:2px;padding:2px 6px}.kb-mv .kb-ls label{display:flex;gap:8px;align-items:center;padding:4px 4px;border-radius:5px;cursor:pointer;font-size:13.5px}.kb-mv .kb-ls label:hover{background:var(--brandbg)}
 </style>
 </head>
 <body>
@@ -85,15 +98,17 @@ const h = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp
 const api = (m, u, b) => nmJson(m, '/api/bk' + u, b);
 const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = s => s ? s.split('-').reverse().join('/') : '—';
-const ABAS = [['kanban', 'Kanban'], ['painel', 'Painel'], ['unidades', 'Unidades'], ['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações'], ['processo', 'Como funciona']];
+const ABAS = [['kanban', 'Kanban'], ['painel', 'Painel'], ['unidades', 'Unidades']], EXTRAS = [['esteira', 'Esteira de protocolos'], ['medicao', 'Medição mensal'], ['config', 'Configurações'], ['processo', 'Como funciona']], TODAS = [...ABAS, ...EXTRAS];
 let ME = {}, BOOT = {}, aba = 'kanban', F = { q: '', uf: '', etapa: '', situacao: '', page: 1 }, podeEditar = false, podeAdmin = false;
 const NIV = { vencido: 'b', critico: 'b', atencao: 'w', ok: 'ok' };
 function aviso(t, erro) { const m = $('#msg'); m.innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
 const guarda = f => async (...a) => { try { aviso(''); return await f(...a); } catch (e) { aviso(e.message || String(e), true); } };
 
 function abrirAba(a) {
-  aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
-  $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
+  aba = a; const extra = EXTRAS.find(x => x[0] === a);
+  $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('') + `<span class="sp"></span><button role="tab" id="mais" aria-selected="${!!extra}" aria-haspopup="true">${extra ? h(extra[1]) : 'Mais'} ▾</button>`;
+  $('#abas').querySelectorAll('button[data-a]').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
+  $('#mais').onclick = e => { e.stopPropagation(); menuFlutuante(e.currentTarget, EXTRAS.map(([k, n]) => `<button data-a="${k}">${n}</button>`).join(''), m => m.querySelectorAll('[data-a]').forEach(b => b.onclick = () => { m.remove(); aviso(''); abrirAba(b.dataset.a); })); };
   gavFecha(); history.replaceState(null, '', '#' + a); ({ kanban, painel, processo, unidades, esteira, medicao, config })[a]();
 }
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
@@ -101,49 +116,56 @@ const selUnidade = u => u.pendencias && u.pendencias.length ? `<span class="sel 
 
 
 // ---------- Kanban: espelho do funil 18 (BK) no Bitrix24 ----------
-let KB = { q: '', tipos: new Set(), pend: '' };
+let KB = { q: '', tipos: new Set(), pend: '' }, kbR = null, arrastando = false;
 const fmtCnpj = v => String(v || '').replace(/\D/g, '').replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 const tituloCard = c => (c.unidade ? `BKN ${c.unidade.bkn} — ${c.unidade.nome}` : c.titulo);
-const kanban = guarda(async () => {
-  if (!BOOT.hoje) await boot();
-  const r = await api('GET', '/kanban'), sc = $('#tela').querySelector('.kb-col'), keep = sc ? sc.scrollLeft : 0;
-  const t = KB.q.toLowerCase().trim(), casa = c => (!t || `${c.titulo} ${c.bkn} ${c.unidade ? c.unidade.nome + ' ' + c.unidade.cidade + ' ' + c.unidade.rt : ''} ${c.empresa ? c.empresa.nome : ''}`.toLowerCase().includes(t))
-    && (!KB.tipos.size || c.tipos.some(x => KB.tipos.has(x))) && (!KB.pend || (KB.pend === 'empresa' ? c.semEmpresa : KB.pend === 'tipo' ? c.semTipo : KB.pend === 'unidade' ? c.semUnidade : KB.pend === 'check' ? c.checklistPendente : c.prazoVencido));
-  const vis = r.cards.filter(casa), podeDocs = r.campos.docs;
-  const ehEnvio = c => !!(r.etapas.find(e => e.id === c.etapa) || {}).envio;
-  const ehVerif = c => !!(r.etapas.find(e => e.id === c.etapa) || {}).verificacao;
-  const card = c => `<div class="kb-cd ${c.semEmpresa || c.semTipo || c.checklistPendente || c.prazoVencido ? 'alerta' : ''}" data-id="${h(c.id)}" ${podeEditar ? 'draggable="true"' : ''}><b>${h(tituloCard(c))}</b>
-    <small>${c.unidade ? [c.unidade.cidade, c.unidade.uf].filter(Boolean).join('/') || 'cidade não informada' : 'Unidade não cadastrada no app'}${c.unidade && c.unidade.rt ? ' · RT ' + h(c.unidade.rt) : ''}</small>${c.empresa ? `<small>${h(c.empresa.nome)}</small>` : ''}
-    <div class="kb-tg">${c.tiposNomes.slice(0, 3).map(n => `<span title="${c.prazos[n] ? 'Prazo: ' + dt(c.prazos[n]) : ''}">${h(n)}${c.prazos[n] ? ' · ' + dt(c.prazos[n]).slice(0, 5) : ''}</span>`).join('')}${c.tiposNomes.length > 3 ? `<span title="${h(c.tiposNomes.slice(3).join(', '))}">+${c.tiposNomes.length - 3}</span>` : ''}${c.semTipo ? '<span class="al">Sem tipo</span>' : ''}${c.semEmpresa ? '<span class="al">Sem empresa</span>' : ''}${c.semUnidade ? '<span class="w">Sem unidade no app</span>' : ''}${c.checklistPendente && !ehVerif(c) ? '<span class="al">Checklist pendente</span>' : ehVerif(c) && c.checklist.total ? `<span class="${c.checklist.pendentes ? 'w' : 'ok'}">✔ checklist ${c.checklist.feitos}/${c.checklist.total}</span>` : ''}${c.prazoVencido ? '<span class="al">Prazo vencido</span>' : ''}${c.docs && (c.docs.recebidos.length || c.docs.nutrimix.length) ? `<span class="w" title="Documentos recebidos / elaborados pela Nutrimix">📎 ${c.docs.recebidos.length}${c.docs.nutrimix.length ? ' · ' + c.docs.nutrimix.length + ' Nutrimix' : ''}</span>` : ''}</div>
-    ${podeEditar ? `<div class="kb-ac">${c.semEmpresa ? `<button class="btn p" data-vi="${h(c.id)}">Vincular empresa</button>` : ''}${c.semTipo ? `<button class="btn" data-ti="${h(c.id)}">Definir tipo</button>` : ''}${podeDocs ? `<button class="btn" data-do="${h(c.id)}">Documentos</button>` : ''}${ehEnvio(c) ? `<button class="btn p" data-ge="${h(c.id)}">Gerar documentos</button>` : ''}<button class="btn" data-mv="${h(c.id)}">Mover ▾</button></div>` : ''}</div>`;
-  $('#tela').innerHTML = `${!r.campos.prontos ? `<p class="msg">Faltam campos no Bitrix24 (${h(r.campos.faltam.slice(0, 4).join(', '))}${r.campos.faltam.length > 4 ? '…' : ''}). ${podeAdmin ? 'Clique em “Preparar campos” para criá-los e organizar o formulário do funil 18.' : 'Peça ao administrador para preparar os campos.'}</p>` : ''}
-  <div class="tools" style="margin-bottom:8px"><input id="kq" type="search" placeholder="Buscar por BKN, unidade, cidade, RT ou empresa" value="${h(KB.q)}" style="flex:1;min-width:220px"><button class="btn" id="kre" title="Recarregar do Bitrix24">↻ Atualizar</button>${!r.campos.prontos && podeAdmin ? '<button class="btn p" id="kpd">Preparar campos</button>' : ''}<a class="btn" href="https://${h(BOOT.bitrixHost || '')}/crm/deal/kanban/category/18/" target="_blank" rel="noopener">Abrir no Bitrix24</a></div>
-  <div class="kb-chips"><span class="mut" style="align-self:center;font-size:12.5px">Tipo de serviço:</span>${r.tipos.map(x => `<button class="kb-chip" aria-pressed="${KB.tipos.has(x.id)}" data-tp="${h(x.id)}">${h(x.nome)}</button>`).join('')}</div>
-  <div class="kb-chips"><span class="mut" style="align-self:center;font-size:12.5px">Pendências:</span>${[['empresa', 'Sem empresa', r.resumo.semEmpresa], ['tipo', 'Sem tipo', r.resumo.semTipo], ['unidade', 'Sem unidade no app', r.resumo.semUnidade], ['check', 'Checklist pendente', r.resumo.checklistPendente], ['prazo', 'Prazo vencido', r.resumo.prazoVencido]].map(([k, n, q]) => `<button class="kb-chip" aria-pressed="${KB.pend === k}" data-pe="${k}">${n} <b>${q}</b></button>`).join('')}<span class="mut" style="align-self:center;font-size:12.5px;margin-left:auto">${vis.length} de ${r.resumo.total} solicitação(ões)</span></div>
-  <div class="kb-bar"><button class="btn" id="kl" aria-label="Rolar para a esquerda">‹</button><span class="mut" style="flex:1;text-align:center;font-size:12.5px">Espelho do funil BK do Bitrix24 · arraste o card ou use “Mover” para mudar a etapa nos dois lugares</span><button class="btn" id="kr" aria-label="Rolar para a direita">›</button></div>
-  <div class="kb-col">${r.etapas.map(e => { const l = vis.filter(c => c.etapa === e.id); return `<div class="kb-cx ${e.tom}" data-col="${h(e.id)}"><h3>${h(e.nome)} <span class="cnt">${l.length}</span></h3>${l.map(card).join('') || '<p class="mut" style="font-size:13px">Vazio</p>'}</div>`; }).join('')}</div>`;
-  const col = $('#tela').querySelector('.kb-col'); col.scrollLeft = keep; const passo = () => ($('.kb-cx') || { offsetWidth: 300 }).offsetWidth + 12;
-  $('#kl').onclick = () => col.scrollBy({ left: -passo(), behavior: 'smooth' }); $('#kr').onclick = () => col.scrollBy({ left: passo(), behavior: 'smooth' });
-  let tq; $('#kq').oninput = e => { clearTimeout(tq); tq = setTimeout(async () => { KB.q = e.target.value; await kanban(); const i = $('#kq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 300); };
-  $('#kre').onclick = () => kanban();
-  if ($('#kpd')) $('#kpd').onclick = guarda(async () => { const x = await api('POST', '/kanban/preparar', { simular: true }); if (!confirm(`Preparar o funil BK no Bitrix24:\n• criar ${x.criar.length} campo(s) de negócio (${x.criar.slice(0, 5).join(', ')}${x.criar.length > 5 ? '…' : ''})\n${x.remover.length ? '• remover ' + x.remover.length + ' campo(s) antigo(s) de documentos\n' : ''}• ${x.formulario}\n\nO campo Tipo de Serviço novo é múltiplo e recebe os valores do campo antigo. Confirmar?`)) return; const y = await api('POST', '/kanban/preparar', { simular: false }); aviso(`${y.criados.length} campo(s) criado(s); ${y.migrados} negócio(s) migrado(s) para Tipo de Serviço. ${y.formulario}.`); kanban(); });
-  $('#tela').querySelectorAll('[data-tp]').forEach(b => b.onclick = () => { KB.tipos.has(b.dataset.tp) ? KB.tipos.delete(b.dataset.tp) : KB.tipos.add(b.dataset.tp); kanban(); });
-  $('#tela').querySelectorAll('[data-pe]').forEach(b => b.onclick = () => { KB.pend = KB.pend === b.dataset.pe ? '' : b.dataset.pe; kanban(); });
-  const por = new Map(r.cards.map(c => [c.id, c]));
-  $('#tela').querySelectorAll('.kb-cd').forEach(el => el.onclick = e => { if (!e.target.closest('button')) kbDetalhe(por.get(el.dataset.id), r); });
-  $('#tela').querySelectorAll('[data-do]').forEach(b => b.onclick = e => { e.stopPropagation(); kbDocs(por.get(b.dataset.do), r); });
-  $('#tela').querySelectorAll('[data-ge]').forEach(b => b.onclick = e => { e.stopPropagation(); kbGerar(por.get(b.dataset.ge), r); });
-  $('#tela').querySelectorAll('[data-vi]').forEach(b => b.onclick = e => { e.stopPropagation(); kbVincular(por.get(b.dataset.vi)); });
-  $('#tela').querySelectorAll('[data-ti]').forEach(b => b.onclick = e => { e.stopPropagation(); kbTipos(por.get(b.dataset.ti), r); });
-  const mover = guarda(async (c, etapa) => { if (c.etapa === etapa) return; await api('POST', `/kanban/${c.id}/mover`, { etapa }); aviso('Etapa atualizada no Bitrix24.'); kanban(); });
-  $('#tela').querySelectorAll('[data-mv]').forEach(b => b.onclick = e => { e.stopPropagation(); document.querySelectorAll('.kb-mv').forEach(x => x.remove()); const c = por.get(b.dataset.mv), m = document.createElement('div'); m.className = 'kb-mv'; m.innerHTML = '<small>Mover para…</small>' + r.etapas.filter(x => x.id !== c.etapa).map(x => `<button data-e="${h(x.id)}">${h(x.nome)}</button>`).join('');
-    const rc = b.getBoundingClientRect(); m.style.top = Math.min(innerHeight - 280, rc.bottom + 4) + 'px'; m.style.left = Math.max(8, Math.min(innerWidth - 220, rc.left)) + 'px'; document.body.appendChild(m); m.querySelectorAll('button').forEach(x => x.onclick = () => { m.remove(); mover(c, x.dataset.e); });
-    setTimeout(() => document.addEventListener('click', function f() { m.remove(); document.removeEventListener('click', f); }), 0); });
+const fechaMenus = () => document.querySelectorAll('.kb-mv').forEach(x => x.remove());
+function menuFlutuante(ancora, html, ligar) {   // pequeno menu suspenso junto de um botão
+  fechaMenus(); const m = document.createElement('div'); m.className = 'kb-mv'; m.innerHTML = html; document.body.appendChild(m);
+  const rc = ancora.getBoundingClientRect(), mh = m.offsetHeight; m.style.top = Math.max(8, Math.min(innerHeight - mh - 8, rc.bottom + 4)) + 'px'; m.style.left = Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, rc.right - m.offsetWidth)) + 'px';
+  ligar(m); setTimeout(() => document.addEventListener('click', function f(e) { if (m.isConnected && m.contains(e.target) && !e.target.closest('button,a')) { document.addEventListener('click', f, { once: true }); return; } m.remove(); }, { once: true }), 0); return m;
+}
+const kanban = guarda(async () => { if (!BOOT.hoje) await boot(); kbR = await api('GET', '/kanban'); kbDesenha(); });
+function kbDesenha() {
+  const r = kbR, sc = $('#tela').querySelector('.kb-col'), keep = sc ? sc.scrollLeft : 0, t = KB.q.toLowerCase().trim(), por = new Map(r.cards.map(c => [c.id, c]));
+  const etapa = c => r.etapas.find(e => e.id === c.etapa) || {};
+  const casa = c => (!t || `${c.titulo} ${c.bkn} ${c.unidade ? c.unidade.nome + ' ' + c.unidade.cidade + ' ' + c.unidade.rt : ''} ${c.empresa ? c.empresa.nome : ''}`.toLowerCase().includes(t)) && (!KB.tipos.size || c.tipos.some(x => KB.tipos.has(x)))
+    && (!KB.pend || (KB.pend === 'empresa' ? c.semEmpresa : KB.pend === 'tipo' ? c.semTipo : KB.pend === 'unidade' ? c.semUnidade : KB.pend === 'check' ? c.checklistPendente : c.prazoVencido));
+  const vis = r.cards.filter(casa), pends = [['empresa', 'Sem empresa', r.resumo.semEmpresa], ['tipo', 'Sem tipo', r.resumo.semTipo], ['unidade', 'Sem unidade no app', r.resumo.semUnidade], ['check', 'Checklist pendente', r.resumo.checklistPendente], ['prazo', 'Prazo vencido', r.resumo.prazoVencido]];
+  const principal = c => { const e = etapa(c); return c.semEmpresa ? ['vi', 'Vincular empresa'] : c.semTipo ? ['ti', 'Definir tipo'] : e.envio ? ['ge', 'Gerar documentos'] : e.levantamento && r.campos.docs ? ['do', 'Pedir documentos'] : e.verificacao && c.checklist.pendentes ? ['de', 'Checklist'] : null; };
+  const card = c => { const e = etapa(c), pr = podeEditar ? principal(c) : null, tn = c.tiposNomes; const alerta = c.semEmpresa || c.semTipo || c.checklistPendente || c.prazoVencido;
+    return `<div class="kb-cd ${alerta ? 'alerta' : ''}" data-id="${h(c.id)}" ${podeEditar ? 'draggable="true"' : ''}><div class="kb-h"><b>${h(tituloCard(c))}</b>${podeEditar ? `<button class="kb-mn" data-mn="${h(c.id)}" aria-label="Mais ações">⋯</button>` : ''}</div>
+      <small>${c.unidade ? [c.unidade.cidade, c.unidade.uf].filter(Boolean).join('/') || 'cidade não informada' : 'Unidade não cadastrada no app'}${c.empresa ? ' · ' + h(c.empresa.nome) : ''}</small>
+      <div class="kb-tg">${tn.slice(0, 2).map(n => `<span title="${c.prazos[n] ? 'Prazo: ' + dt(c.prazos[n]) : ''}">${h(n)}${c.prazos[n] ? ' · ' + dt(c.prazos[n]).slice(0, 5) : ''}</span>`).join('')}${tn.length > 2 ? `<span title="${h(tn.slice(2).join(', '))}">+${tn.length - 2}</span>` : ''}${c.semTipo ? '<span class="al">Sem tipo</span>' : ''}${c.semEmpresa ? '<span class="al">Sem empresa</span>' : ''}${c.semUnidade && !c.semEmpresa ? '<span class="w">Sem unidade</span>' : ''}${c.checklistPendente && !e.verificacao ? '<span class="al">Checklist pendente</span>' : e.verificacao && c.checklist.total ? `<span class="${c.checklist.pendentes ? 'w' : 'ok'}">✔ ${c.checklist.feitos}/${c.checklist.total}</span>` : ''}${c.prazoVencido ? '<span class="al">Prazo vencido</span>' : ''}${c.docs && (c.docs.recebidos.length || c.docs.nutrimix.length) ? `<span title="Recebidos / elaborados pela Nutrimix">📎 ${c.docs.recebidos.length}${c.docs.nutrimix.length ? '+' + c.docs.nutrimix.length : ''}</span>` : ''}</div>
+      ${pr ? `<div class="kb-ac"><button class="btn ${pr[0] === 'vi' ? 'p' : ''}" data-${pr[0]}="${h(c.id)}">${pr[1]}</button></div>` : ''}</div>`; };
+  $('#tela').innerHTML = `${!r.campos.prontos ? `<p class="msg">Faltam campos no Bitrix24 (${h(r.campos.faltam.slice(0, 3).join(', '))}${r.campos.faltam.length > 3 ? '…' : ''}). ${podeAdmin ? '<button class="btn p" id="kpd">Preparar campos</button>' : 'Peça ao administrador para preparar os campos.'}</p>` : ''}
+  <div class="kb-top"><input id="kq" type="search" placeholder="Buscar BKN, unidade, cidade, RT ou empresa" value="${h(KB.q)}"><button class="btn ${KB.tipos.size ? 'p' : ''}" id="ktp">Tipo de serviço${KB.tipos.size ? ` (${KB.tipos.size})` : ''} ▾</button>
+  <select id="kpe" class="${KB.pend ? 'ativo' : ''}"><option value="">Pendências</option>${pends.map(([k, n, q]) => `<option value="${k}" ${KB.pend === k ? 'selected' : ''}>${n} (${q})</option>`).join('')}</select>
+  <span class="mut kb-n">${vis.length === r.resumo.total ? r.resumo.total : vis.length + ' de ' + r.resumo.total} solicitação(ões)</span><span class="sp"></span><button class="btn" id="kl" aria-label="Rolar para a esquerda">‹</button><button class="btn" id="kr" aria-label="Rolar para a direita">›</button><button class="btn" id="kre" title="Recarregar do Bitrix24 (atualiza sozinho a cada minuto)">↻</button><a class="btn" href="https://${h(BOOT.bitrixHost || '')}/crm/deal/kanban/category/18/" target="_blank" rel="noopener" title="Abrir o funil no Bitrix24">Bitrix24 ↗</a></div>
+  <div class="kb-col">${r.etapas.map(e => { const l = vis.filter(c => c.etapa === e.id); return `<div class="kb-cx ${e.tom} ${l.length ? '' : 'vazio'}" data-col="${h(e.id)}"><h3>${h(e.nome)} <span class="cnt">${l.length}</span></h3><div class="kb-lista">${l.map(card).join('') || '<p class="mut" style="font-size:12.5px;margin:4px 2px">Vazio</p>'}</div></div>`; }).join('')}</div>`;
+  const col = $('#tela').querySelector('.kb-col'); col.scrollLeft = keep; const passo = () => 280;
+  $('#kl').onclick = () => col.scrollBy({ left: -passo(), behavior: 'smooth' }); $('#kr').onclick = () => col.scrollBy({ left: passo(), behavior: 'smooth' }); $('#kre').onclick = () => kanban();
+  let tq; $('#kq').oninput = e => { clearTimeout(tq); tq = setTimeout(() => { KB.q = e.target.value; kbDesenha(); const i = $('#kq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }, 200); };
+  $('#kpe').onchange = e => { KB.pend = e.target.value; kbDesenha(); };
+  $('#ktp').onclick = e => { e.stopPropagation(); menuFlutuante(e.currentTarget, `<small>Tipo de serviço (marque um ou mais)</small><div class="kb-ls">${r.tipos.map(x => `<label><input type="checkbox" value="${h(x.id)}" ${KB.tipos.has(x.id) ? 'checked' : ''}> ${h(x.nome)}</label>`).join('')}</div><button data-lim>Limpar filtro</button>`, m => { m.querySelectorAll('input').forEach(i => i.onchange = () => { i.checked ? KB.tipos.add(i.value) : KB.tipos.delete(i.value); kbDesenha(); }); m.querySelector('[data-lim]').onclick = () => { KB.tipos.clear(); kbDesenha(); }; }); };
+  if ($('#kpd')) $('#kpd').onclick = guarda(async () => { const x = await api('POST', '/kanban/preparar', { simular: true }); if (!confirm(`Preparar o funil BK no Bitrix24:\n• criar ${x.criar.length} campo(s) de negócio\n${x.remover.length ? '• remover ' + x.remover.length + ' campo(s) antigo(s)\n' : ''}• ${x.formulario}\n\nConfirmar?`)) return; const y = await api('POST', '/kanban/preparar', { simular: false }); aviso(`${y.criados.length} campo(s) criado(s); ${y.migrados} negócio(s) migrado(s). ${y.formulario}.`); kanban(); });
+  const abre = id => por.get(id);
+  const mover = async (c, etapaId) => { if (!c || c.etapa === etapaId) return; const antes = c.etapa; c.etapa = etapaId; kbDesenha();   // o card muda de coluna na hora; se o Bitrix24 recusar, volta
+    try { await api('POST', `/kanban/${c.id}/mover`, { etapa: etapaId }); aviso(`“${tituloCard(c)}” movido para ${(r.etapas.find(e => e.id === etapaId) || {}).nome}.`); } catch (er) { c.etapa = antes; kbDesenha(); aviso(er.message, true); } };
+  const acao = { vi: c => kbVincular(c), ti: c => kbTipos(c, r), ge: c => kbGerar(c, r), do: c => kbDocs(c, r), de: c => kbDetalhe(c, r) };
+  for (const k of Object.keys(acao)) $('#tela').querySelectorAll(`[data-${k}]`).forEach(b => b.onclick = e => { e.stopPropagation(); acao[k](abre(b.getAttribute('data-' + k))); });
+  $('#tela').querySelectorAll('.kb-cd').forEach(el => el.onclick = e => { if (!e.target.closest('button')) kbDetalhe(abre(el.dataset.id), r); });
+  $('#tela').querySelectorAll('[data-mn]').forEach(b => b.onclick = e => { e.stopPropagation(); const c = abre(b.dataset.mn);
+    menuFlutuante(b, `<button data-o="de">Abrir detalhes</button>${r.campos.docs ? '<button data-o="do">Pedir / anexar documentos</button>' : ''}<button data-o="ge">Gerar documentos</button>${c.semEmpresa ? '<button data-o="vi">Vincular empresa</button>' : ''}<button data-o="ti">Definir tipos de serviço</button><small>Mover para</small>${r.etapas.filter(x => x.id !== c.etapa).map(x => `<button data-e="${h(x.id)}">${h(x.nome)}</button>`).join('')}<a href="${h(c.url)}" target="_blank" rel="noopener">Abrir no Bitrix24 ↗</a>`, m => {
+      m.querySelectorAll('[data-o]').forEach(x => x.onclick = () => { m.remove(); acao[x.dataset.o === 'de' ? 'de' : x.dataset.o](c); }); m.querySelectorAll('[data-e]').forEach(x => x.onclick = () => { m.remove(); mover(c, x.dataset.e); }); }); });
   if (podeEditar) {
-    $('#tela').querySelectorAll('.kb-cd').forEach(el => { el.ondragstart = e => { e.dataTransfer.setData('text/plain', el.dataset.id); setTimeout(() => el.classList.add('arr'), 0); }; el.ondragend = () => el.classList.remove('arr'); });
-    $('#tela').querySelectorAll('.kb-cx').forEach(x => { x.ondragover = e => { e.preventDefault(); x.classList.add('alvo'); }; x.ondragleave = e => { if (!x.contains(e.relatedTarget)) x.classList.remove('alvo'); }; x.ondrop = e => { e.preventDefault(); x.classList.remove('alvo'); const c = por.get(e.dataTransfer.getData('text/plain')); if (c) mover(c, x.dataset.col); }; });
+    const cols = $('#tela').querySelector('.kb-col');
+    $('#tela').querySelectorAll('.kb-cd').forEach(el => { el.ondragstart = e => { arrastando = true; e.dataTransfer.setData('text/plain', el.dataset.id); setTimeout(() => el.classList.add('arr'), 0); }; el.ondragend = () => { arrastando = false; el.classList.remove('arr'); $('#tela').querySelectorAll('.alvo').forEach(x => x.classList.remove('alvo')); }; });
+    cols.ondragover = e => { const rc = cols.getBoundingClientRect(); if (e.clientX > rc.right - 70) cols.scrollLeft += 18; else if (e.clientX < rc.left + 70) cols.scrollLeft -= 18; };   // arrastar até a borda rola o quadro
+    $('#tela').querySelectorAll('.kb-cx').forEach(x => { x.ondragover = e => { e.preventDefault(); x.classList.add('alvo'); }; x.ondragleave = e => { if (!x.contains(e.relatedTarget)) x.classList.remove('alvo'); }; x.ondrop = e => { e.preventDefault(); x.classList.remove('alvo'); arrastando = false; mover(abre(e.dataTransfer.getData('text/plain')), x.dataset.col); }; });
   }
-});
+}
+setInterval(() => { if (aba === 'kanban' && !document.hidden && !arrastando && $('#gav').hidden && !document.querySelector('.kb-mv') && !(document.activeElement && document.activeElement.id === 'kq')) kanban(); }, 60000);   // o quadro é um espelho: atualiza sozinho
 const drawerTopo = '<div style="display:flex;justify-content:flex-end"><button class="btn" data-x aria-label="Fechar">✕</button></div>';
 function kbDetalhe(c, r) {
   const ck = c.checklist, et = (r.etapas.find(e => e.id === c.etapa) || {}).nome || c.etapa, verif = (r.etapas.find(e => e.id === c.etapa) || {}).verificacao;
@@ -495,7 +517,7 @@ const config = guarda(async () => {
   if (!NM.token) return NM.paraLogin();
   try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
     ME = j.usuario; podeEditar = ME.perfil === 'admin' || ME.perfil === 'financeiro'; podeAdmin = ME.perfil === 'admin'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
-    const a = location.hash.slice(1); abrirAba(ABAS.some(x => x[0] === a) ? a : 'kanban');
+    const a = location.hash.slice(1); abrirAba(TODAS.some(x => x[0] === a) ? a : 'kanban');
   } catch { NM.paraLogin(); }
 })();
 </script>
