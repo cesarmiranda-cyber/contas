@@ -246,3 +246,18 @@ test('visibilidade: consultora vê só as próprias visitas, salvo se o administ
   assert.equal((await call('GET', q, null, eu)).itens.length, 2); assert.equal((await call('GET', '/bootstrap', null, eu)).escopoProprio, false);
   assert.equal((await call('GET', q, null, { perfil: 'operacional', bitrixId: '8' })).itens.length, 1);   // a Iris continua só com as dela
 });
+
+test('dashboard: cumprimento, sem registro, cobertura e escopo da consultora', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json'), hoje = require('../lib/rules').todayBR(), mes = hoje.slice(0, 7);
+  fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica', 'Iris'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }, { nome: 'Alfa', empresaBitrixId: '' }], visitas: [] }));
+  const api = createCronApi({ bitrix: fakeBitrix(), bx: createBxEmpresas({ bitrix: fakeBitrix() }), funil: createBxFunil({ bitrix: fakeBitrix() }), store: { log() {} }, dir, seedFile: seed });
+  const d = api.dados(), [mo, ir] = d.consultoras, [cd, ca] = d.clientes; mo.bitrixId = '7';
+  const passado = FER.somaDias(hoje, -3), futuro = FER.somaDias(hoje, 3), mk = (data, status, c, cons, min = 60) => d.visitas.push({ id: K.uid('vs'), data: data.slice(0, 7) === mes ? data : `${mes}-01`, min, consultora: cons.id, clienteId: c.id, status, obs: '', origem: 'manual' });
+  mk(passado, 'realizada', cd, mo); mk(passado, 'realizada', cd, mo, 120); mk(passado, 'agendada', ca, mo); mk(`${mes}-01`, 'faltou', ca, ir); mk(futuro, 'agendada', cd, mo); mk(`${mes}-02`, 'cancelada', cd, ir);
+  const call = async (p, user) => { const u = new URL('http://x/api/cron' + p); return (await api.handle('GET', u.pathname, u, async () => ({}), user)).json; };
+  const r = await call('/dashboard?mes=' + mes, { perfil: 'admin' });
+  assert.equal(r.total, 6); assert.equal(r.realizadas, 2); assert.equal(r.canceladas, 1); assert.ok(r.semRegistro >= 1); assert.equal(r.minReal, 180);
+  assert.equal(r.cumprimento, Math.round(2 / r.vencidas * 100)); assert.equal(r.clientes.previstos, 2); assert.equal(r.clientes.atendidos, 1); assert.equal(r.clientes.cobertura, 50);
+  assert.ok(r.clientes.semVisita.some(x => x.nome === 'Alfa')); assert.equal(r.serie.length, 6); assert.equal(r.serie[5].mes, mes); assert.ok(r.porConsultora.length === 2);
+  const eu = await call('/dashboard?mes=' + mes + '&consultora=' + ir.id, { perfil: 'operacional', bitrixId: '7' }); assert.equal(eu.escopoProprio, true); assert.ok(eu.porConsultora.every(x => x.id === mo.id)); assert.ok(eu.total < r.total);
+});

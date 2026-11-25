@@ -76,6 +76,15 @@ dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface)
 .vc.mini{font-size:11.5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;background:var(--brandbg);color:var(--brand)}
 
+/* Dashboard */
+.dks{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}@media(max-width:760px){.dks{grid-template-columns:repeat(2,1fr)}}@media(max-width:480px){.dks{grid-template-columns:1fr}}.dk{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--kb-n);border-radius:10px;padding:12px 14px;display:grid;gap:2px}.dk small{color:var(--mut);font-size:12.5px}.dk strong{font-size:30px;letter-spacing:-.02em;line-height:1.1}.dk span{color:var(--mut);font-size:12.5px}
+.dk.t-g{border-left-color:var(--kb-g)}.dk.t-g strong{color:var(--kb-g)}.dk.t-w{border-left-color:var(--kb-w)}.dk.t-w strong{color:var(--kb-w)}.dk.t-b{border-left-color:var(--kb-b)}.dk.t-b strong{color:var(--kb-b)}.dk.t-done{border-left-color:var(--kb-done)}.dk.t-done strong{color:var(--kb-done)}
+.stk{display:flex;height:30px;border-radius:8px;overflow:hidden;gap:2px;background:var(--line)}.sg{display:grid;place-items:center;color:#fff;font-size:12.5px;font-weight:700;min-width:4px}.sg.t-done,.lg i.t-done,.pb i.t-done,.bb .rl{background:var(--kb-done)}.sg.t-g,.lg i.t-g,.pb i.t-g{background:var(--kb-g)}.sg.t-b,.lg i.t-b,.pb i.t-b{background:var(--kb-b)}.sg.t-w,.lg i.t-w,.pb i.t-w{background:var(--kb-w)}.sg.t-n,.lg i.t-n,.pb i.t-n{background:var(--kb-n)}.sg.t-n2,.lg i.t-n2{background:#b9c0ca}
+.lg{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12.5px;color:var(--ink2)}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}.lg i.pv,.bb .pv{background:var(--brandbg);border:1px solid var(--line)}
+.dg2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}.dg2 .box{margin-bottom:16px}
+.bars{display:flex;gap:10px;align-items:flex-end;height:210px}.bc{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end}.bc small{font-size:11.5px;color:var(--ink2)}.bp{font-weight:700}.bp.t-g{color:var(--kb-g)}.bp.t-w{color:var(--kb-w)}.bp.t-b{color:var(--kb-b)}.bb{position:relative;width:100%;max-width:46px;flex:1;display:flex;align-items:flex-end;justify-content:center}.bb i{position:absolute;bottom:0;left:0;right:0;border-radius:5px 5px 0 0}.bb .rl{left:22%;right:22%}
+.hb{display:grid;grid-template-columns:70px 1fr 28px;gap:8px;align-items:center;margin:6px 0;font-size:13px}.hb div{background:var(--brandbg);border-radius:5px;height:14px}.hb i{display:block;height:100%;background:var(--kb-done);border-radius:5px}.hb b{text-align:right}
+.pb{height:9px;background:var(--line);border-radius:5px;overflow:hidden}.pb i{display:block;height:100%}.li{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}.li:last-child{border:0}
 /* Barra de rolagem do kanban */
 .kbar{display:flex;align-items:center;gap:8px;margin-bottom:10px}.kbar .btn{padding:4px 14px;font-size:18px;line-height:1.2}.kchips{display:flex;gap:6px;overflow-x:auto;flex:1;scrollbar-width:none}.kchips::-webkit-scrollbar{display:none}
 .kchip{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:99px;padding:3px 11px;font:inherit;font-size:12.5px;white-space:nowrap;cursor:pointer}.kchip b{margin-left:3px}.kchip.t-b{color:var(--kb-b);border-color:var(--kb-b)}.kchip.t-w{color:var(--kb-w);border-color:var(--kb-w)}.kchip.t-g{color:var(--kb-g);border-color:var(--kb-g)}.kchip.t-done{color:var(--kb-done);border-color:var(--kb-done)}.kchip:hover{background:var(--brandbg)}
@@ -110,7 +119,7 @@ const dt = s => s ? s.split('-').reverse().join('/') : '—';
 const dm = s => s.split('-').reverse().slice(0, 2).join('/');
 const fm = m => Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
 const somaDias = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const ABAS = [['semana', 'Agenda'], ['clientes', 'Clientes'], ['recorrencias', 'Recorrências'], ['conferencia', 'Conferência mensal'], ['configuracoes', 'Configurações'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
+const ABAS = [['semana', 'Agenda'], ['clientes', 'Clientes'], ['recorrencias', 'Recorrências'], ['dashboard', 'Dashboard'], ['configuracoes', 'Configurações'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
 let ME = {}, BOOT = {}, aba = 'semana', podeEditar = false, podeAdmin = false, operacional = false;
 let W = { view: 'kanban', data: '', consultora: '', q: '', status: '', fer: false, page: 1 }, CL = { q: '', filtro: '', page: 1 };
 function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
@@ -119,12 +128,12 @@ function gav(html) { $('#gav').innerHTML = html; $('#gav').hidden = false; $('#g
 function gavFecha() { $('#gav').hidden = true; $('#gbk').hidden = true; $('#gav').innerHTML = ''; }
 $('#gbk').onclick = gavFecha; addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#gav').hidden) gavFecha(); });
 const topo = () => '<div class="top"><span class="sp"></span><button class="btn" data-x aria-label="Fechar">✕</button></div>';
-const recarrega = () => ({ semana, clientes, recorrencias, conferencia, configuracoes, feriados, processo })[aba]();
+const recarrega = () => ({ semana, clientes, recorrencias, dashboard, conferencia, configuracoes, feriados, processo })[aba]();
 async function boot() { BOOT = await api('GET', '/bootstrap'); }
 function abrirAba(a) {
   aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
-  gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, recorrencias, conferencia, configuracoes, feriados, processo })[a]();
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, recorrencias, dashboard, conferencia, configuracoes, feriados, processo })[a]();
 }
 const hojeISO = () => BOOT.hoje;
 
@@ -447,6 +456,28 @@ const configuracoes = guarda(async () => {
   $('#nova').onclick = guarda(async () => { const n = prompt('Nome da nova consultora:'); if (!n) return; await api('POST', '/consultoras', { nome: n }); aviso('Consultora incluída. Ligue-a ao usuário do Bitrix24 na lista.'); configuracoes(); });
 });
 
+// ---------- Dashboard (indicadores do cronograma) ----------
+let DB = { mes: '', consultora: '' };
+const dashboard = guarda(async () => {
+  await boot(); DB.mes ||= BOOT.hoje.slice(0, 7);
+  const r = await api('GET', '/dashboard?' + new URLSearchParams({ mes: DB.mes, consultora: DB.consultora }));
+  const tom = p => (p == null ? 'n' : p >= 90 ? 'g' : p >= 70 ? 'w' : 'b'), pc = p => (p == null ? '—' : p + '%'), mn = x => { const t = new Date(x + '-01T12:00:00'); return t.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''); };
+  const kpi = (rot, val, sub, t = '') => `<div class="dk t-${t || 'n'}"><small>${rot}</small><strong>${val}</strong><span>${sub}</span></div>`;
+  const tot = Math.max(1, r.total), seg = [['Realizadas', r.realizadas, 'done'], ['A realizar', r.aRealizar, 'g'], ['Sem registro', r.semRegistro, 'b'], ['Não aconteceu', r.faltou, 'w'], ['Remarcadas', r.remarcadas, 'n'], ['Canceladas', r.canceladas, 'n2']];
+  const maxS = Math.max(1, ...r.serie.map(x => x.previstas)), maxD = Math.max(1, ...r.diaSemana.map(x => x.visitas)), rec = r.origem.recorrencia + r.origem.manual;
+  $('#tela').innerHTML = `<h1>Dashboard do cronograma</h1><p class="sub">Indicadores calculados com as visitas registradas pelas consultoras${r.escopoProprio ? ' (somente as suas)' : ''}. <b>Cumprimento</b> = visitas realizadas ÷ visitas já vencidas (realizadas + sem registro + não aconteceu).</p>
+  <div class="tools"><input type="month" id="dm" value="${h(DB.mes)}" aria-label="Mês">${r.escopoProprio ? '' : `<select id="dc"><option value="">Todas as consultoras</option>${BOOT.consultoras.filter(c => c.ativo || c.id === DB.consultora).map(c => `<option value="${h(c.id)}" ${c.id === DB.consultora ? 'selected' : ''}>${h(c.nome)}</option>`).join('')}</select>`}<span class="sp"></span><button class="btn" id="dcf">Lista de conferência mensal</button></div>
+  <div class="dks">${kpi('Cumprimento do mês', pc(r.cumprimento), `${r.realizadas} de ${r.vencidas} visitas vencidas`, tom(r.cumprimento))}${kpi('Visitas realizadas', r.realizadas, `${fm(r.minReal)} em visitas · média ${r.mediaMin ? fm(r.mediaMin) : '—'}`, 'done')}${kpi('Sem registro', r.semRegistro, r.atrasadasTotal ? `${r.atrasadasTotal} atrasadas no total` : 'nenhuma atrasada', r.semRegistro ? 'b' : 'g')}${kpi('A realizar', r.aRealizar, `${fm(Math.max(0, r.minPrev - r.minReal))} previstas até o fim do mês`, 'g')}${kpi('Clientes atendidos', pc(r.clientes.cobertura), `${r.clientes.atendidos} de ${r.clientes.previstos} com visita no mês`, tom(r.clientes.cobertura))}${kpi('Recorrências', r.recorrencias.ativas, `${r.recorrencias.pausadas} pausada(s) · ${rec ? Math.round(r.origem.recorrencia / rec * 100) : 0}% das visitas geradas sozinhas`, '')}</div>
+  <div class="box"><h2>Situação das ${r.total} visitas do mês</h2><div class="stk">${seg.filter(x => x[1]).map(([n, v, t]) => `<span class="sg t-${t}" style="flex:${v}" title="${n}: ${v}">${v / tot > .06 ? v : ''}</span>`).join('') || '<span class="sg t-n" style="flex:1"></span>'}</div><div class="lg">${seg.map(([n, v, t]) => `<span><i class="t-${t}"></i>${n} <b>${v}</b></span>`).join('')}</div></div>
+  <div class="dg2"><div class="box"><h2>Evolução nos últimos 6 meses</h2><div class="bars">${r.serie.map(x => `<div class="bc"><small class="bp ${'t-' + tom(x.cumprimento)}">${pc(x.cumprimento)}</small><div class="bb"><i class="pv" style="height:${Math.round(x.previstas / maxS * 100)}%" title="Previstas: ${x.previstas}"></i><i class="rl" style="height:${Math.round(x.realizadas / maxS * 100)}%" title="Realizadas: ${x.realizadas}"></i></div><small>${h(mn(x.mes))}</small><small class="mut">${x.realizadas}/${x.previstas}</small></div>`).join('')}</div><div class="lg"><span><i class="pv"></i>Previstas</span><span><i class="t-done"></i>Realizadas</span></div></div>
+  <div class="box"><h2>Visitas por dia da semana</h2>${r.diaSemana.map(x => `<div class="hb"><span>${h(x.dia.replace('-feira', ''))}</span><div><i style="width:${Math.round(x.visitas / maxD * 100)}%"></i></div><b>${x.visitas}</b></div>`).join('')}<p class="mut" style="font-size:12.5px;margin:8px 0 0">${r.feriados ? `${r.feriados} visita(s) do mês foram remarcadas por feriado.` : 'Nenhuma visita remarcada por feriado neste mês.'}</p></div></div>
+  ${r.porConsultora.length ? `<div class="box tw"><h2>Por consultora</h2><table><tr><th>Consultora</th><th>Clientes</th><th>Visitas</th><th>Realizadas</th><th>Sem registro</th><th>Não aconteceu</th><th>Horas realizadas</th><th style="min-width:170px">Cumprimento</th></tr>${r.porConsultora.map(c => `<tr><td><b>${h(c.nome)}</b>${c.ativo ? '' : ' <small class="mut">(inativa)</small>'}</td><td>${c.clientes}</td><td>${c.total}</td><td>${c.realizadas}</td><td>${c.semRegistro ? `<span class="sel b">${c.semRegistro}</span>` : '0'}</td><td>${c.faltou}</td><td>${fm(c.minReal)}</td><td><div class="pb"><i class="t-${tom(c.cumprimento)}" style="width:${c.cumprimento || 0}%"></i></div><small>${pc(c.cumprimento)}</small></td></tr>`).join('')}</table></div>` : ''}
+  <div class="dg2"><div class="box"><h2>Clientes sem nenhuma visita realizada</h2>${r.clientes.semVisita.map(x => `<div class="li"><span>${h(x.nome)}</span><span class="sel w">${x.previstas} prevista(s)</span></div>`).join('') || '<p class="mut">Todos os clientes com visita vencida já tiveram ao menos uma realizada.</p>'}</div>
+  <div class="box"><h2>Clientes com visitas sem registro</h2>${r.clientes.comAtraso.map(x => `<div class="li"><span>${h(x.nome)}</span><span class="sel b">${x.semRegistro} sem registro</span></div>`).join('') || '<p class="mut">Nenhuma visita vencida sem registro neste mês.</p>'}</div></div>`;
+  $('#dm').onchange = e => { DB.mes = e.target.value || DB.mes; dashboard(); }; if ($('#dc')) $('#dc').onchange = e => { DB.consultora = e.target.value; dashboard(); };
+  $('#dcf').onclick = () => { aba = 'conferencia'; $('#abas').querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', 'false')); history.replaceState(null, '', '#conferencia'); conferencia(); };
+});
+
 // ---------- Recorrências ----------
 const recorrencias = guarda(async () => {
   await boot(); const l = await api('GET', '/modelos'), cm = new Map(l.map(m => [m.id, m]));
@@ -494,7 +525,7 @@ const processo = guarda(async () => {
   if (!NM.token) return NM.paraLogin();
   try { const r = await nmFetch('/api/auth/me'), j = await r.json().catch(() => ({})); if (!r.ok) throw 0; if (j.usuario.trocarSenha) { location.href = '/'; return; }
     ME = j.usuario; operacional = ME.perfil === 'operacional'; podeEditar = ME.perfil !== 'consulta'; podeAdmin = ME.perfil === 'admin'; $('#user').textContent = ME.nome + ' · ' + ME.perfilNome; $('#app').hidden = false;
-    const a = location.hash.slice(1); abrirAba(a === 'consultoras' ? 'configuracoes' : ABAS.some(x => x[0] === a) ? a : 'semana');
+    const a = location.hash.slice(1); abrirAba(a === 'consultoras' ? 'configuracoes' : a === 'conferencia' ? 'conferencia' : ABAS.some(x => x[0] === a) ? a : 'semana');
   } catch { NM.paraLogin(); }
 })();
 </script>
