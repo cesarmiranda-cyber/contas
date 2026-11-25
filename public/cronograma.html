@@ -39,7 +39,7 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);bo
 .col{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}.cx{flex:0 0 255px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
 .cx h3{margin:0 0 8px;font-size:13px;display:flex;justify-content:space-between}.ct{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;font-size:13px;cursor:pointer}.ct:hover{border-color:var(--brand)}.ct small{color:var(--mut);display:block}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:20px;width:min(720px,94vw);max-height:92vh}dialog::backdrop{background:#0008}
-.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
+.dur{display:flex;align-items:center;gap:6px;color:var(--ink)}.dur input{width:72px}.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.f label{display:grid;gap:3px;font-size:12.5px;color:var(--mut)}.f label.w{grid-column:1/-1}
 .msg{padding:9px 12px;border-radius:8px;margin:0 0 12px;background:var(--brandbg);color:var(--brand)}.msg.e{background:var(--badbg);color:var(--bad)}
 .fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin:6px 0 4px}
 .st{position:relative;background:var(--surface);border:1px solid var(--line);padding:12px 14px 14px;margin-right:-1px}
@@ -231,31 +231,43 @@ async function visitaDrawer(v) {
 function registrarVisita(v) {
   gav(`${topo()}<h2 style="margin:0 0 4px">Registrar visita</h2><p class="mut" style="margin:0 0 12px">${h(v.clienteNome)} · ${h(v.consultoraNome)} · ${dt(v.data)}</p><form id="fr"><div id="fe"></div>
   <div class="f"><label class="w">O que aconteceu?<select name="r" id="rr"><option value="realizada">A visita foi realizada</option><option value="faltou">Não aconteceu (cliente ausente, imprevisto)</option><option value="remarcar">Remarcar para outra data</option><option value="cancelada">Cancelar a visita</option></select></label>
-  <label id="rdt" hidden>Nova data<input type="date" name="data" value="${somaDias(BOOT.hoje, 1)}"></label><label id="rmin">Duração real<select name="min">${[30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480].map(m => `<option value="${m}" ${m === v.min ? 'selected' : ''}>${fm(m)}</option>`).join('')}</select></label>
+  <label id="rdt" hidden>Nova data<input type="date" name="data" value="${somaDias(BOOT.hoje, 1)}"></label><span id="rmin">${durCampo('r', v.min, 'Duração real')}</span>
   <label class="w">Observação (o que foi feito, pendências)<textarea name="obs" rows="3">${h(v.obs || '')}</textarea></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Registrar</button></div></form>`);
   $('#rr').onchange = () => { $('#rdt').hidden = $('#rr').value !== 'remarcar'; $('#rmin').hidden = $('#rr').value !== 'realizada'; };
   $('#fr').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-    try { if (f.r === 'remarcar') await api('POST', `/visitas/${v.id}/remarcar`, { data: f.data }); else await api('PUT', '/visitas/' + v.id, { status: f.r, min: f.r === 'realizada' ? Number(f.min) : v.min, obs: f.obs });
+    try { if (f.r === 'remarcar') await api('POST', `/visitas/${v.id}/remarcar`, { data: f.data }); else await api('PUT', '/visitas/' + v.id, { status: f.r, min: f.r === 'realizada' ? durOk(lerDur(f, 'r')) : v.min, obs: f.obs });
       gavFecha(); aviso(f.r === 'realizada' ? 'Visita registrada: o cartão foi para “Realizadas”.' : 'Registrado.'); semana(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
 }
 setInterval(() => { if (document.hidden || !$('#gav').hidden || aba !== 'semana' || W.view !== 'kanban') return; semana(); }, 60000);
+// Duração em horas e minutos (dois números), para ninguém errar.
+const durCampo = (nome, min, rotulo = 'Duração') => `<label>${rotulo}<span class="dur"><input type="number" name="${nome}h" min="0" max="12" step="1" value="${Math.floor((min || 0) / 60)}" aria-label="horas"> <b>h</b> <input type="number" name="${nome}m" min="0" max="59" step="5" value="${(min || 0) % 60}" aria-label="minutos"> <b>min</b></span></label>`;
+const lerDur = (f, nome) => (Number(f[nome + 'h']) || 0) * 60 + (Number(f[nome + 'm']) || 0);
+const durOk = m => { if (m < 15 || m > 720) throw new Error('A duração deve ficar entre 15 minutos e 12 horas.'); return m; };
 async function visitaForm(v, s) {
   const cls = (await api('GET', '/clientes?page=1')).total ? await todosClientes() : [];
   v = v || { data: W.data, min: 120, status: 'agendada', consultora: W.consultora || BOOT.minhaConsultora || (BOOT.consultoras.find(c => c.ativo) || {}).id };
-  const mins = [30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480], op = (k, t, sel) => `<option value="${h(k)}" ${k == sel ? 'selected' : ''}>${h(t)}</option>`;
-  gav(`${topo()}<h2 style="margin:0 0 12px">${v.id ? 'Editar visita' : 'Nova visita'}</h2><form id="fv"><div id="fe"></div><div class="f">
+  const op = (k, t, sel) => `<option value="${h(k)}" ${k == sel ? 'selected' : ''}>${h(t)}</option>`;
+  gav(`${topo()}<h2 style="margin:0 0 12px">${v.id ? 'Editar visita' : 'Nova visita'}</h2><form id="fv"><div id="fe"></div>
+  <div class="box"><h2>1. Dados da visita</h2><div class="f">
   <label class="w">Cliente *<select name="clienteId" required><option value="">Escolha…</option>${cls.map(c => op(c.id, c.nome, v.clienteId)).join('')}</select></label>
-  <label>Consultora *<select name="consultora">${BOOT.consultoras.filter(c => c.ativo || c.id === v.consultora).map(c => op(c.id, c.nome + (c.ativo ? '' : ' (inativa)'), v.consultora)).join('')}</select></label><label>Data *<input type="date" name="data" value="${h(v.data)}" required></label>
-  <label>Duração<select name="min">${mins.map(m => op(m, fm(m), v.min)).join('')}</select></label><label>Situação<select name="status">${Object.entries(BOOT.status).map(([k, t]) => op(k, t, v.status)).join('')}</select></label>
-  <label class="w">Observação<textarea name="obs" rows="2">${h(v.obs || '')}</textarea></label>
-  ${v.id ? '' : `<fieldset class="w" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0"><legend class="mut" style="font-size:12px;padding:0 4px">Repetição</legend><div class="f"><label>Tipo<select name="rfreq" id="rfreq">${[['', 'Não repete (só esta visita)'], ['semanal', 'Semanal'], ['quinzenal', 'Quinzenal (15 em 15 dias)'], ['mensal', 'Mensal (mesmo dia da semana do mês)'], ['personalizado', 'Personalizado']].map(([k, t]) => op(k, t, '')).join('')}</select></label>
-  <label id="rcada" hidden>A cada quantas semanas<input type="number" name="rcada" min="1" max="12" value="3"></label><label id="rfim" hidden>Repetir até (opcional)<input type="date" name="rfim"></label></div><small class="mut" id="rdica"></small></fieldset>`}</div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
-  const dicaRec = () => { const f = $('#rfreq'); if (!f) return; const t = f.value; $('#rcada').hidden = t !== 'personalizado'; $('#rfim').hidden = !t; const d = new Date(($('[name=data]').value || BOOT.hoje) + 'T12:00:00'), dia = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getDay()];
-    $('#rdica').textContent = { '': '', semanal: `Toda ${dia}, a cada semana.`, quinzenal: `${dia[0].toUpperCase() + dia.slice(1)} sim, ${dia} não: de 15 em 15 dias.`, mensal: `Todo mês, no mesmo dia da semana (ex.: 2ª ${dia} do mês).`, personalizado: `A cada ${$('[name=rcada]').value || '?'} semana(s), sempre na ${dia}.` }[t] + (t ? ' Feriados do município são remarcados para o próximo dia útil. As próximas semanas são geradas automaticamente.' : ''); };
-  if ($('#rfreq')) { $('#rfreq').onchange = dicaRec; $('[name=rcada]').oninput = dicaRec; $('[name=data]').onchange = dicaRec; }
-  $('#fv').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.min = Number(f.min);
-    if (f.rfreq) f.repetir = { freq: f.rfreq, cada: Number(f.rcada) || 0, fim: f.rfim || '' }; delete f.rfreq; delete f.rcada; delete f.rfim;
-    try { const r = await api(v.id ? 'PUT' : 'POST', '/visitas' + (v.id ? '/' + v.id : ''), f); gavFecha(); if (r.recorrencia) aviso(`Recorrência criada: ${r.recorrencia.criadas} visita(s) nas próximas semanas. As seguintes são geradas automaticamente.`); (aba === 'recorrencias' ? recorrencias : semana)(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+  <label>Consultora *<select name="consultora">${BOOT.consultoras.filter(c => c.ativo || c.id === v.consultora).map(c => op(c.id, c.nome + (c.ativo ? '' : ' (inativa)'), v.consultora)).join('')}</select></label>
+  <label>Data da visita *<input type="date" name="data" value="${h(v.data)}" required></label>
+  ${durCampo('d', v.min)}<label>Situação<select name="status">${Object.entries(BOOT.status).map(([k, t]) => op(k, t, v.status)).join('')}</select></label>
+  <label class="w">Observação<textarea name="obs" rows="2">${h(v.obs || '')}</textarea></label></div></div>
+  ${v.id ? '' : `<div class="box"><h2>2. Repetição</h2><label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" id="rtem" style="width:18px;height:18px"> Repetir esta visita automaticamente</label>
+  <div id="ropc" hidden style="margin-top:12px"><div class="f"><label>Repetir<select name="rfreq" id="rfreq">${[['semanal', 'Toda semana'], ['quinzenal', 'A cada 15 dias'], ['mensal', 'Uma vez por mês'], ['personalizado', 'A cada N semanas']].map(([k, t]) => op(k, t, 'semanal')).join('')}</select></label>
+  <label id="rcada" hidden>N (semanas)<input type="number" name="rcada" min="1" max="12" value="3"></label><label>Até quando (opcional)<input type="date" name="rfim"></label></div>
+  <p class="mut" id="rdica" style="margin:10px 0 0;font-size:13px"></p></div></div>`}
+  <div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  const dicaRec = () => { if (!$('#rtem')) return; $('#ropc').hidden = !$('#rtem').checked; if (!$('#rtem').checked) return; const t = $('#rfreq').value; $('#rcada').hidden = t !== 'personalizado';
+    const dt0 = $('[name=data]').value || BOOT.hoje, d = new Date(dt0 + 'T12:00:00'), dia = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getDay()], br = dt0.split('-').reverse().join('/');
+    const q = { semanal: `toda ${dia}`, quinzenal: `a cada 15 dias, sempre na ${dia}`, mensal: `uma vez por mês, no mesmo dia da semana (${dia})`, personalizado: `a cada ${$('[name=rcada]').value || '?'} semana(s), sempre na ${dia}` }[t];
+    $('#rdica').textContent = `A primeira visita é em ${br}; depois se repete ${q}. Feriados da cidade do cliente vão para o próximo dia útil e as próximas semanas são geradas sozinhas.`; };
+  if ($('#rtem')) { $('#rtem').onchange = dicaRec; $('#rfreq').onchange = dicaRec; $('[name=rcada]').oninput = dicaRec; $('[name=data]').onchange = dicaRec; }
+  $('#fv').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
+    try { f.min = durOk(lerDur(f, 'd')); delete f.dh; delete f.dm;
+      if ($('#rtem') && $('#rtem').checked) f.repetir = { freq: f.rfreq, cada: Number(f.rcada) || 0, fim: f.rfim || '' }; delete f.rfreq; delete f.rcada; delete f.rfim;
+      const r = await api(v.id ? 'PUT' : 'POST', '/visitas' + (v.id ? '/' + v.id : ''), f); gavFecha(); if (r.recorrencia) aviso(`Recorrência criada: ${r.recorrencia.criadas} visita(s) nas próximas semanas. As seguintes são geradas automaticamente.`); (aba === 'recorrencias' ? recorrencias : semana)(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
 }
 async function todosClientes() { const out = []; let p = 1, r; do { r = await api('GET', '/clientes?page=' + p++); out.push(...r.itens); } while (p <= r.paginas); return out.sort((a, b) => a.nome.localeCompare(b.nome)); }
 
@@ -298,7 +310,7 @@ function padraoBox(c) {
   return `<form class="box" id="fp"><h2>Frequência padrão e recorrência</h2><p class="mut" style="margin:0 0 8px">${c.freqTxt ? `Combinado no cadastro: <b>${h(c.freqTxt)}</b>${c.horasTxt ? ' · ' + h(c.horasTxt) : ''}. ` : ''}Escolha como as visitas se repetem e crie a recorrência: as próximas semanas são geradas na hora e depois automaticamente.</p><div id="fpe"></div><div class="f">
   <label>Consultora<select name="pcons">${ativas.map(x => op(x.id, x.nome, cp)).join('')}</select></label><label>Repetição<select name="pfreq">${[['semanal', 'Semanal'], ['quinzenal', 'Quinzenal (15 em 15 dias)'], ['mensal', 'Mensal'], ['personalizado', 'Personalizado']].map(([k, t]) => op(k, t, tp || 'semanal')).join('')}</select></label>
   <label id="pcada" hidden>A cada (semanas)<input type="number" name="pcada" min="1" max="12" value="${c.padrao && c.padrao.cada ? c.padrao.cada : 3}"></label>
-  <label>Primeira visita<input type="date" name="pdata" value="${BOOT.hoje}" required></label><label>Duração<select name="pmin">${[30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480].map(m => op(m, fm(m), (c.padrao && c.padrao.min) || 120)).join('')}</select></label><label>Repetir até (opcional)<input type="date" name="pfim"></label></div>
+  <label>Primeira visita<input type="date" name="pdata" value="${BOOT.hoje}" required></label>${durCampo('p', (c.padrao && c.padrao.min) || 120)}<label>Repetir até (opcional)<input type="date" name="pfim"></label></div>
   <div class="dr"><button class="btn p">Criar recorrência</button></div></form>`;
 }
 const freqTxtDe = t => { t = String(t || '').toLowerCase(); return /15\s*x\s*15|quinzen/.test(t) ? ['quinzenal'] : /m[eê]s/.test(t) ? ['mensal'] : /\dx|seman/.test(t) ? ['semanal'] : ['']; };
@@ -313,7 +325,7 @@ async function clienteDrawer(c) {
   <form id="fc"><div id="fe"></div><div class="f"><label>Cidade<input name="cidade" value="${h(c.cidade)}" placeholder="usada para os feriados"></label><label>UF<input name="uf" value="${h(c.uf)}" maxlength="2"></label></div>
   ${podeAdmin ? '<div class="dr"><button class="btn p">Salvar cidade</button></div>' : ''}</form>`);
   if ($('#fp')) { const dica = () => { $('#pcada').hidden = $('[name=pfreq]').value !== 'personalizado'; }; $('[name=pfreq]').onchange = dica; dica();
-    $('#fp').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); try { const r = await api('POST', `/clientes/${c.id}/recorrencia`, { freq: f.pfreq, cada: Number(f.pcada) || 0, data: f.pdata, min: Number(f.pmin), consultora: f.pcons, fim: f.pfim || '' }); gavFecha(); aviso(`Recorrência criada: ${r.criadas} visita(s) geradas; as próximas saem automaticamente.`); clientes(); } catch (er) { $('#fpe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } }; }
+    $('#fp').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); try { const r = await api('POST', `/clientes/${c.id}/recorrencia`, { freq: f.pfreq, cada: Number(f.pcada) || 0, data: f.pdata, min: durOk(lerDur(f, 'p')), consultora: f.pcons, fim: f.pfim || '' }); gavFecha(); aviso(`Recorrência criada: ${r.criadas} visita(s) geradas; as próximas saem automaticamente.`); clientes(); } catch (er) { $('#fpe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } }; }
   if (c.empresaBitrixId) guarda(async () => { const l = await api('GET', `/clientes/${c.id}/contatos`); const sel = $('#ct');
     sel.innerHTML = `<option value="">— nenhum —</option>${l.map(x => `<option value="${h(x.id)}" ${x.id === c.contatoBitrixId ? 'selected' : ''}>${h(x.nome)}${x.telefone ? ' · ' + h(x.telefone) : ''}</option>`).join('')}`;
     if (!l.length) sel.innerHTML = '<option value="">Nenhum contato nessa empresa no Bitrix24</option>';
