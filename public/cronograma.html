@@ -91,7 +91,7 @@ const dt = s => s ? s.split('-').reverse().join('/') : '—';
 const dm = s => s.split('-').reverse().slice(0, 2).join('/');
 const fm = m => Math.floor(m / 60) + 'h' + (m % 60 ? String(m % 60).padStart(2, '0') : '');
 const somaDias = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-const ABAS = [['semana', 'Semana'], ['clientes', 'Clientes'], ['conferencia', 'Conferência mensal'], ['consultoras', 'Consultoras'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
+const ABAS = [['semana', 'Semana'], ['clientes', 'Clientes'], ['recorrencias', 'Recorrências'], ['conferencia', 'Conferência mensal'], ['consultoras', 'Consultoras'], ['feriados', 'Feriados'], ['processo', 'Como funciona']];
 let ME = {}, BOOT = {}, aba = 'semana', podeEditar = false, podeAdmin = false, operacional = false;
 let W = { view: 'semana', data: '', consultora: '', q: '', status: '', fer: false, page: 1 }, CL = { q: '', filtro: '', page: 1 };
 function aviso(t, erro) { $('#msg').innerHTML = t ? `<p class="msg ${erro ? 'e' : ''}">${h(t)}</p>` : ''; if (t) scrollTo(0, 0); }
@@ -105,7 +105,7 @@ async function boot() { BOOT = await api('GET', '/bootstrap'); }
 function abrirAba(a) {
   aba = a; $('#abas').innerHTML = ABAS.map(([k, n]) => `<button role="tab" aria-selected="${k === a}" data-a="${k}">${n}</button>`).join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => { aviso(''); abrirAba(b.dataset.a); });
-  gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, conferencia, consultoras, feriados, processo })[a]();
+  gavFecha(); history.replaceState(null, '', '#' + a); ({ semana, clientes, recorrencias, conferencia, consultoras, feriados, processo })[a]();
 }
 const hojeISO = () => BOOT.hoje;
 
@@ -246,9 +246,15 @@ async function visitaForm(v, s) {
   <label class="w">Cliente *<select name="clienteId" required><option value="">Escolha…</option>${cls.map(c => op(c.id, c.nome, v.clienteId)).join('')}</select></label>
   <label>Consultora *<select name="consultora">${BOOT.consultoras.map(c => op(c.id, c.nome, v.consultora)).join('')}</select></label><label>Data *<input type="date" name="data" value="${h(v.data)}" required></label>
   <label>Duração<select name="min">${mins.map(m => op(m, fm(m), v.min)).join('')}</select></label><label>Situação<select name="status">${Object.entries(BOOT.status).map(([k, t]) => op(k, t, v.status)).join('')}</select></label>
-  <label class="w">Observação<textarea name="obs" rows="2">${h(v.obs || '')}</textarea></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  <label class="w">Observação<textarea name="obs" rows="2">${h(v.obs || '')}</textarea></label>
+  ${v.id ? '' : `<fieldset class="w" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0"><legend class="mut" style="font-size:12px;padding:0 4px">Repetição</legend><div class="f"><label>Tipo<select name="rfreq" id="rfreq">${[['', 'Não repete (só esta visita)'], ['semanal', 'Semanal'], ['quinzenal', 'Quinzenal (15 em 15 dias)'], ['mensal', 'Mensal (mesmo dia da semana do mês)'], ['personalizado', 'Personalizado']].map(([k, t]) => op(k, t, '')).join('')}</select></label>
+  <label id="rcada" hidden>A cada quantas semanas<input type="number" name="rcada" min="1" max="12" value="3"></label><label id="rfim" hidden>Repetir até (opcional)<input type="date" name="rfim"></label></div><small class="mut" id="rdica"></small></fieldset>`}</div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Salvar</button></div></form>`);
+  const dicaRec = () => { const f = $('#rfreq'); if (!f) return; const t = f.value; $('#rcada').hidden = t !== 'personalizado'; $('#rfim').hidden = !t; const d = new Date(($('[name=data]').value || BOOT.hoje) + 'T12:00:00'), dia = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][d.getDay()];
+    $('#rdica').textContent = { '': '', semanal: `Toda ${dia}, a cada semana.`, quinzenal: `${dia[0].toUpperCase() + dia.slice(1)} sim, ${dia} não: de 15 em 15 dias.`, mensal: `Todo mês, no mesmo dia da semana (ex.: 2ª ${dia} do mês).`, personalizado: `A cada ${$('[name=rcada]').value || '?'} semana(s), sempre na ${dia}.` }[t] + (t ? ' Feriados do município são remarcados para o próximo dia útil. As próximas semanas são geradas automaticamente.' : ''); };
+  if ($('#rfreq')) { $('#rfreq').onchange = dicaRec; $('[name=rcada]').oninput = dicaRec; $('[name=data]').onchange = dicaRec; }
   $('#fv').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.min = Number(f.min);
-    try { await api(v.id ? 'PUT' : 'POST', '/visitas' + (v.id ? '/' + v.id : ''), f); gavFecha(); semana(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
+    if (f.rfreq) f.repetir = { freq: f.rfreq, cada: Number(f.rcada) || 0, fim: f.rfim || '' }; delete f.rfreq; delete f.rcada; delete f.rfim;
+    try { const r = await api(v.id ? 'PUT' : 'POST', '/visitas' + (v.id ? '/' + v.id : ''), f); gavFecha(); if (r.recorrencia) aviso(`Recorrência criada: ${r.recorrencia.criadas} visita(s) nas próximas semanas. As seguintes são geradas automaticamente.`); (aba === 'recorrencias' ? recorrencias : semana)(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
 }
 async function todosClientes() { const out = []; let p = 1, r; do { r = await api('GET', '/clientes?page=' + p++); out.push(...r.itens); } while (p <= r.paginas); return out.sort((a, b) => a.nome.localeCompare(b.nome)); }
 
@@ -373,6 +379,20 @@ const consultoras = guarda(async () => {
   $('#tela').querySelectorAll('select[data-c]').forEach(s => s.onchange = guarda(async () => { await api('PUT', '/consultoras/' + s.dataset.c, { bitrixId: s.value }); aviso('Salvo.'); await boot(); }));
   $('#aut').onclick = guarda(async () => { const r = await api('POST', '/consultoras/auto', {}); aviso(`${r.ligadas} ligada(s); ${r.pendentes} ainda sem usuário no Bitrix24 — crie o usuário lá e ligue aqui.`); consultoras(); });
   $('#nova').onclick = guarda(async () => { const n = prompt('Nome da consultora:'); if (!n) return; await api('POST', '/consultoras', { nome: n }); consultoras(); });
+});
+
+// ---------- Recorrências ----------
+const recorrencias = guarda(async () => {
+  await boot(); const l = await api('GET', '/modelos'), cm = new Map(l.map(m => [m.id, m]));
+  const ativas = l.filter(m => m.ativo).length, fmtD = x => x ? x.split('-').reverse().join('/') : '—';
+  $('#tela').innerHTML = `<h1>Recorrências</h1><p class="sub">Cada recorrência gera sozinha as visitas das próximas semanas (semanal, quinzenal, mensal ou a cada N semanas), com feriados remarcados para o próximo dia útil. ${ativas} ativa(s) de ${l.length}.</p>
+  <div class="tools">${podeEditar ? '<button class="btn p" id="rn">Nova recorrência</button><button class="btn" id="rg" title="Gera agora as visitas das próximas 4 semanas">Gerar próximas 4 semanas</button>' : ''}</div>
+  <div class="box tw"><table><tr><th>Cliente</th><th>Consultora</th><th>Repetição</th><th>Dia</th><th>Duração</th><th>Início</th><th>Até</th><th>Situação</th><th></th></tr>${l.map(m => `<tr><td>${h(m.clienteNome)}</td><td>${h(m.consultoraNome)}</td><td>${h(m.freqNome)}</td><td>${h(m.diaNome)}</td><td>${fm(m.min)}</td><td>${fmtD(m.inicio || '')}</td><td>${m.fim ? fmtD(m.fim) : 'sem fim'}</td><td>${m.ativo ? '<span class="sel ok">ativa</span>' : '<span class="sel b">pausada</span>'}</td><td>${podeEditar ? `<button class="btn" data-p="${h(m.id)}">${m.ativo ? 'Pausar' : 'Retomar'}</button> <button class="btn d" data-rx="${h(m.id)}">Excluir</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="mut">Nenhuma recorrência. Crie uma aqui ou marque “Repetição” ao criar uma visita.</td></tr>'}</table></div>`;
+  if (!podeEditar) return;
+  $('#rg').onclick = guarda(async () => { const r = await api('POST', '/modelos/gerar', { semanas: 4 }); aviso(`${r.criadas} visita(s) criada(s).`); recorrencias(); });
+  $('#tela').querySelectorAll('[data-p]').forEach(b => b.onclick = guarda(async () => { await api('PUT', '/modelos/' + b.dataset.p, { ativo: !cm.get(b.dataset.p).ativo }); recorrencias(); }));
+  $('#tela').querySelectorAll('[data-rx]').forEach(b => b.onclick = guarda(async () => { if (!confirm('Excluir esta recorrência? As visitas já criadas continuam na agenda; só deixam de ser geradas novas.')) return; await api('DELETE', '/modelos/' + b.dataset.rx); recorrencias(); }));
+  $('#rn').onclick = () => visitaForm(null);
 });
 
 // ---------- Feriados ----------

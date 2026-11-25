@@ -298,7 +298,8 @@ server.listen(PORT, () => {
   const avisar = () => bitrix.enabled && finApi.avisarContratos().then(r => r.enviados.length && console.log('avisos de contrato', r.enviados.length)).catch(e => console.error('avisos', e.message));
   setTimeout(avisar, 30000); setInterval(avisar, 3600 * 1000);
   // Sincronização com o Bitrix24 (empresas, contatos, usuários, funis e etapas): 1 min após subir e depois de hora em hora. Idempotente.
-  const sincBitrix = async () => { if (!bitrix.enabled) return; try { const r = await cronApi.reconciliar({ simular: false }); console.log('sync cronograma', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync cronograma', e.message); }
+  const sincBitrix = async () => { try { const n = cronApi.gerarAdiante({ semanas: 4 }); if (n) console.log('visitas geradas pelas recorrências', n); } catch (e) { console.error('recorrências do cronograma', e.message); }
+    if (!bitrix.enabled) return; try { const r = await cronApi.reconciliar({ simular: false }); console.log('sync cronograma', JSON.stringify({ ...r, itens: undefined })); } catch (e) { console.error('sync cronograma', e.message); }
     try { const r = await carApi.sincronizar(); console.log('sync carteira', JSON.stringify(r)); const a = await carApi.avisar(); if (a.enviados.length) console.log('avisos de contrato (carteira)', a.enviados.length); } catch (e) { console.error('sync carteira', e.message); }
     try { const r = await carApi.atualizarAssinaturas(); if (r.atualizadas) console.log('assinaturas atualizadas', r.atualizadas); } catch (e) { console.error('assinaturas', e.message); }
     try { const a = await demApi.avisar(); if (a.enviados.length) console.log('avisos de prazo (processos)', a.enviados.length); } catch (e) { console.error('avisos processos', e.message); }

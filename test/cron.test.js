@@ -187,3 +187,26 @@ test('clientes duplicados: lista os parecidos e junta tudo no que fica sem perde
   const out = dd.conferencia.find(x => x.mes === '2026-10' && x.clienteId === 'b'); assert.deepEqual(out.semanas, [true, true, false, false, false]); assert.equal(out.obs, 'x'); assert.equal(dd.conferencia.filter(x => x.mes === '2026-10').length, 1);   // mesmo mês: marcações somadas
   assert.equal(dd.conferencia.find(x => x.mes === '2026-09').clienteId, 'b'); assert.equal(dd.conferencia.find(x => x.mes === '2026-09').estabelecimento, 'Empório Bortoletto 1'); assert.equal(dd.clientes.find(c => c.id === 'b').empresaBitrixId, '77');
 });
+
+test('recorrência: quinzenal, mensal, personalizada, data final e criação pela visita', async () => {
+  const K2 = require('../lib/cron'), ok = { consultoraOk: () => true, clienteOk: () => true };
+  const base = { clienteId: 'A', consultora: 'm', min: 60, data: '2026-11-10' };   // terça, 2ª terça do mês
+  const quinz = K2.validaModelo({ ...base, freq: 'quinzenal' }, ok), mens = K2.validaModelo({ ...base, freq: 'mensal' }, ok), pers = K2.validaModelo({ ...base, freq: 'personalizado', cada: 3, fim: '2026-12-31' }, ok);
+  const seg = n => FER.somaDias('2026-11-09', 7 * n);
+  assert.deepEqual([0, 1, 2, 3].map(n => K2.ocorreNaSemana(quinz, seg(n))), [true, false, true, false]);
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(n => K2.ocorreNaSemana(mens, seg(n))), [true, false, false, false, true, false]);   // 10/11 e 8/12 (2ª terça)
+  assert.deepEqual([0, 1, 2, 3, 6].map(n => K2.ocorreNaSemana(pers, seg(n))), [true, false, false, true, true]);
+  assert.equal(K2.ocorreNaSemana(pers, seg(8)), false);   // depois da data final (04/01)
+  assert.throws(() => K2.validaModelo({ ...base, freq: 'personalizado', cada: 0 }, ok), /1 a 12/); assert.throws(() => K2.validaModelo({ ...base }, ok), /Escolha a repetição/); assert.throws(() => K2.validaModelo({ ...base, freq: 'mensal', fim: '2026-11-01' }, ok), /anterior/);
+  // pela API: criar a visita com repetição já gera as próximas
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json');
+  fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }], visitas: [] }));
+  const api = createCronApi({ bitrix: fakeBitrix(), bx: createBxEmpresas({ bitrix: fakeBitrix() }), funil: createBxFunil({ bitrix: fakeBitrix() }), store: { log() {} }, dir, seedFile: seed });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/cron' + p); const r = await api.handle(m, u.pathname, u, async () => b || {}, { papel: 'admin', areas: [] }); return r.json; };
+  const d0 = api.dados(), cl = d0.clientes[0].id, co = d0.consultoras[0].id, hoje = require('../lib/rules').todayBR();
+  const r = await call('POST', '/visitas', { clienteId: cl, consultora: co, data: hoje, min: 120, repetir: { freq: 'semanal', fim: FER.somaDias(hoje, 21) } });
+  assert.ok(r.recorrencia && r.recorrencia.criadas >= 2 && r.recorrencia.criadas <= 4, JSON.stringify(r.recorrencia)); assert.equal(api.dados().modelos.length, 1);
+  assert.equal((await call('POST', '/modelos/gerar', { semanas: 4 })).criadas, 0);   // idempotente
+  const m = api.dados().modelos[0]; await call('PUT', `/modelos/${m.id}`, { ativo: false }); assert.equal(api.dados().modelos[0].ativo, false);
+  await call('DELETE', `/modelos/${m.id}`); assert.equal(api.dados().modelos.length, 0);
+});
