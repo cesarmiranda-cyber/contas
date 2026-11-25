@@ -277,3 +277,24 @@ test('registro da visita: resultado, relato e pendências ficam no histórico; P
   const e = await call('PUT', `/visitas/${v.id}`, { obs: 'ajuste' }, { perfil: 'admin' }); assert.equal(e.modeloId, 'md_x'); assert.equal(e.registros.length, 1);   // editar não apaga o registro nem o vínculo com a recorrência
   const f = await call('POST', `/visitas/${v.id}/registrar`, { resultado: 'faltou', resumo: 'Cliente ausente, loja fechada' }, { perfil: 'admin' }); assert.equal(f.status, 'faltou'); assert.equal(f.registros.length, 2);
 });
+
+test('cadastro único: edita no app (grava no Bitrix24), traz o que mudou no Bitrix24 e consulta a Receita', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json'), bitrix = fakeBitrix(), orig = bitrix.call.bind(bitrix);
+  bitrix.call = async (m, p) => { if (m === 'crm.company.update') { bitrix.calls.push([m, p]); const e = bitrix.empresas.find(x => x.ID === String(p.id)); for (const [k, v] of Object.entries(p.fields)) e[k] = k === 'TITLE' ? v : v; return { result: true }; } if (m === 'crm.company.get') return { result: { ID: p.id, EMAIL: [{ ID: '9', VALUE: 'velho@x.com' }] } }; return orig(m, p); };
+  fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }, { nome: 'Outro', empresaBitrixId: '' }], visitas: [] }));
+  const cnpjApi = { cnpjValido: require('../lib/cnpj').cnpjValido, consultar: async c => { if (!require('../lib/cnpj').cnpjValido(c)) throw Object.assign(new Error('CNPJ inválido.'), { status: 400 }); return { cnpj: c, razao: 'DOMUS FOOD SERVICE LTDA', fantasia: 'Domus', cidade: 'Santos', uf: 'SP', cep: '11000000', bairro: 'Centro' }; } };
+  const api = createCronApi({ bitrix, bx: createBxEmpresas({ bitrix }), funil: createBxFunil({ bitrix }), cnpjApi, store: { log() {} }, dir, seedFile: seed });
+  const call = async (m, p, b) => { const u = new URL('http://x/api/cron' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, { perfil: 'admin' })).json; };
+  const [dom, outro] = api.dados().clientes; dom.empresaBitrixId = '1';
+  const rf = await call('POST', '/clientes/consultar-cnpj', { cnpj: '11.222.333/0001-81' }); assert.equal(rf.razao, 'DOMUS FOOD SERVICE LTDA');
+  await assert.rejects(call('POST', '/clientes/consultar-cnpj', { cnpj: '123' }), /CNPJ inválido/);
+  await assert.rejects(call('PUT', `/clientes/${dom.id}/cadastro`, { cnpj: '11111111111111' }), /CNPJ inválido/);
+  const r = await call('PUT', `/clientes/${dom.id}/cadastro`, { cnpj: '11.222.333/0001-81', cidade: 'Guarujá', uf: 'sp', email: 'novo@domus.com' });
+  assert.equal(r.gravadoNoBitrix, true); const up = bitrix.calls.filter(c => c[0] === 'crm.company.update').pop()[1].fields;
+  assert.equal(up.UF_CNPJ, '11.222.333/0001-81'); assert.equal(up.UF_CID, 'Guarujá'); assert.equal(up.EMAIL[0].ID, '9'); assert.equal(up.EMAIL[0].VALUE, 'novo@domus.com'); assert.ok(!('UF_UF' in up));   // só o que mudou; reaproveita o e-mail existente
+  assert.equal(api.dados().clientes[0].cidade, 'Guarujá');
+  await assert.rejects(call('PUT', `/clientes/${outro.id}/cadastro`, { nome: 'domus' }), /Já existe outro cliente/);
+  bitrix.empresas[0].UF_CID = 'Praia Grande'; bitrix.empresas[0].TITLE = 'Domus Food Service SA';   // alguém mudou no Bitrix24
+  const sim = await call('POST', '/clientes/sincronizar-dados', {}); assert.equal(sim.simulacao, true); assert.ok(sim.alterados >= 1); assert.equal(api.dados().clientes[0].cidade, 'Guarujá');
+  await call('POST', '/clientes/sincronizar-dados', { simular: false }); assert.equal(api.dados().clientes[0].cidade, 'Praia Grande'); assert.equal(api.dados().clientes[0].nome, 'Domus Food Service SA');
+});

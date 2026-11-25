@@ -50,7 +50,7 @@ const finApi = createFinApi({ fin, empresas, svc, bitrix, asaas, store, dataDir:
 const { createBitrixLogin } = require('./lib/bitrixLogin');
 const bxLogin = createBitrixLogin({ bitrix, secrets, auth, log: (t, m) => store.log(t, m) });
 const bx = createBxEmpresas({ bitrix }), funil = createBxFunil({ bitrix }), cnpjApi = require('./lib/cnpj').createCnpj();
-const cronApi = createCronApi({ bitrix, bx, funil, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
+const cronApi = createCronApi({ bitrix, bx, funil, cnpjApi, store, dir: DATA_DIR, seedFile: path.join(__dirname, 'seed', 'cron-outubro.json'), confSeedFile: path.join(__dirname, 'seed', 'cron-conferencia.json') });
 const carApi = createCarteiraApi({ bitrix, bx, funil, cnpjApi, store, dir: DATA_DIR, areasDe: u => auth.areasDe(u), autentique, excluir: id => bkApi.empresaIds().has(String(id)) });
 const bkApiRef = {};
 const demApi = createDemandasApi({ bitrix, bx, funil, fin, bk: { unidades: () => (bkApiRef.v ? bkApiRef.v.unidades() : []) }, store, dir: DATA_DIR });
@@ -279,7 +279,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET') {
       const f = path.join(__dirname, 'public', u.pathname === '/' || u.pathname === '/index.html' ? 'index.html' : path.normalize(u.pathname).replace(/^(\.\.[/\\])+/, ''));
       if (f.startsWith(path.join(__dirname, 'public') + path.sep) && fs.existsSync(f) && fs.statSync(f).isFile()) {
-        res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream' });
+        res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
         return fs.createReadStream(f).pipe(res);
       }
     }
