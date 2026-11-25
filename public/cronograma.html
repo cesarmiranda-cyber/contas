@@ -254,6 +254,7 @@ async function visitaDrawer(v) {
   ${podeEditar && ag ? `<button class="btn p" id="vreg" style="width:100%;padding:12px;font-size:15px;margin-bottom:14px">✔ Registrar visita</button>` : ''}
   <div class="box"><h2>A visita</h2><div class="fg">${fato('Consultora', h(v.consultoraNome))}${fato('Data', `${DIAS_CURTOS[diaSemana(v.data)]}, ${dt(v.data)}`)}${fato('Duração', fm(v.min))}${fato('Origem', v.origem === 'recorrencia' ? 'Recorrência' : 'Manual')}</div>
   ${v.obs ? `<div style="margin-top:12px"><small class="mut">Observação</small><div style="white-space:pre-wrap">${h(v.obs)}</div></div>` : ''}</div>
+  ${(v.registros || []).length ? `<div class="box"><h2>Registro da visita</h2>${[...v.registros].reverse().map(g => `<div style="margin-bottom:10px"><small class="mut">${new Date(g.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · ${h(g.por)} · ${h(BOOT.status[g.resultado] || g.resultado)}</small><div style="white-space:pre-wrap">${h(g.resumo)}</div>${g.pendencias ? `<div style="margin-top:6px"><small class="mut">Pendências e próximos passos</small><div style="white-space:pre-wrap">${h(g.pendencias)}</div></div>` : ''}</div>`).join('')}</div>` : ''}
   <div class="box"><h2>Cliente</h2><div class="fg">${fato('Cidade', c ? h(c.cidade || 'não informada (usando São Paulo/SP)') + (c.uf ? '/' + h(c.uf) : '') : '—')}${c ? vinculos(c, true) : ''}</div></div>
   ${podeEditar ? `<div class="dr" style="justify-content:space-between;flex-wrap:wrap"><button class="btn d" id="vx">Excluir</button><span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="vo" title="Cria um negócio no funil Comercial B2B a partir desta visita">Criar oportunidade</button><button class="btn" id="ve">Editar</button></span></div>` : ''}`);
   if (podeEditar) { $('#ve').onclick = () => visitaForm(v); $('#vx').onclick = guarda(async () => { if (!confirm('Excluir esta visita?')) return; await api('DELETE', '/visitas/' + id); gavFecha(); semana(); });
@@ -264,12 +265,16 @@ async function visitaDrawer(v) {
 // Registro da visita pela consultora: o cartão muda de coluna sozinho (o kanban só espelha a situação).
 function registrarVisita(v) {
   gav(`${topo()}<h2 style="margin:0 0 4px">Registrar visita</h2><p class="mut" style="margin:0 0 12px">${h(v.clienteNome)} · ${h(v.consultoraNome)} · ${dt(v.data)}</p><form id="fr"><div id="fe"></div>
-  <div class="f"><label class="w">O que aconteceu?<select name="r" id="rr"><option value="realizada">A visita foi realizada</option><option value="faltou">Não aconteceu (cliente ausente, imprevisto)</option><option value="remarcar">Remarcar para outra data</option><option value="cancelada">Cancelar a visita</option></select></label>
-  <label id="rdt" hidden>Nova data<input type="date" name="data" value="${somaDias(BOOT.hoje, 1)}"></label><span id="rmin">${durCampo('r', v.min, 'Duração real')}</span>
-  <label class="w">Observação (o que foi feito, pendências)<textarea name="obs" rows="3">${h(v.obs || '')}</textarea></label></div><div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Registrar</button></div></form>`);
-  $('#rr').onchange = () => { $('#rdt').hidden = $('#rr').value !== 'remarcar'; $('#rmin').hidden = $('#rr').value !== 'realizada'; };
+  <div class="box"><div class="f"><label class="w">O que aconteceu?<select name="r" id="rr"><option value="realizada">A visita foi realizada</option><option value="faltou">Não aconteceu (cliente ausente, imprevisto)</option><option value="remarcar">Remarcar para outra data</option><option value="cancelada">Cancelar a visita</option></select></label>
+  <label id="rdt" hidden>Nova data<input type="date" name="data" value="${somaDias(BOOT.hoje, 1)}"></label><span id="rmin">${durCampo('r', v.min, 'Duração real')}</span></div></div>
+  <div class="box" id="rrg"><h2 id="rrt">Registro da visita</h2><div class="f"><label class="w"><span id="rrl">O que foi feito na visita *</span><textarea name="resumo" rows="5" placeholder="Ex.: conferência dos POPs, orientação sobre higienização, rótulos analisados…"></textarea></label>
+  <label class="w" id="rpe">Pendências e próximos passos<textarea name="pendencias" rows="3" placeholder="O que ficou combinado ou pendente (opcional)"></textarea></label></div></div>
+  <div class="box"><div class="f"><label class="w">Observação da visita (opcional)<textarea name="obs" rows="2">${h(v.obs || '')}</textarea></label></div></div>
+  <div class="dr"><button type="button" class="btn" data-x>Cancelar</button><button class="btn p">Registrar</button></div></form>`);
+  $('#rr').onchange = () => { const r = $('#rr').value; $('#rdt').hidden = r !== 'remarcar'; $('#rmin').hidden = r !== 'realizada'; $('#rrg').hidden = r === 'remarcar'; $('#rpe').hidden = r !== 'realizada'; $('#rrl').textContent = r === 'realizada' ? 'O que foi feito na visita *' : 'Motivo *'; $('#rrt').textContent = r === 'realizada' ? 'Registro da visita' : 'Motivo'; };
   $('#fr').onsubmit = async e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target));
-    try { if (f.r === 'remarcar') await api('POST', `/visitas/${v.id}/remarcar`, { data: f.data }); else await api('PUT', '/visitas/' + v.id, { status: f.r, min: f.r === 'realizada' ? durOk(lerDur(f, 'r')) : v.min, obs: f.obs });
+    try { if (f.r === 'remarcar') await api('POST', `/visitas/${v.id}/remarcar`, { data: f.data });
+      else await api('POST', `/visitas/${v.id}/registrar`, { resultado: f.r, min: f.r === 'realizada' ? durOk(lerDur(f, 'r')) : undefined, resumo: f.resumo, pendencias: f.pendencias, obs: f.obs });
       gavFecha(); aviso(f.r === 'realizada' ? 'Visita registrada: o cartão foi para “Realizadas”.' : 'Registrado.'); semana(); } catch (er) { $('#fe').innerHTML = `<p class="msg e">${h(er.message)}</p>`; } };
 }
 setInterval(() => { if (document.hidden || !$('#gav').hidden || aba !== 'semana' || W.view !== 'kanban') return; semana(); }, 60000);

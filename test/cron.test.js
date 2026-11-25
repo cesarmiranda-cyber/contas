@@ -261,3 +261,19 @@ test('dashboard: cumprimento, sem registro, cobertura e escopo da consultora', a
   assert.ok(r.clientes.semVisita.some(x => x.nome === 'Alfa')); assert.equal(r.serie.length, 6); assert.equal(r.serie[5].mes, mes); assert.ok(r.porConsultora.length === 2);
   const eu = await call('/dashboard?mes=' + mes + '&consultora=' + ir.id, { perfil: 'operacional', bitrixId: '7' }); assert.equal(eu.escopoProprio, true); assert.ok(eu.porConsultora.every(x => x.id === mo.id)); assert.ok(eu.total < r.total);
 });
+
+test('registro da visita: resultado, relato e pendências ficam no histórico; PUT não perde campos', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json'), hoje = require('../lib/rules').todayBR();
+  fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica', 'Iris'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }], visitas: [{ data: hoje, consultora: 'Mônica', cliente: 'Domus', min: 60 }] }));
+  const api = createCronApi({ bitrix: fakeBitrix(), bx: createBxEmpresas({ bitrix: fakeBitrix() }), funil: createBxFunil({ bitrix: fakeBitrix() }), store: { log() {} }, dir, seedFile: seed });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/cron' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user)).json; };
+  const [mo, ir] = api.dados().consultoras; mo.bitrixId = '7'; const v = api.dados().visitas[0]; v.modeloId = 'md_x';
+  const eu = { perfil: 'operacional', bitrixId: '7', nome: 'Mônica S.' };
+  await assert.rejects(call('POST', `/visitas/${v.id}/registrar`, { resultado: 'realizada', resumo: 'ok' }, eu), /Descreva/);
+  await assert.rejects(call('POST', `/visitas/${v.id}/registrar`, { resultado: 'realizada', resumo: 'Conferência dos POPs', min: 5 }, eu), /entre 15/);
+  await assert.rejects(call('POST', `/visitas/${v.id}/registrar`, { resultado: 'realizada', resumo: 'Conferência dos POPs' }, { perfil: 'operacional', bitrixId: '8' }), /própria/);   // outra consultora não registra
+  const r = await call('POST', `/visitas/${v.id}/registrar`, { resultado: 'realizada', resumo: 'Conferência dos POPs e orientação de higienização', pendencias: 'Enviar rótulos até sexta', min: 150, obs: 'cliente satisfeito' }, eu);
+  assert.equal(r.status, 'realizada'); assert.equal(r.min, 150); assert.equal(r.registros.length, 1); assert.equal(r.registros[0].por, 'Mônica S.'); assert.equal(r.registros[0].pendencias, 'Enviar rótulos até sexta'); assert.equal(r.obs, 'cliente satisfeito');
+  const e = await call('PUT', `/visitas/${v.id}`, { obs: 'ajuste' }, { perfil: 'admin' }); assert.equal(e.modeloId, 'md_x'); assert.equal(e.registros.length, 1);   // editar não apaga o registro nem o vínculo com a recorrência
+  const f = await call('POST', `/visitas/${v.id}/registrar`, { resultado: 'faltou', resumo: 'Cliente ausente, loja fechada' }, { perfil: 'admin' }); assert.equal(f.status, 'faltou'); assert.equal(f.registros.length, 2);
+});
