@@ -298,3 +298,28 @@ test('cadastro único: edita no app (grava no Bitrix24), traz o que mudou no Bit
   const sim = await call('POST', '/clientes/sincronizar-dados', {}); assert.equal(sim.simulacao, true); assert.ok(sim.alterados >= 1); assert.equal(api.dados().clientes[0].cidade, 'Guarujá');
   await call('POST', '/clientes/sincronizar-dados', { simular: false }); assert.equal(api.dados().clientes[0].cidade, 'Praia Grande'); assert.equal(api.dados().clientes[0].nome, 'Domus Food Service SA');
 });
+
+test('geração automática não duplica: excluída/movida não volta, 1 visita por cliente na semana, só recorrências automáticas, limpeza do gerador antigo', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cr-')), seed = path.join(dir, 'seed.json'), hoje = require('../lib/rules').todayBR();
+  fs.writeFileSync(seed, JSON.stringify({ consultoras: ['Mônica'], clientes: [{ nome: 'Domus', empresaBitrixId: '' }, { nome: 'Alfa', empresaBitrixId: '' }], visitas: [] }));
+  const api = createCronApi({ bitrix: fakeBitrix(), bx: createBxEmpresas({ bitrix: fakeBitrix() }), funil: createBxFunil({ bitrix: fakeBitrix() }), store: { log() {} }, dir, seedFile: seed });
+  const call = async (m, p, b, user) => { const u = new URL('http://x/api/cron' + p); return (await api.handle(m, u.pathname, u, async () => b || {}, user || { perfil: 'admin' })).json; };
+  const D = api.dados(), [mo] = D.consultoras, [dom, alfa] = D.clientes, seg0 = K.segunda(hoje);
+  await call('POST', '/visitas', { clienteId: dom.id, consultora: mo.id, data: FER.somaDias(seg0, 7 + 1), min: 120, repetir: { freq: 'semanal' } });   // terça da semana que vem, toda semana
+  const lista = () => D.visitas.filter(v => v.clienteId === dom.id).sort((a, b) => a.data.localeCompare(b.data));
+  const antes = lista().length; assert.ok(antes >= 4); assert.equal((await call('POST', '/modelos/gerar', { semanas: 6 })).criadas >= 0, true);
+  const n1 = lista().length; assert.equal((await call('POST', '/modelos/gerar', { semanas: 6 })).criadas, 0); assert.equal(lista().length, n1);   // rodar de novo não cria nada
+  const v2 = lista()[1]; await call('PUT', `/visitas/${v2.id}`, { data: FER.somaDias(v2.data, 2) });                                              // mover a visita (ter → qui)
+  await call('POST', '/modelos/gerar', { semanas: 6 }); assert.equal(lista().length, n1);                                                       // não nasce outra no dia original
+  const v3 = lista()[2]; await call('DELETE', `/visitas/${v3.id}`); await call('POST', '/modelos/gerar', { semanas: 6 }); assert.equal(lista().length, n1 - 1); assert.ok(!lista().some(v => v.data === v3.data));   // excluída não volta
+  const porSemana = new Map(); for (const v of lista()) porSemana.set(K.segunda(v.data), (porSemana.get(K.segunda(v.data)) || 0) + 1); assert.ok([...porSemana.values()].every(n => n === 1));   // nunca duas na mesma semana
+  // modelo antigo (sem "auto") não gera sozinho; ligar gera
+  D.modelos.push({ id: 'md_velho', clienteId: alfa.id, consultora: mo.id, dow: 3, min: 60, freq: 'semanal', ancora: seg0, ativo: true });
+  await call('POST', '/modelos/gerar', { semanas: 4 }); assert.equal(D.visitas.filter(v => v.clienteId === alfa.id).length, 0);
+  await call('PUT', '/modelos/md_velho', { auto: true }); const a1 = D.visitas.filter(v => v.clienteId === alfa.id).length; assert.ok(a1 >= 3); assert.ok(D.visitas.filter(v => v.clienteId === alfa.id).every(v => v.modeloId === 'md_velho'));
+  // limpeza do gerador antigo: só visitas de recorrência, futuras, agendadas, sem modelo, criadas pelo job
+  const antigaId = 'vs_' + Date.UTC(2026, 10, 26).toString(36) + 'abcdef', semana = 'vs_' + Date.UTC(2026, 9, 1).toString(36) + 'abcdef', fut = FER.somaDias(hoje, 20);
+  D.visitas.push({ id: antigaId, data: fut, min: 60, consultora: mo.id, clienteId: alfa.id, status: 'agendada', obs: '', origem: 'recorrencia' }, { id: semana, data: fut, min: 60, consultora: mo.id, clienteId: dom.id, status: 'agendada', obs: '', origem: 'recorrencia' }, { id: 'vs_' + Date.UTC(2026, 10, 26).toString(36) + 'ffffff', data: fut, min: 60, consultora: mo.id, clienteId: dom.id, status: 'agendada', obs: '', origem: 'manual' });
+  await assert.rejects(call('POST', '/visitas/limpar-automaticas', { simular: false }, { perfil: 'operacional' }), /administrador/);
+  assert.equal((await call('POST', '/visitas/limpar-automaticas', {})).removiveis, 1); const t = D.visitas.length; assert.equal((await call('POST', '/visitas/limpar-automaticas', { simular: false })).removidas, 1); assert.equal(D.visitas.length, t - 1); assert.ok(!D.visitas.some(v => v.id === antigaId) && D.visitas.some(v => v.id === semana));
+});
